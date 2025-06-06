@@ -5,22 +5,27 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useTheme } from "@/hooks/use-theme"
 import { StatsCards } from "@/components/dashboard/stats-cards"
-import { VehicleTable } from "@/components/dashboard/vehicle-table"
 import { BudgetSummary } from "@/components/dashboard/budget-summary"
 import { ChartsSection } from "@/components/dashboard/charts-section"
-import { AddVehicleModal } from "@/components/dashboard/add-vehicle-modal"
+import { AddFuelRecordModal } from "@/components/dashboard/add-fuel-record-modal"
 import { useVehicles, useExportCSV } from "@/hooks/use-vehicles"
-import { Calendar, Save, Bell, Sun, Moon, Fuel, User } from "lucide-react"
+import { useDrivers } from "@/hooks/use-drivers"
+import { useFuelRecords } from "@/hooks/use-fuel-records"
+import { Calendar, Save, Bell, Sun, Moon, Fuel, User, PlusCircle, TrendingUp } from "lucide-react"
 
 export default function Dashboard() {
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0])
-  const [showAddVehicleModal, setShowAddVehicleModal] = useState(false)
+  const [showAddFuelRecordModal, setShowAddFuelRecordModal] = useState(false)
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
   
-  const { data: vehicles = [], isLoading } = useVehicles()
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useVehicles()
+  const { data: drivers = [], isLoading: driversLoading } = useDrivers()
+  const { data: fuelRecords = [], isLoading: fuelRecordsLoading } = useFuelRecords()
   const exportCSVMutation = useExportCSV()
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
+
+  const isLoading = vehiclesLoading || driversLoading || fuelRecordsLoading
 
   // Auto-save functionality
   useEffect(() => {
