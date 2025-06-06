@@ -4,9 +4,12 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Plus, Edit, Trash2, Car } from "lucide-react"
+import { Search, Plus, Edit, Trash2, Car, Fuel, User, MapPin } from "lucide-react"
 import type { Vehicle } from "@shared/schema"
 import { useUpdateVehicle, useDeleteVehicle } from "@/hooks/use-vehicles"
+import { useDrivers } from "@/hooks/use-drivers"
+import { EditVehicleModal } from "./edit-vehicle-modal"
+import { AddFuelRecordModal } from "./add-fuel-record-modal"
 
 interface VehicleTableProps {
   vehicles: Vehicle[]
@@ -16,9 +19,14 @@ interface VehicleTableProps {
 export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterValue, setFilterValue] = useState("all")
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showFuelModal, setShowFuelModal] = useState(false)
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | undefined>()
   
   const updateVehicleMutation = useUpdateVehicle()
   const deleteVehicleMutation = useDeleteVehicle()
+  const { data: drivers = [] } = useDrivers()
 
   const filteredVehicles = useMemo(() => {
     let filtered = vehicles.filter(vehicle =>
@@ -55,10 +63,26 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
     updateVehicleMutation.mutate({ id: vehicleId, updates: { pump: value } })
   }
 
+  const handleEditVehicle = (vehicle: Vehicle) => {
+    setEditingVehicle(vehicle)
+    setShowEditModal(true)
+  }
+
+  const handleAddFuelRecord = (vehicleId: number) => {
+    setSelectedVehicleId(vehicleId)
+    setShowFuelModal(true)
+  }
+
   const handleDeleteVehicle = (vehicleId: number) => {
     if (confirm("Are you sure you want to delete this vehicle?")) {
       deleteVehicleMutation.mutate(vehicleId)
     }
+  }
+
+  const getDriverName = (driverId: number | null) => {
+    if (!driverId) return "Unassigned"
+    const driver = drivers.find(d => d.id === driverId)
+    return driver ? driver.name : "Unknown Driver"
   }
 
   const formatCurrency = (amount: number) => {
@@ -146,16 +170,16 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
                   Vehicle
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Driver
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Mileage
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Budget
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Actual
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Attendant
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Pump
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Variance
@@ -174,8 +198,31 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
                       <div>
                         <p className="text-sm font-medium">{vehicle.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {vehicle.plateNumber || "No plate"} • {vehicle.type}
+                          {vehicle.plateNumber || "No plate"} • {vehicle.type} • {vehicle.fuelType}
                         </p>
+                        <p className="text-xs text-muted-foreground">
+                          Capacity: {vehicle.fuelCapacity}L
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center space-x-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">{getDriverName(vehicle.driverId)}</p>
+                        {vehicle.driverId && (
+                          <p className="text-xs text-muted-foreground">Assigned</p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">{(vehicle.currentMileage || 0).toLocaleString()} km</p>
+                        <p className="text-xs text-muted-foreground">Current</p>
                       </div>
                     </div>
                   </td>
@@ -194,38 +241,27 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
                     />
                   </td>
                   <td className="px-4 py-4">
-                    <Input
-                      type="text"
-                      value={vehicle.attendant || ""}
-                      onChange={(e) => handleAttendantChange(vehicle.id, e.target.value)}
-                      className="w-28"
-                      placeholder="Attendant"
-                    />
-                  </td>
-                  <td className="px-4 py-4">
-                    <Input
-                      type="text"
-                      value={vehicle.pump || ""}
-                      onChange={(e) => handlePumpChange(vehicle.id, e.target.value)}
-                      className="w-16"
-                      placeholder="Pump"
-                    />
-                  </td>
-                  <td className="px-4 py-4">
                     {getVarianceBadge(vehicle.budget, vehicle.actual || 0)}
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-8 w-8 p-0"
-                        onClick={() => {
-                          // Edit functionality could be added here
-                          console.log("Edit vehicle:", vehicle.id)
-                        }}
+                        onClick={() => handleEditVehicle(vehicle)}
+                        title="Edit vehicle details"
                       >
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                        onClick={() => handleAddFuelRecord(vehicle.id)}
+                        title="Add fuel record"
+                      >
+                        <Fuel className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -233,6 +269,7 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
                         className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                         onClick={() => handleDeleteVehicle(vehicle.id)}
                         disabled={deleteVehicleMutation.isPending}
+                        title="Delete vehicle"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -268,6 +305,20 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
           </div>
         </div>
       </CardContent>
+
+      {/* Edit Vehicle Modal */}
+      <EditVehicleModal 
+        open={showEditModal} 
+        onOpenChange={setShowEditModal}
+        vehicle={editingVehicle}
+      />
+
+      {/* Add Fuel Record Modal */}
+      <AddFuelRecordModal 
+        open={showFuelModal} 
+        onOpenChange={setShowFuelModal}
+        vehicleId={selectedVehicleId}
+      />
     </Card>
   )
 }
