@@ -185,12 +185,76 @@ export default function Dashboard() {
 
         {/* Main Dashboard Content */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
-          {/* Vehicle Table */}
+          {/* Fuel Records Section */}
           <div className="xl:col-span-2">
-            <VehicleTable 
-              vehicles={vehicles} 
-              onAddVehicle={() => setShowAddVehicleModal(true)} 
-            />
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Fuel className="h-5 w-5" />
+                      <span>Recent Fuel Records</span>
+                    </CardTitle>
+                  </div>
+                  <Button onClick={() => setShowAddFuelRecordModal(true)} size="sm">
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Add Record
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {fuelRecords.length > 0 ? (
+                  <div className="space-y-4">
+                    {fuelRecords.slice(0, 8).map((record) => {
+                      const vehicle = vehicles.find(v => v.id === record.vehicleId)
+                      const driver = drivers.find(d => d.id === vehicle?.driverId)
+                      return (
+                        <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                              <Fuel className="h-5 w-5 text-primary-foreground" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{vehicle?.name || "Unknown Vehicle"}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {driver?.name || "No driver"} • {new Date(record.sessionDate).toLocaleDateString()}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {record.fuelAmount}L • {record.attendant || "N/A"} • {record.pumpNumber || "N/A"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">${record.fuelCost.toFixed(2)}</p>
+                            {record.fuelEfficiency && (
+                              <p className="text-sm text-green-600">
+                                <TrendingUp className="h-3 w-3 inline mr-1" />
+                                {record.fuelEfficiency.toFixed(1)} km/L
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {record.currentMileage?.toLocaleString() || 0} km
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Fuel className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">No Fuel Records</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Start tracking fuel consumption by adding your first record.
+                    </p>
+                    <Button onClick={() => setShowAddFuelRecordModal(true)}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add First Record
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Budget Summary & Quick Actions */}
@@ -203,10 +267,10 @@ export default function Dashboard() {
         <ChartsSection vehicles={vehicles} />
       </main>
 
-      {/* Add Vehicle Modal */}
-      <AddVehicleModal 
-        open={showAddVehicleModal} 
-        onOpenChange={setShowAddVehicleModal} 
+      {/* Add Fuel Record Modal */}
+      <AddFuelRecordModal 
+        open={showAddFuelRecordModal} 
+        onOpenChange={setShowAddFuelRecordModal} 
       />
     </div>
   )
