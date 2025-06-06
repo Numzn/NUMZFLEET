@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button"
 import { VehicleTable } from "@/components/dashboard/vehicle-table"
 import { AddVehicleModal } from "@/components/dashboard/add-vehicle-modal"
 import { AddDriverModal } from "@/components/dashboard/add-driver-modal"
-import { useVehicles } from "@/hooks/use-vehicles"
-import { useDrivers } from "@/hooks/use-drivers"
+import { useVehicles, useDrivers } from "@/hooks/use-local-storage"
 import { Plus, Users, Car, Settings } from "lucide-react"
 
 export default function VehicleManagement() {

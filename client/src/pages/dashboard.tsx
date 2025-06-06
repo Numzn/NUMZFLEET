@@ -8,9 +8,7 @@ import { StatsCards } from "@/components/dashboard/stats-cards"
 import { BudgetSummary } from "@/components/dashboard/budget-summary"
 import { ChartsSection } from "@/components/dashboard/charts-section"
 import { AddFuelRecordModal } from "@/components/dashboard/add-fuel-record-modal"
-import { useVehicles, useExportCSV } from "@/hooks/use-vehicles"
-import { useDrivers } from "@/hooks/use-drivers"
-import { useFuelRecords } from "@/hooks/use-fuel-records"
+import { useVehicles, useExportCSV, useDrivers, useFuelRecords } from "@/hooks/use-local-storage"
 import { Calendar, Save, Bell, Sun, Moon, Fuel, User, PlusCircle, TrendingUp } from "lucide-react"
 
 export default function Dashboard() {

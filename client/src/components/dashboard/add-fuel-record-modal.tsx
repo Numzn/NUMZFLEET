@@ -119,8 +119,8 @@ export function AddFuelRecordModal({ open, onOpenChange, vehicleId }: AddFuelRec
                 <FormItem>
                   <FormLabel>Driver (Optional)</FormLabel>
                   <Select 
-                    onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
-                    value={field.value?.toString() || ""}
+                    onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                    value={field.value?.toString() || "none"}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -128,7 +128,7 @@ export function AddFuelRecordModal({ open, onOpenChange, vehicleId }: AddFuelRec
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No driver specified</SelectItem>
+                      <SelectItem value="none">No driver specified</SelectItem>
                       {drivers.map((driver) => (
                         <SelectItem key={driver.id} value={driver.id.toString()}>
                           {driver.name}
