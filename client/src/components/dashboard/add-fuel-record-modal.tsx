@@ -8,9 +8,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { insertFuelRecordSchema } from "@shared/schema"
 import type { InsertFuelRecord } from "@shared/schema"
-import { useCreateFuelRecord } from "@/hooks/use-fuel-records"
-import { useVehicles } from "@/hooks/use-vehicles"
-import { useDrivers } from "@/hooks/use-drivers"
+import { useCreateFuelRecord, useVehicles, useDrivers } from "@/hooks/use-local-storage"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
 interface AddFuelRecordModalProps {
