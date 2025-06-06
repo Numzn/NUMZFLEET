@@ -1,10 +1,76 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertVehicleSchema, insertSessionSchema } from "@shared/schema";
+import { insertDriverSchema, insertVehicleSchema, insertFuelRecordSchema, insertSessionSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Driver routes
+  app.get("/api/drivers", async (req, res) => {
+    try {
+      const drivers = await storage.getDrivers();
+      res.json(drivers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  app.get("/api/drivers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const driver = await storage.getDriver(id);
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      res.json(driver);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch driver" });
+    }
+  });
+
+  app.post("/api/drivers", async (req, res) => {
+    try {
+      const driverData = insertDriverSchema.parse(req.body);
+      const driver = await storage.createDriver(driverData);
+      res.status(201).json(driver);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid driver data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create driver" });
+    }
+  });
+
+  app.patch("/api/drivers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = insertDriverSchema.partial().parse(req.body);
+      const driver = await storage.updateDriver(id, updates);
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      res.json(driver);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid driver data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update driver" });
+    }
+  });
+
+  app.delete("/api/drivers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteDriver(id);
+      if (!success) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete driver" });
+    }
+  });
+
   // Vehicle routes
   app.get("/api/vehicles", async (req, res) => {
     try {
@@ -121,6 +187,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid session data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update session" });
+    }
+  });
+
+  // Fuel record routes
+  app.get("/api/fuel-records", async (req, res) => {
+    try {
+      const records = await storage.getFuelRecords();
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch fuel records" });
+    }
+  });
+
+  app.get("/api/fuel-records/vehicle/:vehicleId", async (req, res) => {
+    try {
+      const vehicleId = parseInt(req.params.vehicleId);
+      const records = await storage.getFuelRecordsByVehicle(vehicleId);
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch fuel records for vehicle" });
+    }
+  });
+
+  app.post("/api/fuel-records", async (req, res) => {
+    try {
+      const recordData = insertFuelRecordSchema.parse(req.body);
+      // Calculate distance and efficiency
+      const distanceTraveled = recordData.currentMileage - recordData.previousMileage;
+      const fuelEfficiency = distanceTraveled / recordData.fuelAmount;
+      
+      const record = await storage.createFuelRecord({
+        ...recordData,
+        distanceTraveled,
+        fuelEfficiency,
+      });
+      
+      // Update vehicle's current mileage
+      await storage.updateVehicle(recordData.vehicleId, {
+        currentMileage: recordData.currentMileage,
+      });
+      
+      res.status(201).json(record);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid fuel record data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create fuel record" });
     }
   });
 

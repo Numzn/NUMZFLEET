@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { insertVehicleSchema } from "@shared/schema"
 import type { InsertVehicle } from "@shared/schema"
 import { useCreateVehicle } from "@/hooks/use-vehicles"
+import { useDrivers } from "@/hooks/use-drivers"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
 interface AddVehicleModalProps {
@@ -18,6 +19,7 @@ interface AddVehicleModalProps {
 
 export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
   const createVehicleMutation = useCreateVehicle()
+  const { data: drivers = [] } = useDrivers()
 
   const form = useForm<InsertVehicle>({
     resolver: zodResolver(insertVehicleSchema),
@@ -30,6 +32,9 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
       attendant: "",
       pump: "",
       fuelType: "petrol",
+      fuelCapacity: 50,
+      currentMileage: 0,
+      driverId: undefined,
       isActive: true,
     },
   })
@@ -104,25 +109,74 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                 <FormItem>
                   <FormLabel>License Plate (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., ABC-123-XY" {...field} />
+                    <Input 
+                      placeholder="e.g., ABC-123-XY" 
+                      value={field.value || ""} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="budget"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Budget Amount ($)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        step="0.01" 
+                        placeholder="1500.00"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fuelCapacity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fuel Capacity (L)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        step="0.1" 
+                        placeholder="50.0"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
-              name="budget"
+              name="currentMileage"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Budget Amount ($)</FormLabel>
+                  <FormLabel>Current Mileage (km)</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
                       min="0" 
-                      step="0.01" 
-                      placeholder="1500.00"
+                      step="1" 
+                      placeholder="25000"
                       {...field}
                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                     />
@@ -134,11 +188,40 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
 
             <FormField
               control={form.control}
+              name="driverId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Assigned Driver (Optional)</FormLabel>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
+                    value={field.value?.toString() || ""}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a driver" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">No driver assigned</SelectItem>
+                      {drivers.map((driver) => (
+                        <SelectItem key={driver.id} value={driver.id.toString()}>
+                          {driver.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="fuelType"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Fuel Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select fuel type" />
