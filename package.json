@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "start": "vite preview",
-    "check": "tsc"
+    "check": "tsc",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel",
+    "setup:vercel": "node setup-vercel-env.js",
+    "deploy:full": "npm run setup:vercel && npm run deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
