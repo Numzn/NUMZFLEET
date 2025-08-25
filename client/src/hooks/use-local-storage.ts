@@ -16,7 +16,7 @@ export function useDrivers() {
   })
 }
 
-export function useDriver(id: number) {
+export function useDriver(id: string) {
   return useQuery({
     queryKey: ['drivers', id],
     queryFn: () => localStorageManager.getDriver(id),
@@ -54,7 +54,7 @@ export function useUpdateDriver() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: number; updates: Partial<InsertDriver> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertDriver> }) => {
       const updated = localStorageManager.updateDriver(id, updates)
       if (!updated) throw new Error("Driver not found")
       return updated
@@ -81,7 +81,7 @@ export function useDeleteDriver() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       const deleted = localStorageManager.deleteDriver(id)
       if (!deleted) throw new Error("Driver not found")
       return deleted
@@ -112,7 +112,7 @@ export function useVehicles() {
   })
 }
 
-export function useVehicle(id: number) {
+export function useVehicle(id: string) {
   return useQuery({
     queryKey: ['vehicles', id],
     queryFn: () => localStorageManager.getVehicle(id),
@@ -150,7 +150,7 @@ export function useUpdateVehicle() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: number; updates: Partial<InsertVehicle> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertVehicle> }) => {
       const updated = localStorageManager.updateVehicle(id, updates)
       if (!updated) throw new Error("Vehicle not found")
       return updated
@@ -177,7 +177,7 @@ export function useDeleteVehicle() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       const deleted = localStorageManager.deleteVehicle(id)
       if (!deleted) throw new Error("Vehicle not found")
       return deleted
@@ -204,7 +204,7 @@ export function useBulkUpdateVehicles() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async (updates: Array<{ id: number; updates: Partial<InsertVehicle> }>) => {
+    mutationFn: async (updates: Array<{ id: string; updates: Partial<InsertVehicle> }>) => {
       const results = updates.map(({ id, updates: vehicleUpdates }) => 
         localStorageManager.updateVehicle(id, vehicleUpdates)
       )
@@ -269,7 +269,7 @@ export function useFuelRecords() {
   })
 }
 
-export function useFuelRecordsByVehicle(vehicleId: number) {
+export function useFuelRecordsByVehicle(vehicleId: string) {
   return useQuery({
     queryKey: ['fuel-records', 'vehicle', vehicleId],
     queryFn: () => localStorageManager.getFuelRecordsByVehicle(vehicleId),

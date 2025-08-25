@@ -1,90 +1,167 @@
-import { pgTable, text, serial, integer, boolean, real, timestamp, jsonb } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+// TypeScript interfaces for Firebase collections
+export interface Driver {
+  id: string;
+  name: string;
+  licenseNumber: string;
+  phoneNumber: string;
+  email: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
-export const drivers = pgTable("drivers", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  licenseNumber: text("license_number"),
-  phoneNumber: text("phone_number"),
-  email: text("email"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export interface Vehicle {
+  id: string;
+  name: string;
+  model: string;
+  type: string;
+  registrationNumber: string;
+  plateNumber?: string; // Add missing property
+  driverId?: string;
+  budget: number;
+  currentMileage?: number;
+  fuelType?: string;
+  fuelCapacity?: number;
+  actual?: number;
+  isActive?: boolean;
+  attendant?: string; // Add missing property
+  pump?: string; // Add missing property
+  createdAt?: string;
+  updatedAt?: string;
+  // GPS TRACKING FIELDS
+  traccarDeviceId?: string;
+  lastLocation?: {
+    lat: number;
+    lng: number;
+    timestamp: string;
+    speed?: number;
+    heading?: number;
+    altitude?: number;
+  };
+  isOnline?: boolean;
+  lastUpdate?: string;
+}
+
+export interface FuelRecord {
+  id: string;
+  vehicleId: string;
+  sessionDate: string;
+  fuelAmount: number;
+  fuelCost: number;
+  currentMileage?: number;
+  fuelEfficiency?: number;
+  attendant?: string;
+  pumpNumber?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Session {
+  id: string;
+  date: string;
+  vehicles: Vehicle[];
+  totalBudget: number;
+  totalActual: number;
+  excessAllocation?: string;
+  timestamp: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Traccar-specific type definitions
+export interface TraccarDevice {
+  id: number;
+  name: string;
+  uniqueId: string;
+  status: 'online' | 'offline';
+  lastUpdate?: string;
+  positionId?: number;
+  groupId?: number;
+  phone?: string;
+  model?: string;
+  contact?: string;
+  category?: string;
+  disabled?: boolean;
+}
+
+export interface TraccarPosition {
+  id: number;
+  deviceId: number;
+  protocol: string;
+  serverTime: string;
+  deviceTime: string;
+  fixTime: string;
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  speed: number;
+  course: number;
+  address?: string;
+  accuracy?: number;
+  network?: any;
+}
+
+// Import zod for validation
+import { z } from 'zod';
+
+// Validation schemas
+export const insertDriverSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  licenseNumber: z.string().min(1, "License number is required"),
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  email: z.string().email("Invalid email address"),
+  isActive: z.boolean().optional(),
 });
 
-export const vehicles = pgTable("vehicles", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  type: text("type").notNull().default("sedan"),
-  plateNumber: text("plate_number"),
-  budget: real("budget").notNull(),
-  actual: real("actual").default(0),
-  attendant: text("attendant").default(""),
-  pump: text("pump").default(""),
-  fuelType: text("fuel_type").default("petrol"),
-  fuelCapacity: real("fuel_capacity").default(50),
-  currentMileage: real("current_mileage").default(0),
-  driverId: integer("driver_id").references(() => drivers.id),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export const insertVehicleSchema = z.object({
+  name: z.string().min(1, "Vehicle name is required"),
+  model: z.string().min(1, "Model is required"),
+  type: z.string().min(1, "Type is required"),
+  registrationNumber: z.string().min(1, "Registration number is required"),
+  plateNumber: z.string().optional(), // Add missing property
+  driverId: z.string().optional(),
+  budget: z.number().min(0, "Budget must be a positive number"),
+  fuelType: z.string().optional(),
+  fuelCapacity: z.number().optional(),
+  currentMileage: z.number().optional(),
+  actual: z.number().optional(),
+  isActive: z.boolean().optional(),
+  attendant: z.string().optional(), // Add missing property
+  pump: z.string().optional(), // Add missing property
+  // GPS TRACKING FIELDS
+  traccarDeviceId: z.string().optional(),
+  lastLocation: z.object({
+    lat: z.number(),
+    lng: z.number(),
+    timestamp: z.string(),
+    speed: z.number().optional(),
+    heading: z.number().optional(),
+    altitude: z.number().optional(),
+  }).optional(),
+  isOnline: z.boolean().optional(),
+  lastUpdate: z.string().optional(),
 });
 
-export const fuelRecords = pgTable("fuel_records", {
-  id: serial("id").primaryKey(),
-  vehicleId: integer("vehicle_id").notNull().references(() => vehicles.id),
-  driverId: integer("driver_id").references(() => drivers.id),
-  sessionDate: text("session_date").notNull(),
-  previousMileage: real("previous_mileage").notNull(),
-  currentMileage: real("current_mileage").notNull(),
-  distanceTraveled: real("distance_traveled").notNull(),
-  fuelAmount: real("fuel_amount").notNull(),
-  fuelCost: real("fuel_cost").notNull(),
-  fuelEfficiency: real("fuel_efficiency"),
-  attendant: text("attendant"),
-  pumpNumber: text("pump_number"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
+export const insertFuelRecordSchema = z.object({
+  vehicleId: z.string().min(1, "Vehicle is required"),
+  sessionDate: z.string().min(1, "Session date is required"),
+  fuelAmount: z.number().min(0, "Fuel amount must be a positive number"),
+  fuelCost: z.number().min(0, "Fuel cost must be a positive number"),
+  currentMileage: z.number().optional(),
+  fuelEfficiency: z.number().optional(),
+  attendant: z.string().optional(),
+  pumpNumber: z.string().optional(),
 });
 
-export const sessions = pgTable("sessions", {
-  id: serial("id").primaryKey(),
-  date: text("date").notNull(),
-  excessAllocation: text("excess_allocation").default(""),
-  totalBudget: real("total_budget").notNull(),
-  totalActual: real("total_actual").notNull(),
-  vehicleData: jsonb("vehicle_data").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+// Collection names as constants
+export const COLLECTIONS = {
+  drivers: 'drivers',
+  vehicles: 'vehicles',
+  fuelRecords: 'fuelRecords',
+  sessions: 'sessions'
+} as const;
 
-export const insertDriverSchema = createInsertSchema(drivers).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertVehicleSchema = createInsertSchema(vehicles).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertFuelRecordSchema = createInsertSchema(fuelRecords).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertSessionSchema = createInsertSchema(sessions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type Driver = typeof drivers.$inferSelect;
-export type InsertDriver = z.infer<typeof insertDriverSchema>;
-export type Vehicle = typeof vehicles.$inferSelect;
-export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
-export type FuelRecord = typeof fuelRecords.$inferSelect;
-export type InsertFuelRecord = z.infer<typeof insertFuelRecordSchema>;
-export type Session = typeof sessions.$inferSelect;
-export type InsertSession = z.infer<typeof insertSessionSchema>;
+// Export the insert types for use in forms
+export type InsertDriver = Omit<Driver, 'id' | 'createdAt' | 'updatedAt'>;
+export type InsertVehicle = Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt'>;
+export type InsertFuelRecord = Omit<FuelRecord, 'id' | 'createdAt' | 'updatedAt'>;

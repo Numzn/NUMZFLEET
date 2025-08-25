@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { insertVehicleSchema } from "@shared/schema"
 import type { InsertVehicle, Vehicle } from "@shared/schema"
 import { useUpdateVehicle, useDrivers } from "@/hooks/use-local-storage"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
 
 interface EditVehicleModalProps {
   open: boolean
@@ -53,6 +53,7 @@ export function EditVehicleModal({ open, onOpenChange, vehicle }: EditVehicleMod
         currentMileage: vehicle.currentMileage || 0,
         driverId: vehicle.driverId || undefined,
         isActive: vehicle.isActive || true,
+        traccarDeviceId: vehicle.traccarDeviceId || "",
       })
     }
   }, [vehicle, open, form])
@@ -88,8 +89,10 @@ export function EditVehicleModal({ open, onOpenChange, vehicle }: EditVehicleMod
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Vehicle Name/Model</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Toyota Camry" {...field} />
+                  <FormControl>                      <Input 
+                        placeholder="e.g., Toyota Camry" 
+                        {...field} 
+                      />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -145,8 +148,7 @@ export function EditVehicleModal({ open, onOpenChange, vehicle }: EditVehicleMod
                 control={form.control}
                 name="budget"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Budget Amount ($)</FormLabel>
+                  <FormItem>                    <FormLabel>Budget Amount (ZMW)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -253,6 +255,28 @@ export function EditVehicleModal({ open, onOpenChange, vehicle }: EditVehicleMod
                       <SelectItem value="hybrid">Hybrid</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Traccar Device Assignment */}
+            <FormField
+              control={form.control}
+              name="traccarDeviceId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Traccar Device ID</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="e.g. 5 (leave empty if not assigned yet)"
+                      value={field.value || ""}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Enter the Traccar device ID to link this vehicle for GPS tracking
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

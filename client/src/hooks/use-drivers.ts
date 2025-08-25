@@ -1,94 +1,101 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { apiRequest } from "@/lib/queryClient"
-import type { Driver, InsertDriver } from "@shared/schema"
-import { useToast } from "@/hooks/use-toast"
+import { useCollection } from "./use-firebase-store"
+import { useToast } from "./use-toast"
 
-export function useDrivers() {
-  return useQuery<Driver[]>({
-    queryKey: ["/api/drivers"],
-  })
+export interface Driver {
+  id: string
+  name: string
+  licenseNumber: string
+  phoneNumber: string
+  email: string
+  isActive?: boolean
+  createdAt?: string
+  updatedAt?: string
 }
 
-export function useDriver(id: number) {
-  return useQuery<Driver>({
-    queryKey: ["/api/drivers", id],
-    enabled: !!id,
+export function useDrivers() {
+  return useCollection<Driver>("drivers", { orderByField: "name" })
+}
+
+export function useDriver(id: string) {
+  const { data, isLoading } = useCollection<Driver>("drivers", {
+    where: [["id", "==", id]],
   })
+
+  return {
+    data: data?.[0] as Driver | undefined,
+    isLoading,
+  }
 }
 
 export function useCreateDriver() {
-  const queryClient = useQueryClient()
+  const { addItem } = useCollection("drivers")
   const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: async (driver: InsertDriver) => {
-      const response = await apiRequest("POST", "/api/drivers", driver)
-      return response.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/drivers"] })
+  const createDriver = async (driver: Omit<Driver, "id">) => {
+    try {
+      const newDriver = await addItem(driver)
       toast({
         title: "Success",
-        description: "Driver added successfully.",
+        description: `${driver.name} has been added as a driver.`,
       })
-    },
-    onError: (error: Error) => {
+      return newDriver
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to add driver.",
+        description: "Failed to add driver. Please try again.",
         variant: "destructive",
       })
-    },
-  })
+      throw error
+    }
+  }
+
+  return { createDriver }
 }
 
 export function useUpdateDriver() {
-  const queryClient = useQueryClient()
+  const { updateItem } = useCollection("drivers")
   const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: async ({ id, updates }: { id: number; updates: Partial<InsertDriver> }) => {
-      const response = await apiRequest("PATCH", `/api/drivers/${id}`, updates)
-      return response.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/drivers"] })
+  const updateDriver = async (id: string, updates: Partial<Driver>) => {
+    try {
+      await updateItem(id, updates)
       toast({
         title: "Success",
-        description: "Driver updated successfully.",
+        description: "Driver information has been updated.",
       })
-    },
-    onError: (error: Error) => {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to update driver.",
+        description: "Failed to update driver. Please try again.",
         variant: "destructive",
       })
-    },
-  })
+      throw error
+    }
+  }
+
+  return { updateDriver }
 }
 
 export function useDeleteDriver() {
-  const queryClient = useQueryClient()
+  const { deleteItem } = useCollection("drivers")
   const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/drivers/${id}`)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/drivers"] })
+  const deleteDriver = async (id: string) => {
+    try {
+      await deleteItem(id)
       toast({
         title: "Success",
-        description: "Driver deleted successfully.",
+        description: "Driver has been removed from the system.",
       })
-    },
-    onError: (error: Error) => {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete driver.",
+        description: "Failed to delete driver. Please try again.",
         variant: "destructive",
       })
-    },
-  })
+      throw error
+    }
+  }
+
+  return { deleteDriver }
 }

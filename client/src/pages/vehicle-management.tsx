@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button"
 import { VehicleTable } from "@/components/dashboard/vehicle-table"
 import { AddVehicleModal } from "@/components/dashboard/add-vehicle-modal"
 import { AddDriverModal } from "@/components/dashboard/add-driver-modal"
-import { useVehicles, useDrivers } from "@/hooks/use-local-storage"
+import { useVehicles } from "@/hooks/use-vehicles"
+import { useDrivers } from "@/hooks/use-drivers"
 import { Plus, Users, Car, Settings } from "lucide-react"
+import { NavigationBar } from "@/components/NavigationBar"
 
 export default function VehicleManagement() {
   const [showAddVehicleModal, setShowAddVehicleModal] = useState(false)
   const [showAddDriverModal, setShowAddDriverModal] = useState(false)
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([])
   
   const { data: vehicles = [], isLoading: vehiclesLoading } = useVehicles()
   const { data: drivers = [], isLoading: driversLoading } = useDrivers()
@@ -25,10 +28,20 @@ export default function VehicleManagement() {
     )
   }
 
+  // Handler to adapt VehicleTable's onVehicleSelect signature
+  // This function updates both local state and localStorage so that
+  // the dashboard page can display selected vehicles in the Refuel Entry Table.
+  const handleVehicleSelect = (vehicleIds: string[] | null) => {
+    setSelectedVehicleIds(vehicleIds ?? []);
+    // Sync selection to localStorage so dashboard can read it
+    localStorage.setItem('selectedVehicles', JSON.stringify(vehicleIds ?? []));
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <NavigationBar />
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="pt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -97,9 +110,15 @@ export default function VehicleManagement() {
         </div>
 
         {/* Vehicle Management Table */}
+        {/*
+          Vehicle selection here is for refueling. The selection is saved to localStorage,
+          so the dashboard page can display the Refuel Entry Table for these vehicles only.
+        */}
         <VehicleTable 
           vehicles={vehicles} 
           onAddVehicle={() => setShowAddVehicleModal(true)} 
+          selectedVehicleIds={selectedVehicleIds}
+          onVehicleSelect={handleVehicleSelect}
         />
 
         {/* Drivers Section */}

@@ -1,43 +1,71 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { apiRequest } from "@/lib/queryClient"
-import type { Vehicle, InsertVehicle } from "@shared/schema"
-import { useToast } from "@/hooks/use-toast"
+import { useCollection } from "./use-firebase-store"
+import { useToast } from "./use-toast"
+import type { Vehicle } from "@shared/schema"
+import { addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore"
+import { db, withFirestoreRetry } from "@/lib/firebase"
+import { collections } from "@/lib/firebase"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 export function useVehicles() {
-  return useQuery<Vehicle[]>({
-    queryKey: ["/api/vehicles"],
-  })
+  return useCollection<Vehicle>("vehicles", { orderByField: "name" })
 }
 
-export function useVehicle(id: number) {
-  return useQuery<Vehicle>({
-    queryKey: ["/api/vehicles", id],
-    enabled: !!id,
+export function useVehicle(id: string) {
+  const { data, isLoading } = useCollection<Vehicle>("vehicles", {
+    where: [["id", "==", id]],
   })
+
+  return {
+    data: data?.[0],
+    isLoading,
+  }
 }
 
 export function useCreateVehicle() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: async (vehicle: InsertVehicle) => {
-      const response = await apiRequest("POST", "/api/vehicles", vehicle)
-      return response.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] })
+  const createVehicle = async (vehicle: Omit<Vehicle, "id">) => {
+    try {
+      // Add timestamp fields
+      const vehicleWithTimestamp = {
+        ...vehicle,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isActive: true,
+      }
+
+      // Add to Firestore
+      const docRef = await withFirestoreRetry(async () => {
+        return await addDoc(collections.vehicles, vehicleWithTimestamp);
+      });
+      
+      // Return the newly created vehicle with its ID
+      const newVehicle = {
+        id: docRef.id,
+        ...vehicleWithTimestamp,
+      }
+
       toast({
         title: "Success",
-        description: "Vehicle added successfully.",
+        description: `${vehicle.name} has been added to the fleet.`,
       })
-    },
-    onError: (error: Error) => {
+
+      return newVehicle
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to add vehicle.",
+        description: "Failed to add vehicle. Please try again.",
         variant: "destructive",
       })
+      throw error
+    }
+  }
+
+  return useMutation({
+    mutationFn: createVehicle,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vehicles"] })
     },
   })
 }
@@ -47,23 +75,35 @@ export function useUpdateVehicle() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: number; updates: Partial<InsertVehicle> }) => {
-      const response = await apiRequest("PATCH", `/api/vehicles/${id}`, updates)
-      return response.json()
+    mutationFn: async ({ id, updates }: { id: string, updates: Partial<Vehicle> }) => {
+      try {
+        await withFirestoreRetry(async () => {
+          const vehicleRef = doc(db, "vehicles", id)
+          
+          // Add updated timestamp
+          const updatesWithTimestamp = {
+            ...updates,
+            updatedAt: new Date().toISOString(),
+          }
+
+          await updateDoc(vehicleRef, updatesWithTimestamp);
+        });
+
+        toast({
+          title: "Success",
+          description: "Vehicle has been updated.",
+        })
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update vehicle. Please try again.",
+          variant: "destructive",
+        })
+        throw error
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] })
-      toast({
-        title: "Success",
-        description: "Vehicle updated successfully.",
-      })
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update vehicle.",
-        variant: "destructive",
-      })
+      queryClient.invalidateQueries({ queryKey: ["vehicles"] })
     },
   })
 }
@@ -73,84 +113,28 @@ export function useDeleteVehicle() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/vehicles/${id}`)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] })
-      toast({
-        title: "Success",
-        description: "Vehicle deleted successfully.",
-      })
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete vehicle.",
-        variant: "destructive",
-      })
-    },
-  })
-}
+    mutationFn: async (id: string) => {
+      try {
+        await withFirestoreRetry(async () => {
+          const vehicleRef = doc(db, "vehicles", id);
+          await deleteDoc(vehicleRef);
+        });
 
-export function useBulkUpdateVehicles() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-
-  return useMutation({
-    mutationFn: async (updates: Array<{ id: number; updates: Partial<InsertVehicle> }>) => {
-      const response = await apiRequest("PATCH", "/api/vehicles/bulk", updates)
-      return response.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] })
-      toast({
-        title: "Success",
-        description: "Vehicles updated successfully.",
-      })
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update vehicles.",
-        variant: "destructive",
-      })
-    },
-  })
-}
-
-export function useExportCSV() {
-  const { toast } = useToast()
-
-  return useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/export/csv")
-      if (!response.ok) {
-        throw new Error("Failed to export data")
+        toast({
+          title: "Success",
+          description: "Vehicle has been deleted.",
+        })
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete vehicle. Please try again.",
+          variant: "destructive",
+        })
+        throw error
       }
-      
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = `fuel-report-${new Date().toISOString().split('T')[0]}.csv`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "CSV file downloaded successfully.",
-      })
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to export data.",
-        variant: "destructive",
-      })
+      queryClient.invalidateQueries({ queryKey: ["vehicles"] })
     },
   })
 }

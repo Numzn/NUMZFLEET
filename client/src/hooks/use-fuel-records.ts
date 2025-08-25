@@ -1,44 +1,113 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { apiRequest } from "@/lib/queryClient"
-import type { FuelRecord, InsertFuelRecord } from "@shared/schema"
-import { useToast } from "@/hooks/use-toast"
+import { useCollection } from "./use-firebase-store"
+import { useToast } from "./use-toast"
 
-export function useFuelRecords() {
-  return useQuery<FuelRecord[]>({
-    queryKey: ["/api/fuel-records"],
+export interface FuelRecord {
+  id: string
+  vehicleId: string
+  sessionDate: string
+  fuelAmount: number
+  fuelCost: number
+  currentMileage?: number
+  fuelEfficiency?: number
+  attendant?: string
+  pumpNumber?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export function useFuelRecords(limit?: number) {
+  return useCollection<FuelRecord>("fuelRecords", {
+    limit,
   })
 }
 
-export function useFuelRecordsByVehicle(vehicleId: number) {
-  return useQuery<FuelRecord[]>({
-    queryKey: ["/api/fuel-records", "vehicle", vehicleId],
-    enabled: !!vehicleId,
+export function useFuelRecord(id: string) {
+  const { data, isLoading } = useCollection("fuelRecords", {
+    where: [["id", "==", id]],
+  })
+
+  return {
+    data: data?.[0] as FuelRecord | undefined,
+    isLoading,
+  }
+}
+
+export function useVehicleFuelRecords(vehicleId: string, limit?: number) {
+  return useCollection("fuelRecords", {
+    where: [["vehicleId", "==", vehicleId]],
+    limit,
   })
 }
 
 export function useCreateFuelRecord() {
-  const queryClient = useQueryClient()
+  const { addItem } = useCollection("fuelRecords")
   const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: async (record: InsertFuelRecord) => {
-      const response = await apiRequest("POST", "/api/fuel-records", record)
-      return response.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fuel-records"] })
-      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] })
+  const createFuelRecord = async (record: Omit<FuelRecord, "id">) => {
+    try {
+      const newRecord = await addItem(record as any)
       toast({
         title: "Success",
-        description: "Fuel record added successfully.",
+        description: "Fuel record has been added successfully.",
       })
-    },
-    onError: (error: Error) => {
+      return newRecord
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to add fuel record.",
+        description: "Failed to add fuel record. Please try again.",
         variant: "destructive",
       })
-    },
-  })
+      throw error
+    }
+  }
+
+  return { createFuelRecord }
+}
+
+export function useUpdateFuelRecord() {
+  const { updateItem } = useCollection("fuelRecords")
+  const { toast } = useToast()
+
+  const updateFuelRecord = async (id: string, updates: Partial<FuelRecord>) => {
+    try {
+      await updateItem(id, updates)
+      toast({
+        title: "Success",
+        description: "Fuel record has been updated.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update fuel record. Please try again.",
+        variant: "destructive",
+      })
+      throw error
+    }
+  }
+
+  return { updateFuelRecord }
+}
+
+export function useDeleteFuelRecord() {
+  const { deleteItem } = useCollection("fuelRecords")
+  const { toast } = useToast()
+
+  const deleteFuelRecord = async (id: string) => {
+    try {
+      await deleteItem(id)
+      toast({
+        title: "Success",
+        description: "Fuel record has been deleted.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete fuel record. Please try again.",
+        variant: "destructive",
+      })
+      throw error
+    }
+  }
+
+  return { deleteFuelRecord }
 }

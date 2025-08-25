@@ -39,16 +39,16 @@ class LocalStorageManager {
     return stored ? JSON.parse(stored) : []
   }
 
-  getDriver(id: number): Driver | undefined {
+  getDriver(id: string): Driver | undefined {
     return this.getDrivers().find(d => d.id === id)
   }
 
   createDriver(driver: Omit<Driver, 'id' | 'createdAt' | 'updatedAt'>): Driver {
     const newDriver: Driver = {
       ...driver,
-      id: this.getNextId('drivers'),
-      createdAt: new Date(),
-      updatedAt: new Date()
+      id: this.getNextId('drivers').toString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
     
     const drivers = this.getDrivers()
@@ -57,7 +57,7 @@ class LocalStorageManager {
     return newDriver
   }
 
-  updateDriver(id: number, updates: Partial<Omit<Driver, 'id' | 'createdAt'>>): Driver | undefined {
+  updateDriver(id: string, updates: Partial<Omit<Driver, 'id' | 'createdAt'>>): Driver | undefined {
     const drivers = this.getDrivers()
     const index = drivers.findIndex(d => d.id === id)
     
@@ -66,14 +66,14 @@ class LocalStorageManager {
     drivers[index] = {
       ...drivers[index],
       ...updates,
-      updatedAt: new Date()
+      updatedAt: new Date().toISOString()
     }
     
     localStorage.setItem(STORAGE_KEYS.DRIVERS, JSON.stringify(drivers))
     return drivers[index]
   }
 
-  deleteDriver(id: number): boolean {
+  deleteDriver(id: string): boolean {
     const drivers = this.getDrivers()
     const filtered = drivers.filter(d => d.id !== id)
     
@@ -89,16 +89,16 @@ class LocalStorageManager {
     return stored ? JSON.parse(stored) : []
   }
 
-  getVehicle(id: number): Vehicle | undefined {
+  getVehicle(id: string): Vehicle | undefined {
     return this.getVehicles().find(v => v.id === id)
   }
 
   createVehicle(vehicle: Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt'>): Vehicle {
     const newVehicle: Vehicle = {
       ...vehicle,
-      id: this.getNextId('vehicles'),
-      createdAt: new Date(),
-      updatedAt: new Date()
+      id: this.getNextId('vehicles').toString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
     
     const vehicles = this.getVehicles()
@@ -107,7 +107,7 @@ class LocalStorageManager {
     return newVehicle
   }
 
-  updateVehicle(id: number, updates: Partial<Omit<Vehicle, 'id' | 'createdAt'>>): Vehicle | undefined {
+  updateVehicle(id: string, updates: Partial<Omit<Vehicle, 'id' | 'createdAt'>>): Vehicle | undefined {
     const vehicles = this.getVehicles()
     const index = vehicles.findIndex(v => v.id === id)
     
@@ -116,14 +116,14 @@ class LocalStorageManager {
     vehicles[index] = {
       ...vehicles[index],
       ...updates,
-      updatedAt: new Date()
+      updatedAt: new Date().toISOString()
     }
     
     localStorage.setItem(STORAGE_KEYS.VEHICLES, JSON.stringify(vehicles))
     return vehicles[index]
   }
 
-  deleteVehicle(id: number): boolean {
+  deleteVehicle(id: string): boolean {
     const vehicles = this.getVehicles()
     const filtered = vehicles.filter(v => v.id !== id)
     
@@ -139,19 +139,19 @@ class LocalStorageManager {
     return stored ? JSON.parse(stored) : []
   }
 
-  getFuelRecord(id: number): FuelRecord | undefined {
+  getFuelRecord(id: string): FuelRecord | undefined {
     return this.getFuelRecords().find(r => r.id === id)
   }
 
-  getFuelRecordsByVehicle(vehicleId: number): FuelRecord[] {
+  getFuelRecordsByVehicle(vehicleId: string): FuelRecord[] {
     return this.getFuelRecords().filter(r => r.vehicleId === vehicleId)
   }
 
   createFuelRecord(record: Omit<FuelRecord, 'id' | 'createdAt'>): FuelRecord {
     const newRecord: FuelRecord = {
       ...record,
-      id: this.getNextId('fuelRecords'),
-      createdAt: new Date()
+      id: this.getNextId('fuelRecords').toString(),
+      createdAt: new Date().toISOString()
     }
     
     const records = this.getFuelRecords()
@@ -160,7 +160,7 @@ class LocalStorageManager {
     return newRecord
   }
 
-  updateFuelRecord(id: number, updates: Partial<Omit<FuelRecord, 'id' | 'createdAt'>>): FuelRecord | undefined {
+  updateFuelRecord(id: string, updates: Partial<Omit<FuelRecord, 'id' | 'createdAt'>>): FuelRecord | undefined {
     const records = this.getFuelRecords()
     const index = records.findIndex(r => r.id === id)
     
@@ -175,7 +175,7 @@ class LocalStorageManager {
     return records[index]
   }
 
-  deleteFuelRecord(id: number): boolean {
+  deleteFuelRecord(id: string): boolean {
     const records = this.getFuelRecords()
     const filtered = records.filter(r => r.id !== id)
     
@@ -191,7 +191,7 @@ class LocalStorageManager {
     return stored ? JSON.parse(stored) : []
   }
 
-  getSession(id: number): Session | undefined {
+  getSession(id: string): Session | undefined {
     return this.getSessions().find(s => s.id === id)
   }
 
@@ -202,8 +202,8 @@ class LocalStorageManager {
   createSession(session: Omit<Session, 'id' | 'createdAt'>): Session {
     const newSession: Session = {
       ...session,
-      id: this.getNextId('sessions'),
-      createdAt: new Date()
+      id: this.getNextId('sessions').toString(),
+      createdAt: new Date().toISOString()
     }
     
     const sessions = this.getSessions()
@@ -212,7 +212,7 @@ class LocalStorageManager {
     return newSession
   }
 
-  updateSession(id: number, updates: Partial<Omit<Session, 'id' | 'createdAt'>>): Session | undefined {
+  updateSession(id: string, updates: Partial<Omit<Session, 'id' | 'createdAt'>>): Session | undefined {
     const sessions = this.getSessions()
     const index = sessions.findIndex(s => s.id === id)
     
@@ -227,7 +227,7 @@ class LocalStorageManager {
     return sessions[index]
   }
 
-  deleteSession(id: number): boolean {
+  deleteSession(id: string): boolean {
     const sessions = this.getSessions()
     const filtered = sessions.filter(s => s.id !== id)
     
@@ -260,7 +260,9 @@ class LocalStorageManager {
       // Sample vehicles
       this.createVehicle({
         name: "Mark X",
+        model: "Mark X",
         type: "sedan",
+        registrationNumber: "ABC-123",
         plateNumber: "ABC-123",
         fuelType: "petrol",
         fuelCapacity: 60,
@@ -269,13 +271,15 @@ class LocalStorageManager {
         actual: 0,
         attendant: "",
         pump: "",
-        driverId: 1,
+        driverId: "1",
         isActive: true
       })
 
       this.createVehicle({
         name: "Hilux",
+        model: "Hilux",
         type: "truck",
+        registrationNumber: "XYZ-789",
         plateNumber: "XYZ-789",
         fuelType: "diesel",
         fuelCapacity: 80,
@@ -284,13 +288,15 @@ class LocalStorageManager {
         actual: 0,
         attendant: "",
         pump: "",
-        driverId: 2,
+        driverId: "2",
         isActive: true
       })
 
       this.createVehicle({
         name: "Corolla",
+        model: "Corolla",
         type: "sedan",
+        registrationNumber: "DEF-456",
         plateNumber: "DEF-456",
         fuelType: "petrol",
         fuelCapacity: 50,
@@ -299,7 +305,7 @@ class LocalStorageManager {
         actual: 0,
         attendant: "",
         pump: "",
-        driverId: null,
+        driverId: undefined,
         isActive: true
       })
     }

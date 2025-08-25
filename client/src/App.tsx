@@ -1,82 +1,85 @@
-import { Switch, Route, Link, useLocation } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
-import { Button } from "@/components/ui/button";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { DataSyncProvider } from "@/components/data-sync/DataSyncProvider";
+import "@/lib/session-utils"; // Load session management utilities
+
+import { Skeleton } from "@/components/ui/skeleton";
+import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/dashboard";
 import VehicleManagement from "@/pages/vehicle-management";
 import NotFound from "@/pages/not-found";
-import { BarChart3, Car, Fuel } from "lucide-react";
+import Settings from "@/pages/settings";
+import AdvancedReports from "@/pages/advanced-reports";
+import Reports from "@/pages/reports";
+import Analytics from "@/pages/analytics";
+import LiveTracking from "@/pages/live-tracking";
+import LoginPage from "@/pages/login";
+import AdminResetPage from "@/pages/admin-reset";
+import DebugPage from "@/pages/debug";
+import TraccarAdmin from "@/pages/traccar-admin";
 
-function Navigation() {
-  const [location] = useLocation();
-  
-  return (
-    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Fuel className="h-8 w-8 text-primary" />
-              <h1 className="text-xl font-bold">Fleet Manager</h1>
-            </div>
-            
-            <div className="hidden md:flex space-x-1">
-              <Link href="/">
-                <Button 
-                  variant={location === "/" ? "default" : "ghost"}
-                  size="sm"
-                  className="flex items-center space-x-2"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span>Dashboard</span>
-                </Button>
-              </Link>
-              
-              <Link href="/vehicles">
-                <Button 
-                  variant={location === "/vehicles" ? "default" : "ghost"}
-                  size="sm"
-                  className="flex items-center space-x-2"
-                >
-                  <Car className="h-4 w-4" />
-                  <span>Vehicle Management</span>
-                </Button>
-              </Link>
-            </div>
-          </div>
+function AppContent() {
+  const { user, adminUser, isLoading, forceLogin } = useAuth();
+
+  // Show loading skeleton while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 w-[300px]">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
         </div>
       </div>
-    </nav>
-  );
-}
+    );
+  }
 
-function Router() {
+  // ALWAYS show login page if forceLogin is true, regardless of existing sessions
+  // This ensures users must go through the login process every time
+  if (forceLogin || !user || !adminUser) {
+    return (
+      <Switch>
+        <Route path="/admin-reset" component={AdminResetPage} />
+        <Route component={LoginPage} />
+      </Switch>
+    );
+  }
+
+  // Show main app only after successful authentication and forceLogin is false
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
+    <AppLayout>
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/vehicles" component={VehicleManagement} />
+        <Route path="/tracking" component={LiveTracking} />
+        <Route path="/traccar-admin" component={TraccarAdmin} />
+        <Route path="/reports" component={AdvancedReports} />
+        <Route path="/analytics" component={Analytics} />
+        <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
-    </div>
+    </AppLayout>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="fleet-fuel-ui-theme">
+      <ThemeProvider>
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <AuthProvider>
+            <DataSyncProvider>
+              <AppContent />
+              <Toaster />
+            </DataSyncProvider>
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
 }
-
-export default App;

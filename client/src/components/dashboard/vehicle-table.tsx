@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -6,88 +6,168 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Plus, Edit, Trash2, Car, Fuel, User, MapPin } from "lucide-react"
 import type { Vehicle } from "@shared/schema"
-import { useUpdateVehicle, useDeleteVehicle, useDrivers } from "@/hooks/use-local-storage"
-import { EditVehicleModal } from "./edit-vehicle-modal"
-import { AddFuelRecordModal } from "./add-fuel-record-modal"
+import { useUpdateVehicle, useDeleteVehicle } from "@/hooks/use-vehicles"
+import { useDrivers } from "@/hooks/use-drivers"
+import { useFuelRecords } from "@/hooks/use-fuel-records";
+import { calculateFuelEfficiency } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 interface VehicleTableProps {
   vehicles: Vehicle[]
   onAddVehicle: () => void
+  onVehicleSelect?: (vehicleIds: string[] | null) => void
+  selectedVehicleIds?: string[]
 }
 
-export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
+export function VehicleTable({ vehicles, onAddVehicle, onVehicleSelect, selectedVehicleIds }: VehicleTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterValue, setFilterValue] = useState("all")
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [showFuelModal, setShowFuelModal] = useState(false)
-  const [selectedVehicleId, setSelectedVehicleId] = useState<number | undefined>()
-  
-  const updateVehicleMutation = useUpdateVehicle()
+  const [editingRow, setEditingRow] = useState<{ id: string, field: 'mileage' | 'budget' } | null>(null)
+  // Only use internal state if not controlled
+  const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set())
+  const isControlled = typeof selectedVehicleIds !== 'undefined'
+  const selectedVehicles = isControlled ? new Set(selectedVehicleIds) : internalSelected
+
+  const { mutateAsync: updateVehicle } = useUpdateVehicle()
   const deleteVehicleMutation = useDeleteVehicle()
   const { data: drivers = [] } = useDrivers()
+  const { data: fuelRecords = [] } = useFuelRecords();
 
   const filteredVehicles = useMemo(() => {
-    let filtered = vehicles.filter(vehicle =>
-      vehicle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (vehicle.plateNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    let filtered = vehicles;
 
     switch (filterValue) {
-      case "over-budget":
-        filtered = filtered.filter(v => (v.actual || 0) > v.budget)
+      case "plate":
+        filtered = filtered.filter(vehicle =>
+          (vehicle.registrationNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
+        )
         break
-      case "under-budget":
-        filtered = filtered.filter(v => (v.actual || 0) < v.budget)
+      case "driver":
+        filtered = filtered.filter(vehicle => {
+          const driver = drivers.find(d => d.id === vehicle.driverId)
+          return (driver?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+        })
         break
-      case "on-track":
-        filtered = filtered.filter(v => Math.abs((v.actual || 0) - v.budget) < v.budget * 0.1)
+      case "name":
+        filtered = filtered.filter(vehicle =>
+          vehicle.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
         break
+      default:
+        filtered = filtered.filter(vehicle =>
+          vehicle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          vehicle.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (vehicle.registrationNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (drivers.find(d => d.id === vehicle.driverId)?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+        )
     }
 
     return filtered
-  }, [vehicles, searchTerm, filterValue])
+  }, [vehicles, searchTerm, filterValue, drivers])
 
-  const handleActualChange = (vehicleId: number, value: string) => {
-    const actual = parseFloat(value) || 0
-    updateVehicleMutation.mutate({ id: vehicleId, updates: { actual } })
+  const handleEdit = (vehicleId: string, field: 'mileage' | 'budget') => {
+    setEditingRow({ id: vehicleId, field })
   }
 
-  const handleAttendantChange = (vehicleId: number, value: string) => {
-    updateVehicleMutation.mutate({ id: vehicleId, updates: { attendant: value } })
+  const handleEditSave = async (vehicleId: string, field: string, value: string) => {
+    const numberValue = parseFloat(value) || 0
+    const updates = field === 'mileage' 
+      ? { currentMileage: numberValue }
+      : { budget: numberValue }
+
+    await updateVehicle({ 
+      id: vehicleId, 
+      updates 
+    })
+    setEditingRow(null)
+  }  // Handle vehicle selection
+  const handleSelectForRefuel = (vehicleId: string, event?: React.MouseEvent) => {
+    event?.preventDefault()
+    
+    setSelectedVehicles(prev => {
+      const newSelection = new Set(prev)
+      
+      // Case 1: Toggle mode - Ctrl/Cmd is pressed or "Select All" is active
+      if (event?.ctrlKey || event?.metaKey) {
+        // Simple toggle for Ctrl/Cmd clicks
+        return new Set(
+          newSelection.has(vehicleId) 
+            ? Array.from(newSelection).filter(id => id !== vehicleId)
+            : Array.from(newSelection).concat(vehicleId)
+        )
+      }
+      
+      // Case 2: Range Selection - Shift is pressed and there are existing selections
+      if (event?.shiftKey && prev.size > 0) {
+        const vehicleIds = filteredVehicles.map(v => v.id) // Use filtered list for range
+        const lastSelected = Array.from(prev)[prev.size - 1]
+        const startIdx = vehicleIds.indexOf(lastSelected)
+        const endIdx = vehicleIds.indexOf(vehicleId)
+        
+        // Get the range of IDs and add them to existing selection
+        const range = vehicleIds.slice(
+          Math.min(startIdx, endIdx),
+          Math.max(startIdx, endIdx) + 1
+        )
+        range.forEach(id => newSelection.add(id))
+        return newSelection
+      }
+      
+      // Case 3: Toggle single item if all are selected
+      if (prev.size === filteredVehicles.length && prev.has(vehicleId)) {
+        newSelection.delete(vehicleId)
+        return newSelection
+      }
+      
+      // Case 4: Additive Selection - No modifiers, not all selected
+      if (!event?.ctrlKey && !event?.metaKey && !event?.shiftKey) {
+        // If the clicked item is already selected, just toggle it off
+        if (prev.size === 1 && prev.has(vehicleId)) {
+          return new Set()
+        }
+        // If clicking an unselected item, add it to selection
+        if (!prev.has(vehicleId)) {
+          newSelection.add(vehicleId)
+          return newSelection
+        }
+      }
+      
+      // Default case: Clear and select single
+      return new Set([vehicleId])
+    })
   }
 
-  const handlePumpChange = (vehicleId: number, value: string) => {
-    updateVehicleMutation.mutate({ id: vehicleId, updates: { pump: value } })
-  }
-
-  const handleEditVehicle = (vehicle: Vehicle) => {
-    setEditingVehicle(vehicle)
-    setShowEditModal(true)
-  }
-
-  const handleAddFuelRecord = (vehicleId: number) => {
-    setSelectedVehicleId(vehicleId)
-    setShowFuelModal(true)
-  }
-
-  const handleDeleteVehicle = (vehicleId: number) => {
-    if (confirm("Are you sure you want to delete this vehicle?")) {
-      deleteVehicleMutation.mutate(vehicleId)
+  // Helper to update selection
+  const setSelectedVehicles = (updater: (prev: Set<string>) => Set<string>) => {
+    if (isControlled && onVehicleSelect) {
+      const next = updater(new Set(selectedVehicleIds))
+      onVehicleSelect(Array.from(next))
+    } else {
+      setInternalSelected(updater)
     }
   }
 
-  const getDriverName = (driverId: number | null) => {
+  const handleDeleteVehicle = async (vehicleId: string) => {
+    const result = window.confirm("Are you sure you want to delete this vehicle? This action cannot be undone.")
+    if (result) {
+      try {
+        await deleteVehicleMutation.mutateAsync(vehicleId)
+      } catch (error) {
+        console.error('Failed to delete vehicle:', error)
+      }
+    }
+  }
+
+  const getDriverName = (driverId: string | undefined) => {
     if (!driverId) return "Unassigned"
     const driver = drivers.find(d => d.id === driverId)
     return driver ? driver.name : "Unknown Driver"
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-ZM', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'ZMW',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount)
@@ -120,19 +200,46 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
     )
   }
 
+  const handleSelectAll = () => {
+    setSelectedVehicles(prev => {
+      // If all filtered vehicles are selected, deselect all
+      const allSelected = filteredVehicles.every(v => prev.has(v.id))
+      if (allSelected) {
+        return new Set()
+      }
+      // Otherwise, select all filtered vehicles
+      return new Set(filteredVehicles.map(v => v.id))
+    })
+  }
+
+  // Helper to get fuel efficiency for a vehicle
+  const getVehicleEfficiency = (vehicleId: string) => {
+    const records = fuelRecords.filter(r => r.vehicleId === vehicleId);
+    return calculateFuelEfficiency(records);
+  };
+
+  // Helper to get last refuel date for a vehicle
+  const getLastRefuelDate = (vehicleId: string) => {
+    const records = fuelRecords.filter(r => r.vehicleId === vehicleId);
+    if (records.length === 0) return null;
+    const sorted = [...records].sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+    return sorted[0].sessionDate;
+  };
+
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div>
             <h2 className="text-lg font-semibold">Vehicle Fleet</h2>
-            <p className="text-sm text-muted-foreground">Manage fuel allocation and tracking</p>
+            <p className="text-sm text-muted-foreground">Manage driver allocation and tracking</p>
           </div>
           
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <div className="relative">              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                id="vehicle-search"
+                name="vehicle-search"
                 placeholder="Search vehicles..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -146,15 +253,14 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Vehicles</SelectItem>
-                <SelectItem value="over-budget">Over Budget</SelectItem>
-                <SelectItem value="under-budget">Under Budget</SelectItem>
-                <SelectItem value="on-track">On Track</SelectItem>
-              </SelectContent>
+                <SelectItem value="plate">By Plate</SelectItem>
+                <SelectItem value="driver">By Driver</SelectItem>
+                <SelectItem value="name">By Car Name</SelectItem>              </SelectContent>
             </Select>
             
             <Button onClick={onAddVehicle} className="whitespace-nowrap">
               <Plus className="h-4 w-4 mr-2" />
-              Add Vehicle
+              Register Vehicle
             </Button>
           </div>
         </div>
@@ -162,6 +268,31 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
       
       <CardContent>
         <div className="overflow-x-auto">
+          <div className="mb-4 text-sm text-muted-foreground flex justify-between items-center">
+            <div>
+              {selectedVehicles.size > 0 ? (
+                <p>
+                  {selectedVehicles.size} vehicle(s) selected
+                  <span className="ml-2 text-xs">
+                    (Use Ctrl/Cmd+Click to toggle selection, Shift+Click for range selection)
+                  </span>
+                </p>
+              ) : (
+                <p>Click the fuel icon to select vehicles for refueling</p>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAll}
+              className="ml-4"
+            >
+              {filteredVehicles.every(v => selectedVehicles.has(v.id))
+                ? "Deselect All"
+                : "Select All"}
+            </Button>
+          </div>
+
           <table className="w-full">
             <thead>
               <tr className="border-b">
@@ -178,10 +309,10 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
                   Budget
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Actual
+                  Fuel Efficiency
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Variance
+                  GPS Tracking
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Actions
@@ -189,76 +320,147 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredVehicles.map((vehicle) => (
-                <tr key={vehicle.id} className="hover:bg-muted/50 transition-colors">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center space-x-3">
-                      {getVehicleIcon(vehicle.type)}
-                      <div>
-                        <p className="text-sm font-medium">{vehicle.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {vehicle.plateNumber || "No plate"} • {vehicle.type} • {vehicle.fuelType}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Capacity: {vehicle.fuelCapacity}L
-                        </p>
+              {filteredVehicles.map((vehicle) => {
+                const eff = getVehicleEfficiency(vehicle.id);
+                return (
+                  <tr 
+                    key={vehicle.id} 
+                    className={cn(
+                      "transition-colors",
+                      selectedVehicles.has(vehicle.id) 
+                        ? "bg-primary/5 hover:bg-primary/10" 
+                        : "hover:bg-muted/50"
+                    )}
+                  >
+                    <td className="px-4 py-4">
+                      <div className="flex items-center space-x-3">
+                        {getVehicleIcon(vehicle.type)}
+                        <div>
+                          <p className="text-sm font-medium">{vehicle.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {vehicle.registrationNumber || "No plate"} • {vehicle.type} • {vehicle.fuelType || "N/A"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Capacity: {vehicle.fuelCapacity || "N/A"}L
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">{getDriverName(vehicle.driverId)}</p>
-                        {vehicle.driverId && (
-                          <p className="text-xs text-muted-foreground">Assigned</p>
-                        )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{getDriverName(vehicle.driverId)}</p>
+                          {vehicle.driverId && (
+                            <p className="text-xs text-muted-foreground">Assigned</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <div>
+                    </td>
+                    <td className="px-4 py-4">                    {editingRow?.id === vehicle.id && editingRow.field === 'mileage' ? (
+                      <Input
+                        id={`mileage-${vehicle.id}`}
+                        name={`mileage-${vehicle.id}`}
+                        type="number"
+                        defaultValue={vehicle.currentMileage || 0}
+                        className="w-24 h-8"
+                        onBlur={(e) => handleEditSave(vehicle.id, 'mileage', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleEditSave(vehicle.id, 'mileage', e.currentTarget.value)}
+                        autoFocus
+                      />
+                    ) : (
+                      <div onClick={() => handleEdit(vehicle.id, 'mileage')} className="cursor-pointer hover:bg-muted/50 p-1 rounded">
                         <p className="text-sm font-medium">{(vehicle.currentMileage || 0).toLocaleString()} km</p>
-                        <p className="text-xs text-muted-foreground">Current</p>
+                        <p className="text-xs text-muted-foreground">Click to edit</p>
                       </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">                    {editingRow?.id === vehicle.id && editingRow.field === 'budget' ? (
+                      <Input
+                        id={`budget-${vehicle.id}`}
+                        name={`budget-${vehicle.id}`}
+                        type="number"
+                        defaultValue={vehicle.budget}
+                        className="w-24 h-8"
+                        onBlur={(e) => handleEditSave(vehicle.id, 'budget', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleEditSave(vehicle.id, 'budget', e.currentTarget.value)}
+                        autoFocus
+                      />
+                    ) : (
+                      <div onClick={() => handleEdit(vehicle.id, 'budget')} className="cursor-pointer hover:bg-muted/50 p-1 rounded">
+                        <p className="text-sm font-medium">{formatCurrency(vehicle.budget)}</p>
+                        <p className="text-xs text-muted-foreground">Click to edit</p>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    {eff.efficiency !== null ? `${eff.efficiency.toFixed(1)} ${eff.type}` : <span className="text-xs text-muted-foreground">N/A</span>}
+                    {/* Refuel Reminder Badge */}
+                    {(() => {
+                      const lastRefuel = getLastRefuelDate(vehicle.id);
+                      if (lastRefuel) {
+                        const daysSince = Math.floor((Date.now() - new Date(lastRefuel).getTime()) / (1000 * 60 * 60 * 24));
+                        if (daysSince >= 21) {
+                          return (
+                            <Badge variant="destructive" className="ml-2 mt-1">Refuel Due! ({daysSince} days)</Badge>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center space-x-2">
+                      {vehicle.traccarDeviceId ? (
+                        <>
+                          <Badge variant="default" className="text-xs">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            Device {vehicle.traccarDeviceId}
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            asChild
+                          >
+                            <a href={`/tracking?vehicle=${vehicle.id}`}>
+                              Track
+                            </a>
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Badge variant="secondary" className="text-xs">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            No Device
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            asChild
+                          >
+                            <a href="/traccar-admin">
+                              Assign
+                            </a>
+                          </Button>
+                        </>
+                      )}
                     </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="text-sm font-medium">{formatCurrency(vehicle.budget)}</span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={vehicle.actual || ""}
-                      onChange={(e) => handleActualChange(vehicle.id, e.target.value)}
-                      className="w-24"
-                      placeholder="0"
-                    />
-                  </td>
-                  <td className="px-4 py-4">
-                    {getVarianceBadge(vehicle.budget, vehicle.actual || 0)}
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center space-x-1">
                       <Button
-                        variant="ghost"
+                        variant={selectedVehicles.has(vehicle.id) ? "default" : "ghost"}
                         size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => handleEditVehicle(vehicle)}
-                        title="Edit vehicle details"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
-                        onClick={() => handleAddFuelRecord(vehicle.id)}
-                        title="Add fuel record"
+                        className={cn(
+                          "h-8 w-8 p-0",
+                          selectedVehicles.has(vehicle.id)
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "text-blue-600 hover:text-blue-700"
+                        )}
+                        onClick={(e) => handleSelectForRefuel(vehicle.id, e)}
+                        title="Click to select, Ctrl+Click to toggle, Shift+Click for range"
                       >
                         <Fuel className="h-4 w-4" />
                       </Button>
@@ -275,7 +477,7 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
           
@@ -289,35 +491,10 @@ export function VehicleTable({ vehicles, onAddVehicle }: VehicleTableProps) {
         <div className="flex items-center justify-between mt-4 pt-4 border-t">
           <div className="text-sm text-muted-foreground">
             Showing {filteredVehicles.length} of {vehicles.length} vehicles
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" disabled>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled>
-              1
-            </Button>
-            <Button variant="outline" size="sm" disabled>
-              Next
-            </Button>
+            {selectedVehicles.size > 0 && ` • ${selectedVehicles.size} selected`}
           </div>
         </div>
       </CardContent>
-
-      {/* Edit Vehicle Modal */}
-      <EditVehicleModal 
-        open={showEditModal} 
-        onOpenChange={setShowEditModal}
-        vehicle={editingVehicle}
-      />
-
-      {/* Add Fuel Record Modal */}
-      <AddFuelRecordModal 
-        open={showFuelModal} 
-        onOpenChange={setShowFuelModal}
-        vehicleId={selectedVehicleId}
-      />
     </Card>
   )
 }
