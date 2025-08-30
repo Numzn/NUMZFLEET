@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { useVehicles, useUpdateVehicle } from "@/hooks/use-vehicles"
+// TODO: Replace with Supabase hooks
+// import { useVehicles, useUpdateVehicle } from "@/hooks/use-vehicles"
 import { NavigationBar } from "@/components/NavigationBar"
 import { RefreshCw, Link, Unlink, MapPin, Wifi, WifiOff } from "lucide-react"
 import { getTraccarCredentials } from "@/lib/traccar-auth"
@@ -23,8 +24,11 @@ export default function TraccarAdmin() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("")
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("")
   
-  const { data: vehicles = [] } = useVehicles()
-  const { mutate: updateVehicle } = useUpdateVehicle()
+  // TODO: Replace with Supabase hooks
+  const { data: vehicles = [] } = { data: [] };
+  const { mutate: updateVehicle } = { 
+    mutate: (data: any) => console.log('🔧 Supabase integration needed for vehicle update', data)
+  };
   const { toast } = useToast()
 
   // Fetch Traccar devices

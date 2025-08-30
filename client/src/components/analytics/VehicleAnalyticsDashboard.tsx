@@ -1,29 +1,43 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { GaugeChart, DonutChart, LineChart } from '@/components/analytics/Charts';
-import { TraccarIframe } from '@/components/tracking/TraccarIframe';
-import { Car, Fuel, MapPin, Clock, DollarSign, TrendingUp, Battery, Settings, ChevronLeft, ChevronRight, Calendar, RefreshCw } from 'lucide-react';
-import { useRealAnalytics, useTraccarSync } from '@/hooks/use-real-data';
-import { calculateEfficiencyScore, calculateFuelMetrics } from '@/lib/analytics';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Fuel, 
+  Gauge, 
+  MapPin, 
+  Clock, 
+  DollarSign,
+  RefreshCw,
+  Settings,
+  Car,
+  User
+} from 'lucide-react';
+import { useVehicles } from '@/hooks/use-supabase-vehicles';
+import { useFuelRecords } from '@/hooks/use-supabase-fuel-records';
+// TODO: Replace with Supabase hooks
+// import { useTraccarSync } from '@/hooks/use-real-data';
+// TODO: Replace with Supabase analytics
+// import { calculateFuelMetrics, calculateEfficiencyScore } from '@/lib/analytics';
+import type { Vehicle, FuelRecord } from '@shared/schema';
 
 export function VehicleAnalyticsDashboard() {
+  const { data: vehicles = [] } = useVehicles();
+  const { data: fuelRecords = [] } = useFuelRecords();
   const [selectedVehicleId, setSelectedVehicleId] = React.useState<string>('');
-  const [timeRange, setTimeRange] = React.useState<'24h' | '30d' | '1y'>('30d');
   
-  // Use real-time data from Firebase and Traccar
-  const { 
-    vehicles, 
-    fuelRecords, 
-    traccarDevices, 
-    traccarPositions, 
-    selectedVehicle, 
-    vehicleDevice 
-  } = useRealAnalytics(selectedVehicleId);
-  
-  const syncMutation = useTraccarSync();
+  // TODO: Replace with Supabase hooks
+  const syncMutation = {
+    mutate: () => console.log('🔧 Supabase integration needed for Traccar sync'),
+    isPending: false,
+    isSuccess: false,
+    isError: false,
+    error: null
+  };
 
   // Set default vehicle when vehicles load
   React.useEffect(() => {
@@ -32,14 +46,26 @@ export function VehicleAnalyticsDashboard() {
     }
   }, [vehicles, selectedVehicleId]);
 
-  const vehicleRecords = fuelRecords.filter(r => r.vehicleId === selectedVehicleId);
+  // Find the selected vehicle
+  const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+  
+  // Filter fuel records for the selected vehicle
+  const vehicleRecords = fuelRecords.filter((r: FuelRecord) => r.vehicleId === selectedVehicleId);
+  
+  // Get assigned driver info
   const assignedDriver = selectedVehicle?.driverId ? { id: selectedVehicle.driverId, name: 'Driver' } : null;
 
   // Calculate real vehicle-specific metrics using actual data
-  const fuelMetrics = calculateFuelMetrics(vehicleRecords);
-  const efficiencyScore = calculateEfficiencyScore(vehicleRecords, vehicles);
+  // TODO: Replace with Supabase analytics
+  const fuelMetrics = { 
+    totalCost: 0, 
+    totalUsage: 0, 
+    averageUsage: 0,
+    monthlyTrend: []
+  };
+  const efficiencyScore = 0;
   const lastRefuelDate = vehicleRecords.length > 0 
-    ? new Date(Math.max(...vehicleRecords.map(r => new Date(r.sessionDate).getTime())))
+    ? new Date(Math.max(...vehicleRecords.map((r: FuelRecord) => new Date(r.sessionDate).getTime())))
     : new Date();
 
   // Real fuel station data (this would come from an actual fuel station API)
@@ -54,7 +80,7 @@ export function VehicleAnalyticsDashboard() {
 
   // Recent refuel history
   const recentRefuels = vehicleRecords
-    .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime())
+    .sort((a: FuelRecord, b: FuelRecord) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime())
     .slice(0, 3);
 
   // Monthly fuel usage trend from real data
@@ -87,7 +113,7 @@ export function VehicleAnalyticsDashboard() {
               <SelectValue placeholder="Select vehicle" />
             </SelectTrigger>
             <SelectContent>
-              {vehicles.map((vehicle) => (
+              {vehicles.map((vehicle: Vehicle) => (
                 <SelectItem key={vehicle.id} value={vehicle.id}>
                   {vehicle.name} - {vehicle.registrationNumber}
                 </SelectItem>
@@ -123,75 +149,40 @@ export function VehicleAnalyticsDashboard() {
               <Badge variant="outline">Live</Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center space-y-4">
-              {/* Vehicle Image Placeholder */}
-              <div className="w-full h-48 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
-                <Car className="h-24 w-24 text-blue-600" />
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Current Mileage</p>
+                <p className="text-2xl font-bold">{selectedVehicle.currentMileage || '0'}</p>
+                <p className="text-xs text-muted-foreground">km</p>
               </div>
-              
-              {/* Vehicle Controls */}
-              <div className="flex space-x-2 w-full">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="flex space-x-1">
-                  <Button variant="outline" size="sm" className="w-8 h-8 p-0">L</Button>
-                  <Button variant="outline" size="sm" className="w-8 h-8 p-0">R</Button>
-                  <Button variant="outline" size="sm" className="w-8 h-8 p-0">P</Button>
-                  <Button variant="outline" size="sm" className="w-8 h-8 p-0">N</Button>
-                  <Button variant="default" size="sm" className="w-8 h-8 p-0">D</Button>
-                  <Button variant="outline" size="sm" className="w-8 h-8 p-0">S</Button>
-                </div>
-                <Button variant="outline" size="sm" className="flex-1">
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Fuel Type</p>
+                <p className="text-lg font-semibold">{selectedVehicle.fuelType || 'N/A'}</p>
               </div>
-
-              {/* Vehicle Stats */}
-              <div className="grid grid-cols-2 gap-4 w-full text-center">
-                <div>
-                  <p className="text-2xl font-bold">{selectedVehicle.currentMileage || '0'}</p>
-                  <p className="text-sm text-muted-foreground">Total Miles</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{fuelMetrics.averageEfficiency.toFixed(1)}</p>
-                  <p className="text-sm text-muted-foreground">L/100km</p>
-                </div>
-              </div>
-              
-              {/* GPS Status */}
-              {vehicleDevice && (
-                <div className="w-full p-3 bg-muted/30 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-2 h-2 rounded-full ${vehicleDevice.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-sm font-medium">GPS Device</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {vehicleDevice.status === 'online' ? 'Online' : 'Offline'}
-                    </span>
-                  </div>
-                  {selectedVehicle.lastLocation && (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <p>Speed: {selectedVehicle.lastLocation.speed?.toFixed(1) || '0'} km/h</p>
-                      <p>Last Update: {new Date(selectedVehicle.lastLocation.timestamp).toLocaleTimeString()}</p>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
+            
+            {assignedDriver && (
+              <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Assigned Driver</p>
+                  <p className="text-xs text-muted-foreground">{assignedDriver.name}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Vehicle GPS Tracking Map */}
-        <TraccarIframe 
+        {/* The TraccarIframe component was removed from imports, so this section is commented out or removed if not needed */}
+        {/* <TraccarIframe 
           deviceId={selectedVehicle.traccarDeviceId}
           height="500px"
           showControls={false}
           autoRefresh={false}
           refreshInterval={30000}
-        />
+        /> */}
       </div>
 
       {/* Statistics Grid */}

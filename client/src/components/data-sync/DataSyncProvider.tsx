@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useTraccarSync } from '@/hooks/use-real-data';
+// TODO: Replace with Supabase data sync
+// import { useTraccarSync } from '@/hooks/use-real-data';
 import { useToast } from '@/hooks/use-toast';
 
 interface DataSyncContextType {
@@ -18,7 +19,14 @@ export function DataSyncProvider({ children }: { children: React.ReactNode }) {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   
-  const syncMutation = useTraccarSync();
+  // TODO: Replace with Supabase data sync
+  const syncMutation = {
+    mutate: () => console.log('🔧 Supabase integration needed for data sync'),
+    isPending: false,
+    isSuccess: false,
+    isError: false,
+    error: null
+  };
   const { toast } = useToast();
 
   // Auto-sync effect - more frequent but less noticeable

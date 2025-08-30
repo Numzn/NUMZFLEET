@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from "react"
-import { useFuelRecords } from "@/hooks/use-fuel-records"
-import { useVehicles } from "@/hooks/use-vehicles"
+// TODO: Replace with Supabase hooks
+// import { useFuelRecords } from "@/hooks/use-fuel-records"
+// TODO: Replace with Supabase hooks
+// import { useVehicles } from "@/hooks/use-vehicles"
 import { DateTime } from "luxon"
 import { Bar } from "react-chartjs-2"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,8 +27,9 @@ import { Info } from "lucide-react";
 ChartJS.register(BarElement, CategoryScale, LinearScale, ChartJSTooltip, Legend)
 
 export function ChartsSection() {
-  const { data: fuelRecords = [] } = useFuelRecords()
-  const { data: vehicles = [] } = useVehicles()
+  // TODO: Replace with Supabase hooks
+  const { data: fuelRecords = [] } = { data: [] as any[] }
+  const { data: vehicles = [] } = { data: [] as any[] }
 
   // Group records by month (YYYY-MM)
   const recordsByMonth = useMemo(() => {

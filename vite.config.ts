@@ -33,7 +33,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs']
         }
       }

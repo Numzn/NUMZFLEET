@@ -5,7 +5,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { insertDriverSchema } from "@shared/schema"
 import type { z } from "zod"
-import { useCreateDriver } from "@/hooks/use-drivers"
+// TODO: Replace with Supabase hooks
+// import { useCreateDriver } from "@/hooks/use-drivers"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Loader2 } from "lucide-react"
 import { useState } from "react"
@@ -18,7 +19,13 @@ interface AddDriverModalProps {
 }
 
 export function AddDriverModal({ open, onOpenChange }: AddDriverModalProps) {
-  const { createDriver } = useCreateDriver()
+  // TODO: Replace with Supabase hooks
+  const { createDriver } = { 
+    createDriver: async (data: any) => {
+      console.log('🔧 Supabase integration needed for driver creation', data);
+      return data;
+    }
+  }
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<FormData>({

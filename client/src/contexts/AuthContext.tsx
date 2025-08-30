@@ -1,21 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
-import { auth, db, collections } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { useTraccarAuth } from '@/hooks/use-traccar-auth';
+import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/supabase';
 
-interface AdminUser {
-  uid: string;
-  email: string;
-  role: 'admin' | 'owner';
-  name: string;
-  createdAt: string;
-  isActive: boolean;
-}
+type AdminUser = Database['public']['Tables']['admins']['Row'];
 
 interface AuthContextType {
-  user: User | null;
+  user: any | null;
   adminUser: AdminUser | null;
   isLoading: boolean;
   isAdmin: boolean;
@@ -32,44 +23,53 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [forceLogin, setForceLogin] = useState(true); // Always start with force login
+  const [forceLogin, setForceLogin] = useState(false);
   const { toast } = useToast();
-  const { authenticate: authenticateTraccar } = useTraccarAuth();
 
-  // Check if admin registration is allowed (allows up to 2 admin accounts)
+  // Check if admin registration is complete
   const checkAdminRegistration = async (): Promise<boolean> => {
     try {
-      // Count existing admin accounts
-      const { collection, getDocs } = await import('firebase/firestore');
-      const adminsSnapshot = await getDocs(collection(db, 'admins'));
-      const adminCount = adminsSnapshot.size;
-      
-      // Allow registration if less than 2 admin accounts exist
-      const maxAdmins = 2;
-      const registrationAllowed = adminCount < maxAdmins;
-      
-      console.log(`📊 Admin count: ${adminCount}/${maxAdmins} - Registration allowed: ${registrationAllowed}`);
-      
-      return registrationAllowed;
+      const { data, error } = await supabase
+        .from('admins')
+        .select('*')
+        .limit(1);
+
+      if (error) {
+        console.error('Error checking admin registration:', error);
+        return false;
+      }
+
+      return data && data.length > 0;
     } catch (error) {
       console.error('Error checking admin registration:', error);
       return false;
     }
   };
 
-  // Load admin user data when Firebase user changes
-  const loadAdminUser = async (firebaseUser: User) => {
+  // Load admin user data
+  const loadAdminUser = async (user: any) => {
+    if (!user) {
+      setAdminUser(null);
+      return;
+    }
+
     try {
-      const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
-      if (adminDoc.exists()) {
-        const adminData = adminDoc.data() as AdminUser;
-        setAdminUser(adminData);
-      } else {
+      const { data, error } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('email', user.email)
+        .single();
+
+      if (error) {
+        console.error('Error loading admin user:', error);
         setAdminUser(null);
+        return;
       }
+
+      setAdminUser(data);
     } catch (error) {
       console.error('Error loading admin user:', error);
       setAdminUser(null);
@@ -78,136 +78,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Listen for authentication state changes
   useEffect(() => {
-    // Clear any existing sessions when the app starts
-    const clearExistingSessions = async () => {
-      try {
-        // Check if there's an existing Firebase user
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-          console.log('🔒 Clearing existing Firebase session on app start');
-          await signOut(auth);
-          
-          // Clear any stored session data
-          if (typeof window !== 'undefined') {
-            // Clear Firebase-specific storage
-            const firebaseKeys = Object.keys(localStorage).filter(key => 
-              key.startsWith('firebase:') || 
-              key.startsWith('firebaseLocalStorageDb') ||
-              key.includes('firebase')
-            );
-            firebaseKeys.forEach(key => localStorage.removeItem(key));
-          }
-        }
-      } catch (error) {
-        console.warn('Warning: Could not clear existing session:', error);
-      }
-    };
-
-    // Handle browser refresh - clear sessions
-    const handleBeforeUnload = () => {
-      console.log('🔄 Browser refresh detected - clearing sessions');
-      // Clear Firebase-specific storage on refresh
-      if (typeof window !== 'undefined') {
-        const firebaseKeys = Object.keys(localStorage).filter(key => 
-          key.startsWith('firebase:') || 
-          key.startsWith('firebaseLocalStorageDb') ||
-          key.includes('firebase')
-        );
-        firebaseKeys.forEach(key => localStorage.removeItem(key));
-      }
-    };
-
-    // Add refresh listener
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // Clear sessions first, then set up auth listener
-    clearExistingSessions().then(() => {
-      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        setUser(firebaseUser);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null);
         
-        if (firebaseUser && !forceLogin) {
-          // Only auto-load admin user if force login is disabled
-          await loadAdminUser(firebaseUser);
+        if (session?.user) {
+          await loadAdminUser(session.user);
         } else {
           setAdminUser(null);
         }
         
         setIsLoading(false);
-      });
+      }
+    );
 
-      return unsubscribe;
-    });
+    return () => subscription.unsubscribe();
+  }, []);
 
-    // Cleanup
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [forceLogin]);
-
-  // Login function
-  const login = async (email: string, password: string) => {
+  // Login function - supports both username and email login
+  const login = async (usernameOrEmail: string, password: string) => {
     try {
+      console.log('Login attempt for:', usernameOrEmail);
       setIsLoading(true);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      // Check if user is an admin
-      const adminDoc = await getDoc(doc(db, 'admins', userCredential.user.uid));
-      if (!adminDoc.exists()) {
-        await signOut(auth);
-        throw new Error('Access denied. Admin privileges required.');
-      }
-
-      const adminData = adminDoc.data() as AdminUser;
-      if (!adminData.isActive) {
-        await signOut(auth);
-        throw new Error('Account is deactivated. Contact the system administrator.');
-      }
-
-      // Set admin user data first
-      setAdminUser(adminData);
+      // Check if this is the first login (no admins exist)
+      const hasAdmins = await checkAdminRegistration();
+      console.log('Has admins:', hasAdmins);
       
-      // Disable force login after successful authentication
-      setForceLogin(false);
+      if (!hasAdmins) {
+        // First-time setup - create admin account
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: usernameOrEmail,
+          password,
+        });
 
-      toast({
-        title: "Success",
-        description: `Welcome back, ${adminData.name}!`,
-      });
-
-      // Authenticate with Traccar AFTER successful login and user data loading
-      // Use setTimeout to ensure this happens after the current execution cycle
-      setTimeout(async () => {
-        try {
-          console.log('🔐 Authenticating with Traccar in background...');
-          await authenticateTraccar();
-          console.log('✅ Traccar authentication successful');
-        } catch (error) {
-          console.warn('⚠️ Traccar authentication failed:', error);
-          // Don't show error to user - this is background process
+        if (authError) {
+          throw authError;
         }
-      }, 100);
 
-    } catch (error) {
+        if (authData.user) {
+          // Create admin record
+          const { error: adminError } = await supabase
+            .from('admins')
+            .insert({
+              email: authData.user.email!,
+              role: 'owner',
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+
+          if (adminError) {
+            throw adminError;
+          }
+
+          setUser(authData.user);
+          setForceLogin(false);
+          console.log('Admin account created, user set:', authData.user);
+          toast({
+            title: "Admin Account Created",
+            description: "Welcome! Your admin account has been set up successfully.",
+          });
+        }
+      } else {
+        // Normal login
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: usernameOrEmail,
+          password,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        console.log('Login successful, user:', data.user);
+        setUser(data.user);
+        setForceLogin(false);
+        
+        // Manually load admin user after login
+        await loadAdminUser(data.user);
+        
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
+      }
+    } catch (error: any) {
       console.error('Login error:', error);
-      let errorMessage = 'Login failed. Please try again.';
-      
-      if (error instanceof Error) {
-        if (error.message.includes('user-not-found')) {
-          errorMessage = 'User not found. Please check your email.';
-        } else if (error.message.includes('wrong-password')) {
-          errorMessage = 'Incorrect password. Please try again.';
-        } else if (error.message.includes('too-many-requests')) {
-          errorMessage = 'Too many failed attempts. Please try again later.';
-        } else if (error.message.includes('Access denied')) {
-          errorMessage = error.message;
-        } else if (error.message.includes('Account is deactivated')) {
-          errorMessage = error.message;
-        }
-      }
-      
       toast({
         title: "Login Failed",
-        description: errorMessage,
+        description: error.message || "An error occurred during login.",
         variant: "destructive",
       });
       throw error;
@@ -216,154 +176,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Register admin function (allows up to 2 admin accounts)
+  // Register admin function
   const registerAdmin = async (email: string, password: string, name: string) => {
     try {
       setIsLoading(true);
       
-      // Check if admin registration is allowed
-      const registrationAllowed = await checkAdminRegistration();
-      if (!registrationAllowed) {
-        throw new Error('Admin registration is not allowed. Maximum number of admin accounts (2) has been reached.');
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
       }
 
-      // Create Firebase user
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Determine admin role based on existing count
-      const { collection, getDocs } = await import('firebase/firestore');
-      const adminsSnapshot = await getDocs(collection(db, 'admins'));
-      const adminCount = adminsSnapshot.size;
-      
-      // Create admin document
-      const adminData: AdminUser = {
-        uid: userCredential.user.uid,
-        email: email,
-        role: adminCount === 0 ? 'owner' : 'admin', // First admin is owner, others are admin
-        name: name,
-        createdAt: new Date().toISOString(),
-        isActive: true,
-      };
+      if (data.user) {
+        // Create admin record
+        const { error: adminError } = await supabase
+          .from('admins')
+                      .insert({
+              email: data.user.email!,
+              role: 'admin',
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
 
-      await setDoc(doc(db, 'admins', userCredential.user.uid), adminData);
-      
-      // Update registration status
-      await setDoc(doc(db, 'system', 'admin_registration'), {
-        registrationAllowed: adminCount + 1 < 2, // Allow more if under limit
-        registeredAt: new Date().toISOString(),
-        registeredBy: userCredential.user.uid,
-        adminCount: adminCount + 1,
-        maxAdmins: 2,
-      });
-
-      setAdminUser(adminData);
-      
-      // Disable force login after successful registration
-      setForceLogin(false);
-      
-      toast({
-        title: "Success",
-        description: `Welcome, ${name}! Your ${adminData.role} account has been created.`,
-      });
-
-      // Authenticate with Traccar AFTER successful registration and user data loading
-      // Use setTimeout to ensure this happens after the current execution cycle
-      setTimeout(async () => {
-        try {
-          console.log('🔐 Authenticating with Traccar in background...');
-          await authenticateTraccar();
-          console.log('✅ Traccar authentication successful');
-        } catch (error) {
-          console.warn('⚠️ Traccar authentication failed:', error);
-          // Don't show error to user - this is background process
+        if (adminError) {
+          throw adminError;
         }
-      }, 100);
-    } catch (error) {
+
+        setUser(data.user);
+        setForceLogin(false);
+        toast({
+          title: "Admin Account Created",
+          description: "Admin account has been created successfully.",
+        });
+      }
+    } catch (error: any) {
       console.error('Registration error:', error);
-      let errorMessage = 'Registration failed. Please try again.';
-      
-      if (error instanceof Error) {
-        if (error.message.includes('email-already-in-use')) {
-          errorMessage = 'An account with this email already exists.';
-        } else if (error.message.includes('weak-password')) {
-          errorMessage = 'Password is too weak. Please use a stronger password.';
-        } else if (error.message.includes('invalid-email')) {
-          errorMessage = 'Please enter a valid email address.';
-        } else if (error.message.includes('Admin registration is not allowed')) {
-          errorMessage = error.message;
-        } else if (error.message.includes('Maximum number of admin accounts')) {
-          errorMessage = error.message;
-        }
-      }
-      
       toast({
         title: "Registration Failed",
-        description: errorMessage,
+        description: error.message || "An error occurred during registration.",
         variant: "destructive",
       });
       throw error;
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Clear session function - completely clears all authentication state
-  const clearSession = async () => {
-    try {
-      // Sign out from Firebase
-      await signOut(auth);
-      
-      // Clear all local state
-      setUser(null);
-      setAdminUser(null);
-      setForceLogin(true);
-      
-      // Clear any stored session data
-      if (typeof window !== 'undefined') {
-        // Clear localStorage and sessionStorage
-        localStorage.clear();
-        sessionStorage.clear();
-        
-        // Clear any Firebase-specific storage
-        const firebaseKeys = Object.keys(localStorage).filter(key => 
-          key.startsWith('firebase:') || 
-          key.startsWith('firebaseLocalStorageDb') ||
-          key.includes('firebase')
-        );
-        firebaseKeys.forEach(key => localStorage.removeItem(key));
-      }
-      
-      toast({
-        title: "Session Cleared",
-        description: "All sessions have been cleared. Please log in again.",
-      });
-      
-      console.log('🔒 Session completely cleared - user must login again');
-    } catch (error) {
-      console.error('Error clearing session:', error);
-      toast({
-        title: "Error",
-        description: "Failed to clear session. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
   // Logout function
   const logout = async () => {
     try {
-      await signOut(auth);
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+      
+      setUser(null);
       setAdminUser(null);
-      setForceLogin(true); // Re-enable force login after logout
+      setForceLogin(true);
+      
       toast({
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logout error:', error);
       toast({
-        title: "Logout Error",
-        description: "Failed to logout. Please try again.",
+        title: "Logout Failed",
+        description: error.message || "An error occurred during logout.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Clear session function
+  const clearSession = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Session Cleared",
+        description: "All session data has been cleared.",
+      });
+    } catch (error) {
+      console.error('Clear session error:', error);
+      toast({
+        title: "Clear Session Error",
+        description: "An error occurred while clearing the session.",
         variant: "destructive",
       });
     }
@@ -373,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     adminUser,
     isLoading,
-    isAdmin: !!adminUser,
+    isAdmin: adminUser?.role === 'admin' || adminUser?.role === 'owner',
     isOwner: adminUser?.role === 'owner',
     forceLogin,
     login,
@@ -384,11 +285,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setForceLogin,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

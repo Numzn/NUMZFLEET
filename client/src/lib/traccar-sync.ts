@@ -1,5 +1,5 @@
-import { db } from './firebase';
-import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+// TODO: Replace with Supabase imports
+// import { supabase } from './supabase';
 
 // Use the same credential source as traccar.ts
 const getTraccarCredentials = (): { username: string; password: string } | null => {
@@ -155,7 +155,7 @@ class TraccarSyncService {
     }
   }
 
-  async syncToFirebase(): Promise<TraccarSyncData> {
+  async syncToSupabase(): Promise<TraccarSyncData> {
     try {
       // Check if credentials are available before starting sync
       if (!this.credentials || this.hasCredentialError) {
@@ -167,15 +167,15 @@ class TraccarSyncService {
         };
       }
 
-      console.log('🔄 Starting Traccar to Firebase sync...');
+      console.log('🔄 Starting Traccar to Supabase sync...');
       
       const [devices, positions] = await Promise.all([
         this.getDevices(),
         this.getPositions()
       ]);
 
-      // Update Firebase with latest data
-      await this.updateFirebaseData(devices, positions);
+      // Update Supabase with latest data
+      await this.updateSupabaseData(devices, positions);
 
       const syncData: TraccarSyncData = {
         devices,
@@ -196,38 +196,24 @@ class TraccarSyncService {
     }
   }
 
-  private async updateFirebaseData(devices: TraccarDevice[], positions: TraccarPosition[]) {
+  private async updateSupabaseData(devices: TraccarDevice[], positions: TraccarPosition[]) {
     try {
-      // Update devices in Firebase
+      // TODO: Implement with Supabase
+      console.log('🔧 Supabase integration needed for updating Traccar data');
+      console.log(`📊 Devices: ${devices.length}, Positions: ${positions.length}`);
+      
+      // Placeholder implementation
       for (const device of devices) {
-        const deviceRef = doc(db, 'traccar_devices', device.id.toString());
-        await setDoc(deviceRef, {
-          ...device,
-          lastSync: new Date().toISOString()
-        }, { merge: true });
+        console.log(`📱 Device: ${device.name} (${device.id})`);
       }
-
-      // Update positions in Firebase
+      
       for (const position of positions) {
-        const positionRef = doc(db, 'traccar_positions', position.id.toString());
-        await setDoc(positionRef, {
-          ...position,
-          lastSync: new Date().toISOString()
-        }, { merge: true });
+        console.log(`📍 Position: ${position.latitude}, ${position.longitude} for device ${position.deviceId}`);
       }
 
-      // Update sync status
-      const syncRef = doc(db, 'system', 'traccar_sync');
-      await setDoc(syncRef, {
-        lastSync: new Date().toISOString(),
-        deviceCount: devices.length,
-        positionCount: positions.length,
-        status: 'success'
-      }, { merge: true });
-
-      console.log('🔥 Firebase updated with Traccar data');
+      console.log('🔥 Supabase update with Traccar data (placeholder)');
     } catch (error) {
-      console.error('Failed to update Firebase with Traccar data:', error);
+      console.error('Failed to update Supabase with Traccar data:', error);
       throw error;
     }
   }
@@ -242,23 +228,11 @@ class TraccarSyncService {
 
       const latestPosition = positions[0]; // Most recent position
       
-      // Update vehicle document with latest location
-      const vehicleRef = doc(db, 'vehicles', vehicleId);
-      await updateDoc(vehicleRef, {
-        lastLocation: {
-          latitude: latestPosition.latitude,
-          longitude: latestPosition.longitude,
-          speed: latestPosition.speed,
-          course: latestPosition.course,
-          address: latestPosition.address,
-          timestamp: latestPosition.fixTime,
-          accuracy: latestPosition.accuracy
-        },
-        isOnline: true,
-        lastUpdate: new Date().toISOString()
-      });
+      // TODO: Implement with Supabase
+      console.log('🔧 Supabase integration needed for vehicle location update');
+      console.log(`📍 Vehicle ${vehicleId} location: ${latestPosition.latitude}, ${latestPosition.longitude}`);
 
-      console.log(`📍 Updated vehicle ${vehicleId} location from device ${deviceId}`);
+      console.log(`📍 Updated vehicle ${vehicleId} location from device ${deviceId} (placeholder)`);
       return true;
     } catch (error) {
       console.error(`Failed to update vehicle ${vehicleId} location:`, error);

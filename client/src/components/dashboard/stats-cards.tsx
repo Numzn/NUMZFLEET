@@ -1,13 +1,16 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Wallet, CreditCard, TrendingUp, Car } from "lucide-react"
-import { useFuelRecords } from "@/hooks/use-fuel-records"
-import { useVehicles } from "@/hooks/use-vehicles"
+// TODO: Replace with Supabase hooks
+// import { useFuelRecords } from "@/hooks/use-fuel-records"
+// TODO: Replace with Supabase hooks
+// import { useVehicles } from "@/hooks/use-vehicles"
 import { useLastSessionSummary } from "./fuel-record-summary-table"
 import { calculateFuelEfficiency } from "@/lib/utils";
 
 export function StatsCards() {
-  const { data: fuelRecords = [], isLoading: fuelLoading } = useFuelRecords();
-  const { data: vehicles = [], isLoading: vehiclesLoading } = useVehicles();
+  // TODO: Replace with Supabase hooks
+  const { data: fuelRecords = [], isLoading: fuelLoading } = { data: [] as any[], isLoading: false };
+  const { data: vehicles = [], isLoading: vehiclesLoading } = { data: [] as any[], isLoading: false };
   const { lastSessionDate, totalBudget, totalSpent, totalDifference, activeVehicles, isEmpty } = useLastSessionSummary(fuelRecords, vehicles);
 
   // Calculate overall fleet fuel efficiency

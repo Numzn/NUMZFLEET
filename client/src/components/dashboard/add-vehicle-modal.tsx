@@ -6,9 +6,11 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { insertVehicleSchema } from "@shared/schema"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
-import { useCreateVehicle } from "@/hooks/use-vehicles"
+// TODO: Replace with Supabase hooks
+// import { useCreateVehicle } from "@/hooks/use-vehicles"
 import { useToast } from "@/hooks/use-toast"
-import { useDrivers } from "@/hooks/use-drivers"
+// TODO: Replace with Supabase hooks
+// import { useDrivers } from "@/hooks/use-drivers"
 import { Loader2 } from "lucide-react"
 import { z } from "zod"
 
@@ -20,8 +22,12 @@ interface AddVehicleModalProps {
 }
 
 export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
-  const { data: drivers = [] } = useDrivers()
-  const { mutate: createVehicle, isPending } = useCreateVehicle()
+  // TODO: Replace with Supabase hooks
+  const { data: drivers = [] } = { data: [] as any[] }
+  const { mutate: createVehicle, isPending } = { 
+    mutate: (data: any) => console.log('🔧 Supabase integration needed for vehicle creation', data),
+    isPending: false
+  }
   const { toast } = useToast()
 
   const form = useForm<FormData>({

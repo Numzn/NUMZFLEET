@@ -1,7 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Fuel, Wallet, Info, Car, PlusCircle } from "lucide-react";
-import { useFuelRecords } from "@/hooks/use-fuel-records";
-import { useVehicles } from "@/hooks/use-vehicles";
+// TODO: Replace with Supabase hooks
+// import { useFuelRecords } from "@/hooks/use-fuel-records";
+// TODO: Replace with Supabase hooks
+// import { useVehicles } from "@/hooks/use-vehicles";
 import { Badge } from "@/components/ui/badge";
 import { DateTime } from "luxon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -9,8 +11,9 @@ import { calculateFuelEfficiency } from "@/lib/utils";
 import React from "react";
 
 export function DashboardMetricsCards({ onAddFuelRecord }: { onAddFuelRecord?: () => void }) {
-  const { data: vehicles = [] } = useVehicles();
-  const { data: fuelRecords = [] } = useFuelRecords();
+  // TODO: Replace with Supabase hooks
+  const { data: vehicles = [] } = { data: [] as any[] };
+  const { data: fuelRecords = [] } = { data: [] as any[] };
 
   // Vehicles Needing Refuel (21+ days)
   const vehiclesNeedingRefuel = vehicles.filter(vehicle => {

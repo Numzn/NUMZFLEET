@@ -17,23 +17,22 @@ import {
 } from 'lucide-react';
 
 export default function DebugPage() {
-  const [firebaseResults, setFirebaseResults] = useState<any>(null);
+  const [supabaseResults, setSupabaseResults] = useState<any>(null);
   const [traccarResults, setTraccarResults] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const runFirebaseTests = async () => {
+  const runSupabaseTests = async () => {
     setIsLoading(true);
     try {
+      // TODO: Implement with Supabase
+      console.log('🔧 Supabase integration needed for diagnostics');
       const results = {
-        permissions: await (window as any).testFirebasePermissions(),
-        admins: await (window as any).checkFirebaseAdmins(),
-        authUsers: await (window as any).checkFirebaseAuthUsers(),
-        diagnostics: await (window as any).runFirebaseDiagnostics(),
+        message: 'Supabase integration not yet implemented'
       };
-      setFirebaseResults(results);
+      setSupabaseResults(results);
     } catch (error) {
-      console.error('Firebase tests failed:', error);
-      setFirebaseResults({ error: error instanceof Error ? error.message : 'Unknown error' });
+      console.error('Supabase tests failed:', error);
+      setSupabaseResults({ error: error instanceof Error ? error.message : 'Unknown error' });
     } finally {
       setIsLoading(false);
     }
@@ -56,11 +55,12 @@ export default function DebugPage() {
     }
   };
 
-  const resetFirebase = async () => {
-    if (confirm('Are you sure you want to reset Firebase to initial state? This will delete all data!')) {
+  const resetSupabase = async () => {
+    if (confirm('Are you sure you want to reset Supabase to initial state? This will delete all data!')) {
       try {
-        await (window as any).resetFirebaseToInitial();
-        alert('Firebase reset complete. Please refresh the page.');
+        // TODO: Implement with Supabase
+        console.log('🔧 Supabase integration needed for reset');
+        alert('Supabase reset complete (placeholder). Please refresh the page.');
       } catch (error) {
         alert(`Reset failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -69,8 +69,9 @@ export default function DebugPage() {
 
   const createTestAdmin = async () => {
     try {
-      await (window as any).createTestAdmin();
-      alert('Test admin created successfully!');
+      // TODO: Implement with Supabase
+      console.log('🔧 Supabase integration needed for test admin creation');
+      alert('Test admin created successfully (placeholder)!');
     } catch (error) {
       alert(`Failed to create test admin: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -81,28 +82,28 @@ export default function DebugPage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-2">🔧 System Debug & Diagnostics</h1>
         <p className="text-muted-foreground">
-          Comprehensive testing and debugging tools for Firebase and Traccar integration
+          Comprehensive testing and debugging tools for Supabase and Traccar integration
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Firebase Diagnostics */}
+        {/* Supabase Diagnostics */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
-              Firebase Diagnostics
+              Supabase Diagnostics
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Button 
-                onClick={runFirebaseTests} 
+                onClick={runSupabaseTests} 
                 disabled={isLoading}
                 className="flex-1"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Run Firebase Tests
+                Run Supabase Tests
               </Button>
             </div>
             
@@ -117,20 +118,20 @@ export default function DebugPage() {
               </Button>
               
               <Button 
-                onClick={resetFirebase} 
+                onClick={resetSupabase} 
                 variant="destructive"
                 className="flex-1"
               >
                 <Settings className="h-4 w-4 mr-2" />
-                Reset Firebase
+                Reset Supabase
               </Button>
             </div>
 
-            {firebaseResults && (
+            {supabaseResults && (
               <div className="mt-4 p-4 bg-muted rounded-lg">
                 <h4 className="font-semibold mb-2">Test Results:</h4>
                 <pre className="text-xs overflow-auto max-h-64">
-                  {JSON.stringify(firebaseResults, null, 2)}
+                  {JSON.stringify(supabaseResults, null, 2)}
                 </pre>
               </div>
             )}
@@ -218,12 +219,12 @@ export default function DebugPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h4 className="font-semibold mb-2">Firebase Commands:</h4>
+              <h4 className="font-semibold mb-2">Supabase Commands:</h4>
               <ul className="text-sm space-y-1">
-                <li><code className="bg-muted px-1 rounded">runFirebaseDiagnostics()</code></li>
-                <li><code className="bg-muted px-1 rounded">checkFirebaseAdmins()</code></li>
-                <li><code className="bg-muted px-1 rounded">testFirebasePermissions()</code></li>
-                <li><code className="bg-muted px-1 rounded">createTestAdmin()</code></li>
+                <li><code className="bg-muted px-1 rounded">runSupabaseDiagnostics()</code> (TODO)</li>
+                <li><code className="bg-muted px-1 rounded">checkSupabaseAdmins()</code> (TODO)</li>
+                <li><code className="bg-muted px-1 rounded">testSupabasePermissions()</code> (TODO)</li>
+                <li><code className="bg-muted px-1 rounded">createTestAdmin()</code> (TODO)</li>
               </ul>
             </div>
             

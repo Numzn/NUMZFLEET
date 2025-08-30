@@ -12,10 +12,14 @@ import { AddFuelRecordModal } from "@/components/dashboard/add-fuel-record-modal
 import { VehicleTable } from "@/components/dashboard/vehicle-table"
 import { RefuelEntryTable } from "@/components/dashboard/refuel-entry-table"
 import { FuelRecordSummaryTable } from "@/components/dashboard/fuel-record-summary-table"
-import { useVehicles, useExportCSV, useDrivers, useFuelRecords } from "@/hooks/use-local-storage"
+import { useVehicles as useSupabaseVehicles } from "@/hooks/use-supabase-vehicles"
+import { useFuelRecords as useSupabaseFuelRecords } from "@/hooks/use-supabase-fuel-records"
+import { useDrivers as useSupabaseDrivers } from "@/hooks/use-supabase-drivers"
+import { useExportCSV } from "@/hooks/use-supabase-export-csv"
 import { Calendar, Save, Bell, Sun, Moon, Fuel, User, PlusCircle, Car } from "lucide-react"
 import React from "react"
 import { DashboardMetricsCards } from "@/components/dashboard/dashboard-metrics-cards";
+
 
 export default function Dashboard() {
   const [view, setView] = React.useState<"refueling" | "analytics">("refueling");
@@ -29,9 +33,9 @@ export default function Dashboard() {
     return savedSelection ? new Set(JSON.parse(savedSelection)) : new Set()
   })
   
-  const { data: vehicles = [], isLoading: vehiclesLoading } = useVehicles()
-  const { data: drivers = [], isLoading: driversLoading } = useDrivers()
-  const { data: fuelRecords = [], isLoading: fuelRecordsLoading } = useFuelRecords()
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useSupabaseVehicles()
+  const { data: drivers = [], isLoading: driversLoading } = useSupabaseDrivers()
+  const { data: fuelRecords = [], isLoading: fuelRecordsLoading } = useSupabaseFuelRecords()
   const exportCSVMutation = useExportCSV()
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()

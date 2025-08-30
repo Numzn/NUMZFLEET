@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button"
 import { VehicleTable } from "@/components/dashboard/vehicle-table"
 import { AddVehicleModal } from "@/components/dashboard/add-vehicle-modal"
 import { AddDriverModal } from "@/components/dashboard/add-driver-modal"
-import { useVehicles } from "@/hooks/use-vehicles"
-import { useDrivers } from "@/hooks/use-drivers"
+import { useVehicles } from "@/hooks/use-supabase-vehicles"
+import { useDrivers } from "@/hooks/use-supabase-drivers"
 import { Plus, Users, Car, Settings } from "lucide-react"
 import { NavigationBar } from "@/components/NavigationBar"
 
@@ -100,7 +100,7 @@ export default function VehicleManagement() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {vehicles.filter(v => v.driverId).length}
+                                 {vehicles.filter(v => v.driver_id).length}
               </div>
               <p className="text-xs text-muted-foreground">
                 Vehicles with assigned drivers
@@ -143,19 +143,19 @@ export default function VehicleManagement() {
                       </div>
                       <div className="flex-1">
                         <h3 className="font-medium">{driver.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {driver.licenseNumber || "No license"}
-                        </p>
-                        {driver.phoneNumber && (
-                          <p className="text-xs text-muted-foreground">
-                            {driver.phoneNumber}
-                          </p>
-                        )}
+                                                 <p className="text-sm text-muted-foreground">
+                           {driver.license_number || "No license"}
+                         </p>
+                         {driver.phone_number && (
+                           <p className="text-xs text-muted-foreground">
+                             {driver.phone_number}
+                           </p>
+                         )}
                       </div>
                     </div>
                     <div className="mt-3">
                       <div className="text-xs text-muted-foreground">
-                        Assigned Vehicles: {vehicles.filter(v => v.driverId === driver.id).length}
+                                                 Assigned Vehicles: {vehicles.filter(v => v.driver_id === driver.id).length}
                       </div>
                     </div>
                   </div>

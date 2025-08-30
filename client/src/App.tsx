@@ -6,7 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataSyncProvider } from "@/components/data-sync/DataSyncProvider";
-import "@/lib/session-utils"; // Load session management utilities
+// TODO: Replace with Supabase session management
+// import "@/lib/session-utils";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -19,7 +20,8 @@ import Reports from "@/pages/reports";
 import Analytics from "@/pages/analytics";
 import LiveTracking from "@/pages/live-tracking";
 import LoginPage from "@/pages/login";
-import AdminResetPage from "@/pages/admin-reset";
+// TODO: Replace with Supabase admin reset
+// import AdminResetPage from "@/pages/admin-reset";
 import DebugPage from "@/pages/debug";
 import TraccarAdmin from "@/pages/traccar-admin";
 
@@ -44,7 +46,8 @@ function AppContent() {
   if (forceLogin || !user || !adminUser) {
     return (
       <Switch>
-        <Route path="/admin-reset" component={AdminResetPage} />
+        {/* TODO: Replace with Supabase admin reset */}
+        {/* <Route path="/admin-reset" component={AdminResetPage} /> */}
         <Route component={LoginPage} />
       </Switch>
     );

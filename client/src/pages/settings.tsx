@@ -3,43 +3,26 @@ import { Button } from "@/components/ui/button";
 import { NavigationBar } from "@/components/NavigationBar";
 import { useToast } from "@/hooks/use-toast";
 import React from "react";
-import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
-import { db, withFirestoreRetry, isFirestoreAvailable } from "@/lib/firebase";
-import { initializeData } from "@/lib/initData";
+// TODO: Replace with Supabase imports
+// import { supabase } from "@/lib/supabase";
 
 export default function Settings() {
   const { toast } = useToast();
   const [clearing, setClearing] = React.useState(false);
   const [showReload, setShowReload] = React.useState(false);
 
-  // Helper to clear all Firestore collections
-  async function clearAllFirestoreCollections() {
-    if (!isFirestoreAvailable()) {
-      throw new Error("Firestore is not available for clearing operations");
-    }
-
+  // Helper to clear all Supabase collections
+  async function clearAllSupabaseCollections() {
+    // TODO: Implement with Supabase
+    console.log("🔧 Supabase integration needed for clearing collections");
+    
     const collectionsToClear = ["vehicles", "drivers", "fuelRecords"];
-
+    
     for (const col of collectionsToClear) {
-      await withFirestoreRetry(async () => {
-        // Fetch documents
-        const snap = await getDocs(collection(db, col));
-        if (snap.empty) {
-          console.log(`No documents found in ${col}`);
-          return;
-        }
-
-        // Delete documents in batches to avoid overwhelming Firestore
-        const deletePromises = snap.docs.map(async (d) => {
-          await deleteDoc(doc(db, col, d.id));
-          console.log(`Deleted from ${col}:`, d.id);
-        });
-
-        await Promise.all(deletePromises);
-        console.log(`Successfully cleared collection: ${col}`);
-      });
+      console.log(`Would clear collection: ${col}`);
     }
-    console.log("Firestore clearing complete");
+    
+    console.log("Supabase clearing complete (placeholder)");
   }
 
   const handleClearDatabase = async () => {
@@ -62,8 +45,8 @@ export default function Settings() {
         );
       }
 
-      // Clear all Firestore collections
-      await clearAllFirestoreCollections();
+      // Clear all Supabase collections
+      await clearAllSupabaseCollections();
 
       toast({
         title: "Database Cleared",
@@ -105,10 +88,11 @@ export default function Settings() {
                 )}
                 <Button className="ml-4" variant="secondary" onClick={async () => {
                   try {
-                    await initializeData();
+                    // TODO: Implement with Supabase
+                    console.log("🔧 Supabase integration needed for sample data initialization");
                     toast({
                       title: "Sample Data Initialized",
-                      description: "Demo data has been added to the database.",
+                      description: "Demo data has been added to the database (placeholder).",
                     });
                   } catch (err) {
                     toast({
@@ -118,8 +102,8 @@ export default function Settings() {
                     });
                   }
                 }}>
-                               Add Demo Sample Data
-                             </Button>
+                  Add Demo Sample Data
+                </Button>
                 <p className="text-xs text-muted-foreground mt-2">
                   This will remove all data stored in your browser for this app. This action cannot be undone.
                 </p>

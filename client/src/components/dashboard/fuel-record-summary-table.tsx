@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useFuelRecords } from "@/hooks/use-fuel-records"
-import { useVehicles } from "@/hooks/use-vehicles"
+import { useFuelRecords } from "@/hooks/use-supabase-fuel-records"
+import { useVehicles } from "@/hooks/use-supabase-vehicles"
 import { DateTime } from "luxon"
 import { Paperclip } from "lucide-react"
 

@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Plus, Edit, Trash2, Car, Fuel, User, MapPin } from "lucide-react"
 import type { Vehicle } from "@shared/schema"
-import { useUpdateVehicle, useDeleteVehicle } from "@/hooks/use-vehicles"
-import { useDrivers } from "@/hooks/use-drivers"
-import { useFuelRecords } from "@/hooks/use-fuel-records";
+import { useUpdateVehicle, useDeleteVehicle } from "@/hooks/use-supabase-vehicles"
+import { useDrivers } from "@/hooks/use-supabase-drivers"
+import { useFuelRecords } from "@/hooks/use-supabase-fuel-records";
 import { calculateFuelEfficiency } from "@/lib/utils";
 import { cn } from "@/lib/utils"
 
@@ -28,9 +28,9 @@ export function VehicleTable({ vehicles, onAddVehicle, onVehicleSelect, selected
   const isControlled = typeof selectedVehicleIds !== 'undefined'
   const selectedVehicles = isControlled ? new Set(selectedVehicleIds) : internalSelected
 
-  const { mutateAsync: updateVehicle } = useUpdateVehicle()
-  const deleteVehicleMutation = useDeleteVehicle()
-  const { data: drivers = [] } = useDrivers()
+  const { mutateAsync: updateVehicle } = useUpdateVehicle();
+  const deleteVehicleMutation = useDeleteVehicle();
+  const { data: drivers = [] } = useDrivers();
   const { data: fuelRecords = [] } = useFuelRecords();
 
   const filteredVehicles = useMemo(() => {
@@ -44,7 +44,7 @@ export function VehicleTable({ vehicles, onAddVehicle, onVehicleSelect, selected
         break
       case "driver":
         filtered = filtered.filter(vehicle => {
-          const driver = drivers.find(d => d.id === vehicle.driverId)
+          const driver = drivers.find(d => d.id === vehicle.driver_id)
           return (driver?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
         })
         break
@@ -57,8 +57,8 @@ export function VehicleTable({ vehicles, onAddVehicle, onVehicleSelect, selected
         filtered = filtered.filter(vehicle =>
           vehicle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           vehicle.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (vehicle.registrationNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (drivers.find(d => d.id === vehicle.driverId)?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+          (vehicle.registration_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (drivers.find(d => d.id === vehicle.driver_id)?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
         )
     }
 
@@ -72,7 +72,7 @@ export function VehicleTable({ vehicles, onAddVehicle, onVehicleSelect, selected
   const handleEditSave = async (vehicleId: string, field: string, value: string) => {
     const numberValue = parseFloat(value) || 0
     const updates = field === 'mileage' 
-      ? { currentMileage: numberValue }
+      ? { current_mileage: numberValue }
       : { budget: numberValue }
 
     await updateVehicle({ 

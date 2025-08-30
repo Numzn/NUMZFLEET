@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NavigationBar } from "@/components/NavigationBar";
-import { useVehicles } from "@/hooks/use-vehicles";
-import { useFuelRecords } from "@/hooks/use-fuel-records";
-import { useDrivers } from "@/hooks/use-drivers";
+import { useVehicles } from "@/hooks/use-supabase-vehicles";
+import { useFuelRecords } from "@/hooks/use-supabase-fuel-records";
+import { useDrivers } from "@/hooks/use-supabase-drivers";
 import React from "react";
 import { FuelRecord, Vehicle, Driver } from "@shared/schema";
 import { Button } from "@/components/ui/button";

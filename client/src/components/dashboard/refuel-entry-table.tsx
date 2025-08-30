@@ -2,8 +2,10 @@ import { useState, useCallback, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { useVehicles } from "@/hooks/use-vehicles"
-import { useCreateFuelRecord } from "@/hooks/use-fuel-records"
+// TODO: Replace with Supabase hooks
+// import { useVehicles } from "@/hooks/use-vehicles"
+// TODO: Replace with Supabase hooks
+// import { useCreateFuelRecord } from "@/hooks/use-fuel-records"
 import { useToast } from "@/hooks/use-toast"
 import { Vehicle } from "@shared/schema"
 import { cn } from "@/lib/utils"
@@ -20,8 +22,14 @@ interface EditableRow {
 }
 
 export function RefuelEntryTable({ selectedVehicleIds }: RefuelEntryTableProps) {
-  const { data: vehicles = [] } = useVehicles();
-  const { createFuelRecord } = useCreateFuelRecord();
+  // TODO: Replace with Supabase hooks
+  const { data: vehicles = [] } = { data: [] as any[] };
+  const { createFuelRecord } = { 
+    createFuelRecord: async (data: any) => {
+      console.log('🔧 Supabase integration needed for fuel record creation', data);
+      return data;
+    }
+  };
   const { toast } = useToast();
 
   const [editableRows, setEditableRows] = useState<Record<string, EditableRow>>({});

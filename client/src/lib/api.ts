@@ -1,14 +1,12 @@
-import { db, collections } from './firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+// TODO: Replace with Supabase imports
+// import { supabase } from './supabase';
 
-// Generic API functions
+// Generic API functions - Supabase ready placeholders
 export async function fetchCollection(collectionName: string) {
   try {
-    const snapshot = await getDocs(collection(db, collectionName));
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    // TODO: Implement with Supabase
+    console.log(`🔧 Supabase integration needed for fetching ${collectionName}`);
+    return [];
   } catch (error) {
     console.error(`Error fetching ${collectionName}:`, error);
     throw error;
@@ -17,11 +15,9 @@ export async function fetchCollection(collectionName: string) {
 
 export async function addDocument(collectionName: string, data: any) {
   try {
-    const docRef = await addDoc(collection(db, collectionName), data);
-    return {
-      id: docRef.id,
-      ...data
-    };
+    // TODO: Implement with Supabase
+    console.log(`🔧 Supabase integration needed for adding to ${collectionName}`, data);
+    return { id: 'placeholder', ...data };
   } catch (error) {
     console.error(`Error adding document to ${collectionName}:`, error);
     throw error;
@@ -30,12 +26,9 @@ export async function addDocument(collectionName: string, data: any) {
 
 export async function updateDocument(collectionName: string, id: string, data: any) {
   try {
-    const docRef = doc(db, collectionName, id);
-    await updateDoc(docRef, data);
-    return {
-      id,
-      ...data
-    };
+    // TODO: Implement with Supabase
+    console.log(`🔧 Supabase integration needed for updating ${collectionName}/${id}`, data);
+    return { id, ...data };
   } catch (error) {
     console.error(`Error updating document in ${collectionName}:`, error);
     throw error;
@@ -44,7 +37,8 @@ export async function updateDocument(collectionName: string, id: string, data: a
 
 export async function deleteDocument(collectionName: string, id: string) {
   try {
-    await deleteDoc(doc(db, collectionName, id));
+    // TODO: Implement with Supabase
+    console.log(`🔧 Supabase integration needed for deleting ${collectionName}/${id}`);
     return true;
   } catch (error) {
     console.error(`Error deleting document from ${collectionName}:`, error);

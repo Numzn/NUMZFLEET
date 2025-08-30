@@ -6,46 +6,12 @@ import { ErrorBoundary } from "./components/error-boundary";
 import App from "./App";
 import "./index.css";
 
-// Initialize Firebase
-import "./lib/firebase";
+// Initialize Supabase (will be added later)
+// import "./lib/supabase";
 
-// Initialize sample data in development
+// Development debugging functions
 if (import.meta.env.DEV) {
-  import("./lib/initData")
-    .then(({ initializeData }) => {
-      initializeData()
-        .then(() => console.log("Development data initialization complete"))
-        .catch(console.error);
-    })
-    .catch(console.error);
-  
-  // Add Firebase admin checking functions to window for debugging
-  import("./lib/checkFirebaseAdmins")
-    .then(({ checkFirebaseAdmins, checkAdminByEmail, checkFirebaseAuthUsers }) => {
-      (window as any).checkFirebaseAdmins = checkFirebaseAdmins;
-      (window as any).checkAdminByEmail = checkAdminByEmail;
-      (window as any).checkFirebaseAuthUsers = checkFirebaseAuthUsers;
-    })
-    .catch(console.error);
-  
-  // Add Firebase permission testing functions
-  import("./lib/firebaseRules")
-    .then(({ testFirebasePermissions, createTestAdmin, resetFirebaseToInitial }) => {
-      (window as any).testFirebasePermissions = testFirebasePermissions;
-      (window as any).createTestAdmin = createTestAdmin;
-      (window as any).resetFirebaseToInitial = resetFirebaseToInitial;
-    })
-    .catch(console.error);
-  
-  // Add Firebase diagnostic functions
-  import("./lib/firebaseDiagnostics")
-    .then(({ runFirebaseDiagnostics, verifyFirebaseProject }) => {
-      (window as any).runFirebaseDiagnostics = runFirebaseDiagnostics;
-      (window as any).verifyFirebaseProject = verifyFirebaseProject;
-    })
-    .catch(console.error);
-  
-  // Add Traccar debugging functions
+  // Add legacy Traccar debugging functions
   import("./lib/traccar-auth")
     .then(({ debugTraccarAuth, authenticateTraccarBackground, getTraccarCredentials }) => {
       (window as any).debugTraccarAuth = debugTraccarAuth;
@@ -63,13 +29,6 @@ if (import.meta.env.DEV) {
     })
     .catch(console.error);
   
-  console.log("🔧 Firebase debugging functions available in console:");
-  console.log("  - runFirebaseDiagnostics() - Comprehensive Firebase diagnostics");
-  console.log("  - verifyFirebaseProject() - Quick project verification");
-  console.log("  - testFirebasePermissions() - Test database permissions");
-  console.log("  - checkFirebaseAdmins() - Check admin accounts");
-  console.log("  - createTestAdmin() - Create a test admin account");
-  console.log("  - resetFirebaseToInitial() - Reset database to initial state");
   console.log("🔧 Traccar debugging functions available in console:");
   console.log("  - debugTraccarAuth() - Check Traccar authentication status");
   console.log("  - authenticateTraccarBackground() - Manually trigger Traccar auth");

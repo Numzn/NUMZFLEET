@@ -7,7 +7,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { insertVehicleSchema } from "@shared/schema"
 import type { InsertVehicle, Vehicle } from "@shared/schema"
-import { useUpdateVehicle, useDrivers } from "@/hooks/use-local-storage"
+import { useUpdateVehicle } from "@/hooks/use-supabase-vehicles"
+import { useDrivers } from "@/hooks/use-supabase-drivers"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
 
 interface EditVehicleModalProps {

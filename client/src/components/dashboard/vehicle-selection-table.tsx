@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Check } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useVehicles } from "@/hooks/use-vehicles"
+import { useVehicles } from "@/hooks/use-supabase-vehicles"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -61,11 +61,11 @@ export function VehicleSelectionTable({ selectedVehicles, setSelectedVehicles }:
             <TableBody>
               {vehicles.map((vehicle) => {
                 const isSelected = selectedVehicles.has(vehicle.id)
-                const style = {
-                  backgroundColor: vehicle.fuelType?.toLowerCase() === 'diesel' ? 'rgb(243 232 255)' : 
-                                vehicle.fuelType?.toLowerCase() === 'petrol' ? 'rgb(220 252 231)' : 
-                                'transparent'
-                }
+                                 const style = {
+                   backgroundColor: vehicle.fuel_type?.toLowerCase() === 'diesel' ? 'rgb(243 232 255)' : 
+                                 vehicle.fuel_type?.toLowerCase() === 'petrol' ? 'rgb(220 252 231)' : 
+                                 'transparent'
+                 }
 
                 return (
                   <TableRow 
@@ -87,8 +87,8 @@ export function VehicleSelectionTable({ selectedVehicles, setSelectedVehicles }:
                     </TableCell>
                     <TableCell className="font-medium">{vehicle.name}</TableCell>
                     <TableCell>{vehicle.type}</TableCell>
-                    <TableCell>{vehicle.fuelType || 'N/A'}</TableCell>
-                    <TableCell className="text-right">{vehicle.budget.toLocaleString()}</TableCell>
+                                         <TableCell>{vehicle.fuel_type || 'N/A'}</TableCell>
+                     <TableCell className="text-right">{(vehicle.budget || 0).toLocaleString()}</TableCell>
                   </TableRow>
                 )
               })}

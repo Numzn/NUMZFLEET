@@ -7,6 +7,7 @@ import { Calculator, Upload, Plus, Bolt, FileText, Download, Edit, Trash, Histor
 import type { Vehicle } from "@shared/schema"
 import { useToast } from "@/hooks/use-toast"
 import { trackEvent } from "@/lib/analytics"
+import * as AnalyticsHelpers from "@/lib/analytics"
 
 interface BudgetSummaryProps {
   vehicles: Vehicle[]
@@ -24,7 +25,7 @@ export function BudgetSummary({ vehicles }: BudgetSummaryProps) {
   const handleRecordAllocation = () => {
     try {
       // Track the allocation event
-      trackEvent.pageView('record_allocation')
+      AnalyticsHelpers.trackPageView('record_allocation')
       
       toast({
         title: "Allocation Recorded",
@@ -39,7 +40,7 @@ export function BudgetSummary({ vehicles }: BudgetSummaryProps) {
         description: "Could not save your allocation. Please try again.",
         variant: "destructive"
       })
-      trackEvent.error(error as Error, "Record Allocation")
+      AnalyticsHelpers.trackError("Record Allocation", error instanceof Error ? error.message : "Unknown error")
     }
   }
   const formatCurrency = (amount: number) => {

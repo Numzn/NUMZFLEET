@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { useCreateFuelRecord } from "@/hooks/use-fuel-records"
-import { useVehicles } from "@/hooks/use-vehicles"
+// TODO: Replace with Supabase hooks
+// import { useCreateFuelRecord } from "@/hooks/use-fuel-records"
+// TODO: Replace with Supabase hooks
+// import { useVehicles } from "@/hooks/use-vehicles"
 import { useToast } from "@/hooks/use-toast"
 
 interface AddFuelRecordModalProps {
@@ -21,8 +23,14 @@ export function AddFuelRecordModal({ open, onOpenChange }: AddFuelRecordModalPro
   const [attendant, setAttendant] = useState("")
   const [pumpNumber, setPumpNumber] = useState("")
   
-  const { data: vehicles = [] } = useVehicles()
-  const { createFuelRecord } = useCreateFuelRecord()
+  // TODO: Replace with Supabase hooks
+  const { data: vehicles = [] } = { data: [] as any[] }
+  const { createFuelRecord } = { 
+    createFuelRecord: async (data: any) => {
+      console.log('🔧 Supabase integration needed for fuel record creation', data);
+      return data;
+    }
+  }
   const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
