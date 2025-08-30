@@ -1,75 +1,26 @@
 import React from 'react';
-import { Calendar, Car, BarChart, TrendingUp, MapPin, Shield, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { SyncStatusIndicator } from '@/components/data-sync/SyncStatusIndicator';
+import { useNavigation } from '@/contexts/NavigationContext';
+import { NAV_ITEMS } from '@/lib/routing';
 
 interface SidebarNavProps {
   className?: string;
 }
 
-interface NavItem {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  badge?: string;
-  adminOnly?: boolean;
-  description?: string;
-}
-
-const navItems: NavItem[] = [
-  {
-    href: '/',
-    icon: Calendar,
-    label: 'Dashboard',
-    description: 'Overview and metrics',
-  },
-  {
-    href: '/vehicles',
-    icon: Car,
-    label: 'Vehicle Management',
-    description: 'Manage fleet vehicles',
-  },
-  {
-    href: '/reports',
-    icon: BarChart,
-    label: 'Reports',
-    description: 'Generate reports',
-  },
-  {
-    href: '/analytics',
-    icon: TrendingUp,
-    label: 'Analytics',
-    description: 'Data insights',
-  },
-  {
-    href: '/tracking',
-    icon: MapPin,
-    label: 'Live Tracking',
-    description: 'GPS tracking',
-  },
-  {
-    href: '/traccar-admin',
-    icon: Shield,
-    label: 'GPS Admin',
-    description: 'Device management',
-    adminOnly: true,
-  },
-  {
-    href: '/settings',
-    icon: Settings,
-    label: 'Settings',
-    description: 'System configuration',
-  },
-];
-
 export function SidebarNav({ className }: SidebarNavProps) {
   const { isOwner } = useAuth();
-  const currentPath = window.location.pathname;
+  const { currentPath, navigate } = useNavigation();
 
-  const filteredNavItems = navItems.filter(item => 
+  const filteredNavItems = NAV_ITEMS.filter(item => 
     !item.adminOnly || isOwner
   );
+
+  const handleNavigation = (href: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(href);
+  };
 
   return (
     <div className={cn("flex-1 overflow-auto py-4", className)}>
@@ -79,11 +30,11 @@ export function SidebarNav({ className }: SidebarNavProps) {
           const isActive = currentPath === item.href;
           
           return (
-            <a
+            <button
               key={item.href}
-              href={item.href}
+              onClick={(e) => handleNavigation(item.href, e)}
               className={cn(
-                "group flex items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                "group flex items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 w-full text-left",
                 "hover:bg-accent hover:text-accent-foreground",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-sm"
@@ -119,7 +70,7 @@ export function SidebarNav({ className }: SidebarNavProps) {
                   </p>
                 )}
               </div>
-            </a>
+            </button>
           );
         })}
       </nav>

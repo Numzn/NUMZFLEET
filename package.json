@@ -13,9 +13,10 @@
     "db:deploy": "npx supabase db push",
     "db:migrate": "npx supabase migration new",
     "db:diff": "npx supabase db diff --linked",
-    "db:logs": "npx supabase logs",
+    "db:logs": "npx supabase db logs",
     "db:help": "node scripts/database-help.js",
-    "setup:admins": "node scripts/setup-admin-credentials.js"
+    "setup:admins": "node scripts/setup-admin-credentials.js",
+    "test:auth": "node scripts/test-auth.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
