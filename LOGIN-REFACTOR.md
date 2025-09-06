@@ -20,12 +20,12 @@ The login page has been completely refactored to be **simple and functional** wi
 ### **First Time Setup**
 1. **Navigate to login page**
 2. **Enter credentials**: `admin` / `admin1234`
-3. **System automatically creates** the admin account in Firebase
+3. **System automatically creates** the admin account in Supabase
 4. **Login successful** - Redirected to dashboard
 
 ### **Subsequent Logins**
 1. **Enter credentials**: `admin` / `admin1234`
-2. **System authenticates** against existing Firebase account
+2. **System authenticates** against existing Supabase account
 3. **Login successful** - Redirected to dashboard
 
 ## 🔧 **Technical Implementation**
@@ -58,7 +58,7 @@ The login page has been completely refactored to be **simple and functional** wi
 ## 🔒 **Security Features**
 
 ### **Authentication Flow**
-- **Firebase Authentication** - Secure, industry-standard auth
+- **Supabase Authentication** - Secure, industry-standard auth
 - **Admin role verification** - Only admin users can access the system
 - **Session management** - Proper logout and session clearing
 - **Force login mode** - Prevents automatic login bypass
@@ -91,7 +91,7 @@ The login page has been completely refactored to be **simple and functional** wi
 
 ### **Dependencies**
 - All existing UI components maintained
-- Firebase authentication unchanged
+- Supabase authentication unchanged
 - Traccar integration preserved
 
 ### **Testing**

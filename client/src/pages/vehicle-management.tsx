@@ -7,13 +7,14 @@ import { AddDriverModal } from "@/components/dashboard/add-driver-modal"
 import { useVehicles } from "@/hooks/use-supabase-vehicles"
 import { useDrivers } from "@/hooks/use-supabase-drivers"
 import { Plus, Users, Car, Settings } from "lucide-react"
-import { NavigationBar } from "@/components/NavigationBar"
+
 
 export default function VehicleManagement() {
   const [showAddVehicleModal, setShowAddVehicleModal] = useState(false)
   const [showAddDriverModal, setShowAddDriverModal] = useState(false)
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([])
   
+  // RE-ENABLED: Supabase data fetching hooks
   const { data: vehicles = [], isLoading: vehiclesLoading } = useVehicles()
   const { data: drivers = [], isLoading: driversLoading } = useDrivers()
 
@@ -39,7 +40,7 @@ export default function VehicleManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      <NavigationBar />
+
       {/* Main Content */}
       <main className="pt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}

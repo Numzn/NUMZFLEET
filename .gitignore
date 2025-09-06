@@ -16,9 +16,9 @@ out
 .env.production
 .env.development
 
-# Firebase admin SDK (security risk)
-**/firebase-adminsdk-*.json
-**/*-firebase-adminsdk-*.json
+# Supabase (keep these)
+.env.local
+.env.*.local
 
 # IDE and OS files
 .DS_Store

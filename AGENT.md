@@ -8,7 +8,7 @@
 
 ## Architecture
 - **Frontend**: React 18 + TypeScript SPA with Vite
-- **Database**: Firebase Firestore with offline persistence
+- **Database**: Supabase PostgreSQL with real-time subscriptions
 - **UI**: shadcn/ui components with Radix UI + Tailwind CSS
 - **Routing**: Wouter for client-side routing
 - **State**: TanStack Query for server state management

@@ -1,11 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
-import { NavigationBar } from "@/components/NavigationBar";
+
 
 export default function NotFound() {
   return (
     <div className="min-h-screen w-full bg-gray-50">
-      <NavigationBar />
+
       <div className="pt-20 flex items-center justify-center">
         <Card className="w-full max-w-md mx-4">
           <CardContent className="pt-6">

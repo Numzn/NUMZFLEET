@@ -150,7 +150,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    // Add timeout to prevent infinite loading
+    const authTimeout = setTimeout(() => {
+      if (mounted && isLoading) {
+        console.warn('⚠️ Authentication timeout - forcing login page');
+        setIsLoading(false);
+        setForceLogin(true);
+      }
+    }, 10000); // 10 second timeout
+
     initializeAuth();
+
+    return () => {
+      mounted = false;
+      clearTimeout(authTimeout);
+    };
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

@@ -15,6 +15,7 @@
     "db:diff": "npx supabase db diff --linked",
     "db:logs": "npx supabase db logs",
     "db:help": "node scripts/database-help.js",
+    "db:check": "node scripts/setup-database.js",
     "setup:admins": "node scripts/setup-admin-credentials.js",
     "test:auth": "node scripts/test-auth.js"
   },

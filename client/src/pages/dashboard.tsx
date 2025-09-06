@@ -19,6 +19,7 @@ import { useExportCSV } from "@/hooks/use-supabase-export-csv"
 import { Calendar, Save, Bell, Sun, Moon, Fuel, User, PlusCircle, Car } from "lucide-react"
 import React from "react"
 import { DashboardMetricsCards } from "@/components/dashboard/dashboard-metrics-cards";
+import { setupDatabase } from "@/lib/database-setup";
 
 
 export default function Dashboard() {
@@ -41,6 +42,51 @@ export default function Dashboard() {
   const { toast } = useToast()
 
   const isLoading = vehiclesLoading || driversLoading || fuelRecordsLoading
+
+  // Debug logging
+  console.log('🔍 Dashboard loading states:', { vehiclesLoading, driversLoading, fuelRecordsLoading, isLoading })
+  console.log('🔍 Dashboard data:', { vehicles: vehicles.length, drivers: drivers.length, fuelRecords: fuelRecords.length })
+
+  // Check database setup on mount
+  useEffect(() => {
+    const checkDatabase = async () => {
+      try {
+        console.log('🔍 Checking database setup...')
+        const result = await setupDatabase()
+        
+        if (!result.success) {
+          console.error('❌ Database setup failed:', result.message)
+          toast({
+            title: "Database Error",
+            description: result.message,
+            variant: "destructive"
+          })
+        } else {
+          console.log('✅ Database setup successful:', result.message)
+        }
+      } catch (error) {
+        console.error('❌ Database check error:', error)
+      }
+    }
+
+    checkDatabase()
+  }, [toast])
+
+  // Add timeout to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isLoading) {
+        console.warn('⚠️ Dashboard loading timeout - forcing display after 10 seconds')
+        toast({
+          title: "Loading Timeout",
+          description: "Dashboard took too long to load. Showing with available data.",
+          variant: "destructive"
+        })
+      }
+    }, 10000) // 10 second timeout
+
+    return () => clearTimeout(timeout)
+  }, [isLoading, toast])
 
   // Update localStorage when selection changes
   useEffect(() => {

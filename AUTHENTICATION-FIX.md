@@ -2,7 +2,7 @@
 
 ## 🎯 **Problem Solved**
 
-The system was automatically bypassing the login page and going straight to the dashboard due to persistent Firebase authentication sessions. This has been **permanently fixed** with a comprehensive solution.
+The system was automatically bypassing the login page and going straight to the dashboard due to persistent Supabase authentication sessions. This has been **permanently fixed** with a comprehensive solution.
 
 ## 🛠️ **What Was Changed**
 
@@ -13,7 +13,7 @@ The system was automatically bypassing the login page and going straight to the 
 
 ### 2. **Automatic Session Clearing (App.tsx)**
 - App always checks `forceLogin` state first
-- Login page shown regardless of existing Firebase sessions
+- Login page shown regardless of existing Supabase sessions
 - Dashboard only accessible after proper authentication
 
 ### 3. **Session Management Utilities (session-utils.ts)**
@@ -25,7 +25,7 @@ The system was automatically bypassing the login page and going straight to the 
 
 ### **App Startup Flow**
 1. **App starts** → `forceLogin = true`
-2. **Session clearing** → All Firebase sessions automatically cleared
+2. **Session clearing** → All Supabase sessions automatically cleared
 3. **Login page shown** → User must authenticate
 4. **After login** → `forceLogin = false`, dashboard accessible
 5. **On logout** → `forceLogin = true`, back to login page
@@ -63,7 +63,7 @@ window.forceLogout()
 4. **session-utils.ts** - Console utilities
 
 ### **Session Clearing Mechanisms**
-- **App Start**: Automatic Firebase session clearing
+- **App Start**: Automatic Supabase session clearing
 - **Browser Refresh**: Automatic cleanup on page refresh
 - **Manual Control**: User-initiated session clearing
 - **Logout**: Automatic force login re-enabling
@@ -119,7 +119,7 @@ window.forceLogout()
 4. Or run `window.clearAllSessions()` in console
 
 ### **Login Not Working?**
-1. Verify Firebase configuration
+1. Verify Supabase configuration
 2. Check admin account exists in database
 3. Use admin reset page if needed
 4. Check browser console for error messages
@@ -136,7 +136,7 @@ If you encounter any issues:
 1. Check browser console for error messages
 2. Use the provided console utilities
 3. Clear sessions using sidebar options
-4. Ensure Firebase configuration is correct
+4. Ensure Supabase configuration is correct
 
 ---
 

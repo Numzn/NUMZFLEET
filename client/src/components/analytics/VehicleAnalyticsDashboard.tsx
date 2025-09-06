@@ -57,16 +57,63 @@ export function VehicleAnalyticsDashboard() {
 
   // Calculate real vehicle-specific metrics using actual data
   // TODO: Replace with Supabase analytics
-  const fuelMetrics = { 
-    totalCost: 0, 
-    totalUsage: 0, 
-    averageUsage: 0,
-    monthlyTrend: []
-  };
-  const efficiencyScore = 0;
-  const lastRefuelDate = vehicleRecords.length > 0 
-    ? new Date(Math.max(...vehicleRecords.map((r: FuelRecord) => new Date(r.sessionDate).getTime())))
-    : new Date();
+  const fuelMetrics = React.useMemo(() => {
+    if (!vehicleRecords || vehicleRecords.length === 0) {
+      return {
+        totalCost: 0,
+        totalFuelUsed: 0,
+        totalUsage: 0,
+        averageUsage: 0,
+        monthlyTrend: []
+      };
+    }
+
+    const totalCost = vehicleRecords.reduce((sum, record) => sum + (record.fuelCost || 0), 0);
+    const totalFuelUsed = vehicleRecords.reduce((sum, record) => sum + (record.fuelAmount || 0), 0);
+    const averageUsage = totalFuelUsed / vehicleRecords.length;
+
+    // Calculate monthly trends
+    const monthlyTrend = vehicleRecords.reduce((acc, record) => {
+      const date = new Date(record.sessionDate);
+      const monthKey = date.toISOString().slice(0, 7); // YYYY-MM
+      
+      if (!acc[monthKey]) {
+        acc[monthKey] = { month: monthKey, totalFuel: 0, totalCost: 0 };
+      }
+      
+      acc[monthKey].totalFuel += record.fuelAmount || 0;
+      acc[monthKey].totalCost += record.fuelCost || 0;
+      
+      return acc;
+    }, {} as Record<string, { month: string; totalFuel: number; totalCost: number }>);
+
+    return {
+      totalCost,
+      totalFuelUsed,
+      totalUsage: totalFuelUsed,
+      averageUsage,
+      monthlyTrend: Object.values(monthlyTrend)
+    };
+  }, [vehicleRecords]);
+
+  const efficiencyScore = React.useMemo(() => {
+    if (!fuelMetrics.totalFuelUsed || fuelMetrics.totalFuelUsed === 0) {
+      return 0;
+    }
+    
+    // Simple efficiency calculation based on fuel usage patterns
+    // Higher score for lower fuel consumption relative to distance
+    const avgFuelPerSession = fuelMetrics.totalFuelUsed / vehicleRecords.length;
+    const baseScore = Math.max(0, 100 - (avgFuelPerSession * 2)); // Lower fuel = higher score
+    return Math.round(Math.min(100, Math.max(0, baseScore)));
+  }, [fuelMetrics.totalFuelUsed, vehicleRecords.length]);
+
+  const lastRefuelDate = React.useMemo(() => {
+    if (!vehicleRecords || vehicleRecords.length === 0) {
+      return new Date();
+    }
+    return new Date(Math.max(...vehicleRecords.map((r: FuelRecord) => new Date(r.sessionDate).getTime())));
+  }, [vehicleRecords]);
 
   // Real fuel station data (this would come from an actual fuel station API)
   const fuelStations = {

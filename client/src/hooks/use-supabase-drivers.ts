@@ -11,21 +11,29 @@ export const useDrivers = () => {
   return useQuery({
     queryKey: ['drivers'],
     queryFn: async (): Promise<Driver[]> => {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('*')
-        .eq('is_active', true)
-        .order('name')
+      console.log('🔍 Fetching drivers from Supabase...');
+      try {
+        const { data, error } = await supabase
+          .from('drivers')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
 
-      if (error) {
-        console.error('Error fetching drivers:', error)
-        throw error
+        if (error) {
+          console.error('❌ Error fetching drivers:', error);
+          throw error;
+        }
+
+        console.log('✅ Drivers fetched successfully:', data?.length || 0, 'drivers');
+        return data || [];
+      } catch (err) {
+        console.error('❌ Exception in drivers query:', err);
+        throw err;
       }
-
-      return data || []
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
+    retry: 1,
   })
 }
 

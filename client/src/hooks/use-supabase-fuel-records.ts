@@ -9,22 +9,30 @@ type FuelRecordUpdate = Database['public']['Tables']['fuel_records']['Update']
 // Fetch all fuel records
 export const useFuelRecords = () => {
   return useQuery({
-    queryKey: ['fuel-records'],
+    queryKey: ['fuelRecords'],
     queryFn: async (): Promise<FuelRecord[]> => {
-      const { data, error } = await supabase
-        .from('fuel_records')
-        .select('*')
-        .order('session_date', { ascending: false })
+      console.log('🔍 Fetching fuel records from Supabase...');
+      try {
+        const { data, error } = await supabase
+          .from('fuel_records')
+          .select('*')
+          .order('session_date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching fuel records:', error)
-        throw error
+        if (error) {
+          console.error('❌ Error fetching fuel records:', error);
+          throw error;
+        }
+
+        console.log('✅ Fuel records fetched successfully:', data?.length || 0, 'records');
+        return data || [];
+      } catch (err) {
+        console.error('❌ Exception in fuel records query:', err);
+        throw err;
       }
-
-      return data || []
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
+    retry: 1,
   })
 }
 

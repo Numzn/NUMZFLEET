@@ -1,12 +1,12 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Home, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { NAV_ITEMS } from '@/lib/routing';
 import { cn } from '@/lib/utils';
 
 export function NavigationHeader() {
-  const { currentPath, navigate, goBack, goForward, canGoBack, canGoForward, isNavigating } = useNavigation();
+  const { currentPath, navigate, goBack, goForward } = useNavigation();
 
   // Get current page info
   const currentPage = NAV_ITEMS.find(item => item.href === currentPath) || {
@@ -29,7 +29,6 @@ export function NavigationHeader() {
             variant="outline"
             size="sm"
             onClick={goBack}
-            disabled={!canGoBack || isNavigating}
             className="h-8 w-8 p-0"
             title="Go back"
           >
@@ -39,21 +38,12 @@ export function NavigationHeader() {
             variant="outline"
             size="sm"
             onClick={goForward}
-            disabled={!canGoForward || isNavigating}
             className="h-8 w-8 p-0"
             title="Go forward"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-
-        {/* Navigation Status */}
-        {isNavigating && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Navigating...</span>
-          </div>
-        )}
 
         {/* Breadcrumbs */}
         <div className="flex items-center gap-2 text-sm">
@@ -71,8 +61,7 @@ export function NavigationHeader() {
                 ) : (
                   <button
                     onClick={() => navigate(crumb.href)}
-                    disabled={isNavigating}
-                    className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {crumb.label}
                   </button>

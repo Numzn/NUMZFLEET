@@ -6,14 +6,10 @@ console.log('🚀 Setting up Vercel environment variables automatically...\n');
 
 // Environment variables to set
 const envVars = {
-  // Firebase Configuration
-  'VITE_FIREBASE_API_KEY': 'AIzaSyBfkSyQ4aSvx8vGSvWUjTox1uVo3jpsctQ',
-  'VITE_FIREBASE_AUTH_DOMAIN': 'numzfleet.firebaseapp.com',
-  'VITE_FIREBASE_PROJECT_ID': 'numzfleet',
-  'VITE_FIREBASE_STORAGE_BUCKET': 'numzfleet.firebasestorage.app',
-  'VITE_FIREBASE_MESSAGING_SENDER_ID': '956244443398',
-  'VITE_FIREBASE_APP_ID': '1:956244443398:web:40f0a017fccf6fa9311e87',
-  
+  // Supabase Configuration
+  'VITE_SUPABASE_URL': 'https://yyqvediztsrlugentoca.supabase.co',
+  'VITE_SUPABASE_ANON_KEY': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cXZlZGl6dHNybHVnZW50b2NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzOTM1NTUsImV4cCI6MjA3MTk2OTU1NX0.jAw3r078GtGTKkrLBXSv',
+   
   // Traccar Configuration
   'VITE_TRACCAR_URL': 'https://your-production-traccar-server.com',
   'VITE_TRACCAR_AUTH': 'YWRtaW46YWRtaW4=',

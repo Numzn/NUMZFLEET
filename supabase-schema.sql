@@ -7,12 +7,14 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS vehicles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
+    model VARCHAR(100) NOT NULL,
     type VARCHAR(100) NOT NULL,
     registration_number VARCHAR(50),
     fuel_type VARCHAR(50),
     fuel_capacity DECIMAL(10,2),
     current_mileage DECIMAL(12,2) DEFAULT 0,
     budget DECIMAL(12,2) DEFAULT 0,
+    actual DECIMAL(12,2) DEFAULT 0,
     driver_id UUID REFERENCES drivers(id),
     traccar_device_id VARCHAR(100),
     is_active BOOLEAN DEFAULT true,
@@ -69,6 +71,7 @@ CREATE TABLE IF NOT EXISTS system_config (
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_vehicles_driver_id ON vehicles(driver_id);
 CREATE INDEX IF NOT EXISTS idx_vehicles_is_active ON vehicles(is_active);
+CREATE INDEX IF NOT EXISTS idx_vehicles_model ON vehicles(model);
 CREATE INDEX IF NOT EXISTS idx_fuel_records_vehicle_id ON fuel_records(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_fuel_records_session_date ON fuel_records(session_date);
 CREATE INDEX IF NOT EXISTS idx_drivers_is_active ON drivers(is_active);

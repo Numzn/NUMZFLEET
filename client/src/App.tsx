@@ -1,6 +1,4 @@
-import { Switch, Route, useLocation, Router } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { Switch, Route, Router } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
@@ -57,8 +55,6 @@ function AppContent() {
     console.log('🔒 Showing login page...');
     return (
       <Switch>
-        {/* TODO: Replace with Supabase admin reset */}
-        {/* <Route path="/admin-reset" component={AdminResetPage} /> */}
         <Route component={LoginPage} />
       </Switch>
     );
@@ -84,21 +80,19 @@ function AppContent() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <AuthProvider>
-            <NavigationProvider>
-              <DataSyncProvider>
-                <Router>
-                  <AppContent />
-                  <Toaster />
-                </Router>
-              </DataSyncProvider>
-            </NavigationProvider>
-          </AuthProvider>
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <AuthProvider>
+          <NavigationProvider>
+            <DataSyncProvider>
+              <Router>
+                <AppContent />
+                <Toaster />
+              </Router>
+            </DataSyncProvider>
+          </NavigationProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   );
 }

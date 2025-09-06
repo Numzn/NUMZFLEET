@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { NavigationBar } from "@/components/NavigationBar";
+
 import { useToast } from "@/hooks/use-toast";
 import React from "react";
 // TODO: Replace with Supabase imports
@@ -68,7 +68,7 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-background">
-      <NavigationBar />
+
       <main className="pt-20 max-w-2xl mx-auto px-4 py-8">
         <Card>
           <CardHeader>

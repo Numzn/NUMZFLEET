@@ -1,104 +1,82 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 
-// Configure dotenv for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-dotenv.config({ path: join(__dirname, '..', '.env.local') });
+console.log('🔐 NUMZFLEET - Authentication Test');
+console.log('==================================\n');
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing Supabase environment variables');
-  process.exit(1);
-}
+// Supabase configuration
+const supabaseUrl = 'https://yyqvediztsrlugentoca.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cXZlZGl6dHNybHVnZW50b2NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzOTM1NTUsImV4cCI6MjA3MTk2OTU1NX0.jAw3r078GtGTKkrLBXSv';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function testAuth() {
-  console.log('🧪 Testing Authentication System');
-  console.log('================================\n');
-
+async function testAuthentication() {
   try {
-    // 1. Check admins table
-    console.log('1️⃣ Checking admins table...');
-    const { data: admins, error: adminsError } = await supabase
-      .from('admins')
-      .select('*');
-
-    if (adminsError) {
-      console.error('❌ Error fetching admins:', adminsError);
+    console.log('🔗 Testing Supabase connection...');
+    
+    // Test 1: Check if we can connect
+    const { data: connectionTest, error: connectionError } = await supabase.auth.getSession();
+    if (connectionError) {
+      console.error('❌ Connection error:', connectionError);
       return;
     }
+    console.log('✅ Supabase connection successful\n');
 
-    console.log(`✅ Found ${admins.length} admin users:`);
-    admins.forEach((admin, index) => {
-      console.log(`   ${index + 1}. ${admin.email} (${admin.role})`);
+    // Test 2: Try to sign in with admin credentials
+    console.log('🔑 Testing admin login...');
+    console.log('Email: admin@numzfleet.com');
+    console.log('Password: admin1234\n');
+    
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: 'admin@numzfleet.com',
+      password: 'admin1234'
     });
 
-    // 2. Test login with first admin
-    if (admins.length > 0) {
-      const testAdmin = admins[0];
-      console.log(`\n2️⃣ Testing login with: ${testAdmin.email}`);
+    if (authError) {
+      console.error('❌ Authentication failed:', authError.message);
+      console.error('Error details:', authError);
       
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: testAdmin.email,
-        password: 'admin1234', // Default password
-      });
-
-      if (authError) {
-        console.log('⚠️ Login test failed (expected if password is different):', authError.message);
-      } else {
-        console.log('✅ Login test successful!');
-        console.log('   User ID:', authData.user.id);
-        console.log('   Email:', authData.user.email);
-        
-        // 3. Test admin user lookup
-        console.log('\n3️⃣ Testing admin user lookup...');
-        const { data: adminUser, error: lookupError } = await supabase
-          .from('admins')
-          .select('*')
-          .eq('email', authData.user.email)
-          .single();
-
-        if (lookupError) {
-          console.error('❌ Admin lookup failed:', lookupError);
+      // Let's check if the user exists
+      console.log('\n🔍 Checking if user exists...');
+      try {
+        const { data: userCheck, error: userCheckError } = await supabase.auth.admin.listUsers();
+        if (userCheckError) {
+          console.error('❌ Cannot check users (insufficient permissions):', userCheckError.message);
         } else {
-          console.log('✅ Admin lookup successful!');
-          console.log('   Admin ID:', adminUser.id);
-          console.log('   Role:', adminUser.role);
+          console.log('✅ User check successful');
+          console.log('Users found:', userCheck?.length || 0);
         }
-
-        // Sign out
-        await supabase.auth.signOut();
+      } catch (err) {
+        console.error('❌ User check failed:', err.message);
       }
-    }
-
-    // 4. Test database connection
-    console.log('\n4️⃣ Testing database connection...');
-    const { data: testData, error: testError } = await supabase
-      .from('vehicles')
-      .select('count')
-      .limit(1);
-
-    if (testError) {
-      console.error('❌ Database connection failed:', testError);
+      
     } else {
-      console.log('✅ Database connection successful!');
+      console.log('✅ Authentication successful!');
+      console.log('User ID:', authData.user.id);
+      console.log('User email:', authData.user.email);
+      console.log('Session:', !!authData.session);
+      
+      // Test 3: Check admin record
+      console.log('\n🔍 Checking admin record...');
+      const { data: adminData, error: adminError } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('email', 'admin@numzfleet.com')
+        .single();
+      
+      if (adminError) {
+        console.error('❌ Admin record check failed:', adminError);
+      } else {
+        console.log('✅ Admin record found:', adminData);
+      }
+      
+      // Sign out
+      await supabase.auth.signOut();
+      console.log('✅ Signed out successfully');
     }
-
+    
   } catch (error) {
     console.error('❌ Test failed:', error);
   }
 }
 
-testAuth().then(() => {
-  console.log('\n🏁 Test completed!');
-  process.exit(0);
-}).catch((error) => {
-  console.error('❌ Test error:', error);
-  process.exit(1);
-});
+testAuthentication();

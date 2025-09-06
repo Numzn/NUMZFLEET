@@ -6,11 +6,9 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { insertVehicleSchema } from "@shared/schema"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
-// TODO: Replace with Supabase hooks
-// import { useCreateVehicle } from "@/hooks/use-vehicles"
+import { useCreateVehicle } from "@/hooks/use-supabase-vehicles"
 import { useToast } from "@/hooks/use-toast"
-// TODO: Replace with Supabase hooks
-// import { useDrivers } from "@/hooks/use-drivers"
+import { useDrivers } from "@/hooks/use-supabase-drivers"
 import { Loader2 } from "lucide-react"
 import { z } from "zod"
 
@@ -22,12 +20,9 @@ interface AddVehicleModalProps {
 }
 
 export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
-  // TODO: Replace with Supabase hooks
-  const { data: drivers = [] } = { data: [] as any[] }
-  const { mutate: createVehicle, isPending } = { 
-    mutate: (data: any) => console.log('🔧 Supabase integration needed for vehicle creation', data),
-    isPending: false
-  }
+  // Supabase hooks for data
+  const { data: drivers = [] } = useDrivers()
+  const { mutate: createVehicle, isPending } = useCreateVehicle()
   const { toast } = useToast()
 
   const form = useForm<FormData>({
@@ -43,7 +38,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
       currentMileage: 0,
       driverId: undefined,
       isActive: true,
-      actual: 0,
+      traccarDeviceId: "",
     },
   })
 
@@ -84,13 +79,13 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleCancel}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add Vehicle</DialogTitle>
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-lg sm:text-xl">Add Vehicle</DialogTitle>
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="name"
@@ -102,6 +97,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                       {...field}
                       id="name"
                       placeholder="e.g. Toyota Corolla"
+                      className="w-full"
                     />
                   </FormControl>
                   <FormMessage />
@@ -109,7 +105,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="model"
@@ -121,6 +117,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                         {...field}
                         id="model"
                         placeholder="e.g. 2023"
+                        className="w-full"
                       />
                     </FormControl>
                     <FormMessage />
@@ -136,7 +133,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                     <FormLabel htmlFor="type">Type</FormLabel>
                     <FormControl>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger id="type">
+                        <SelectTrigger id="type" className="w-full">
                           <SelectValue placeholder="Select Type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -153,7 +150,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="registrationNumber"
@@ -165,6 +162,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                         {...field}
                         id="registration"
                         placeholder="e.g. ABC-123"
+                        className="w-full"
                       />
                     </FormControl>
                     <FormMessage />
@@ -180,7 +178,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                     <FormLabel htmlFor="driver">Assigned Driver</FormLabel>
                     <FormControl>
                       <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                        <SelectTrigger id="driver">
+                        <SelectTrigger id="driver" className="w-full">
                           <SelectValue placeholder="Select Driver" />
                         </SelectTrigger>
                         <SelectContent>
@@ -198,7 +196,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="fuelType"
@@ -207,7 +205,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                     <FormLabel htmlFor="fuelType">Fuel Type</FormLabel>
                     <FormControl>
                       <Select onValueChange={field.onChange} value={field.value ?? "petrol"}>
-                        <SelectTrigger id="fuelType">
+                        <SelectTrigger id="fuelType" className="w-full">
                           <SelectValue placeholder="Select Fuel Type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -246,7 +244,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="currentMileage"
@@ -262,6 +260,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                         step={1}
                         placeholder="e.g. 50000"
                         onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        className="w-full"
                       />
                     </FormControl>
                     <FormMessage />
@@ -284,6 +283,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                         step={0.01}
                         placeholder="e.g. 1500.00"
                         onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        className="w-full"
                       />
                     </FormControl>
                     <FormMessage />
@@ -307,6 +307,7 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
                         id="traccarDeviceId"
                         placeholder="e.g. 5 (leave empty if not assigned yet)"
                         value={field.value || ""}
+                        className="w-full"
                       />
                     </FormControl>
                     <FormDescription>
@@ -318,18 +319,22 @@ export function AddVehicleModal({ open, onOpenChange }: AddVehicleModalProps) {
               />
             </div>
 
-            <div className="flex justify-end space-x-2 pt-4">
+
+
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t">
               <Button 
                 type="button" 
                 variant="outline" 
                 onClick={handleCancel}
                 disabled={isPending}
+                className="w-full sm:w-auto order-2 sm:order-1"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 disabled={isPending}
+                className="w-full sm:w-auto order-1 sm:order-2"
               >
                 {isPending ? (
                   <>

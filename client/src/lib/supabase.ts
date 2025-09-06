@@ -3,6 +3,12 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+console.log('🔍 Supabase initialization:', { 
+  hasUrl: !!supabaseUrl, 
+  hasKey: !!supabaseAnonKey,
+  url: supabaseUrl?.substring(0, 20) + '...' 
+})
+
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.')
 }
@@ -19,6 +25,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
   }
 })
+
+console.log('✅ Supabase client created successfully')
 
 // Database types (these will be generated from your Supabase schema)
 export interface Database {

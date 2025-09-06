@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { NavigationBar } from "@/components/NavigationBar";
+
 import { useVehicles } from "@/hooks/use-supabase-vehicles";
 import { useFuelRecords } from "@/hooks/use-supabase-fuel-records";
 import { useDrivers } from "@/hooks/use-supabase-drivers";
@@ -33,9 +33,10 @@ ChartJS.register(
 );
 
 export default function Reports() {
-  const { data: vehicles } = useVehicles();
-  const { data: fuelRecords } = useFuelRecords();
-  const { data: drivers } = useDrivers();
+  // RE-ENABLED: Supabase data fetching hooks
+  const { data: vehicles = [] } = useVehicles()
+  const { data: fuelRecords = [] } = useFuelRecords()
+  const { data: drivers = [] } = useDrivers()
   const [timeFrame, setTimeFrame] = React.useState<'week' | 'month' | 'year'>('month');
   const [selectedMetric, setSelectedMetric] = React.useState<'consumption' | 'cost' | 'distance'>('consumption');
 
@@ -129,7 +130,7 @@ export default function Reports() {
 
   return (
     <div className="min-h-screen bg-background">
-      <NavigationBar />
+
       <main className="pt-20 container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">Fleet Reports</h1>
 

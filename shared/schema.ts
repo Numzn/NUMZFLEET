@@ -1,4 +1,4 @@
-// TypeScript interfaces for Firebase collections
+// TypeScript interfaces for Supabase tables
 export interface Driver {
   id: string;
   name: string;

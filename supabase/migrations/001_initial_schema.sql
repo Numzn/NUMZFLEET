@@ -51,9 +51,7 @@ CREATE TABLE IF NOT EXISTS fuel_records (
 CREATE TABLE IF NOT EXISTS admins (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email VARCHAR(255) NOT NULL UNIQUE,
-    role VARCHAR(20) NOT NULL DEFAULT '
-    
-    admin' CHECK (role IN ('admin', 'owner')),
+    role VARCHAR(20) NOT NULL DEFAULT 'admin' CHECK (role IN ('admin', 'owner')),
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

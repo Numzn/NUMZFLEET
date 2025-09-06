@@ -4,7 +4,7 @@ console.log('==========================================\n');
 console.log('📋 COMPLETE DATABASE WORKFLOW');
 console.log('==============================\n');
 
-console.log('🎯 YOUR GOAL: Firebase-style automated database setup');
+console.log('🎯 YOUR GOAL: Supabase automated database setup');
 console.log('   ✅ No more copy-pasting SQL into dashboard');
 console.log('   ✅ One command to deploy changes');
 console.log('   ✅ Version-controlled database schema');
@@ -103,7 +103,7 @@ console.log('3. Test your changes');
 console.log('4. Commit to version control');
 console.log('5. Deploy to production\n');
 
-console.log('🚀 YOU HAVE FIREBASE-STYLE AUTOMATION!');
+console.log('🚀 YOU HAVE SUPABASE AUTOMATION!');
 console.log('   No more manual SQL copy-pasting!');
 console.log('   Everything is automated and version-controlled!');
 console.log('   Your database is now as easy to manage as your code!\n');

@@ -1,10 +1,26 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./components/ui/theme-provider";
 import { Toaster } from "./components/ui/toaster";
 import { ErrorBoundary } from "./components/error-boundary";
 import App from "./App";
 import "./index.css";
+
+// Create a React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 10, // 10 minutes
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 // Initialize Supabase (will be added later)
 // import "./lib/supabase";
@@ -41,10 +57,12 @@ if (import.meta.env.DEV) {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-        <App />
-        <Toaster />
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+          <App />
+          <Toaster />
+        </ThemeProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   </React.StrictMode>
 );

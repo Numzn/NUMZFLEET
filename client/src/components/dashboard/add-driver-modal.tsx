@@ -5,11 +5,11 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { insertDriverSchema } from "@shared/schema"
 import type { z } from "zod"
-// TODO: Replace with Supabase hooks
-// import { useCreateDriver } from "@/hooks/use-drivers"
+import { useCreateDriver } from "@/hooks/use-supabase-drivers"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Loader2 } from "lucide-react"
 import { useState } from "react"
+import { useToast } from "@/hooks/use-toast"
 
 type FormData = z.infer<typeof insertDriverSchema>
 
@@ -19,13 +19,8 @@ interface AddDriverModalProps {
 }
 
 export function AddDriverModal({ open, onOpenChange }: AddDriverModalProps) {
-  // TODO: Replace with Supabase hooks
-  const { createDriver } = { 
-    createDriver: async (data: any) => {
-      console.log('🔧 Supabase integration needed for driver creation', data);
-      return data;
-    }
-  }
+  const createDriverMutation = useCreateDriver()
+  const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<FormData>({
@@ -42,15 +37,26 @@ export function AddDriverModal({ open, onOpenChange }: AddDriverModalProps) {
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true)
     try {
-      await createDriver({
+      await createDriverMutation.mutateAsync({
         ...data,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
+      
+      toast({
+        title: "Driver Created",
+        description: "Driver has been added successfully.",
+      })
+      
       form.reset()
       onOpenChange(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create driver:', error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create driver. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
