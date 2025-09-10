@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { SyncStatusIndicator } from '@/components/data-sync/SyncStatusIndicator';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { NAV_ITEMS } from '@/lib/routing';

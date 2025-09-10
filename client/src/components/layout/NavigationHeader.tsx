@@ -1,12 +1,14 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigation } from '@/contexts/NavigationContext';
+import { useAuth } from '@/hooks/useAuth';
 import { NAV_ITEMS } from '@/lib/routing';
 import { cn } from '@/lib/utils';
 
 export function NavigationHeader() {
   const { currentPath, navigate, goBack, goForward } = useNavigation();
+  const { user, signOut } = useAuth();
 
   // Get current page info
   const currentPage = NAV_ITEMS.find(item => item.href === currentPath) || {
@@ -75,10 +77,26 @@ export function NavigationHeader() {
         </div>
 
         {/* Page Title */}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-4">
           <h1 className="text-lg font-semibold text-foreground">
             {currentPage.label}
           </h1>
+          
+          {/* User Info & Sign Out */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {user?.email}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={signOut}
+              className="h-8 px-3"
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </div>
     </div>

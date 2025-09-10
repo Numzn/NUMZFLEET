@@ -1,8 +1,8 @@
 // Enhanced Traccar API Client with Type Safety
 import { TraccarDevice, TraccarPosition } from '@shared/schema';
 
-// Environment-based configuration
-const TRACCAR_BASE_URL = import.meta.env.VITE_TRACCAR_URL || 'http://localhost:8082';
+// Environment-based configuration - AWS Hosted Traccar
+const TRACCAR_BASE_URL = import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site';
 // Convert email:password to base64 for Basic Auth
 const TRACCAR_AUTH = import.meta.env.VITE_TRACCAR_AUTH || btoa('numerinyirenda14@gmail.com:numz0099');
 
@@ -30,10 +30,13 @@ export class TraccarClient {
     try {
       console.log('🌐 TraccarClient.getDevices: Connecting to Traccar server at', traccarEndpoints.devices);
       const response = await fetch(traccarEndpoints.devices, {
+        method: 'GET',
         headers: {
           'Authorization': `Basic ${TRACCAR_AUTH}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        credentials: 'omit', // Don't send cookies, use Basic Auth only
         signal: AbortSignal.timeout(CONNECTION_TIMEOUT),
       });
 
@@ -63,10 +66,13 @@ export class TraccarClient {
 
       console.log(`🌐 TraccarClient.getPositions: Fetching positions from ${url}`);
       const response = await fetch(url, {
+        method: 'GET',
         headers: {
           'Authorization': `Basic ${TRACCAR_AUTH}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        credentials: 'omit', // Don't send cookies, use Basic Auth only
         signal: AbortSignal.timeout(CONNECTION_TIMEOUT),
       });
 
@@ -103,10 +109,13 @@ export class TraccarClient {
   static async getDevice(deviceId: number): Promise<TraccarDevice> {
     try {
       const response = await fetch(`${traccarEndpoints.devices}/${deviceId}`, {
+        method: 'GET',
         headers: {
           'Authorization': `Basic ${TRACCAR_AUTH}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        credentials: 'omit', // Don't send cookies, use Basic Auth only
         signal: AbortSignal.timeout(10000),
       });
 
@@ -130,10 +139,13 @@ export class TraccarClient {
   static async testConnection(): Promise<boolean> {
     try {
       const response = await fetch(traccarEndpoints.devices, {
+        method: 'GET',
         headers: {
           'Authorization': `Basic ${TRACCAR_AUTH}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        credentials: 'omit', // Don't send cookies, use Basic Auth only
         signal: AbortSignal.timeout(5000), // Shorter timeout for connection test
       });
       return response.ok;

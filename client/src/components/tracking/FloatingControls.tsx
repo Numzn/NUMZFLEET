@@ -140,15 +140,7 @@ export function FloatingControls({
                   <Settings className="h-3 w-3 mr-1" />
                   Traccar
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => window.location.reload()}
-                >
-                  <Users className="h-3 w-3 mr-1" />
-                  Refresh
-                </Button>
+                {/* Refresh button removed for silent operation */}
               </div>
             </div>
           </div>
@@ -157,4 +149,8 @@ export function FloatingControls({
     </>
   );
 }
+
+
+
+
 

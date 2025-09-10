@@ -1,0 +1,120 @@
+/* Google Maps style marker */
+.google-maps-style-icon {
+  background: transparent !important;
+  border: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+/* Legacy custom marker styles */
+.custom-vehicle-icon {
+  background: transparent !important;
+  border: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+/* Device name label styles */
+.custom-vehicle-icon .device-name-label {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Custom popup styles */
+.custom-popup .leaflet-popup-content-wrapper {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.custom-popup .leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.custom-popup .leaflet-popup-tip {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-left: none;
+}
+
+/* Marker pulse animation */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.custom-vehicle-icon svg {
+  animation: pulse 2s infinite;
+}
+
+/* Smooth transitions for marker updates */
+.leaflet-marker-icon {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Hover effects for Google Maps style markers */
+.google-maps-style-icon:hover {
+  transform: scale(1.1);
+  z-index: 1000;
+}
+
+.google-maps-style-icon:hover .device-name-label {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.05);
+}
+
+/* Hover effects for legacy device markers */
+.custom-vehicle-icon:hover {
+  transform: scale(1.1);
+  z-index: 1000;
+}
+
+.custom-vehicle-icon:hover .device-name-label {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.05);
+}
+
+/* Custom popup close button */
+.custom-popup .leaflet-popup-close-button {
+  color: #6b7280;
+  font-size: 18px;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.custom-popup .leaflet-popup-close-button:hover {
+  background: #f3f4f6;
+  color: #374151;
+}

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traccar Auth Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Traccar Authentication Debug</h1>
+    
+    <div class="info">
+        <h3>Configuration</h3>
+        <p><strong>Server:</strong> http://localhost:3001 (CORS Proxy)</p>
+        <p><strong>Target:</strong> https://fleet.numz.site</p>
+        <p><strong>Username:</strong> numerinyirenda14@gmail.com</p>
+        <p><strong>Password:</strong> numz0099</p>
+        <p><strong>Auth Header:</strong> Basic bjVtZXJpbnlyZW5kYTE0QGdtYWlsLmNvbTpudW16MDA5OQ==</p>
+    </div>
+
+    <div class="test">
+        <h3>Test 1: Basic Server Reachability</h3>
+        <button onclick="testServerReachability()">Test Server</button>
+        <div id="server-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Test 2: API Authentication (Basic Auth)</h3>
+        <button onclick="testApiAuth()">Test API Auth</button>
+        <div id="api-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Test 3: API Authentication (Session-based)</h3>
+        <button onclick="testSessionAuth()">Test Session Auth</button>
+        <div id="session-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Test 4: Different Auth Headers</h3>
+        <button onclick="testDifferentHeaders()">Test Different Headers</button>
+        <div id="headers-result"></div>
+    </div>
+
+    <script>
+        const config = {
+            server: 'http://localhost:3001',  // Using CORS proxy
+            username: 'numerinyirenda14@gmail.com',
+            password: 'numz0099',
+            authHeader: 'Basic ' + btoa('numerinyirenda14@gmail.com:numz0099')
+        };
+
+        function log(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            const className = isError ? 'error' : 'success';
+            element.innerHTML = `<div class="${className}"><pre>${message}</pre></div>`;
+        }
+
+        async function testServerReachability() {
+            try {
+                log('server-result', 'Testing server reachability...');
+                
+                const response = await fetch(config.server, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                log('server-result', `✅ Server responded: ${response.status} ${response.statusText}\nHeaders: ${JSON.stringify([...response.headers.entries()], null, 2)}`);
+            } catch (error) {
+                log('server-result', `❌ Server test failed: ${error.message}`, true);
+            }
+        }
+
+        async function testApiAuth() {
+            try {
+                log('api-result', 'Testing API with Basic Auth...');
+                
+                const response = await fetch(`${config.server}/api/devices`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': config.authHeader,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-result', `✅ API Auth successful!\nStatus: ${response.status}\nDevices found: ${data.length}\nData: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    const errorText = await response.text();
+                    log('api-result', `❌ API Auth failed: ${response.status} ${response.statusText}\nResponse: ${errorText}`, true);
+                }
+            } catch (error) {
+                log('api-result', `❌ API test failed: ${error.message}`, true);
+            }
+        }
+
+        async function testSessionAuth() {
+            try {
+                log('session-result', 'Testing session-based authentication...');
+                
+                // First, try to login
+                const loginFormData = new FormData();
+                loginFormData.append('username', config.username);
+                loginFormData.append('password', config.password);
+                
+                const loginResponse = await fetch(`${config.server}/login`, {
+                    method: 'POST',
+                    body: loginFormData,
+                    mode: 'cors',
+                    credentials: 'include',
+                    redirect: 'manual'
+                });
+                
+                log('session-result', `Login response: ${loginResponse.status} ${loginResponse.statusText}`);
+                
+                // Then try API with session
+                const apiResponse = await fetch(`${config.server}/api/devices`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors',
+                    credentials: 'include'
+                });
+                
+                if (apiResponse.ok) {
+                    const data = await apiResponse.json();
+                    log('session-result', `✅ Session Auth successful!\nStatus: ${apiResponse.status}\nDevices found: ${data.length}`);
+                } else {
+                    const errorText = await apiResponse.text();
+                    log('session-result', `❌ Session Auth failed: ${apiResponse.status} ${apiResponse.statusText}\nResponse: ${errorText}`, true);
+                }
+            } catch (error) {
+                log('session-result', `❌ Session test failed: ${error.message}`, true);
+            }
+        }
+
+        async function testDifferentHeaders() {
+            try {
+                log('headers-result', 'Testing different authentication methods...');
+                
+                const tests = [
+                    {
+                        name: 'Basic Auth (current)',
+                        headers: {
+                            'Authorization': config.authHeader,
+                            'Accept': 'application/json'
+                        }
+                    },
+                    {
+                        name: 'Basic Auth + Content-Type',
+                        headers: {
+                            'Authorization': config.authHeader,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    },
+                    {
+                        name: 'Basic Auth + User-Agent',
+                        headers: {
+                            'Authorization': config.authHeader,
+                            'Accept': 'application/json',
+                            'User-Agent': 'NUMZFLEET/1.0'
+                        }
+                    }
+                ];
+                
+                let results = '';
+                
+                for (const test of tests) {
+                    try {
+                        const response = await fetch(`${config.server}/api/devices`, {
+                            method: 'GET',
+                            headers: test.headers,
+                            mode: 'cors',
+                            credentials: 'omit'
+                        });
+                        
+                        results += `${test.name}: ${response.status} ${response.statusText}\n`;
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            results += `  ✅ Success! Found ${data.length} devices\n`;
+                        } else {
+                            const errorText = await response.text();
+                            results += `  ❌ Failed: ${errorText.substring(0, 200)}...\n`;
+                        }
+                    } catch (error) {
+                        results += `${test.name}: ❌ Error - ${error.message}\n`;
+                    }
+                    results += '\n';
+                }
+                
+                log('headers-result', results);
+            } catch (error) {
+                log('headers-result', `❌ Headers test failed: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>

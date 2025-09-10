@@ -6,7 +6,9 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 console.log('🔍 Supabase initialization:', { 
   hasUrl: !!supabaseUrl, 
   hasKey: !!supabaseAnonKey,
-  url: supabaseUrl?.substring(0, 20) + '...' 
+  url: supabaseUrl?.substring(0, 20) + '...',
+  fullUrl: supabaseUrl,
+  keyLength: supabaseAnonKey?.length
 })
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -17,11 +19,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    storage: window.localStorage,
+    storageKey: 'supabase.auth.token',
+    debug: false
   },
   realtime: {
     params: {
       eventsPerSecond: 10
+    }
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'numz-fleet-app'
     }
   }
 })

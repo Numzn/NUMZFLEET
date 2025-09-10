@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ExternalLink, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
 import { generateTraccarUrl } from '@/lib/traccar-auth';
-import { useTraccarAuth } from '@/hooks/use-traccar-auth';
+import { useTraccarBackgroundAuth } from '@/lib/traccar-auth';
 
 interface TraccarIframeProps {
   deviceId?: string | number;
@@ -28,9 +28,9 @@ export const TraccarIframe = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated, isAuthenticating, authenticate } = useTraccarAuth();
+  const { isAuthenticated, isAuthenticating, authenticate } = useTraccarBackgroundAuth();
 
-  const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'http://localhost:8082';
+  const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site';
 
   const updateIframeUrl = async () => {
     if (!iframeRef.current) return;
@@ -152,15 +152,7 @@ export const TraccarIframe = ({
               </CardTitle>
               
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={isLoading}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
+                {/* Refresh button removed for silent operation */}
                 
                 <Button
                   variant="outline"

@@ -10,6 +10,8 @@ interface TraccarUrlOptions {
   fullscreen?: boolean;
   hideHeader?: boolean;
   hideMenu?: boolean;
+  hideControls?: boolean;
+  mapOnly?: boolean;
   autoLogin?: boolean;
 }
 
@@ -23,16 +25,20 @@ export function generateTraccarUrl(options: TraccarUrlOptions = {}): string {
     fullscreen = true,
     hideHeader = true,
     hideMenu = true,
+    hideControls = false,
+    mapOnly = false,
     autoLogin = true
   } = options;
 
-  const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'http://localhost:8082';
+  const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site';
   const params = new URLSearchParams();
 
   // UI parameters for clean embedding
   if (fullscreen) params.append('fullscreen', 'true');
   if (hideHeader) params.append('hideHeader', 'true');
   if (hideMenu) params.append('hideMenu', 'true');
+  if (hideControls) params.append('hideControls', 'true');
+  if (mapOnly) params.append('mapOnly', 'true');
 
   // Use Traccar's session-based authentication
   // This relies on the browser's session management to handle authentication
@@ -63,7 +69,7 @@ export async function authenticateTraccarBackground(): Promise<boolean> {
       return false;
     }
 
-    const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'http://localhost:8082';
+    const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site';
     console.log('🔐 Starting Traccar authentication to:', baseUrl);
     
     // First, try to access Traccar to check if already authenticated
@@ -165,7 +171,7 @@ export async function debugTraccarAuth(): Promise<{
   try {
     const configured = isTraccarAuthConfigured();
     const credentials = getTraccarCredentials();
-    const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'http://localhost:8082';
+    const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site';
     
     if (!configured || !credentials) {
       return {

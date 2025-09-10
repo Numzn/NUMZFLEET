@@ -2,29 +2,55 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { traccarApi } from '@/lib/traccar';
 import { TraccarDevice, TraccarPosition } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
-// Enhanced hook to get all Traccar devices
+// Enhanced hook to get all Traccar devices with network error handling
 export const useTraccarDevices = () => {
+  const { handleNetworkError, isOnline } = useNetworkStatus();
+  
   return useQuery({
     queryKey: ['traccar-devices'],
     queryFn: traccarApi.getDevices,
     refetchInterval: 30000, // Refresh every 30 seconds
-    retry: 3,
-    retryDelay: 1000,
+    retry: (failureCount, error) => {
+      // Don't retry if offline
+      if (!isOnline) return false;
+      
+      // Handle network errors
+      const { shouldRetry } = handleNetworkError(error, 'fetching devices');
+      return shouldRetry && failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     staleTime: 10000, // Consider data stale after 10 seconds
+    enabled: isOnline, // Only run when online
+    onError: (error) => {
+      handleNetworkError(error, 'fetching devices');
+    },
   });
 };
 
-// Enhanced hook to get device positions
+// Enhanced hook to get device positions with network error handling
 export const useTraccarPositions = (deviceId?: number) => {
+  const { handleNetworkError, isOnline } = useNetworkStatus();
+  
   return useQuery({
     queryKey: ['traccar-positions', deviceId],
     queryFn: () => traccarApi.getPositions(deviceId),
     refetchInterval: 10000, // Refresh every 10 seconds for real-time updates
-    retry: 3,
-    retryDelay: 1000,
-    enabled: !!deviceId, // Only run if deviceId is provided
+    retry: (failureCount, error) => {
+      // Don't retry if offline
+      if (!isOnline) return false;
+      
+      // Handle network errors
+      const { shouldRetry } = handleNetworkError(error, 'fetching positions');
+      return shouldRetry && failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    enabled: !!deviceId && isOnline, // Only run if deviceId is provided and online
     staleTime: 5000, // Consider data stale after 5 seconds
+    onError: (error) => {
+      handleNetworkError(error, 'fetching positions');
+    },
   });
 };
 
@@ -102,10 +128,7 @@ export const useRefreshTraccarDevices = () => {
     onSuccess: (data) => {
       queryClient.setQueryData(['traccar-devices'], data);
       queryClient.invalidateQueries({ queryKey: ['traccar-stats'] });
-      toast({
-        title: "Devices refreshed",
-        description: `Successfully loaded ${data.length} devices`,
-      });
+      // Removed toast notification to prevent annoying popups
     },
     onError: (error) => {
       toast({
@@ -126,10 +149,7 @@ export const useRefreshTraccarPositions = () => {
     mutationFn: (deviceId?: number) => traccarApi.getPositions(deviceId),
     onSuccess: (data, deviceId) => {
       queryClient.setQueryData(['traccar-positions', deviceId], data);
-      toast({
-        title: "Positions refreshed",
-        description: `Successfully loaded ${data.length} positions`,
-      });
+      // Removed toast notification to prevent annoying popups
     },
     onError: (error) => {
       toast({

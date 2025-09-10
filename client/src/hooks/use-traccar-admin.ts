@@ -49,10 +49,7 @@ export function useTraccarAdmin(vehicles: any[], updateVehicle: any) {
       });
 
       setDevices(devicesWithAssignments);
-      toast({
-        title: "Success",
-        description: `Fetched ${devicesWithAssignments.length} devices from Traccar`
-      });
+      // Removed toast notification to prevent annoying popups
     } catch (error) {
       console.error('Failed to fetch devices:', error);
       toast({

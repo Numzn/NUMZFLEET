@@ -2,12 +2,10 @@ import { Switch, Route, Router } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { NavigationProvider } from "@/contexts/NavigationContext";
 import { DataSyncProvider } from "@/components/data-sync/DataSyncProvider";
 import { PageLoading } from "@/components/ui/loading";
-// TODO: Replace with Supabase session management
-// import "@/lib/session-utils";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/dashboard";
@@ -17,51 +15,32 @@ import Settings from "@/pages/settings";
 import AdvancedReports from "@/pages/advanced-reports";
 import Reports from "@/pages/reports";
 import Analytics from "@/pages/analytics";
-import LiveTracking from "@/pages/live-tracking";
-import LoginPage from "@/pages/login";
-// TODO: Replace with Supabase admin reset
-// import AdminResetPage from "@/pages/admin-reset";
-import DebugPage from "@/pages/debug";
+import LiveTracking from "@/pages/live-tracking-new";
+import { SimpleLoginForm } from "@/components/auth/SimpleLoginForm";
 import TraccarAdmin from "@/pages/traccar-admin";
 import React from "react";
 
 function AppContent() {
-  const { user, adminUser, isLoading, forceLogin, debugAuthState } = useAuth();
+  const { user, isLoading } = useAuth();
 
-  // Debug auth state on mount
-  React.useEffect(() => {
-    console.log('🔍 AppContent mounted - Auth state:');
-    debugAuthState();
-  }, [debugAuthState]);
-
-  // Show loading skeleton while checking authentication
   if (isLoading) {
-    console.log('⏳ Showing loading skeleton...');
-    return <PageLoading />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
   }
 
-  // Check authentication conditions
-  const shouldShowLogin = forceLogin || !user || !adminUser;
-  
-  console.log('🔍 Auth check:', {
-    forceLogin,
-    hasUser: !!user,
-    hasAdminUser: !!adminUser,
-    shouldShowLogin
-  });
-
-  // Show login page if authentication is required
-  if (shouldShowLogin) {
-    console.log('🔒 Showing login page...');
+  // Show login page if not authenticated
+  if (!user) {
     return (
       <Switch>
-        <Route component={LoginPage} />
+        <Route component={SimpleLoginForm} />
       </Switch>
     );
   }
 
-  // Show main app only after successful authentication
-  console.log('✅ Showing main app...');
+  // Show main app after successful authentication
   return (
     <AppLayout>
       <Switch>

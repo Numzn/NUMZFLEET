@@ -1,10 +1,9 @@
 import React from 'react';
-import { Moon, Sun, User, LogOut, Shield, RefreshCw } from 'lucide-react';
+import { Moon, Sun, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/hooks/use-theme';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 interface SidebarFooterProps {
@@ -13,28 +12,20 @@ interface SidebarFooterProps {
 
 export function SidebarFooter({ className }: SidebarFooterProps) {
   const { theme, setTheme } = useTheme();
-  const { adminUser, logout, clearSession, isOwner } = useAuth();
+  const { user, signOut } = useAuth();
   
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await signOut();
     } catch (error) {
       console.error('Logout failed:', error);
     }
   };
 
-  const handleClearSession = async () => {
-    try {
-      await clearSession();
-    } catch (error) {
-      console.error('Clear session failed:', error);
-    }
-  };
-
   return (
-    <div className={cn("border-t bg-muted/30 p-4", className)}>
+    <div className={cn("border-t bg-muted/30 p-4 space-y-3", className)}>
       {/* User Profile */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -44,40 +35,30 @@ export function SidebarFooter({ className }: SidebarFooterProps) {
                 <User className="h-4 w-4 text-primary" />
               </div>
               <div className="flex-1 text-left min-w-0">
-                <p className="text-sm font-medium truncate">{adminUser?.name || 'Admin'}</p>
-                <p className="text-xs text-muted-foreground truncate">{adminUser?.email}</p>
+                <p className="text-sm font-medium truncate">{user?.email || 'User'}</p>
+                <p className="text-xs text-muted-foreground truncate">Signed in</p>
               </div>
-              {isOwner && (
-                <Badge variant="secondary" className="text-xs shrink-0">
-                  <Shield className="h-3 w-3 mr-1" />
-                  Owner
-                </Badge>
-              )}
             </div>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">{adminUser?.name}</p>
-              <p className="text-xs leading-none text-muted-foreground">{adminUser?.email}</p>
+              <p className="text-sm font-medium leading-none">{user?.email}</p>
+              <p className="text-xs leading-none text-muted-foreground">Signed in</p>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
             <a href="/settings" className="flex items-center">
-              <Shield className="h-4 w-4 mr-2" />
+              <User className="h-4 w-4 mr-2" />
               Settings
             </a>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
             <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleClearSession} className="text-orange-600 focus:text-orange-600">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Clear Session
+            Sign Out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
