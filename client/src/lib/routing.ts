@@ -10,6 +10,7 @@ export const ROUTES = {
   ANALYTICS: '/analytics',
   SETTINGS: '/settings',
   LOGIN: '/login',
+  MAP_TEST: '/map-test',
 } as const;
 
 // Navigation items configuration with icons

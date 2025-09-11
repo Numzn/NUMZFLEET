@@ -57,11 +57,19 @@ export class TraccarClient {
     }
   }
 
-  // Get device positions
-  static async getPositions(deviceId?: number): Promise<TraccarPosition[]> {
+  // Get device positions - using correct positions endpoint
+  static async getPositions(deviceId?: number | any): Promise<TraccarPosition[]> {
     try {
-      const url = deviceId 
-        ? `${traccarEndpoints.positions}?deviceId=${deviceId}`
+      // Handle case where deviceId might be an object or invalid
+      let validDeviceId: number | undefined;
+      if (typeof deviceId === 'number' && deviceId > 0) {
+        validDeviceId = deviceId;
+      } else if (deviceId && typeof deviceId === 'object' && deviceId.id) {
+        validDeviceId = deviceId.id;
+      }
+
+      const url = validDeviceId 
+        ? `${traccarEndpoints.positions}?deviceId=${validDeviceId}`
         : traccarEndpoints.positions;
 
       console.log(`🌐 TraccarClient.getPositions: Fetching positions from ${url}`);
@@ -88,6 +96,7 @@ export class TraccarClient {
       throw new Error(`Failed to fetch positions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
 
   // Get latest position for a specific device
   static async getLatestPosition(deviceId: number): Promise<TraccarPosition | null> {
@@ -193,7 +202,7 @@ export const traccarApi = {
   },
 
   // Get device positions
-  async getPositions(deviceId?: number): Promise<TraccarPosition[]> {
+  async getPositions(deviceId?: number | any): Promise<TraccarPosition[]> {
     return TraccarClient.getPositions(deviceId);
   },
 

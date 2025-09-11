@@ -1,15 +1,26 @@
-import React from "react";
+import React, { useState } from "react";
 import { MapContainer } from "./MapContainer";
 import { DeviceMarkers } from "./DeviceMarkers";
 import { MapStatus } from "./MapStatus";
+import { SimpleMapControls } from "./SimpleMapControls";
 import { useDeviceData } from "./useDeviceData";
-import { TrackingMapProps } from "./types";
+import { TrackingMapProps, Device } from "./types";
 
 export const TrackingMap = ({ 
   className = '', 
-  height = '100vh' 
+  height = '100vh',
+  selectedDevice,
+  onDeviceSelect
 }: TrackingMapProps) => {
   const { devices, isLoading, error, refetch } = useDeviceData();
+  const [internalSelectedDevice, setInternalSelectedDevice] = useState<Device | undefined>();
+
+  const handleDeviceSelect = (device: Device) => {
+    setInternalSelectedDevice(device);
+    onDeviceSelect?.(device);
+  };
+
+  const currentSelectedDevice = selectedDevice || internalSelectedDevice;
 
   return (
     <div 
@@ -21,7 +32,16 @@ export const TrackingMap = ({
       }}
     >
       <MapContainer>
-        <DeviceMarkers devices={devices} />
+        <DeviceMarkers 
+          devices={devices} 
+          selectedDevice={currentSelectedDevice}
+          onDeviceSelect={handleDeviceSelect}
+        />
+        <SimpleMapControls 
+          devices={devices}
+          selectedDevice={currentSelectedDevice}
+          onDeviceSelect={handleDeviceSelect}
+        />
       </MapContainer>
       
       <MapStatus 

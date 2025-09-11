@@ -191,7 +191,7 @@ export const NetworkStatusIndicator = () => {
         <div className="text-xs text-muted-foreground">
           <span className="font-medium">Server:</span>{' '}
           <code className="bg-muted px-1 rounded">
-            {import.meta.env.VITE_TRACCAR_URL || 'http://localhost:8082'}
+            {import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site'}
           </code>
         </div>
       </CardContent>

@@ -64,7 +64,7 @@ class TraccarSyncService {
   private hasCredentialError: boolean = false;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_TRACCAR_URL || 'http://localhost:8082';
+    this.baseUrl = import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site';
     this.credentials = getTraccarCredentials();
     
     if (!this.credentials) {

@@ -8,7 +8,8 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (
+    email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -51,9 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+          email,
+          password,
+        });
     if (error) {
       toast({
         title: "Login Failed",
@@ -62,11 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       throw error;
     }
-    
-    toast({
-      title: "Login Successful",
-      description: "Welcome back!",
-    });
+
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
   };
 
   const signUp = async (email: string, password: string) => {
@@ -82,8 +83,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       throw error;
     }
-    
-    toast({
+      
+      toast({
       title: "Account Created",
       description: "Please check your email for verification link.",
     });

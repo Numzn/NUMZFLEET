@@ -18,6 +18,9 @@ import Analytics from "@/pages/analytics";
 import LiveTracking from "@/pages/live-tracking-new";
 import { SimpleLoginForm } from "@/components/auth/SimpleLoginForm";
 import TraccarAdmin from "@/pages/traccar-admin";
+import MapTestPage from "@/pages/map-test";
+import TraccarTestPage from "@/pages/traccar-test";
+import EnvTestPage from "@/pages/env-test";
 import React from "react";
 
 function AppContent() {
@@ -47,6 +50,9 @@ function AppContent() {
         <Route path="/" component={Dashboard} />
         <Route path="/vehicles" component={VehicleManagement} />
         <Route path="/tracking" component={LiveTracking} />
+        <Route path="/map-test" component={MapTestPage} />
+        <Route path="/traccar-test" component={TraccarTestPage} />
+        <Route path="/env-test" component={EnvTestPage} />
         <Route path="/traccar-admin" component={TraccarAdmin} />
         <Route path="/reports" component={AdvancedReports} />
         <Route path="/analytics" component={Analytics} />

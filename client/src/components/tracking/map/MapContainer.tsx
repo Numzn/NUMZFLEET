@@ -17,8 +17,8 @@ export const MapContainer = ({ children, className = "z-0" }: MapContainerProps)
       }}
     >
       <LeafletMapContainer 
-        center={[-15.4167, 28.2833]} // Default: Lusaka, Zambia
-        zoom={12} 
+        center={[-15.35, 28.28]} // Lusaka, Zambia - center of real device locations
+        zoom={13} 
         style={{ 
           height: "100%", 
           width: "100%",
