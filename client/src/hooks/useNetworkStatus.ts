@@ -21,7 +21,6 @@ export const useNetworkStatus = () => {
   // Monitor browser online/offline status
   useEffect(() => {
     const handleOnline = () => {
-      console.log('🌐 Network: Browser is online');
       setStatus(prev => ({
         ...prev,
         isOnline: true,
@@ -37,7 +36,6 @@ export const useNetworkStatus = () => {
     };
 
     const handleOffline = () => {
-      console.log('🌐 Network: Browser is offline');
       setStatus(prev => ({
         ...prev,
         isOnline: false,
@@ -240,4 +238,8 @@ export const useNetworkStatus = () => {
     resetRetryCount,
   };
 };
+
+
+
+
 

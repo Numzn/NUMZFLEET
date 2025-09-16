@@ -11,16 +11,13 @@ export const useVehicles = () => {
   return useQuery({
     queryKey: ['vehicles'],
     queryFn: async (): Promise<Vehicle[]> => {
-      console.log('🔍 Fetching vehicles from Supabase...');
       try {
-        console.log('🔍 Step 1: About to query vehicles table...');
         const { data, error } = await supabase
           .from('vehicles')
           .select('*')
           .eq('is_active', true)
           .order('name');
 
-        console.log('🔍 Step 2: Query completed, checking for errors...');
         if (error) {
           console.error('❌ Error fetching vehicles:', error);
           console.error('❌ Error details:', {
@@ -32,8 +29,6 @@ export const useVehicles = () => {
           throw error;
         }
 
-        console.log('✅ Vehicles fetched successfully:', data?.length || 0, 'vehicles');
-        console.log('✅ Sample vehicle data:', data?.[0] || 'No vehicles found');
         return data || [];
       } catch (err) {
         console.error('❌ Exception in vehicles query:', err);
@@ -70,7 +65,6 @@ export const useCreateVehicle = () => {
         updated_at: new Date().toISOString(),
       }
 
-      console.log('🔍 Creating vehicle with data:', dbVehicle);
 
       const { data, error } = await supabase
         .from('vehicles')
@@ -89,7 +83,6 @@ export const useCreateVehicle = () => {
         throw error
       }
 
-      console.log('✅ Vehicle created successfully:', data)
       return data
     },
     onSuccess: () => {
@@ -121,7 +114,6 @@ export const useUpdateVehicle = () => {
       
       dbUpdates.updated_at = new Date().toISOString()
 
-      console.log('🔍 Updating vehicle with data:', dbUpdates);
 
       const { data, error } = await supabase
         .from('vehicles')
@@ -135,7 +127,6 @@ export const useUpdateVehicle = () => {
         throw error
       }
 
-      console.log('✅ Vehicle updated successfully:', data)
       return data
     },
     onSuccess: () => {

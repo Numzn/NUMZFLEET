@@ -1,14 +1,39 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Home, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useSidebar } from '@/contexts/SidebarContext';
 import { NAV_ITEMS } from '@/lib/routing';
 import { cn } from '@/lib/utils';
+import { DeviceSelector } from '@/components/tracking/controls/DeviceSelector';
+import { MapControls } from '@/components/tracking/controls/MapControls';
+interface NavigationHeaderProps {
+  // Live map controls props
+  traccarDevices?: any[];
+  selectedDeviceId?: number | undefined;
+  onDeviceSelect?: (deviceId: number | undefined) => void;
+  onDeviceSelectObject?: (device: any) => void;
+  selectedDevice?: any;
+  traccarLoading?: boolean;
+  onFullscreen?: () => void;
+  onOpenExternal?: () => void;
+  isFullscreen?: boolean;
+}
 
-export function NavigationHeader() {
+export function NavigationHeader({
+  traccarDevices = [],
+  selectedDeviceId = undefined,
+  onDeviceSelect,
+  onDeviceSelectObject,
+  selectedDevice,
+  traccarLoading = false,
+  onFullscreen,
+  onOpenExternal,
+  isFullscreen = false
+}: NavigationHeaderProps) {
   const { currentPath, navigate, goBack, goForward } = useNavigation();
-  const { user, signOut } = useAuth();
+  const { isHidden, setHidden } = useSidebar();
 
   // Get current page info
   const currentPage = NAV_ITEMS.find(item => item.href === currentPath) || {
@@ -22,9 +47,24 @@ export function NavigationHeader() {
     ...(currentPath !== '/' ? [{ label: currentPage.label, href: currentPath }] : []),
   ];
 
+  const isTrackingPage = currentPath === '/tracking';
+
   return (
-    <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 navigation-header">
       <div className="flex h-16 items-center gap-4 px-6">
+        {/* Sidebar Toggle - Only show on tracking page when sidebar is hidden */}
+        {isTrackingPage && isHidden && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setHidden(false)}
+            className="h-8 w-8 p-0"
+            title="Show sidebar"
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        )}
+
         {/* Navigation Controls */}
         <div className="flex items-center gap-2">
           <Button
@@ -76,28 +116,35 @@ export function NavigationHeader() {
           })}
         </div>
 
-        {/* Page Title */}
-        <div className="ml-auto flex items-center gap-4">
-          <h1 className="text-lg font-semibold text-foreground">
-            {currentPage.label}
-          </h1>
-          
-          {/* User Info & Sign Out */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {user?.email}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={signOut}
-              className="h-8 px-3"
-            >
-              <LogOut className="h-4 w-4 mr-1" />
-              Sign Out
-            </Button>
+        {/* Live Map Controls - Only show on tracking page */}
+        {isTrackingPage && (
+          <div className="flex items-center gap-2 ml-4">
+            <DeviceSelector
+              devices={traccarDevices}
+              selectedDeviceId={selectedDeviceId}
+              onDeviceSelect={onDeviceSelect || (() => {})}
+            />
           </div>
-        </div>
+        )}
+
+        {/* Live Map Controls - Right side */}
+        {isTrackingPage && (
+          <div className="ml-auto flex items-center gap-2">
+            {/* Subtle background update indicator */}
+            {traccarLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                <span>Updating...</span>
+              </div>
+            )}
+            <MapControls
+              selectedDevice={selectedDevice}
+              onFullscreen={onFullscreen || (() => {})}
+              onOpenExternal={onOpenExternal || (() => {})}
+              isFullscreen={isFullscreen}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

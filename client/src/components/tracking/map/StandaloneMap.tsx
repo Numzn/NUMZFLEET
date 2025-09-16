@@ -27,3 +27,7 @@ export const StandaloneMap = () => {
 };
 
 export default StandaloneMap;
+
+
+
+

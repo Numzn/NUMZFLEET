@@ -5,9 +5,11 @@ import { createVehicleIcon, vehicleIcon } from "./MapIcon";
 
 interface DeviceMarkersProps {
   devices: Device[];
+  selectedDevice?: Device;
+  onDeviceSelect?: (device: Device) => void;
 }
 
-export const DeviceMarkers = ({ devices }: DeviceMarkersProps) => {
+export const DeviceMarkers = ({ devices, selectedDevice, onDeviceSelect }: DeviceMarkersProps) => {
   const markerRefs = useRef<{ [key: number]: any }>({});
 
   // Update marker positions smoothly when data changes
@@ -32,9 +34,57 @@ export const DeviceMarkers = ({ devices }: DeviceMarkersProps) => {
         if (!device.position?.latitude || !device.position?.longitude) {
           return null; // Skip devices without position data
         }
-        
+
+        // Special debugging for GIFT device
+        if (device.name === 'GIFT' || device.id === 20863396) {
+          const expectedLat = -15.386024386774672;
+          const expectedLng = 28.3081738740988;
+          const latDiff = Math.abs(device.position.latitude - expectedLat);
+          const lngDiff = Math.abs(device.position.longitude - expectedLng);
+          const isAccurate = latDiff < 0.001 && lngDiff < 0.001; // Within 0.001 degrees (about 100m)
+          
+          console.log('🎯 GIFT DEVICE MARKER CREATION:', {
+            deviceName: device.name,
+            deviceId: device.id,
+            position: device.position,
+            coordinates: [device.position.latitude, device.position.longitude],
+            expectedCoords: [expectedLat, expectedLng],
+            coordinateMatch: isAccurate,
+            latDifference: latDiff,
+            lngDifference: lngDiff,
+            accuracy: isAccurate ? '✅ ACCURATE' : '❌ INACCURATE'
+          });
+        }
+
+        // Special debugging for NUMZ device
+        if (device.name === 'NUMZ' || device.name?.includes('NUMZ')) {
+          const accuracy = device.position.accuracy;
+          const accuracyScore = device.position.accuracyScore;
+          const locationType = accuracy ? `Estimated area (±${accuracy}m)` : 'Exact point';
+          
+          console.log('🎯 NUMZ DEVICE MARKER CREATION:', {
+            deviceName: device.name,
+            deviceId: device.id,
+            position: device.position,
+            coordinates: [device.position.latitude, device.position.longitude],
+            accuracy: accuracy,
+            accuracyScore: accuracyScore,
+            locationType: locationType,
+            speed: device.position.speed,
+            course: device.position.course,
+            address: device.position.address,
+            lastUpdate: device.position.lastUpdate
+          });
+        }
+
         const isOnline = device.status === 'online';
-        const dynamicIcon = createVehicleIcon(device.status, isOnline, device.name);
+        const dynamicIcon = createVehicleIcon(
+          device.status,
+          isOnline,
+          device.name,
+          device.position?.accuracy,
+          device.position?.accuracyScore
+        );
         
         return (
           <Marker 
@@ -48,7 +98,7 @@ export const DeviceMarkers = ({ devices }: DeviceMarkersProps) => {
             }}
             eventHandlers={{
               click: () => {
-                // Device clicked - could add functionality here
+                onDeviceSelect?.(device);
               }
             }}
           >
@@ -57,6 +107,12 @@ export const DeviceMarkers = ({ devices }: DeviceMarkersProps) => {
               autoClose={false}
               closeOnClick={false}
               className="custom-popup"
+              maxWidth={320}
+              minWidth={280}
+              maxHeight={400}
+              keepInView={true}
+              offset={[0, -20]}
+              position="top"
             >
               <div className="p-4 min-w-[280px] max-w-[320px]">
                 {/* Header */}
@@ -96,6 +152,28 @@ export const DeviceMarkers = ({ devices }: DeviceMarkersProps) => {
                       {device.position.longitude.toFixed(6)}
                     </span>
                   </div>
+                  
+                  {device.position.accuracy && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">Accuracy:</span>
+                      <span className="text-gray-800 font-mono text-xs">
+                        ±{device.position.accuracy}m
+                      </span>
+                    </div>
+                  )}
+                  
+                  {device.position.accuracyScore && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 font-medium">Quality:</span>
+                      <span className={`text-xs font-medium ${
+                        device.position.accuracyScore >= 80 ? 'text-green-600' :
+                        device.position.accuracyScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {device.position.accuracyScore >= 80 ? 'High' :
+                         device.position.accuracyScore >= 60 ? 'Medium' : 'Low'} ({device.position.accuracyScore}%)
+                      </span>
+                    </div>
+                  )}
                   
                   {device.position.speed !== undefined && (
                     <div className="flex justify-between items-center">

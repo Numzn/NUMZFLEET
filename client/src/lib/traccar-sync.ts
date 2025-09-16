@@ -103,7 +103,6 @@ class TraccarSyncService {
       }
 
       const devices = await this.makeRequest('devices');
-      console.log('📱 Fetched Traccar devices:', devices.length);
       return devices;
     } catch (error) {
       if (error instanceof Error && error.message.includes('credentials not configured')) {
@@ -125,7 +124,6 @@ class TraccarSyncService {
       }
 
       const positions = await this.makeRequest('positions');
-      console.log('📍 Fetched Traccar positions:', positions.length);
       return positions;
     } catch (error) {
       if (error instanceof Error && error.message.includes('credentials not configured')) {
@@ -147,7 +145,6 @@ class TraccarSyncService {
       }
 
       const positions = await this.makeRequest(`positions?deviceId=${deviceId}`);
-      console.log(`📍 Fetched positions for device ${deviceId}:`, positions.length);
       return positions;
     } catch (error) {
       console.error(`Failed to fetch positions for device ${deviceId}:`, error);
@@ -167,7 +164,6 @@ class TraccarSyncService {
         };
       }
 
-      console.log('🔄 Starting Traccar to Supabase sync...');
       
       const [devices, positions] = await Promise.all([
         this.getDevices(),
@@ -183,12 +179,6 @@ class TraccarSyncService {
         lastSync: new Date().toISOString()
       };
 
-      console.log('✅ Traccar sync completed:', {
-        devices: devices.length,
-        positions: positions.length,
-        lastSync: syncData.lastSync
-      });
-
       return syncData;
     } catch (error) {
       console.error('❌ Traccar sync failed:', error);
@@ -199,19 +189,14 @@ class TraccarSyncService {
   private async updateSupabaseData(devices: TraccarDevice[], positions: TraccarPosition[]) {
     try {
       // TODO: Implement with Supabase
-      console.log('🔧 Supabase integration needed for updating Traccar data');
-      console.log(`📊 Devices: ${devices.length}, Positions: ${positions.length}`);
       
       // Placeholder implementation
       for (const device of devices) {
-        console.log(`📱 Device: ${device.name} (${device.id})`);
       }
       
       for (const position of positions) {
-        console.log(`📍 Position: ${position.latitude}, ${position.longitude} for device ${position.deviceId}`);
       }
 
-      console.log('🔥 Supabase update with Traccar data (placeholder)');
     } catch (error) {
       console.error('Failed to update Supabase with Traccar data:', error);
       throw error;
@@ -229,10 +214,7 @@ class TraccarSyncService {
       const latestPosition = positions[0]; // Most recent position
       
       // TODO: Implement with Supabase
-      console.log('🔧 Supabase integration needed for vehicle location update');
-      console.log(`📍 Vehicle ${vehicleId} location: ${latestPosition.latitude}, ${latestPosition.longitude}`);
 
-      console.log(`📍 Updated vehicle ${vehicleId} location from device ${deviceId} (placeholder)`);
       return true;
     } catch (error) {
       console.error(`Failed to update vehicle ${vehicleId} location:`, error);
@@ -245,7 +227,6 @@ class TraccarSyncService {
     this.hasCredentialError = false;
     this.credentials = getTraccarCredentials();
     if (this.credentials) {
-      console.log('🔄 Traccar credentials restored, sync service re-enabled');
     }
   }
 

@@ -67,3 +67,7 @@ export const DeviceInfo = ({ device, className = '' }: DeviceInfoProps) => {
   );
 };
 
+
+
+
+

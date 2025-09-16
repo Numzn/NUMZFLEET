@@ -3,58 +3,285 @@
 @tailwind utilities;
 
 :root {
-  --background: 210 11% 98%; /* #fafafa */
-  --foreground: 222.2 84% 4.9%; /* #09090b */
-  --muted: 210 40% 96%; /* #f1f5f9 */
-  --muted-foreground: 215.4 16.3% 46.9%; /* #64748b */
-  --popover: 0 0% 100%; /* #ffffff */
+  /* Base colors - Professional blue-gray palette */
+  --background: 0 0% 100%; /* #ffffff - Clean white background */
+  --foreground: 222.2 84% 4.9%; /* #09090b - Deep charcoal text */
+  --muted: 210 40% 98%; /* #f8fafc - Very light blue-gray */
+  --muted-foreground: 215.4 16.3% 46.9%; /* #64748b - Medium gray */
+  
+  /* Surface colors */
+  --popover: 0 0% 100%; /* #ffffff - Pure white popovers */
   --popover-foreground: 222.2 84% 4.9%; /* #09090b */
-  --card: 0 0% 100%; /* #ffffff */
+  --card: 0 0% 100%; /* #ffffff - Clean white cards */
   --card-foreground: 222.2 84% 4.9%; /* #09090b */
-  --border: 214.3 31.8% 91.4%; /* #e2e8f0 */
-  --input: 214.3 31.8% 91.4%; /* #e2e8f0 */
-  --primary: 221.2 83.2% 53.3%; /* #3b82f6 */
-  --primary-foreground: 210 40% 98%; /* #f8fafc */
-  --secondary: 210 40% 96%; /* #f1f5f9 */
+  
+  /* Border and input colors */
+  --border: 214.3 31.8% 91.4%; /* #e2e8f0 - Light gray borders */
+  --input: 214.3 31.8% 91.4%; /* #e2e8f0 - Light gray inputs */
+  
+  /* Primary colors - Professional blue */
+  --primary: 221.2 83.2% 53.3%; /* #3b82f6 - Vibrant blue */
+  --primary-foreground: 0 0% 100%; /* #ffffff - White text on primary */
+  
+  /* Secondary colors */
+  --secondary: 210 40% 96%; /* #f1f5f9 - Light blue-gray */
   --secondary-foreground: 222.2 84% 4.9%; /* #09090b */
-  --accent: 210 40% 96%; /* #f1f5f9 */
+  
+  /* Accent colors */
+  --accent: 210 40% 96%; /* #f1f5f9 - Light blue-gray */
   --accent-foreground: 222.2 84% 4.9%; /* #09090b */
-  --destructive: 0 84.2% 60.2%; /* #ef4444 */
-  --destructive-foreground: 210 40% 98%; /* #f8fafc */
-  --ring: 221.2 83.2% 53.3%; /* #3b82f6 */
-  --radius: 0.5rem;
-  --chart-1: 12 76% 61%; /* #e88c30 */
-  --chart-2: 173 58% 39%; /* #2dd4bf */
-  --chart-3: 197 37% 24%; /* #0891b2 */
-  --chart-4: 43 74% 66%; /* #facc15 */
-  --chart-5: 27 87% 67%; /* #f97316 */
+  
+  /* Status colors */
+  --destructive: 0 84.2% 60.2%; /* #ef4444 - Red for errors */
+  --destructive-foreground: 0 0% 100%; /* #ffffff */
+  --success: 142.1 76.2% 36.3%; /* #16a34a - Green for success */
+  --success-foreground: 0 0% 100%; /* #ffffff */
+  --warning: 38.5 95.7% 54.1%; /* #f59e0b - Amber for warnings */
+  --warning-foreground: 0 0% 100%; /* #ffffff */
+  
+  /* Interactive elements */
+  --ring: 221.2 83.2% 53.3%; /* #3b82f6 - Focus ring */
+  --radius: 0.5rem; /* Border radius */
+  
+  /* Chart colors - Professional palette */
+  --chart-1: 221.2 83.2% 53.3%; /* #3b82f6 - Primary blue */
+  --chart-2: 142.1 76.2% 36.3%; /* #16a34a - Success green */
+  --chart-3: 38.5 95.7% 54.1%; /* #f59e0b - Warning amber */
+  --chart-4: 0 84.2% 60.2%; /* #ef4444 - Destructive red */
+  --chart-5: 262.1 83.3% 57.8%; /* #8b5cf6 - Purple accent */
 }
 
 .dark {
-  --background: 222.2 84% 4.9%; /* #09090b */
-  --foreground: 210 40% 98%; /* #f8fafc */
-  --muted: 217.2 32.6% 17.5%; /* #1e293b */
-  --muted-foreground: 215 20.2% 65.1%; /* #94a3b8 */
-  --popover: 222.2 84% 4.9%; /* #09090b */
+  /* Base colors - Professional dark theme */
+  --background: 222.2 84% 4.9%; /* #09090b - Deep charcoal background */
+  --foreground: 210 40% 98%; /* #f8fafc - Light text */
+  --muted: 217.2 32.6% 17.5%; /* #1e293b - Dark blue-gray */
+  --muted-foreground: 215 20.2% 65.1%; /* #94a3b8 - Medium gray text */
+  
+  /* Surface colors */
+  --popover: 222.2 84% 4.9%; /* #09090b - Dark popovers */
   --popover-foreground: 210 40% 98%; /* #f8fafc */
-  --card: 222.2 84% 4.9%; /* #09090b */
+  --card: 222.2 84% 4.9%; /* #09090b - Dark cards */
   --card-foreground: 210 40% 98%; /* #f8fafc */
-  --border: 217.2 32.6% 17.5%; /* #1e293b */
-  --input: 217.2 32.6% 17.5%; /* #1e293b */
-  --primary: 217.2 91.2% 59.8%; /* #3b82f6 */
-  --primary-foreground: 222.2 84% 4.9%; /* #09090b */
-  --secondary: 217.2 32.6% 17.5%; /* #1e293b */
+  
+  /* Border and input colors */
+  --border: 217.2 32.6% 17.5%; /* #1e293b - Dark borders */
+  --input: 217.2 32.6% 17.5%; /* #1e293b - Dark inputs */
+  
+  /* Primary colors - Brighter blue for dark theme */
+  --primary: 217.2 91.2% 59.8%; /* #3b82f6 - Vibrant blue */
+  --primary-foreground: 0 0% 100%; /* #ffffff - White text on primary */
+  
+  /* Secondary colors */
+  --secondary: 217.2 32.6% 17.5%; /* #1e293b - Dark blue-gray */
   --secondary-foreground: 210 40% 98%; /* #f8fafc */
-  --accent: 217.2 32.6% 17.5%; /* #1e293b */
+  
+  /* Accent colors */
+  --accent: 217.2 32.6% 17.5%; /* #1e293b - Dark blue-gray */
   --accent-foreground: 210 40% 98%; /* #f8fafc */
-  --destructive: 0 62.8% 30.6%; /* #dc2626 */
-  --destructive-foreground: 210 40% 98%; /* #f8fafc */
-  --ring: 217.2 91.2% 59.8%; /* #3b82f6 */
-  --chart-1: 220 70% 50%; /* #2563eb */
-  --chart-2: 160 60% 45%; /* #059669 */
-  --chart-3: 30 80% 55%; /* #dc2626 */
-  --chart-4: 280 65% 60%; /* #7c3aed */
-  --chart-5: 340 75% 55%; /* #db2777 */
+  
+  /* Status colors */
+  --destructive: 0 62.8% 30.6%; /* #dc2626 - Darker red for dark theme */
+  --destructive-foreground: 0 0% 100%; /* #ffffff */
+  --success: 142.1 70.6% 45.3%; /* #22c55e - Brighter green for dark theme */
+  --success-foreground: 0 0% 100%; /* #ffffff */
+  --warning: 38.5 95.7% 54.1%; /* #f59e0b - Amber for warnings */
+  --warning-foreground: 0 0% 100%; /* #ffffff */
+  
+  /* Interactive elements */
+  --ring: 217.2 91.2% 59.8%; /* #3b82f6 - Focus ring */
+  
+  /* Chart colors - Dark theme optimized */
+  --chart-1: 217.2 91.2% 59.8%; /* #3b82f6 - Primary blue */
+  --chart-2: 142.1 70.6% 45.3%; /* #22c55e - Success green */
+  --chart-3: 38.5 95.7% 54.1%; /* #f59e0b - Warning amber */
+  --chart-4: 0 62.8% 30.6%; /* #dc2626 - Destructive red */
+  --chart-5: 262.1 83.3% 57.8%; /* #8b5cf6 - Purple accent */
+}
+
+/* Custom professional styling */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Improved scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+  
+  /* Focus styles */
+  .focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+  
+  /* Professional shadows */
+  .shadow-professional {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+  
+  .shadow-professional-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .shadow-professional-xl {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  
+  /* Status indicators */
+  .status-online {
+    @apply bg-green-500 text-white;
+  }
+  
+  .status-offline {
+    @apply bg-gray-400 text-white;
+  }
+  
+  .status-warning {
+    @apply bg-yellow-500 text-white;
+  }
+  
+  .status-error {
+    @apply bg-red-500 text-white;
+  }
+  
+  /* Professional animations */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideUp {
+    from { 
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideDown {
+    from { 
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes scaleIn {
+    from { 
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to { 
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  /* Hover effects */
+  .hover-lift {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Professional button styles */
+  .btn-primary {
+    @apply bg-blue-500 hover:bg-blue-600 text-white shadow-professional;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-900 shadow-professional;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .btn-secondary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Professional card styles */
+  .card-professional {
+    @apply bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-professional;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .card-professional:hover {
+    @apply shadow-professional-lg;
+    transform: translateY(-1px);
+  }
+  
+  /* Professional input styles */
+  .input-professional {
+    @apply border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  /* Professional badge styles */
+  .badge-success {
+    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+  }
+  
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
+  }
+  
+  .badge-error {
+    @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
+  }
+  
+  .badge-info {
+    @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200;
+  }
 }
 
 @layer base {
@@ -217,6 +444,7 @@
 
 /* Glass morphism effect */
 .glass-morphism {
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);

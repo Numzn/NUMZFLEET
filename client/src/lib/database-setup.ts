@@ -11,7 +11,6 @@ export interface DatabaseSetupResult {
  */
 export async function setupDatabase(): Promise<DatabaseSetupResult> {
   try {
-    console.log('🔧 Setting up database...')
     
     // Test basic connection
     const { data: testData, error: testError } = await supabase
@@ -41,7 +40,6 @@ export async function setupDatabase(): Promise<DatabaseSetupResult> {
       }
     }
     
-    console.log('✅ Database connection successful')
     
     // Test all required tables
     const tables = ['vehicles', 'drivers', 'fuel_records', 'admins']
@@ -65,7 +63,6 @@ export async function setupDatabase(): Promise<DatabaseSetupResult> {
       }
     }
     
-    console.log('✅ All database tables are accessible')
     
     return {
       success: true,
@@ -87,7 +84,6 @@ export async function setupDatabase(): Promise<DatabaseSetupResult> {
  */
 export async function createTestAdmin(): Promise<DatabaseSetupResult> {
   try {
-    console.log('🔧 Creating test admin user...')
     
     // Check if any admins exist
     const { data: existingAdmins, error: checkError } = await supabase
@@ -111,7 +107,6 @@ export async function createTestAdmin(): Promise<DatabaseSetupResult> {
     }
     
     // Create test admin (this should be done through proper registration)
-    console.log('⚠️ No admin users found. Please register through the login page.')
     
     return {
       success: false,
@@ -128,6 +123,10 @@ export async function createTestAdmin(): Promise<DatabaseSetupResult> {
     }
   }
 }
+
+
+
+
 
 
 

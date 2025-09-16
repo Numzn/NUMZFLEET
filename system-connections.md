@@ -102,3 +102,7 @@ Map Display (real GPS coordinates)
 - **No Fake Data**: All coordinates are real GPS positions
 - **Real-time Updates**: Every 10 seconds from Traccar
 - **Authentication**: Basic Auth with your Traccar credentials
+
+
+
+

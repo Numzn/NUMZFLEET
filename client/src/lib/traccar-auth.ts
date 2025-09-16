@@ -70,11 +70,9 @@ export async function authenticateTraccarBackground(): Promise<boolean> {
     }
 
     const baseUrl = import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site';
-    console.log('🔐 Starting Traccar authentication to:', baseUrl);
     
     // First, try to access Traccar to check if already authenticated
     try {
-      console.log('🔍 Checking if already authenticated...');
       const response = await fetch(`${baseUrl}/api/devices`, {
         method: 'GET',
         credentials: 'include', // Include cookies
@@ -85,17 +83,13 @@ export async function authenticateTraccarBackground(): Promise<boolean> {
       
       // If we get a successful response, we're already authenticated
       if (response.ok) {
-        console.log('✅ Already authenticated with Traccar');
         return true;
       } else {
-        console.log('⚠️ Not authenticated, status:', response.status);
       }
     } catch (error) {
-      console.log('ℹ️ Not authenticated, proceeding with login...');
     }
     
     // Perform login using form submission to get proper session cookies
-    console.log('🔑 Attempting Traccar login...');
     const loginFormData = new FormData();
     loginFormData.append('username', credentials.username);
     loginFormData.append('password', credentials.password);
@@ -108,15 +102,12 @@ export async function authenticateTraccarBackground(): Promise<boolean> {
         redirect: 'manual', // Don't follow redirects
       });
       
-      console.log('📡 Login response status:', loginResponse.status);
       
       // Check if login was successful
       if (loginResponse.status === 200 || loginResponse.status === 302) {
-        console.log('✅ Traccar login successful');
         
         // Verify authentication by testing API access
         try {
-          console.log('🔍 Verifying authentication with API test...');
           const testResponse = await fetch(`${baseUrl}/api/devices`, {
             method: 'GET',
             credentials: 'include',
@@ -126,7 +117,6 @@ export async function authenticateTraccarBackground(): Promise<boolean> {
           });
           
           if (testResponse.ok) {
-            console.log('✅ Traccar API access confirmed');
             return true;
           } else {
             console.warn('⚠️ API test failed with status:', testResponse.status);

@@ -8,12 +8,15 @@ interface MapContainerProps {
 }
 
 export const MapContainer = ({ children, className = "z-0" }: MapContainerProps) => {
+
   return (
     <div 
+      className="w-full h-full relative map-container-wrapper"
+      // eslint-disable-next-line react/forbid-dom-props
       style={{ 
         height: "100%", 
         width: "100%", 
-        minHeight: "500px"
+        minHeight: "400px"
       }}
     >
       <LeafletMapContainer 
@@ -22,9 +25,22 @@ export const MapContainer = ({ children, className = "z-0" }: MapContainerProps)
         style={{ 
           height: "100%", 
           width: "100%",
-          minHeight: "500px"
+          minHeight: "400px"
         }}
-        className={className}
+        className={`w-full h-full ${className}`}
+        whenReady={() => {
+          console.log('🗺️ Map ready - Center:', [-15.35, 28.28], 'Zoom: 13');
+          console.log('🗺️ Map projection: EPSG:3857 (Web Mercator) - Standard for web maps');
+          console.log('🗺️ Expected coordinate format: [latitude, longitude]');
+          
+          // Test coordinate accuracy with known location
+          const testCoords = [-15.386024386774672, 28.3081738740988]; // GIFT device location
+          console.log('🎯 Test coordinates for GIFT device:', {
+            latLng: testCoords,
+            format: '[latitude, longitude]',
+            location: 'Lusaka, Zambia'
+          });
+        }}
       >
         {/* 🔥 Reliable Tile Provider - OpenStreetMap */}
         <TileLayer 

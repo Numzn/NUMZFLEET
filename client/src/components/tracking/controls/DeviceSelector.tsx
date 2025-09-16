@@ -19,6 +19,8 @@ export const DeviceSelector = ({
 }: DeviceSelectorProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
+  console.log('🔍 DeviceSelector: Received devices:', devices.length, 'Selected:', selectedDeviceId);
+
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
   const onlineCount = devices.filter(d => d.status === 'online').length;
 
@@ -55,7 +57,7 @@ export const DeviceSelector = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-[9999]">
           <div className="p-2">
             <Button
               variant="ghost"

@@ -1,112 +1,110 @@
 import L from "leaflet";
 
-// Create Google Maps style vehicle icons
-export const createVehicleIcon = (status: string, isOnline: boolean, deviceName?: string) => {
+// Create Google Maps style vehicle icons with accuracy indicators
+export const createVehicleIcon = (status: string, isOnline: boolean, deviceName?: string, accuracy?: number | null, accuracyScore?: number) => {
   const color = isOnline ? '#4285F4' : '#EA4335'; // Google Maps blue for online, red for offline
   const statusText = isOnline ? 'ONLINE' : 'OFFLINE';
   
-  // Create Google Maps style marker with device name and status
+  // Determine accuracy indicator
+  const getAccuracyIndicator = () => {
+    if (!accuracyScore) return '';
+    
+    if (accuracyScore >= 80) {
+      return '<div style="position: absolute; top: -8px; right: -8px; width: 12px; height: 12px; background: #10B981; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>';
+    } else if (accuracyScore >= 60) {
+      return '<div style="position: absolute; top: -8px; right: -8px; width: 12px; height: 12px; background: #F59E0B; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>';
+    } else {
+      return '<div style="position: absolute; top: -8px; right: -8px; width: 12px; height: 12px; background: #EF4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>';
+    }
+  };
+  
+  // Create clean, single marker with device name and accuracy indicator
   const svgIcon = `
-    <div style="display: flex; flex-direction: column; align-items: center;">
+    <div style="display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1000;">
+      <!-- Device name label (the accurate one) -->
       ${deviceName ? `
         <div style="
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(0, 0, 0, 0.9);
           color: white;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-size: 10px;
+          padding: 4px 10px;
+          border-radius: 8px;
+          font-size: 12px;
           font-weight: bold;
-          margin-bottom: 2px;
+          margin-bottom: 4px;
           white-space: nowrap;
-          max-width: 120px;
+          max-width: 160px;
           overflow: hidden;
           text-overflow: ellipsis;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+          border: 1px solid rgba(255,255,255,0.3);
+          backdrop-filter: blur(6px);
+          z-index: 1001;
+          position: relative;
         " title="${deviceName}">
           ${deviceName}
         </div>
       ` : ''}
-      
-      <!-- Google Maps style marker -->
+
+      <!-- Single, clean marker -->
       <div style="position: relative;">
-        <!-- Main marker body -->
+        <!-- Main marker body - simplified -->
         <div style="
-          width: 32px;
-          height: 32px;
+          width: 24px;
+          height: 24px;
           background: ${color};
-          border: 3px solid white;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          border: 2px solid white;
+          border-radius: 50%;
+          box-shadow: 0 3px 10px rgba(0,0,0,0.4);
           position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         ">
-          <!-- Inner circle -->
+          ${getAccuracyIndicator()}
+          <!-- Inner dot -->
           <div style="
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(45deg);
-            width: 12px;
-            height: 12px;
+            width: 8px;
+            height: 8px;
             background: white;
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          ">
-            <div style="
-              width: 6px;
-              height: 6px;
-              background: ${color};
-              border-radius: 50%;
-            "></div>
-          </div>
+          "></div>
         </div>
-        
-        <!-- Status text below marker -->
+      </div>
+
+      <!-- Accuracy radius indicator (if accuracy is available) -->
+      ${accuracy && accuracy > 0 ? `
         <div style="
           position: absolute;
-          top: 100%;
+          top: 50%;
           left: 50%;
-          transform: translateX(-50%);
-          margin-top: 4px;
-          background: ${color};
-          color: white;
-          padding: 2px 6px;
-          border-radius: 12px;
-          font-size: 9px;
-          font-weight: bold;
-          white-space: nowrap;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-          border: 1px solid white;
-        ">
-          ${statusText}
-        </div>
-        
-        <!-- Pulse animation for online devices -->
-        ${isOnline ? `
-          <div style="
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            border: 2px solid ${color};
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-            opacity: 0.6;
-          "></div>
-        ` : ''}
-      </div>
+          transform: translate(-50%, -50%);
+          width: ${Math.min(accuracy * 2, 200)}px;
+          height: ${Math.min(accuracy * 2, 200)}px;
+          border: 2px solid ${color}40;
+          border-radius: 50%;
+          background: ${color}20;
+          pointer-events: none;
+          z-index: 999;
+        " title="Accuracy: ±${accuracy}m"></div>
+      ` : ''}
     </div>
   `;
   
+  // Determine accuracy class
+  const getAccuracyClass = () => {
+    if (!accuracyScore) return '';
+    
+    if (accuracyScore >= 80) return 'high-accuracy';
+    if (accuracyScore >= 60) return 'medium-accuracy';
+    return 'low-accuracy';
+  };
+
   return new L.DivIcon({
     html: svgIcon,
-    className: 'google-maps-style-icon',
-    iconSize: [32, deviceName ? 80 : 50], // Adjust size for name and status
-    iconAnchor: [16, deviceName ? 70 : 40], // Adjust anchor point
+    className: `google-maps-style-icon ${getAccuracyClass()}`,
+    iconSize: [24, deviceName ? 60 : 30], // Smaller, cleaner size
+    iconAnchor: [12, deviceName ? 50 : 15], // Centered anchor point
+    popupAnchor: [0, deviceName ? -55 : -25], // Better popup positioning
   });
 };
 

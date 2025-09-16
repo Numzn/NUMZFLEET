@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { NavigationProvider } from "@/contexts/NavigationContext";
+import { NavigationTransitionProvider } from "@/contexts/NavigationTransitionContext";
+import { TrackingModeProvider } from "@/contexts/TrackingModeContext";
 import { DataSyncProvider } from "@/components/data-sync/DataSyncProvider";
 import { PageLoading } from "@/components/ui/loading";
 
@@ -15,7 +17,7 @@ import Settings from "@/pages/settings";
 import AdvancedReports from "@/pages/advanced-reports";
 import Reports from "@/pages/reports";
 import Analytics from "@/pages/analytics";
-import LiveTracking from "@/pages/live-tracking-new";
+import UnifiedMapPage from "@/pages/unified-map";
 import { SimpleLoginForm } from "@/components/auth/SimpleLoginForm";
 import TraccarAdmin from "@/pages/traccar-admin";
 import MapTestPage from "@/pages/map-test";
@@ -45,21 +47,25 @@ function AppContent() {
 
   // Show main app after successful authentication
   return (
-    <AppLayout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/vehicles" component={VehicleManagement} />
-        <Route path="/tracking" component={LiveTracking} />
-        <Route path="/map-test" component={MapTestPage} />
-        <Route path="/traccar-test" component={TraccarTestPage} />
-        <Route path="/env-test" component={EnvTestPage} />
-        <Route path="/traccar-admin" component={TraccarAdmin} />
-        <Route path="/reports" component={AdvancedReports} />
-        <Route path="/analytics" component={Analytics} />
-        <Route path="/settings" component={Settings} />
-        <Route component={NotFound} />
-      </Switch>
-    </AppLayout>
+    <Switch>
+      <Route path="/map" component={UnifiedMapPage} />
+      <Route>
+        <AppLayout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/vehicles" component={VehicleManagement} />
+            <Route path="/map-test" component={MapTestPage} />
+            <Route path="/traccar-test" component={TraccarTestPage} />
+            <Route path="/env-test" component={EnvTestPage} />
+            <Route path="/traccar-admin" component={TraccarAdmin} />
+            <Route path="/reports" component={AdvancedReports} />
+            <Route path="/analytics" component={Analytics} />
+            <Route path="/settings" component={Settings} />
+            <Route component={NotFound} />
+          </Switch>
+        </AppLayout>
+      </Route>
+    </Switch>
   );
 }
 
@@ -69,12 +75,16 @@ export default function App() {
       <TooltipProvider>
         <AuthProvider>
           <NavigationProvider>
-            <DataSyncProvider>
-              <Router>
-                <AppContent />
-                <Toaster />
-              </Router>
-            </DataSyncProvider>
+            <NavigationTransitionProvider>
+              <TrackingModeProvider>
+                <DataSyncProvider>
+                  <Router>
+                    <AppContent />
+                    <Toaster />
+                  </Router>
+                </DataSyncProvider>
+              </TrackingModeProvider>
+            </NavigationTransitionProvider>
           </NavigationProvider>
         </AuthProvider>
       </TooltipProvider>

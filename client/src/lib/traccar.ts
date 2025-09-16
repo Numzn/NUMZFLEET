@@ -1,5 +1,7 @@
 // Enhanced Traccar API Client with Type Safety
 import { TraccarDevice, TraccarPosition } from '@shared/schema';
+import { optimizeCoordinates } from '@/utils/optimization';
+import { OptimizationOptions } from '@/types/optimization';
 
 // Environment-based configuration - AWS Hosted Traccar
 const TRACCAR_BASE_URL = import.meta.env.VITE_TRACCAR_URL || 'https://fleet.numz.site';
@@ -17,18 +19,13 @@ export const traccarEndpoints = {
   users: `${TRACCAR_BASE_URL}/api/users`,
 } as const;
 
-console.log('🌐 Traccar Configuration:', {
-  TRACCAR_BASE_URL,
-  TRACCAR_AUTH: '***',
-  MODE: 'REAL_TRACCAR_API_ONLY'
-});
 
 // Enhanced Traccar API Client
 export class TraccarClient {
   // Get all devices
   static async getDevices(): Promise<TraccarDevice[]> {
     try {
-      console.log('🌐 TraccarClient.getDevices: Connecting to Traccar server at', traccarEndpoints.devices);
+      
       const response = await fetch(traccarEndpoints.devices, {
         method: 'GET',
         headers: {
@@ -40,12 +37,14 @@ export class TraccarClient {
         signal: AbortSignal.timeout(CONNECTION_TIMEOUT),
       });
 
+
       if (!response.ok) {
-        throw new Error(`Traccar API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ Traccar API error response:', errorText);
+        throw new Error(`Traccar API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const devices = await response.json();
-      console.log(`✅ Successfully fetched ${devices.length} devices from Traccar`);
       return devices.map((device: any) => ({
         ...device,
         status: device.status || 'offline',
@@ -72,7 +71,6 @@ export class TraccarClient {
         ? `${traccarEndpoints.positions}?deviceId=${validDeviceId}`
         : traccarEndpoints.positions;
 
-      console.log(`🌐 TraccarClient.getPositions: Fetching positions from ${url}`);
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -89,7 +87,8 @@ export class TraccarClient {
       }
 
       const positions = await response.json();
-      console.log(`✅ Successfully fetched ${positions.length} positions from Traccar`);
+      
+      
       return positions;
     } catch (error) {
       console.error('❌ Error fetching Traccar positions:', error);
@@ -185,14 +184,57 @@ export class TraccarClient {
       return 0;
     }
   }
+
+  // Get optimized positions for a device
+  static async getOptimizedPositions(
+    deviceId?: number | any, 
+    options: OptimizationOptions = {}
+  ): Promise<{
+    positions: TraccarPosition[];
+    optimization: {
+      originalCount: number;
+      optimizedCount: number;
+      reductionPercentage: number;
+      statistics: any;
+    };
+  }> {
+    try {
+      // Get raw positions first
+      const rawPositions = await this.getPositions(deviceId);
+      
+      if (rawPositions.length === 0) {
+        return {
+          positions: [],
+          optimization: {
+            originalCount: 0,
+            optimizedCount: 0,
+            reductionPercentage: 0,
+            statistics: {}
+          }
+        };
+      }
+
+      // Apply optimization
+      const optimizationResult = optimizeCoordinates(rawPositions, options);
+      
+
+      return {
+        positions: optimizationResult.optimizedPositions,
+        optimization: {
+          originalCount: optimizationResult.originalCount,
+          optimizedCount: optimizationResult.optimizedCount,
+          reductionPercentage: optimizationResult.reductionPercentage,
+          statistics: optimizationResult.statistics
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error getting optimized positions:', error);
+      throw new Error(`Failed to get optimized positions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 }
 
 // Debug logging
-console.log('🌐 Traccar Configuration:', {
-  TRACCAR_BASE_URL,
-  TRACCAR_AUTH: '***',
-  MODE: 'REAL_TRACCAR_API_ONLY'
-});
 
 // Production API functions - only real Traccar data
 export const traccarApi = {
@@ -214,5 +256,10 @@ export const traccarApi = {
   // Test connection
   async testConnection(): Promise<boolean> {
     return TraccarClient.testConnection();
+  },
+
+  // Get optimized positions
+  async getOptimizedPositions(deviceId?: number | any, options?: OptimizationOptions) {
+    return TraccarClient.getOptimizedPositions(deviceId, options);
   },
 }; 

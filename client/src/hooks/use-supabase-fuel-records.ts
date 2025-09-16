@@ -11,7 +11,6 @@ export const useFuelRecords = () => {
   return useQuery({
     queryKey: ['fuelRecords'],
     queryFn: async (): Promise<FuelRecord[]> => {
-      console.log('🔍 Fetching fuel records from Supabase...');
       try {
         const { data, error } = await supabase
           .from('fuel_records')
@@ -23,7 +22,6 @@ export const useFuelRecords = () => {
           throw error;
         }
 
-        console.log('✅ Fuel records fetched successfully:', data?.length || 0, 'records');
         return data || [];
       } catch (err) {
         console.error('❌ Exception in fuel records query:', err);

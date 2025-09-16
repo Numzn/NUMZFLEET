@@ -1,4 +1,4 @@
-import React from "react";
+n import React from "react";
 import { createPortal } from "react-dom";
 import { useMap } from "react-leaflet";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,7 @@ import {
   ZoomIn, 
   ZoomOut, 
   RotateCcw,
-  Target,
-  MapPin
+  Target
 } from "lucide-react";
 import { Device } from "./types";
 
@@ -108,97 +107,174 @@ export const MapControlButtons = ({
   }
 
   return createPortal(
-    <div className="flex flex-col gap-2">
-      {/* Center Map Button */}
-      <Button
-        onClick={centerMap}
-        size="sm"
-        variant="outline"
-        className="bg-white/95 hover:bg-white shadow-lg border-0"
-        title="Center map on all devices"
+    <div 
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        maxWidth: 'calc(100vw - 20px)',
+        maxHeight: 'calc(100vh - 20px)'
+      }}
+    >
+      {/* Clean Control Panel */}
+      <div 
+        style={{
+          background: 'transparent',
+          borderRadius: '6px',
+          padding: '4px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
+          minWidth: '44px'
+        }}
       >
-        <Navigation className="h-4 w-4" />
-      </Button>
+        {/* Center Map Button */}
+        <button
+          onClick={centerMap}
+          title="Center map on all devices"
+          style={{
+            width: '32px',
+            height: '32px',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: '4px',
+            color: '#374151',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          <Navigation className="h-4 w-4" />
+        </button>
 
-      {/* Center on Selected Device */}
-      {selectedDevice && (
-        <Button
-          onClick={centerOnSelectedDevice}
-          size="sm"
-          variant="outline"
-          className="bg-white/95 hover:bg-white shadow-lg border-0"
-          title={`Center on ${selectedDevice.name}`}
-        >
-          <Target className="h-4 w-4" />
-        </Button>
-      )}
+        {/* Center on Selected Device */}
+        {selectedDevice && (
+          <button
+            onClick={centerOnSelectedDevice}
+            title={`Center on ${selectedDevice.name}`}
+            style={{
+              width: '32px',
+              height: '32px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '4px',
+              color: '#374151',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <Target className="h-4 w-4" />
+          </button>
+        )}
 
-      {/* Zoom Controls */}
-      <div className="flex flex-col gap-1">
-        <Button
-          onClick={zoomIn}
-          size="sm"
-          variant="outline"
-          className="bg-white/95 hover:bg-white shadow-lg border-0 h-8 w-8 p-0"
-          title="Zoom in"
+        {/* Zoom Controls Container */}
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '2px'
+        }}>
+          <button
+            onClick={zoomIn}
+            title="Zoom in"
+            style={{
+              width: '28px',
+              height: '28px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '4px',
+              color: '#374151',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            +
+          </button>
+          <button
+            onClick={zoomOut}
+            title="Zoom out"
+            style={{
+              width: '28px',
+              height: '28px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '4px',
+              color: '#374151',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            −
+          </button>
+        </div>
+
+        {/* Reset View Button */}
+        <button
+          onClick={resetView}
+          title="Reset to default view"
+          style={{
+            width: '32px',
+            height: '32px',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: '4px',
+            color: '#374151',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
         >
-          <ZoomIn className="h-3 w-3" />
-        </Button>
-        <Button
-          onClick={zoomOut}
-          size="sm"
-          variant="outline"
-          className="bg-white/95 hover:bg-white shadow-lg border-0 h-8 w-8 p-0"
-          title="Zoom out"
-        >
-          <ZoomOut className="h-3 w-3" />
-        </Button>
+          <RotateCcw className="h-4 w-4" />
+        </button>
       </div>
 
-      {/* Reset View */}
-      <Button
-        onClick={resetView}
-        size="sm"
-        variant="outline"
-        className="bg-white/95 hover:bg-white shadow-lg border-0"
-        title="Reset to default view"
-      >
-        <RotateCcw className="h-4 w-4" />
-      </Button>
-
-      {/* Device List Toggle */}
-      {devices.length > 0 && (
-        <div className="bg-white/95 rounded-lg shadow-lg p-2 max-h-48 overflow-y-auto">
-          <div className="text-xs font-medium text-gray-600 mb-2 px-2">
-            Devices ({devices.length})
-          </div>
-          {devices.map((device) => (
-            <button
-              key={device.id}
-              onClick={() => onDeviceSelect?.(device)}
-              className={`w-full text-left px-2 py-1 rounded text-xs hover:bg-gray-100 transition-colors ${
-                selectedDevice?.id === device.id 
-                  ? 'bg-blue-100 text-blue-700 font-medium' 
-                  : 'text-gray-700'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <MapPin className="h-3 w-3" />
-                <span className="truncate">{device.name}</span>
-                <span className={`text-xs px-1 py-0.5 rounded ${
-                  device.status === 'online' 
-                    ? 'bg-green-100 text-green-700' 
-                    : device.status === 'offline'
-                    ? 'bg-red-100 text-red-700'
-                    : 'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {device.status}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
     </div>,
     controlContainer
   );

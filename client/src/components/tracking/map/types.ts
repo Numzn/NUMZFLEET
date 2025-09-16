@@ -10,6 +10,9 @@ export interface Device {
     speed?: number;
     course?: number;
     address?: string;
+    accuracy?: number | null;
+    accuracyScore?: number;
+    lastUpdate?: string;
   };
 }
 
@@ -17,6 +20,6 @@ export interface TrackingMapProps {
   className?: string;
   height?: string;
   selectedDevice?: Device;
-  onDeviceSelect?: (device: Device) => void;
+  onDeviceSelect?: (device: Device | undefined) => void;
 }
 

@@ -11,7 +11,6 @@ export const useDrivers = () => {
   return useQuery({
     queryKey: ['drivers'],
     queryFn: async (): Promise<Driver[]> => {
-      console.log('🔍 Fetching drivers from Supabase...');
       try {
         const { data, error } = await supabase
           .from('drivers')
@@ -24,7 +23,6 @@ export const useDrivers = () => {
           throw error;
         }
 
-        console.log('✅ Drivers fetched successfully:', data?.length || 0, 'drivers');
         return data || [];
       } catch (err) {
         console.error('❌ Exception in drivers query:', err);

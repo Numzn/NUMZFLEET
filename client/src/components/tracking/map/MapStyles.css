@@ -1,10 +1,58 @@
-/* Google Maps style marker */
+/* Google Maps style marker - single clean marker */
 .google-maps-style-icon {
   background: transparent !important;
   border: none !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
+  z-index: 1000 !important;
+  position: relative !important;
+}
+
+/* Ensure only one marker per device */
+.google-maps-style-icon * {
+  pointer-events: none !important;
+}
+
+/* Remove any duplicate visual effects */
+.google-maps-style-icon::before,
+.google-maps-style-icon::after {
+  display: none !important;
+}
+
+/* Accuracy indicator animations */
+.google-maps-style-icon .accuracy-indicator {
+  animation: accuracyPulse 2s infinite;
+}
+
+@keyframes accuracyPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+}
+
+/* High accuracy marker */
+.google-maps-style-icon.high-accuracy {
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.3));
+}
+
+/* Medium accuracy marker */
+.google-maps-style-icon.medium-accuracy {
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.3));
+}
+
+/* Low accuracy marker */
+.google-maps-style-icon.low-accuracy {
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.3));
 }
 
 /* Legacy custom marker styles */
@@ -18,23 +66,27 @@
 
 /* Device name label styles */
 .custom-vehicle-icon .device-name-label {
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.9);
   color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: bold;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
   white-space: nowrap;
-  max-width: 120px;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  z-index: 1000;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.2);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  z-index: 1001 !important;
+  position: relative !important;
   pointer-events: none;
 }
 
-/* Custom popup styles */
+/* Enhanced popup styles */
 .custom-popup .leaflet-popup-content-wrapper {
   background: white;
   border-radius: 12px;
@@ -42,6 +94,16 @@
   border: 1px solid #e5e7eb;
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(1);
+  z-index: 10001 !important;
+  position: relative !important;
+}
+
+.custom-popup .leaflet-popup-content-wrapper:hover {
+  transform: scale(1.02);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+  border-color: #d1d5db;
 }
 
 .custom-popup .leaflet-popup-content {
@@ -55,17 +117,211 @@
   border: 1px solid #e5e7eb;
   border-top: none;
   border-left: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Marker pulse animation */
+.custom-popup .leaflet-popup-content-wrapper:hover .leaflet-popup-tip {
+  border-color: #d1d5db;
+}
+
+/* Fix popup positioning and cropping issues */
+.leaflet-popup {
+  z-index: 10000 !important;
+  position: absolute !important;
+}
+
+.leaflet-popup-content-wrapper {
+  z-index: 10001 !important;
+  position: relative !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.leaflet-popup-tip {
+  z-index: 10002 !important;
+  position: relative !important;
+}
+
+/* Ensure popup is not cropped by viewport */
+.leaflet-popup-pane .leaflet-popup {
+  z-index: 10000 !important;
+  position: absolute !important;
+}
+
+/* Fix popup positioning relative to map container */
+.leaflet-container .leaflet-popup-pane {
+  z-index: 10000 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important;
+}
+
+.leaflet-container .leaflet-popup-pane .leaflet-popup {
+  pointer-events: auto !important;
+}
+
+/* Additional popup content styling */
+.custom-popup .leaflet-popup-content {
+  max-height: 70vh !important;
+  overflow-y: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Ensure popup is visible above all elements */
+.leaflet-popup-pane {
+  z-index: 10000 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important;
+}
+
+.leaflet-popup-pane .leaflet-popup {
+  pointer-events: auto !important;
+  z-index: 10001 !important;
+  position: absolute !important;
+}
+
+/* Additional popup positioning fixes */
+.leaflet-popup-content {
+  z-index: 10002 !important;
+  position: relative !important;
+  max-height: 70vh !important;
+  overflow-y: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Ensure popup is not cropped by navigation header */
+.leaflet-popup-pane {
+  z-index: 10000 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+}
+
+/* Fix popup positioning relative to map container */
+.leaflet-container .leaflet-popup-pane {
+  z-index: 10000 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+}
+
+/* Specific fixes for marker click popups */
+.leaflet-popup {
+  z-index: 10000 !important;
+  position: absolute !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content-wrapper {
+  z-index: 10001 !important;
+  position: relative !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+}
+
+.leaflet-popup-tip {
+  z-index: 10002 !important;
+  position: relative !important;
+}
+
+/* Ensure popup is not clipped by viewport */
+.leaflet-popup-pane .leaflet-popup {
+  z-index: 10000 !important;
+  position: absolute !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate3d(0, 0, 0) !important;
+}
+
+/* Enhanced popup button styles */
+.custom-popup button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+}
+
+.custom-popup button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.custom-popup button:hover::before {
+  left: 100%;
+}
+
+.custom-popup button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.custom-popup button:active {
+  transform: translateY(0);
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Specific button color enhancements */
+.custom-popup button.bg-blue-500 {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border-color: #1d4ed8;
+}
+
+.custom-popup button.bg-blue-500:hover {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.custom-popup button.bg-gray-500 {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  border-color: #374151;
+}
+
+.custom-popup button.bg-gray-500:hover {
+  background: linear-gradient(135deg, #4b5563, #374151);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+}
+
+/* Disable pulse animations to prevent visual duplicates */
 @keyframes pulse {
   0% {
     transform: scale(1);
     opacity: 1;
   }
   50% {
-    transform: scale(1.1);
-    opacity: 0.7;
+    transform: scale(1);
+    opacity: 1;
   }
   100% {
     transform: scale(1);
@@ -74,7 +330,7 @@
 }
 
 .custom-vehicle-icon svg {
-  animation: pulse 2s infinite;
+  animation: none !important;
 }
 
 /* Smooth transitions for marker updates */
@@ -82,39 +338,485 @@
   transition: all 0.3s ease-in-out;
 }
 
-/* Hover effects for Google Maps style markers */
+/* Enhanced hover effects for Google Maps style markers */
+.google-maps-style-icon {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
 .google-maps-style-icon:hover {
-  transform: scale(1.1);
-  z-index: 1000;
+  transform: scale(1.15) translateY(-2px);
+  z-index: 2000 !important;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3));
 }
 
 .google-maps-style-icon:hover .device-name-label {
-  background: rgba(0, 0, 0, 0.9);
-  transform: scale(1.05);
+  background: rgba(0, 0, 0, 0.95);
+  transform: scale(1.08) translateY(-1px);
+  z-index: 2001 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-/* Hover effects for legacy device markers */
+.google-maps-style-icon:active {
+  transform: scale(1.05) translateY(-1px);
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced hover effects for legacy device markers */
+.custom-vehicle-icon {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
 .custom-vehicle-icon:hover {
-  transform: scale(1.1);
-  z-index: 1000;
+  transform: scale(1.15) translateY(-2px);
+  z-index: 2000 !important;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3));
 }
 
 .custom-vehicle-icon:hover .device-name-label {
-  background: rgba(0, 0, 0, 0.9);
-  transform: scale(1.05);
+  background: rgba(0, 0, 0, 0.95);
+  transform: scale(1.08) translateY(-1px);
+  z-index: 2001 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-/* Custom popup close button */
+.custom-vehicle-icon:active {
+  transform: scale(1.05) translateY(-1px);
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced popup close button */
 .custom-popup .leaflet-popup-close-button {
   color: #6b7280;
   font-size: 18px;
   font-weight: bold;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: 1px solid transparent;
 }
 
 .custom-popup .leaflet-popup-close-button:hover {
   background: #f3f4f6;
   color: #374151;
+  transform: scale(1.1);
+  border-color: #d1d5db;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.custom-popup .leaflet-popup-close-button:active {
+  transform: scale(0.95);
+  background: #e5e7eb;
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure map container takes full height */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 100% !important;
+}
+
+/* Ensure map tiles are properly sized */
+.leaflet-tile-container {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Ensure map pane takes full space */
+.leaflet-map-pane {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Ensure tile pane takes full space */
+.leaflet-tile-pane {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Fix any potential cropping issues */
+.leaflet-container .leaflet-pane {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Ensure proper z-index layering for all map elements */
+.leaflet-marker-pane {
+  z-index: 600 !important;
+}
+
+.leaflet-popup-pane {
+  z-index: 10000 !important;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 800 !important;
+}
+
+.leaflet-control-pane {
+  z-index: 900 !important;
+}
+
+/* Enhanced marker visibility */
+.leaflet-marker-icon {
+  z-index: 1000 !important;
+  position: relative !important;
+}
+
+/* Ensure device labels are always visible */
+.google-maps-style-icon div[style*="z-index: 1001"] {
+  z-index: 1001 !important;
+  position: relative !important;
+}
+
+.google-maps-style-icon div[style*="z-index: 1002"] {
+  z-index: 1002 !important;
+  position: relative !important;
+}
+
+/* Map container styles */
+.tracking-map-container {
+  min-height: 400px;
+  width: 100%;
+  position: relative;
+}
+
+.map-container-wrapper {
+  min-height: 400px;
+  width: 100%;
+}
+
+/* Force full width for Leaflet container */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 100% !important;
+  position: relative !important;
+}
+
+/* Ensure no margins or padding on map elements */
+.leaflet-map-pane,
+.leaflet-tile-pane,
+.leaflet-overlay-pane {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Enhanced button hover effects for navigation */
+.btn-enhanced {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-enhanced::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s;
+}
+
+.btn-enhanced:hover::before {
+  left: 100%;
+}
+
+.btn-enhanced:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-enhanced:active {
+  transform: translateY(0);
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced navigation button styles */
+.nav-button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.nav-button:active {
+  transform: scale(0.95);
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced breadcrumb hover effects */
+.breadcrumb-link {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.breadcrumb-link:hover {
+  color: hsl(var(--primary));
+  transform: translateX(2px);
+}
+
+.breadcrumb-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: hsl(var(--primary));
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.breadcrumb-link:hover::after {
+  width: 100%;
+}
+
+/* Enhanced map control button styles */
+.map-control-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.map-control-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.map-control-btn:hover::before {
+  left: 100%;
+}
+
+.map-control-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+/* Ripple effect for map control buttons */
+.map-control-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+}
+
+.map-control-btn:active::after {
+  width: 100px;
+  height: 100px;
+}
+
+/* Ensure dropdowns appear above map elements */
+.device-selector-dropdown {
+  z-index: 9999 !important;
+  position: relative !important;
+  max-height: 16rem !important;
+  overflow-y: auto !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 0.375rem !important;
+}
+
+/* Ensure all UI dropdowns are above map */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+/* Floating device info panel */
+.floating-device-info {
+  z-index: 1000 !important;
+  position: absolute !important;
+  top: 1rem !important;
+  left: 1rem !important;
+  pointer-events: auto !important;
+}
+
+.floating-device-info .card {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(229, 231, 235, 0.8) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.floating-device-info .card:hover {
+  box-shadow: 
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05),
+    0 0 0 1px rgba(0, 0, 0, 0.1) !important;
+  transform: translateY(-1px) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Status indicator animation */
+.floating-device-info .animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+}
+
+/* Smooth transitions for all elements */
+.floating-device-info * {
+  transition: all 0.2s ease !important;
+}
+
+/* Badge styling */
+.floating-device-info .badge {
+  font-weight: 500 !important;
+  letter-spacing: 0.025em !important;
+}
+
+/* Icon styling */
+.floating-device-info .lucide {
+  transition: all 0.2s ease !important;
+}
+
+/* Hover effects for interactive elements */
+.floating-device-info button:hover {
+  background-color: rgba(243, 244, 246, 0.8) !important;
+  transform: scale(1.05) !important;
+}
+
+/* Close button specific styling */
+.floating-device-info .close-button {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(209, 213, 219, 0.8) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  z-index: 10 !important;
+  position: relative !important;
+}
+
+.floating-device-info .close-button:hover {
+  background-color: rgba(249, 250, 251, 0.95) !important;
+  border-color: rgba(156, 163, 175, 0.8) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+  transform: scale(1.1) !important;
+}
+
+.floating-device-info .close-button svg {
+  color: rgba(75, 85, 99, 0.8) !important;
+  transition: color 0.2s ease !important;
+}
+
+.floating-device-info .close-button:hover svg {
+  color: rgba(31, 41, 55, 0.9) !important;
+}
+
+/* Ensure navigation header elements are above map */
+.navigation-header {
+  z-index: 1000 !important;
+  position: relative !important;
+}
+
+/* Fix popup positioning to avoid header cropping */
+.leaflet-popup-pane .leaflet-popup {
+  z-index: 10000 !important;
+  position: absolute !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate3d(0, 0, 0) !important;
+}
+
+/* Custom popup positioning */
+.custom-popup {
+  z-index: 10001 !important;
+  position: relative !important;
+}
+
+/* Adjust popup arrow positioning */
+.leaflet-popup-tip {
+  z-index: 10002 !important;
+  position: relative !important;
+  margin-top: -1px !important;
+}
+
+/* Better popup positioning relative to marker */
+.leaflet-popup-pane .leaflet-popup {
+  margin-top: -10px !important;
+  margin-left: 0 !important;
+}
+
+/* Alternative popup positions - uncomment one of these: */
+
+/* Position popup to the right of marker */
+/* .leaflet-popup-pane .leaflet-popup {
+  margin-top: -20px !important;
+  margin-left: 20px !important;
+} */
+
+/* Position popup to the left of marker */
+/* .leaflet-popup-pane .leaflet-popup {
+  margin-top: -20px !important;
+  margin-left: -320px !important;
+} */
+
+/* Position popup below marker */
+/* .leaflet-popup-pane .leaflet-popup {
+  margin-top: 20px !important;
+  margin-left: 0 !important;
+} */
+
+/* Center popup above marker */
+.leaflet-popup-pane .leaflet-popup {
+  margin-top: -20px !important;
+  margin-left: -160px !important;
+  transform: translateX(50%) !important;
+}
+
+/* Ensure popup content is not clipped */
+.leaflet-popup-content-wrapper {
+  z-index: 10001 !important;
+  position: relative !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+/* Compact dropdown button styles */
+.device-selector-dropdown button {
+  height: 2rem !important;
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+}
+
+.device-selector-dropdown button svg {
+  height: 0.75rem !important;
+  width: 0.75rem !important;
 }

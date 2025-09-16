@@ -1,85 +1,143 @@
-import { Calendar, Car, BarChart, TrendingUp, MapPin, Shield, Settings } from 'lucide-react';
-
-// Route configuration
+// Application routing configuration
 export const ROUTES = {
   HOME: '/',
-  VEHICLES: '/vehicles',
-  TRACKING: '/tracking',
-  TRACCAR_ADMIN: '/traccar-admin',
+  MAP: '/map',
   REPORTS: '/reports',
   ANALYTICS: '/analytics',
   SETTINGS: '/settings',
   LOGIN: '/login',
-  MAP_TEST: '/map-test',
+  REGISTER: '/register',
+  DASHBOARD: '/dashboard',
+  VEHICLES: '/vehicles',
+  DRIVERS: '/drivers',
+  FUEL: '/fuel',
+  MAINTENANCE: '/maintenance',
+  EXPORTS: '/exports',
+  ADMIN: '/admin'
 } as const;
 
-// Navigation items configuration with icons
+// Navigation items for sidebar
 export const NAV_ITEMS = [
   {
-    href: ROUTES.HOME,
     label: 'Dashboard',
-    description: 'Overview and metrics',
-    icon: Calendar,
-    adminOnly: false,
-    badge: undefined,
+    href: ROUTES.DASHBOARD,
+    icon: 'Home',
+    description: 'Overview and key metrics'
   },
   {
-    href: ROUTES.VEHICLES,
-    label: 'Vehicle Management',
-    description: 'Manage fleet vehicles',
-    icon: Car,
-    adminOnly: false,
-    badge: undefined,
+    label: 'Map View',
+    href: ROUTES.MAP,
+    icon: 'MapPin',
+    description: 'Live tracking and historical replay analysis'
   },
   {
-    href: ROUTES.REPORTS,
     label: 'Reports',
-    description: 'Generate reports',
-    icon: BarChart,
-    adminOnly: false,
-    badge: undefined,
+    href: ROUTES.REPORTS,
+    icon: 'FileText',
+    description: 'Generate and view reports'
   },
   {
-    href: ROUTES.ANALYTICS,
     label: 'Analytics',
-    description: 'Data insights',
-    icon: TrendingUp,
-    adminOnly: false,
-    badge: undefined,
+    href: ROUTES.ANALYTICS,
+    icon: 'BarChart3',
+    description: 'Data analysis and insights'
   },
   {
-    href: ROUTES.TRACKING,
-    label: 'Live Tracking',
-    description: 'GPS tracking',
-    icon: MapPin,
-    adminOnly: false,
-    badge: undefined,
+    label: 'Vehicles',
+    href: ROUTES.VEHICLES,
+    icon: 'Truck',
+    description: 'Manage vehicle fleet'
   },
   {
-    href: ROUTES.TRACCAR_ADMIN,
-    label: 'GPS Admin',
-    description: 'Device management',
-    icon: Shield,
-    adminOnly: true,
-    badge: undefined,
+    label: 'Drivers',
+    href: ROUTES.DRIVERS,
+    icon: 'Users',
+    description: 'Driver management'
   },
   {
-    href: ROUTES.SETTINGS,
+    label: 'Fuel Records',
+    href: ROUTES.FUEL,
+    icon: 'Fuel',
+    description: 'Fuel consumption tracking'
+  },
+  {
+    label: 'Maintenance',
+    href: ROUTES.MAINTENANCE,
+    icon: 'Wrench',
+    description: 'Vehicle maintenance logs'
+  },
+  {
+    label: 'Exports',
+    href: ROUTES.EXPORTS,
+    icon: 'Download',
+    description: 'Export data and reports'
+  },
+  {
     label: 'Settings',
-    description: 'System configuration',
-    icon: Settings,
-    adminOnly: false,
-    badge: undefined,
-  },
+    href: ROUTES.SETTINGS,
+    icon: 'Settings',
+    description: 'Application settings'
+  }
 ] as const;
 
-// Route guard hook
-export function useRouteGuard(requiredAuth: boolean = true) {
-  // Add any route-specific logic here
-  // For example, checking permissions, redirecting, etc.
+// Page titles mapping
+export const PAGE_TITLES = {
+  [ROUTES.HOME]: 'Home',
+  [ROUTES.DASHBOARD]: 'Dashboard',
+  [ROUTES.MAP]: 'Map View',
+  [ROUTES.REPORTS]: 'Reports',
+  [ROUTES.ANALYTICS]: 'Analytics',
+  [ROUTES.VEHICLES]: 'Vehicles',
+  [ROUTES.DRIVERS]: 'Drivers',
+  [ROUTES.FUEL]: 'Fuel Records',
+  [ROUTES.MAINTENANCE]: 'Maintenance',
+  [ROUTES.EXPORTS]: 'Exports',
+  [ROUTES.SETTINGS]: 'Settings',
+  [ROUTES.LOGIN]: 'Login',
+  [ROUTES.REGISTER]: 'Register',
+  [ROUTES.ADMIN]: 'Admin'
+} as const;
+
+// Helper function to get page title
+export const getPageTitle = (path: string): string => {
+  return PAGE_TITLES[path as keyof typeof PAGE_TITLES] || 'Unknown Page';
+};
+
+// Helper function to check if route is active
+export const isActiveRoute = (currentPath: string, targetPath: string): boolean => {
+  if (targetPath === ROUTES.HOME) {
+    return currentPath === ROUTES.HOME;
+  }
+  return currentPath.startsWith(targetPath);
+};
+
+// Helper function to get navigation item by path
+export const getNavItemByPath = (path: string) => {
+  return NAV_ITEMS.find(item => item.href === path);
+};
+
+// Helper function to get breadcrumbs
+export const getBreadcrumbs = (currentPath: string) => {
+  const breadcrumbs = [];
   
-  return {
-    canAccess: true, // Add your logic here
-    redirectTo: null, // Add redirect logic if needed
-  };
-}
+  // Always start with home
+  breadcrumbs.push({
+    label: 'Home',
+    href: ROUTES.HOME,
+    icon: 'Home'
+  });
+  
+  // Add current page if not home
+  if (currentPath !== ROUTES.HOME) {
+    const currentItem = getNavItemByPath(currentPath);
+    if (currentItem) {
+      breadcrumbs.push({
+        label: currentItem.label,
+        href: currentItem.href,
+        icon: currentItem.icon
+      });
+    }
+  }
+  
+  return breadcrumbs;
+};
