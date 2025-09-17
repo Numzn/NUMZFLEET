@@ -68,3 +68,5 @@ vite.config.ts.*
 *.tmp
 *.temp
 .vercel
+
+.vercel
