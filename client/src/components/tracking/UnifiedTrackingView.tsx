@@ -6,6 +6,7 @@ import { useReplayControls } from '@/hooks/useReplayControls';
 import { TopControlBar } from '@/components/tracking/controls/TopControlBar';
 import { MainContentArea } from '@/components/tracking/layout/MainContentArea';
 import { BottomControlBar } from '@/components/tracking/controls/BottomControlBar';
+import { FloatingReplayControls } from '@/components/tracking/controls/FloatingReplayControls';
 import { DebugPanel } from '@/components/tracking/debug/DebugPanel';
 
 interface UnifiedTrackingViewProps {
@@ -180,41 +181,44 @@ export const UnifiedTrackingView: React.FC<UnifiedTrackingViewProps> = ({
         isLoading={replayLoading}
       />
 
-      {/* Main Content Area */}
-      <MainContentArea
-        mode={mode}
-        liveData={liveData}
-        replayData={{
-          ...replayData,
-          dateRange: replayState.dateRange || replayData.dateRange
-        }}
-        replayDataFromHook={replayDataFromHook}
-        currentPosition={currentPosition}
-        replayLoading={replayLoading}
-        replayError={replayError}
-      />
+          {/* Main Content Area - Full Screen Map */}
+          <div className="flex-1 relative">
+            <MainContentArea
+              mode={mode}
+              liveData={liveData}
+              replayData={{
+                ...replayData,
+                dateRange: replayState.dateRange || replayData.dateRange
+              }}
+              replayDataFromHook={replayDataFromHook}
+              currentPosition={currentPosition}
+              replayLoading={replayLoading}
+              replayError={replayError}
+            />
 
-      {/* Bottom Control Bar */}
-      <BottomControlBar
-        mode={mode}
-        selectedDeviceId={selectedDeviceId}
-        positions={replayDataFromHook?.positions || replayData.positions}
-        replayData={{
-          ...replayData,
-          isPlaying: replayState.isPlaying,
-          playbackSpeed: replayState.playbackSpeed,
-          currentTime: replayState.currentTime
-        }}
-        onPlay={play}
-        onPause={pause}
-        onStop={stop}
-        onStepBack={handleStepBack}
-        onStepForward={handleStepForward}
-        onSpeedChange={setPlaybackSpeed}
-        onTimelineClick={handleTimelineClick}
-        progressPercentage={progressPercentage}
-        isLoading={replayLoading}
-      />
+            {/* Floating Replay Controls - Only in replay mode */}
+            {mode === 'replay' && (
+              <FloatingReplayControls
+                selectedDeviceId={selectedDeviceId}
+                positions={replayDataFromHook?.positions || replayData.positions}
+                replayData={{
+                  ...replayData,
+                  isPlaying: replayState.isPlaying,
+                  playbackSpeed: replayState.playbackSpeed,
+                  currentTime: replayState.currentTime
+                }}
+                onPlay={play}
+                onPause={pause}
+                onStop={stop}
+                onStepBack={handleStepBack}
+                onStepForward={handleStepForward}
+                onSpeedChange={setPlaybackSpeed}
+                onTimelineClick={handleTimelineClick}
+                progressPercentage={progressPercentage}
+                isLoading={replayLoading}
+              />
+            )}
+          </div>
     </div>
   );
 };

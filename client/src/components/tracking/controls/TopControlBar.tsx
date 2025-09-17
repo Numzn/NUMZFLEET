@@ -33,7 +33,7 @@ export const TopControlBar: React.FC<TopControlBarProps> = ({
   isLoading
 }) => {
   return (
-    <div className="bg-card border-b border-border p-2 flex-shrink-0">
+    <div className={`bg-card border-b border-border flex-shrink-0 ${mode === 'replay' ? 'p-1' : 'p-2'}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           {/* Mode Toggle */}
@@ -61,7 +61,7 @@ export const TopControlBar: React.FC<TopControlBarProps> = ({
         </div>
         
         {/* Status Indicator */}
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+        <div className={`flex items-center space-x-2 text-muted-foreground ${mode === 'replay' ? 'text-xs' : 'text-sm'}`}>
           {mode === 'live' ? (
             <>
               <MapPin className="w-4 h-4" />

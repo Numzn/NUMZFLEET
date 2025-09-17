@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, Zap } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, SkipForward, Zap, RotateCcw, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 
 interface PlaybackControlsProps {
   isPlaying: boolean;

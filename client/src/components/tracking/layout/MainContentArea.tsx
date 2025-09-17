@@ -39,34 +39,19 @@ export const MainContentArea: React.FC<MainContentAreaProps> = ({
 }) => {
   return (
     <div className="flex flex-1 min-h-0">
-      {/* Map Area */}
-      <div className="flex-1 relative">
+      {/* Map Area - Full width in replay mode, with side panel in live mode */}
+      <div className={`relative ${mode === 'replay' ? 'flex-1' : 'flex-1'}`}>
         <UnifiedMap height="100%" />
       </div>
 
-      {/* Side Panel */}
-      <div className="w-64 bg-card border-l border-border overflow-y-auto flex-shrink-0">
-        <div className="p-2">
-          {mode === 'live' && (
+      {/* Side Panel - Only in live mode */}
+      {mode === 'live' && (
+        <div className="w-64 bg-card border-l border-border overflow-y-auto flex-shrink-0">
+          <div className="p-2">
             <LiveStatusPanel data={liveData} />
-          )}
-          
-          {mode === 'replay' && (
-            <ReplayStatsPanel
-              replayData={replayDataFromHook}
-              currentPosition={currentPosition}
-              currentTime={replayData.currentTime || (replayData.positions.length > 0 ? new Date(replayData.positions[0].deviceTime) : null)}
-              duration={replayData.positions.length > 1 ? 
-                new Date(replayData.positions[replayData.positions.length - 1].deviceTime).getTime() - 
-                new Date(replayData.positions[0].deviceTime).getTime() : 0
-              }
-              currentTimeMs={replayData.currentTime ? 
-                replayData.currentTime.getTime() - new Date(replayData.positions[0]?.deviceTime || 0).getTime() : 0
-              }
-            />
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
