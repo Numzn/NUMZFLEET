@@ -1,19 +1,12 @@
 import React, { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useTrackingMode } from '@/contexts/TrackingModeContext';
 import { useDeviceData } from '@/components/tracking/map/useDeviceData';
 import { useReplay } from '@/hooks/use-replay';
-import { UnifiedMap } from '@/components/tracking/map/UnifiedMap';
-import { ModeToggle } from '@/components/tracking/controls/ModeToggle';
-import { DeviceSelector } from '@/components/tracking/controls/DeviceSelector';
-import { DateRangePicker } from '@/components/tracking/controls/replay/DateRangePicker';
-import { PlaybackControls } from '@/components/tracking/controls/replay/PlaybackControls';
-import { Timeline } from '@/components/tracking/controls/replay/Timeline';
-import { ReplayStats } from '@/components/tracking/controls/replay/ReplayStats';
-import { LiveStatusPanel } from '@/components/tracking/panels/LiveStatusPanel';
-import { ReplayStatsPanel } from '@/components/tracking/replay/ReplayStatsPanel';
-import { Card, CardContent } from '@/components/ui/card';
-import { Clock, MapPin } from 'lucide-react';
+import { useReplayControls } from '@/hooks/useReplayControls';
+import { TopControlBar } from '@/components/tracking/controls/TopControlBar';
+import { MainContentArea } from '@/components/tracking/layout/MainContentArea';
+import { BottomControlBar } from '@/components/tracking/controls/BottomControlBar';
+import { DebugPanel } from '@/components/tracking/debug/DebugPanel';
 
 interface UnifiedTrackingViewProps {
   className?: string;
@@ -33,12 +26,6 @@ export const UnifiedTrackingView: React.FC<UnifiedTrackingViewProps> = ({
     updateReplayData,
     liveData,
     replayData,
-    play,
-    pause,
-    stop,
-    setPlaybackSpeed,
-    jumpToTime,
-    jumpToPosition,
     setDateRange
   } = useTrackingMode();
 
@@ -56,16 +43,28 @@ export const UnifiedTrackingView: React.FC<UnifiedTrackingViewProps> = ({
     replayData: replayDataFromHook,
     replayState,
     currentPosition,
-    play: playReplay,
-    pause: pauseReplay,
-    stop: stopReplay,
-    setPlaybackSpeed: setReplaySpeed,
-    jumpToTime: jumpToReplayTime,
-    jumpToPosition: jumpToReplayPosition,
     setDateRange: setReplayDateRange,
     isLoading: replayLoading,
     error: replayError
-  } = useReplay(selectedDeviceId);
+  } = useReplay(selectedDeviceId || undefined);
+
+  // Replay controls
+  const {
+    handleStepBack,
+    handleStepForward,
+    handleTimelineClick,
+    play,
+    pause,
+    stop,
+    setPlaybackSpeed
+  } = useReplayControls();
+
+  console.log('🔍 Hook data structure:', {
+    replayDataFromHook: !!replayDataFromHook,
+    positions: replayDataFromHook?.positions?.length || 0,
+    replayState: replayState,
+    currentPosition: !!currentPosition
+  });
 
   // Update live data in context
   useEffect(() => {
@@ -81,14 +80,20 @@ export const UnifiedTrackingView: React.FC<UnifiedTrackingViewProps> = ({
   // Update replay data in context
   useEffect(() => {
     console.log('🔄 Updating replay data - Hook data:', !!replayDataFromHook, 'Positions:', replayDataFromHook?.positions?.length || 0, 'Current position:', !!currentPosition, 'Loading:', replayLoading);
-    if (replayDataFromHook) {
-      updateReplayData({
-        positions: replayDataFromHook.positions || [],
-        currentPosition: currentPosition,
-        isLoading: replayLoading,
-        error: replayError
-      });
-    }
+    
+    // Force update the context with current data
+    const positions = replayDataFromHook?.positions || [];
+    console.log('🔄 Force updating context with positions:', positions.length);
+    
+    // Use current position from hook, or fallback to first position if available
+    const effectiveCurrentPosition = currentPosition || (positions.length > 0 ? positions[0] : null);
+    
+    updateReplayData({
+      positions: positions,
+      currentPosition: effectiveCurrentPosition,
+      isLoading: replayLoading,
+      error: replayError?.message || (replayError as unknown as string) || null
+    });
   }, [replayDataFromHook, currentPosition, replayLoading, replayError, updateReplayData]);
 
   // Sync replay controls
@@ -97,13 +102,15 @@ export const UnifiedTrackingView: React.FC<UnifiedTrackingViewProps> = ({
       // Sync context state with hook state
       if (replayState.isPlaying !== replayData.isPlaying) {
         if (replayState.isPlaying) {
-          playReplay();
+          play();
         } else {
-          pauseReplay();
+          pause();
         }
       }
     }
-  }, [mode, replayState.isPlaying, replayData.isPlaying, playReplay, pauseReplay]);
+  }, [mode, replayState.isPlaying, replayData.isPlaying, play, pause]);
+
+  // No need to sync date range - use hook's date range directly
 
   // Handle device selection
   const handleDeviceSelect = (deviceId: number | null) => {
@@ -131,156 +138,84 @@ export const UnifiedTrackingView: React.FC<UnifiedTrackingViewProps> = ({
 
   // Calculate progress for replay mode
   const progressPercentage = React.useMemo(() => {
-    if (mode !== 'replay' || !replayData.positions.length || !replayData.currentTime) {
+    const positions = replayDataFromHook?.positions || replayData.positions;
+    const currentTime = replayState.currentTime || replayData.currentTime;
+    
+    if (mode !== 'replay' || !positions.length || !currentTime) {
       return 0;
     }
     
-    const startTime = new Date(replayData.positions[0].deviceTime).getTime();
-    const endTime = new Date(replayData.positions[replayData.positions.length - 1].deviceTime).getTime();
-    const currentTime = replayData.currentTime.getTime();
+    const startTime = new Date(positions[0].deviceTime).getTime();
+    const endTime = new Date(positions[positions.length - 1].deviceTime).getTime();
+    const currentTimeMs = currentTime.getTime();
     
-    return ((currentTime - startTime) / (endTime - startTime)) * 100;
-  }, [mode, replayData.positions, replayData.currentTime]);
+    return ((currentTimeMs - startTime) / (endTime - startTime)) * 100;
+  }, [mode, replayDataFromHook?.positions, replayData.positions, replayState.currentTime, replayData.currentTime]);
 
   console.log('🔍 UnifiedTrackingView render - Mode:', mode, 'Selected device:', selectedDeviceId, 'Replay data positions:', replayData.positions.length, 'Should show controls:', mode === 'replay');
 
   return (
-    <div className={`w-full h-full ${className}`} style={{ height }}> {/* eslint-disable-line react/forbid-dom-props */}
+    <div className={`w-full h-full flex flex-col ${className}`} style={{ height }}> {/* eslint-disable-line react/forbid-dom-props, react/forbid-elements */}
+      {/* Debug Panel */}
+      <DebugPanel
+        mode={mode}
+        selectedDeviceId={selectedDeviceId}
+        positionsCount={replayDataFromHook?.positions?.length || replayData.positions.length}
+        isLoading={replayLoading}
+        error={replayError}
+        showControls={mode === 'replay'}
+      />
+      
       {/* Top Control Bar */}
-      <div className="bg-card border-b border-border p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            {/* Mode Toggle */}
-            <ModeToggle 
-              mode={mode} 
-              onModeChange={handleModeSwitch}
-            />
-            
-            {/* Device Selector */}
-            <DeviceSelector
-              devices={allDevicesForReplay}
-              selectedDeviceId={selectedDeviceId}
-              onDeviceSelect={handleDeviceSelect}
-            />
-            
-            {/* Date Range Picker - Only in replay mode */}
-            {mode === 'replay' && (
-              <DateRangePicker
-                fromDate={replayData.dateRange.from}
-                toDate={replayData.dateRange.to}
-                onDateChange={setDateRange}
-                isLoading={replayLoading}
-              />
-            )}
-          </div>
-          
-          {/* Status Indicator */}
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            {mode === 'live' ? (
-              <>
-                <MapPin className="w-4 h-4" />
-                <span>Live Tracking</span>
-              </>
-            ) : (
-              <>
-                <Clock className="w-4 h-4" />
-                <span>Replay Mode</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      <TopControlBar
+        mode={mode}
+        onModeChange={handleModeSwitch}
+        devices={allDevicesForReplay}
+        selectedDeviceId={selectedDeviceId}
+        onDeviceSelect={handleDeviceSelect}
+        replayData={{
+          dateRange: replayState.dateRange || replayData.dateRange
+        }}
+        onDateRangeChange={setReplayDateRange}
+        isLoading={replayLoading}
+      />
 
       {/* Main Content Area */}
-      <div className="flex h-[calc(100vh-80px)]">
-        {/* Map Area */}
-        <div className="flex-1 relative">
-          <UnifiedMap height="100%" />
-        </div>
+      <MainContentArea
+        mode={mode}
+        liveData={liveData}
+        replayData={{
+          ...replayData,
+          dateRange: replayState.dateRange || replayData.dateRange
+        }}
+        replayDataFromHook={replayDataFromHook}
+        currentPosition={currentPosition}
+        replayLoading={replayLoading}
+        replayError={replayError}
+      />
 
-        {/* Side Panel */}
-        <div className="w-80 bg-card border-l border-border overflow-y-auto">
-          <div className="p-4">
-            {mode === 'live' && (
-              <LiveStatusPanel data={liveData} />
-            )}
-            
-            {mode === 'replay' && (
-              <ReplayStatsPanel
-                replayData={replayDataFromHook}
-                currentPosition={currentPosition}
-                currentTime={replayData.currentTime}
-                duration={replayData.positions.length > 0 ? 
-                  new Date(replayData.positions[replayData.positions.length - 1].deviceTime).getTime() - 
-                  new Date(replayData.positions[0].deviceTime).getTime() : 0
-                }
-                currentTimeMs={replayData.currentTime ? 
-                  replayData.currentTime.getTime() - new Date(replayData.positions[0]?.deviceTime || 0).getTime() : 0
-                }
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Control Bar - Only in replay mode */}
-      {mode === 'replay' && (
-        <div className="bg-card border-t border-border p-4" style={{ backgroundColor: '#ff0000', minHeight: '80px' }}>
-          {console.log('🎮 Rendering playback controls for replay mode - Device selected:', selectedDeviceId)}
-          <div className="flex items-center justify-between">
-            {/* Show message when no device selected */}
-            {!selectedDeviceId ? (
-              <div className="flex-1 text-center text-muted-foreground">
-                <p className="text-lg font-medium">Please select a device to view playback controls</p>
-                <p className="text-sm">Choose a device from the dropdown above to start replay</p>
-              </div>
-            ) : (
-              <>
-                {/* Playback Controls */}
-                <PlaybackControls
-              isPlaying={replayData.isPlaying}
-              currentSpeed={replayData.playbackSpeed}
-              playbackSpeeds={[0.25, 0.5, 1, 2, 4, 8]}
-              onPlay={play}
-              onPause={pause}
-              onStop={stop}
-              onStepBack={() => {
-                // Implement step back logic
-                const currentIndex = replayData.positions.findIndex((pos: any) => 
-                  pos.deviceTime === replayData.currentPosition?.deviceTime
-                );
-                if (currentIndex > 0) {
-                  jumpToPosition(currentIndex - 1);
-                }
-              }}
-              onStepForward={() => {
-                // Implement step forward logic
-                const currentIndex = replayData.positions.findIndex((pos: any) => 
-                  pos.deviceTime === replayData.currentPosition?.deviceTime
-                );
-                if (currentIndex < replayData.positions.length - 1) {
-                  jumpToPosition(currentIndex + 1);
-                }
-              }}
-              onSpeedChange={setPlaybackSpeed}
-              isLoading={replayLoading}
-            />
-            
-            {/* Timeline */}
-            <div className="flex-1 mx-4">
-              <Timeline
-                currentTime={replayData.currentTime}
-                startTime={replayData.positions.length > 0 ? new Date(replayData.positions[0].deviceTime) : null}
-                endTime={replayData.positions.length > 0 ? new Date(replayData.positions[replayData.positions.length - 1].deviceTime) : null}
-                onTimeChange={(time) => jumpToTime(time)}
-                isLoading={replayLoading}
-              />
-            </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Bottom Control Bar */}
+      <BottomControlBar
+        mode={mode}
+        selectedDeviceId={selectedDeviceId}
+        positions={replayDataFromHook?.positions || replayData.positions}
+        replayData={{
+          ...replayData,
+          isPlaying: replayState.isPlaying,
+          playbackSpeed: replayState.playbackSpeed,
+          currentTime: replayState.currentTime
+        }}
+        onPlay={play}
+        onPause={pause}
+        onStop={stop}
+        onStepBack={handleStepBack}
+        onStepForward={handleStepForward}
+        onSpeedChange={setPlaybackSpeed}
+        onTimelineClick={handleTimelineClick}
+        progressPercentage={progressPercentage}
+        isLoading={replayLoading}
+      />
     </div>
   );
 };
+

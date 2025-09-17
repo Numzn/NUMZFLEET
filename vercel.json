@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "outputDirectory": "dist/public",
   "framework": "vite",
   "installCommand": "npm install",
   "devCommand": "npm run dev",
@@ -32,7 +32,7 @@
   "env": {
     "VITE_SUPABASE_URL": "https://yyqvediztsrlugentoca.supabase.co",
     "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cXZlZGl6dHNybHVnZW50b2NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzOTM1NTUsImV4cCI6MjA3MTk2OTU1NX0.jAw3r078GtGTKkrLBXSvENKO3US3gHLp_RoYbZt5HOM",
-    "VITE_TRACCAR_URL": "http://localhost:8082",
+    "VITE_TRACCAR_URL": "https://your-traccar-server.com",
     "VITE_TRACCAR_USERNAME": "admin",
     "VITE_TRACCAR_PASSWORD": "admin",
     "VITE_USE_TRACCAR_SIMULATION": "true"

@@ -14,6 +14,8 @@ export const ReplayPath: React.FC<ReplayPathProps> = ({
   className = ''
 }) => {
   const map = useMap();
+  
+  console.log('🗺️ ReplayPath: Rendering with', positions?.length || 0, 'positions');
 
   // Calculate efficiency path segments
   const pathSegments = React.useMemo(() => {
@@ -51,7 +53,30 @@ export const ReplayPath: React.FC<ReplayPathProps> = ({
   }, [positions, map]);
 
   if (!positions || positions.length === 0) {
+    console.log('🗺️ ReplayPath: No positions, returning null');
     return null;
+  }
+  
+  // For single position, show a simple marker
+  if (positions.length === 1) {
+    console.log('🗺️ ReplayPath: Single position, showing simple marker at', positions[0].latitude, positions[0].longitude);
+    return (
+      <>
+        <Polyline
+          positions={[[positions[0].latitude, positions[0].longitude]]}
+          color="#3b82f6"
+          weight={8}
+          opacity={1}
+        />
+        {/* Fallback marker for single position */}
+        <Polyline
+          positions={[[positions[0].latitude, positions[0].longitude]]}
+          color="#ef4444"
+          weight={12}
+          opacity={0.8}
+        />
+      </>
+    );
   }
 
   return (

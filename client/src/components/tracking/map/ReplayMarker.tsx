@@ -13,7 +13,12 @@ export const ReplayMarker: React.FC<ReplayMarkerProps> = ({
   isPlaying,
   className = ''
 }) => {
-  if (!position) return null;
+  console.log('📍 ReplayMarker: Rendering with position:', !!position, position?.latitude, position?.longitude);
+  
+  if (!position) {
+    console.log('📍 ReplayMarker: No position, returning null');
+    return null;
+  }
 
   // Create custom icon based on playing state
   const createCustomIcon = (isPlaying: boolean) => {

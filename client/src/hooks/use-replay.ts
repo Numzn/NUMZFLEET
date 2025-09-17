@@ -51,6 +51,19 @@ export const useReplay = (initialDeviceId?: number) => {
     }
   });
 
+  // Update selectedDeviceId when initialDeviceId changes
+  useEffect(() => {
+    if (initialDeviceId && initialDeviceId !== replayState.selectedDeviceId) {
+      console.log('🔄 useReplay: Device ID changed from', replayState.selectedDeviceId, 'to', initialDeviceId);
+      setReplayState(prev => ({
+        ...prev,
+        selectedDeviceId: initialDeviceId,
+        currentTime: null,
+        isPlaying: false
+      }));
+    }
+  }, [initialDeviceId, replayState.selectedDeviceId]);
+
   // Animation frame reference
   const animationFrameRef = useRef<number | null>(null);
 
@@ -58,20 +71,25 @@ export const useReplay = (initialDeviceId?: number) => {
   const { data: historicalData, isLoading, error, refetch } = useQuery({
     queryKey: ['replay-data', replayState.selectedDeviceId, replayState.dateRange.from, replayState.dateRange.to],
     queryFn: async () => {
-      console.log('🔄 useReplay: Fetching data for device', replayState.selectedDeviceId);
+      console.log('🔄 useReplay: Fetching data for device', replayState.selectedDeviceId, 'Date range:', replayState.dateRange.from, 'to', replayState.dateRange.to);
       if (!replayState.selectedDeviceId) {
         console.log('❌ useReplay: No device ID, returning null');
         return null;
       }
       
-      const positions = await historyApi.getHistoricalPositions(
-        replayState.selectedDeviceId,
-        replayState.dateRange.from,
-        replayState.dateRange.to
-      );
-      
-      console.log('✅ useReplay: Fetched', positions.length, 'positions for device', replayState.selectedDeviceId);
-      return positions;
+      try {
+        const positions = await historyApi.getHistoricalPositions(
+          replayState.selectedDeviceId,
+          replayState.dateRange.from,
+          replayState.dateRange.to
+        );
+        
+        console.log('✅ useReplay: Fetched', positions.length, 'positions for device', replayState.selectedDeviceId);
+        return positions;
+      } catch (error) {
+        console.error('❌ useReplay: Error fetching historical data:', error);
+        throw error;
+      }
     },
     enabled: !!replayState.selectedDeviceId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -86,8 +104,9 @@ export const useReplay = (initialDeviceId?: number) => {
       return null;
     }
 
-    const efficiencySegments = processEfficiencySegments(historicalData);
-    const idlePeriods = detectIdlePeriods(historicalData);
+    // Only process efficiency if we have enough data points
+    const efficiencySegments = historicalData.length > 1 ? processEfficiencySegments(historicalData) : [];
+    const idlePeriods = historicalData.length > 1 ? detectIdlePeriods(historicalData) : [];
     const fuelData = historicalData.filter(pos => 
       pos.fuelLevel !== null && pos.fuelLevel !== undefined && pos.fuelLevel >= 0
     );
@@ -96,6 +115,9 @@ export const useReplay = (initialDeviceId?: number) => {
     const totalDistance = efficiencySegments.reduce((sum, seg) => sum + seg.distance, 0);
     const totalDuration = efficiencySegments.reduce((sum, seg) => sum + seg.duration, 0);
     const averageSpeed = totalDuration > 0 ? (totalDistance / totalDuration) * 60 : 0;
+    
+    // For single position, set duration to 0
+    const actualTotalDuration = historicalData.length === 1 ? 0 : totalDuration;
 
     // Fuel statistics
     const fuelStats = fuelData.length > 0 ? {
@@ -122,7 +144,7 @@ export const useReplay = (initialDeviceId?: number) => {
       stats: {
         totalPositions: historicalData.length,
         totalDistance,
-        totalDuration,
+        totalDuration: actualTotalDuration,
         averageSpeed,
         fuelStats,
         efficiencyStats
@@ -250,12 +272,14 @@ export const useReplay = (initialDeviceId?: number) => {
     };
   }, [replayState.isPlaying, replayData, replayState.playbackSpeed]);
 
-  // Initialize current time when data loads
+  // Initialize current time and position when data loads
   useEffect(() => {
-    if (replayData && !replayState.currentTime) {
+    if (replayData && !replayState.currentTime && replayData.positions.length > 0) {
+      console.log('🔄 useReplay: Initializing current time and position with first position');
       setCurrentTime(new Date(replayData.positions[0].deviceTime));
+      jumpToPosition(0); // Jump to first position
     }
-  }, [replayData, replayState.currentTime, setCurrentTime]);
+  }, [replayData, replayState.currentTime, setCurrentTime, jumpToPosition]);
 
   // Cleanup on unmount
   useEffect(() => {

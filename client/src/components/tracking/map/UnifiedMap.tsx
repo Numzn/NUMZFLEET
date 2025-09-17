@@ -114,18 +114,21 @@ export const UnifiedMap: React.FC<UnifiedMapProps> = ({
           </>
         )}
 
-        {mode === 'replay' && (
-          <>
-            <ReplayPath 
-              positions={replayData.positions}
-              currentPosition={replayData.currentPosition}
-            />
-            <ReplayMarker 
-              position={replayData.currentPosition}
-              isPlaying={replayData.isPlaying}
-            />
-          </>
-        )}
+        {mode === 'replay' && (() => {
+          console.log('🗺️ UnifiedMap: Rendering replay mode with', replayData.positions?.length || 0, 'positions and current position:', !!replayData.currentPosition);
+          return (
+            <>
+              <ReplayPath 
+                positions={replayData.positions}
+                currentPosition={replayData.currentPosition}
+              />
+              <ReplayMarker 
+                position={replayData.currentPosition}
+                isPlaying={replayData.isPlaying}
+              />
+            </>
+          );
+        })()}
 
         {/* Shared map controls */}
         <SimpleMapControls />

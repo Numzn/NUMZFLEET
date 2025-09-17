@@ -23,10 +23,12 @@ export const ReplayStatsPanel: React.FC<ReplayStatsPanelProps> = ({
 
   const formatTime = (time: Date | null) => {
     if (!time) return '00:00:00';
-    const hours = time.getHours();
-    const minutes = time.getMinutes();
-    const seconds = time.getSeconds();
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    return time.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   const formatDuration = (duration: number) => {
@@ -36,38 +38,38 @@ export const ReplayStatsPanel: React.FC<ReplayStatsPanelProps> = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const progressPercentage = duration > 0 ? (currentTimeMs / duration) * 100 : 0;
+  const progressPercentage = duration > 0 ? (currentTimeMs / duration) * 100 : (replayData.positions.length === 1 ? 100 : 0);
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={`space-y-2 ${className}`}>
       {/* Main Stats */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center">
-            <Clock className="w-5 h-5 mr-2" />
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center">
+            <Clock className="w-4 h-4 mr-1" />
             Replay Statistics
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-2">
           {/* Time Info */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="text-sm font-medium text-muted-foreground">Current Time</div>
-              <div className="text-2xl font-bold">{formatTime(currentTime)}</div>
+              <div className="text-xs font-medium text-muted-foreground">Current Time</div>
+              <div className="text-lg font-bold">{formatTime(currentTime)}</div>
             </div>
             <div>
-              <div className="text-sm font-medium text-muted-foreground">Total Duration</div>
-              <div className="text-2xl font-bold">{formatDuration(duration)}</div>
+              <div className="text-xs font-medium text-muted-foreground">Total Duration</div>
+              <div className="text-lg font-bold">{formatDuration(duration)}</div>
             </div>
           </div>
 
           {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs">
               <span>Progress</span>
               <span>{progressPercentage.toFixed(1)}%</span>
             </div>
-            <div className="w-full h-2 bg-gray-200 rounded-full">
+            <div className="w-full h-1.5 bg-gray-200 rounded-full">
               <div
                 className="h-full bg-blue-500 rounded-full transition-all duration-100"
                 style={{ width: `${Math.max(0, Math.min(100, progressPercentage))}%` }} // eslint-disable-line react/forbid-dom-props
@@ -77,17 +79,17 @@ export const ReplayStatsPanel: React.FC<ReplayStatsPanelProps> = ({
 
           {/* Position Info */}
           {currentPosition && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <div className="text-sm font-medium text-muted-foreground">Current Speed</div>
-                <div className="text-xl font-bold flex items-center">
-                  <Gauge className="w-4 h-4 mr-1" />
+                <div className="text-xs font-medium text-muted-foreground">Current Speed</div>
+                <div className="text-sm font-bold flex items-center">
+                  <Gauge className="w-3 h-3 mr-1" />
                   {currentPosition.speed?.toFixed(0) || 0} km/h
                 </div>
               </div>
               <div>
-                <div className="text-sm font-medium text-muted-foreground">Position</div>
-                <div className="text-sm font-mono">
+                <div className="text-xs font-medium text-muted-foreground">Position</div>
+                <div className="text-xs font-mono">
                   {currentPosition.latitude?.toFixed(6)}, {currentPosition.longitude?.toFixed(6)}
                 </div>
               </div>
@@ -98,21 +100,21 @@ export const ReplayStatsPanel: React.FC<ReplayStatsPanelProps> = ({
 
       {/* Data Stats */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center">
-            <MapPin className="w-5 h-5 mr-2" />
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center">
+            <MapPin className="w-4 h-4 mr-1" />
             Data Overview
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="text-sm font-medium text-muted-foreground">Total Positions</div>
-              <div className="text-2xl font-bold">{replayData.positions.length}</div>
+              <div className="text-xs font-medium text-muted-foreground">Total Positions</div>
+              <div className="text-lg font-bold">{replayData.positions.length}</div>
             </div>
             <div>
-              <div className="text-sm font-medium text-muted-foreground">Efficiency Segments</div>
-              <div className="text-2xl font-bold">{replayData.efficiencySegments?.length || 0}</div>
+              <div className="text-xs font-medium text-muted-foreground">Efficiency Segments</div>
+              <div className="text-lg font-bold">{replayData.efficiencySegments?.length || 0}</div>
             </div>
           </div>
         </CardContent>

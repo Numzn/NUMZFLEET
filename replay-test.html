@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replay Mode Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .step { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .step h3 { color: #2563eb; margin-top: 0; }
+        .code { background: #f5f5f5; padding: 10px; border-radius: 3px; font-family: monospace; }
+        .highlight { background: #fef3c7; padding: 2px 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🎮 Replay Mode Access Guide</h1>
+    
+    <div class="step">
+        <h3>Step 1: Open the Map</h3>
+        <p>Navigate to: <span class="code">http://localhost:5174/map</span></p>
+        <p>You should see the unified tracking interface with a map.</p>
+    </div>
+
+    <div class="step">
+        <h3>Step 2: Switch to Replay Mode</h3>
+        <p>Look for the mode toggle in the top control bar:</p>
+        <div class="code">
+            [Live] [<span class="highlight">Replay</span>] ← Click this button
+        </div>
+        <p>The status indicator should change from "Live Tracking" to "Replay Mode".</p>
+    </div>
+
+    <div class="step">
+        <h3>Step 3: Select a Device</h3>
+        <p>Use the device selector dropdown and choose a device:</p>
+        <div class="code">
+            Device: [Dropdown] ← Select: Numz, HELLEN, GIFT, or CHARLES
+        </div>
+        <p>This will trigger the replay controls to appear at the bottom.</p>
+    </div>
+
+    <div class="step">
+        <h3>Step 4: Set Date Range</h3>
+        <p>Choose your desired time period for replay:</p>
+        <div class="code">
+            From: [Date Picker] To: [Date Picker]
+        </div>
+        <p>The system will fetch historical data for the selected period.</p>
+    </div>
+
+    <div class="step">
+        <h3>Step 5: Use Replay Controls</h3>
+        <p>Once a device is selected, you'll see the bottom control bar with:</p>
+        <ul>
+            <li>▶️ Play/Pause/Stop buttons</li>
+            <li>⏮️ Step Forward/Backward buttons</li>
+            <li>⚡ Speed control (0.25x to 8x)</li>
+            <li>📊 Interactive timeline</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>🔍 Troubleshooting</h3>
+        <p><strong>If you don't see the mode toggle:</strong></p>
+        <ul>
+            <li>Make sure you're on the <span class="code">/map</span> route</li>
+            <li>Check browser console for any errors</li>
+            <li>Refresh the page</li>
+        </ul>
+        
+        <p><strong>If you don't see replay controls after selecting a device:</strong></p>
+        <ul>
+            <li>Check browser console for API errors</li>
+            <li>Verify Traccar server is accessible</li>
+            <li>Try selecting a different device</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>🎯 Expected Behavior</h3>
+        <p>When working correctly, you should see:</p>
+        <ol>
+            <li>Mode toggle switches between Live/Replay</li>
+            <li>Device selector shows available devices</li>
+            <li>Date range picker appears in replay mode</li>
+            <li>Bottom control bar appears when device is selected</li>
+            <li>Map shows historical path and current position marker</li>
+            <li>Side panel shows replay statistics</li>
+        </ol>
+    </div>
+</body>
+</html>
