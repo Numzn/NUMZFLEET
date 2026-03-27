@@ -23,14 +23,25 @@ const MapSelectedDevice = ({ mapReady }) => {
 
     const positionChanged = position && (!previousPosition || position.latitude !== previousPosition.latitude || position.longitude !== previousPosition.longitude);
 
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[MapSelectedDevice]', {
+        mapReady,
+        currentId,
+        previousId,
+        position: position ? { lat: position.latitude, lng: position.longitude } : null,
+        shouldCenter: (currentId !== previousId || currentTime !== previousTime || (mapFollow && positionChanged)) && !!position,
+      });
+    }
+
     if ((currentId !== previousId || currentTime !== previousTime || (mapFollow && positionChanged)) && position) {
+      console.log('[MapSelectedDevice] Centering map to', [position.longitude, position.latitude]);
       map.easeTo({
         center: [position.longitude, position.latitude],
         zoom: Math.max(map.getZoom(), selectZoom),
         offset: [0, -dimensions.popupMapOffset / 2],
       });
     }
-  }, [currentId, previousId, currentTime, previousTime, mapFollow, position, selectZoom, mapReady]);
+  }, [currentId, previousId, currentTime, previousTime, mapFollow, position, previousPosition, selectZoom, mapReady]);
 
   return null;
 };

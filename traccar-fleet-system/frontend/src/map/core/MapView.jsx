@@ -10,6 +10,7 @@ import { SwitcherControl } from '../switcher/switcher';
 import { useAttributePreference, usePreference } from '../../common/util/preferences';
 import usePersistedState, { savePersistedState } from '../../common/util/usePersistedState';
 import { mapImages } from './preloadImages';
+import { mapImages as enhancedMapImages } from './enhancedPreloadImages';
 import enhancedPreloadImages from './enhancedPreloadImages';
 import useMapStyles from './useMapStyles';
 import { useEffectAsync } from '../../reactHelper';
@@ -66,7 +67,8 @@ const initMap = async () => {
       console.error('[MapView] Failed to load enhanced images:', error);
     }
     
-    Object.entries(mapImages).forEach(([key, value]) => {
+    // Add enhanced images to map
+    Object.entries(enhancedMapImages).forEach(([key, value]) => {
       if (!map.hasImage(key)) {
         map.addImage(key, value, {
           pixelRatio: window.devicePixelRatio,
