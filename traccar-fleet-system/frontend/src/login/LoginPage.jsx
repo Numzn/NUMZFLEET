@@ -92,6 +92,7 @@ const LoginPage = () => {
       const query = `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
       const response = await fetch('/api/session', {
         method: 'POST',
+        credentials: 'include',
         body: new URLSearchParams(code.length ? `${query}&code=${code}` : query),
       });
       if (response.ok) {
