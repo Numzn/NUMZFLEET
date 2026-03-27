@@ -1,0 +1,139 @@
+services:
+  # ===========================================
+  # DATABASE LAYER
+  # ===========================================
+
+  traccar-mysql:
+    image: mysql:8.0
+    container_name: numztrak-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: traccar
+      MYSQL_USER: traccar
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - /opt/numztrak/mysql:/var/lib/mysql
+    networks:
+      - numztrak-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+
+  fuel-postgres:
+    image: postgres:15-alpine
+    container_name: numztrak-postgres
+    environment:
+      POSTGRES_DB: numztrak_fuel
+      POSTGRES_USER: numztrak
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - /opt/numztrak/postgres:/var/lib/postgresql/data
+    networks:
+      - numztrak-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numztrak -d numztrak_fuel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # CORE SERVICES
+  # ===========================================
+
+  traccar-server:
+    image: traccar/traccar:latest
+    container_name: numztrak-traccar
+    depends_on:
+      traccar-mysql:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+      - "8443:8443"
+      - "5001:5001"
+      - "5002:5002"
+      - "5003:5003"
+      - "5005:5005"
+      - "5006:5006"
+      - "5009:5009"
+      - "5013:5013"
+      - "5020:5020"
+      - "5055:5055"
+    volumes:
+      - /opt/numztrak/traccar/logs:/opt/traccar/logs
+      - ./conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+      - ./cert.pem:/opt/traccar/conf/cert.pem:ro
+      - ./key.pem:/opt/traccar/conf/key.pem:ro
+    environment:
+      TRACCAR_DATABASE_URL: jdbc:mysql://traccar-mysql:3306/traccar?useSSL=false&allowPublicKeyRetrieval=true
+      TRACCAR_DATABASE_USER: traccar
+      TRACCAR_DATABASE_PASSWORD: ${MYSQL_PASSWORD}
+    networks:
+      - numztrak-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "if command -v wget >/dev/null 2>&1; then wget -qO- http://localhost:8082/ >/dev/null; elif command -v nc >/dev/null 2>&1; then nc -z localhost 8082; else echo 'no http client' >&2; exit 1; fi"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  fuel-api:
+    build:
+      context: ../fuel-api
+      dockerfile: Dockerfile
+    image: backend-fuel-api:latest
+    container_name: numztrak-fuel-api
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://numztrak:${POSTGRES_PASSWORD}@fuel-postgres:5432/numztrak_fuel
+      TRACCAR_MYSQL_HOST: traccar-mysql
+      TRACCAR_MYSQL_PORT: 3306
+      TRACCAR_MYSQL_DATABASE: traccar
+      TRACCAR_MYSQL_USER: traccar
+      TRACCAR_MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      NODE_ENV: production
+      PORT: 3001
+      SESSION_SECRET: ${SESSION_SECRET}
+      # Allow Netlify preview and custom app domain (comma-separated)
+      CORS_ORIGIN: https://app.numz.site,https://rad-cactus-ca0409.netlify.app
+    depends_on:
+      fuel-postgres:
+        condition: service_healthy
+      traccar-mysql:
+        condition: service_healthy
+    networks:
+      - numztrak-network
+    restart: unless-stopped
+
+  # ===========================================
+  # GATEWAY / REVERSE PROXY
+  # ===========================================
+
+  numztrak-nginx:
+    image: nginx:alpine
+    container_name: numztrak-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./cert.pem:/etc/nginx/ssl/cert.pem:ro
+      - ./key.pem:/etc/nginx/ssl/key.pem:ro
+    depends_on:
+      - traccar-server
+      - fuel-api
+    networks:
+      - numztrak-network
+    restart: unless-stopped
+
+# ===========================================
+# NETWORK
+# ===========================================
+
+networks:
+  numztrak-network:
+    driver: bridge
