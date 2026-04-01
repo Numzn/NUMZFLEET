@@ -7,25 +7,40 @@ export const initializeSocket = (io) => {
   // Socket.IO v4+ standard: Use middleware for authentication
   io.use((socket, next) => {
     try {
+      console.log(`🔍 [Socket] Middleware start for socket ${socket.id}`);
+
       // Initialize socket.data if it doesn't exist
       if (!socket.data) {
         socket.data = {};
+        console.log(`🔍 [Socket] Initialized socket.data`);
       }
-      
+
+      // Debug: Log the handshake data
+      console.log('🔍 [Socket] Handshake debug:', {
+        auth: socket.handshake.auth,
+        query: socket.handshake.query,
+        headers: Object.keys(socket.handshake.headers),
+        url: socket.handshake.url,
+      });
+
       // Auth data is sent from client in connection options (Socket.IO v4+ standard)
       const auth = socket.handshake.auth || {};
-      
+
       // Store auth data in socket for later use
       socket.data.userId = auth.userId || null;
       socket.data.administrator = auth.administrator || false;
-      
+
+      console.log(`🔍 [Socket] Set auth data: userId=${socket.data.userId}, admin=${socket.data.administrator}`);
+
       // Log if auth is missing
-      if (!auth.userId && !auth.administrator && isDev) {
+      if (!auth.userId && !auth.administrator && process.env.NODE_ENV === 'development') {
         console.warn(`⚠️ [Socket] No auth data received from socket ${socket.id}`);
       }
-      
+
+      console.log(`🔍 [Socket] Calling next() for socket ${socket.id}`);
       // Allow connection (you can add validation here)
       next();
+      console.log(`🔍 [Socket] next() called successfully for socket ${socket.id}`);
     } catch (error) {
       console.error(`❌ [Socket] Middleware error for ${socket.id}:`, error);
       console.error('Stack:', error.stack);

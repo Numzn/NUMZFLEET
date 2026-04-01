@@ -578,7 +578,7 @@ const FuelRequestsCard = () => {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          ...(user?.id && !document.cookie.includes('JSESSIONID') ? { 'x-user-id': user.id.toString() } : {})
+          ...(user?.id ? { 'x-user-id': user.id.toString() } : {})
         },
         credentials: 'include',
         body: JSON.stringify({ 
@@ -642,7 +642,7 @@ const FuelRequestsCard = () => {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          ...(user?.id && !document.cookie.includes('JSESSIONID') ? { 'x-user-id': user.id.toString() } : {})
+          ...(user?.id ? { 'x-user-id': user.id.toString() } : {})
         },
         credentials: 'include',
         body: JSON.stringify({ notes: notes || 'Rejected by manager' }),

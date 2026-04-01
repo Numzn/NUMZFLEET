@@ -9,9 +9,7 @@
 const getAuthHeaders = (userId) => {
   return {
     'Content-Type': 'application/json',
-    ...(userId && !document.cookie.includes('JSESSIONID') 
-      ? { 'x-user-id': userId.toString() } 
-      : {})
+    ...(userId ? { 'x-user-id': userId.toString() } : {})
   };
 };
 

@@ -6,10 +6,10 @@
 # 
 # Usage:
 #   chmod +x deploy.sh
-#   ./deploy.sh <oracle-ip> <netlify-domain>
+#   ./deploy.sh <oracle-domain-or-ip> <frontend-domain>
 # 
 # Example:
-#   ./deploy.sh 123.45.67.89 my-app.netlify.app
+#   ./deploy.sh numz.site app.numz.site
 # =========================================================================
 
 set -e
@@ -54,6 +54,7 @@ echo ""
 
 echo -e "${BLUE}[1/8] Creating deployment directory...${NC}"
 mkdir -p "${DEPLOY_DIR}/conf"
+mkdir -p "${DEPLOY_DIR}/nginx"
 mkdir -p "${DEPLOY_DIR}/logs"
 cd "${DEPLOY_DIR}"
 
@@ -71,18 +72,16 @@ fi
 echo -e "${BLUE}[2/8] Copying configuration files from repo...${NC}"
 
 # Check if files exist in current directory (for local testing)
-if [ -f "docker-compose.backend-only.yml" ]; then
+if [ -f "docker-compose.prod.yml" ]; then
     echo -e "${YELLOW}  Using local files${NC}"
-elif [ -d "../NUMZGPS" ]; then
-    echo -e "${YELLOW}  Copying from ../NUMZGPS${NC}"
-    cp ../NUMZGPS/backend/docker-compose.backend-only.yml .
-    cp ../NUMZGPS/backend/nginx.conf.production .
-    cp ../NUMZGPS/backend/cert.pem .
-    cp ../NUMZGPS/backend/key.pem .
-    cp ../NUMZGPS/backend/conf/traccar.xml conf/
+elif [ -d "../NUMZFLEET" ]; then
+    echo -e "${YELLOW}  Copying from ../NUMZFLEET${NC}"
+    cp ../NUMZFLEET/backend/docker-compose.prod.yml .
+    cp ../NUMZFLEET/backend/nginx/nginx.prod.conf ./nginx/nginx.prod.conf
+    cp ../NUMZFLEET/backend/conf/traccar.xml conf/
 else
     echo -e "${RED}✗ Could not find files. Clone repo first:${NC}"
-    echo "  git clone https://github.com/Numzn/NUMZGPS.git"
+    echo "  git clone https://github.com/Numzn/NUMZFLEET.git"
     exit 1
 fi
 
@@ -127,26 +126,20 @@ echo "  SESSION_SECRET: ${SESSION_SECRET}"
 echo ""
 
 # =========================================================================
-# Step 4: Verify SSL Certificates
+# Step 4: Verify Let's Encrypt Certificates
 # =========================================================================
 
-echo -e "${BLUE}[4/8] Checking SSL certificates...${NC}"
+echo -e "${BLUE}[4/8] Checking Let's Encrypt certificates...${NC}"
 
-if [ -f "cert.pem" ] && [ -f "key.pem" ]; then
-    echo -e "${GREEN}✓ SSL certificates found${NC}"
-    
-    # Show expiration date
-    EXPIRY=$(openssl x509 -in cert.pem -noout -enddate | cut -d= -f2)
-    echo -e "${YELLOW}  Expires: ${EXPIRY}${NC}"
+if [ -f "/etc/letsencrypt/live/${ORACLE_IP}/fullchain.pem" ] && [ -f "/etc/letsencrypt/live/${ORACLE_IP}/privkey.pem" ]; then
+    echo -e "${GREEN}✓ Let's Encrypt certificates found for ${ORACLE_IP}${NC}"
 else
-    echo -e "${YELLOW}⚠️  SSL certificates not found${NC}"
-    echo -e "${YELLOW}  Generating self-signed certificates (dev only)${NC}"
-    
-    openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
-        -subj "/CN=${ORACLE_IP}"
-    
-    echo -e "${GREEN}✓ Self-signed certificates generated${NC}"
-    echo -e "${YELLOW}  ⚠️  For production, use Let's Encrypt!${NC}"
+    echo -e "${RED}✗ Missing Let's Encrypt certs for ${ORACLE_IP}${NC}"
+    echo "  Expected files:"
+    echo "    /etc/letsencrypt/live/${ORACLE_IP}/fullchain.pem"
+    echo "    /etc/letsencrypt/live/${ORACLE_IP}/privkey.pem"
+    echo "  Issue certs before deploying nginx."
+    exit 1
 fi
 
 # =========================================================================
@@ -176,8 +169,8 @@ echo "  Docker Compose: $(docker-compose --version)"
 echo -e "${BLUE}[6/8] Starting Docker containers...${NC}"
 echo -e "${YELLOW}  This may take 1-2 minutes...${NC}"
 
-docker-compose -f docker-compose.backend-only.yml pull 2>/dev/null || true
-docker-compose -f docker-compose.backend-only.yml up -d
+docker-compose -f docker-compose.prod.yml pull 2>/dev/null || true
+docker-compose -f docker-compose.prod.yml up -d
 
 echo -e "${GREEN}✓ Containers started${NC}"
 
@@ -193,7 +186,7 @@ echo -e "${BLUE}[7/8] Checking service health...${NC}"
 HEALTH_COUNT=0
 while [ $HEALTH_COUNT -lt 5 ]; do
     if curl -sk https://localhost/health &>/dev/null; then
-        echo -e "${GREEN}✓ Fuel API is responding${NC}"
+        echo -e "${GREEN}✓ Nginx health endpoint is responding${NC}"
         break
     fi
     HEALTH_COUNT=$((HEALTH_COUNT + 1))
@@ -205,7 +198,7 @@ done
 
 if [ $HEALTH_COUNT -eq 5 ]; then
     echo -e "${YELLOW}⚠️  Services may still be starting. Check logs:${NC}"
-    echo "  docker-compose -f docker-compose.backend-only.yml logs -f"
+    echo "  docker-compose -f docker-compose.prod.yml logs -f"
 else
     echo -e "${GREEN}✓ All services are healthy${NC}"
 fi
@@ -225,7 +218,7 @@ echo -e "${YELLOW}Next Steps:${NC}"
 echo ""
 echo "1. Verify API is accessible:"
 echo "   curl -k https://${ORACLE_IP}/health"
-echo "   curl -k https://${ORACLE_IP}/api/traccar/server"
+echo "   curl -k https://${ORACLE_IP}/api/server"
 echo ""
 echo "2. Update frontend configuration:"
 echo "   nano traccar-fleet-system/frontend/.env.production"
@@ -258,7 +251,7 @@ echo -e "${YELLOW}Backend URLs:${NC}"
 echo "  HTTP (redirects to HTTPS): http://${ORACLE_IP}"
 echo "  HTTPS: https://${ORACLE_IP}"
 echo "  Fuel API: https://${ORACLE_IP}/api/fuel-requests"
-echo "  Traccar API: https://${ORACLE_IP}/api/traccar/server"
+echo "  Traccar API: https://${ORACLE_IP}/api/server"
 echo "  WebSocket: wss://${ORACLE_IP}/socket.io"
 echo ""
 

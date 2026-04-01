@@ -81,9 +81,7 @@ const VehicleSpecsPage = () => {
     try {
       const response = await fetch('/api/vehicle-specs', {
         headers: {
-          ...(user?.id && !document.cookie.includes('JSESSIONID') 
-            ? { 'X-User-Id': user.id.toString() } 
-            : {})
+          ...(user?.id ? { 'X-User-Id': user.id.toString() } : {})
         },
         credentials: 'include',
       });
@@ -138,9 +136,7 @@ const VehicleSpecsPage = () => {
         method,
         headers: {
           'Content-Type': 'application/json',
-          ...(user?.id && !document.cookie.includes('JSESSIONID') 
-            ? { 'X-User-Id': user.id.toString() } 
-            : {})
+          ...(user?.id ? { 'X-User-Id': user.id.toString() } : {})
         },
         credentials: 'include',
         body: JSON.stringify({
@@ -164,9 +160,7 @@ const VehicleSpecsPage = () => {
       await fetch(`/api/vehicle-specs/${deviceId}/sync`, {
         method: 'POST',
         headers: {
-          ...(user?.id && !document.cookie.includes('JSESSIONID') 
-            ? { 'X-User-Id': user.id.toString() } 
-            : {})
+          ...(user?.id ? { 'X-User-Id': user.id.toString() } : {})
         },
         credentials: 'include',
       });

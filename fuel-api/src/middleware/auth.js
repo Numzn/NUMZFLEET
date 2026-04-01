@@ -91,6 +91,16 @@ export const authenticate = async (req, res, next) => {
 };
 
 /**
+ * Authorization middleware requiring authenticated user
+ */
+export const requireAuth = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  next();
+};
+
+/**
  * Authorization middleware for managers only
  */
 export const requireManager = (req, res, next) => {

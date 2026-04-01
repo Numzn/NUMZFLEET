@@ -1,5 +1,3 @@
-version: '3.9'
-
 # =========================================================================
 # NumzTrak Backend-Only Production Stack (Oracle Cloud / Any Linux Host)
 # =========================================================================
@@ -15,7 +13,7 @@ version: '3.9'
 #   - Netlify-hosted frontend connecting to these APIs
 #   - Production deployments on Oracle Cloud, AWS, DigitalOcean, etc.
 #
-# Startup: docker-compose -f docker-compose.backend-only.yml up -d
+# Startup: docker-compose -f docker-compose.prod.yml up -d
 # =========================================================================
 
 services:
@@ -28,10 +26,10 @@ services:
     container_name: numztrak-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-traccar_root_pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: traccar
       MYSQL_USER: traccar
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traccar_pass}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - traccar_mysql_data:/var/lib/mysql
     networks:
@@ -41,8 +39,6 @@ services:
       interval: 10s
       timeout: 20s
       retries: 10
-    ports:
-      - '3306:3306'  # Exposed for monitoring/backups only
 
   fuel-postgres:
     image: postgres:15-alpine
@@ -51,7 +47,7 @@ services:
     environment:
       POSTGRES_DB: numztrak_fuel
       POSTGRES_USER: numztrak
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-numztrak_pass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - fuel_postgres_data:/var/lib/postgresql/data
     networks:
@@ -61,8 +57,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - '5432:5432'  # Exposed for monitoring/backups only
 
   # =========================================================================
   # CORE BACKEND SERVICES
@@ -78,7 +72,7 @@ services:
     environment:
       TRACCAR_DATABASE_URL: jdbc:mysql://traccar-mysql:3306/traccar?useSSL=false&allowPublicKeyRetrieval=true
       TRACCAR_DATABASE_USER: traccar
-      TRACCAR_DATABASE_PASSWORD: ${MYSQL_PASSWORD:-traccar_pass}
+      TRACCAR_DATABASE_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - traccar_logs:/opt/traccar/logs
       - ./conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
@@ -97,7 +91,7 @@ services:
       - '5009:5009'   # Teltonika protocol
       - '5013:5013'   # Neoway protocol
       - '5020:5020'   # TK103-2 protocol
-      - '5055:5055'   # Siptech protocol
+      - '5055:5055'   # OsmAnd protocol
       # Add more GPS protocols as needed based on traccar.xml config
     healthcheck:
       test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:8082/api/server']
@@ -106,7 +100,10 @@ services:
       retries: 3
 
   fuel-api:
-    image: numztrak/fuel-api:latest
+    # remove `image: numztrak/fuel-api:latest`
+    build:
+      context: ../fuel-api
+      dockerfile: Dockerfile
     container_name: numztrak-fuel-api
     restart: unless-stopped
     depends_on:
@@ -116,18 +113,18 @@ services:
         condition: service_healthy
     environment:
       # Database connections
-      DATABASE_URL: postgresql://numztrak:${POSTGRES_PASSWORD:-numztrak_pass}@fuel-postgres:5432/numztrak_fuel
+      DATABASE_URL: postgresql://numztrak:${POSTGRES_PASSWORD}@fuel-postgres:5432/numztrak_fuel
       TRACCAR_MYSQL_HOST: traccar-mysql
       TRACCAR_MYSQL_PORT: 3306
       TRACCAR_MYSQL_DATABASE: traccar
       TRACCAR_MYSQL_USER: traccar
-      TRACCAR_MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traccar_pass}
+      TRACCAR_MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       # App configuration
       NODE_ENV: production
       PORT: 3001
-      SESSION_SECRET: ${SESSION_SECRET:-change_me_in_production}
+      SESSION_SECRET: ${SESSION_SECRET}
       # CORS - Allow Netlify preview and custom domain (comma-separated)
-      CORS_ORIGIN: ${CORS_ORIGIN:-https://app.numz.site,https://rad-cactus-ca0409.netlify.app}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://numz.site,https://app.numz.site}
       # Optional: for external Traccar connections
       TRACCAR_SERVER_URL: ${TRACCAR_SERVER_URL:-http://traccar-server:8082}
     networks:
@@ -155,8 +152,8 @@ services:
     volumes:
       - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
       # Let's Encrypt SSL certificates (host paths on Oracle Cloud server)
-      - /etc/letsencrypt/live/api.numz.site/fullchain.pem:/etc/ssl/certs/api.numz.site.crt:ro
-      - /etc/letsencrypt/live/api.numz.site/privkey.pem:/etc/ssl/private/api.numz.site.key:ro
+      - /etc/letsencrypt/live/numz.site/fullchain.pem:/etc/ssl/certs/numz.site.crt:ro
+      - /etc/letsencrypt/live/numz.site/privkey.pem:/etc/ssl/private/numz.site.key:ro
       - nginx_logs:/var/log/nginx
     networks:
       - numztrak-network
