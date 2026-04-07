@@ -1,0 +1,20 @@
+# Ignore local config with secrets
+config_local.py
+
+# Data and logs
+/data/
+data/
+erb_page_dump.txt
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+.env
+
+# Editor files
+.vscode/
+*.swp
+*.swo

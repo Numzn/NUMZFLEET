@@ -6,12 +6,12 @@
 #   - Fuel API (Node.js microservice)
 #   - PostgreSQL (Fuel API database)
 #   - MySQL (Traccar database)
-#   - Nginx Reverse Proxy (HTTPS/SSL)
+#   - Nginx Reverse Proxy (HTTPS/SSL + frontend static hosting)
 #
-# No frontend service; suitable for:
-#   - Hosting backend APIs only
-#   - Netlify-hosted frontend connecting to these APIs
-#   - Production deployments on Oracle Cloud, AWS, DigitalOcean, etc.
+# Same-origin production topology:
+#   - https://numz.site serves frontend and API
+#   - /api routes to Traccar
+#   - Fuel API and socket paths are proxied by Nginx
 #
 # Startup: docker-compose -f docker-compose.prod.yml up -d
 # =========================================================================
@@ -123,14 +123,67 @@ services:
       NODE_ENV: production
       PORT: 3001
       SESSION_SECRET: ${SESSION_SECRET}
-      # CORS - Allow Netlify preview and custom domain (comma-separated)
-      CORS_ORIGIN: ${CORS_ORIGIN:-https://numz.site,https://app.numz.site}
+      # Same-origin default. Add extra origins only for temporary previews.
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://numz.site}
       # Optional: for external Traccar connections
       TRACCAR_SERVER_URL: ${TRACCAR_SERVER_URL:-http://traccar-server:8082}
+      # ERB API relay (server-side only)
+      ERB_API_BASE_URL: ${ERB_API_BASE_URL:-http://erb-api:8000}
+      ERB_API_TOKEN: ${ERB_API_TOKEN}
     networks:
       - numztrak-network
     healthcheck:
       test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://127.0.0.1:3001/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  erb-worker:
+    build:
+      context: ../erb-fuel-monitor
+      dockerfile: Dockerfile
+    container_name: numztrak-erb-worker
+    restart: unless-stopped
+    command: ['python', 'erb_scraper_final.py', '--mode', 'schedule']
+    environment:
+      EMAIL_ENABLED: ${ERB_EMAIL_ENABLED:-true}
+      EMAIL_FROM: ${ERB_EMAIL_FROM}
+      EMAIL_PASSWORD: ${ERB_EMAIL_PASSWORD}
+      EMAIL_TO: ${ERB_EMAIL_TO}
+      SMTP_SERVER: ${ERB_SMTP_SERVER:-smtp.gmail.com}
+      SMTP_PORT: ${ERB_SMTP_PORT:-587}
+      SSL_VERIFY: ${ERB_SSL_VERIFY:-true}
+      SSL_ALLOW_INSECURE_FALLBACK: ${ERB_SSL_ALLOW_INSECURE_FALLBACK:-true}
+      S3_ENABLED: ${ERB_S3_ENABLED:-false}
+      S3_BUCKET: ${ERB_S3_BUCKET:-}
+      S3_KEY: ${ERB_S3_KEY:-fuel_prices.json}
+    volumes:
+      - erb_data:/app/data
+    networks:
+      - numztrak-network
+
+  erb-api:
+    build:
+      context: ../erb-fuel-monitor
+      dockerfile: Dockerfile
+    container_name: numztrak-erb-api
+    restart: unless-stopped
+    command: ['python', '-m', 'uvicorn', 'api_server:app', '--host', '0.0.0.0', '--port', '8000']
+    environment:
+      PORT: 8000
+      API_TOKEN: ${ERB_API_TOKEN}
+      API_ALLOWED_ORIGINS: ${ERB_API_ALLOWED_ORIGINS:-https://numz.site}
+      S3_ENABLED: ${ERB_S3_ENABLED:-false}
+      S3_BUCKET: ${ERB_S3_BUCKET:-}
+      S3_KEY: ${ERB_S3_KEY:-fuel_prices.json}
+    depends_on:
+      - erb-worker
+    volumes:
+      - erb_data:/app/data
+    networks:
+      - numztrak-network
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/v1/health")']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -146,11 +199,13 @@ services:
     depends_on:
       - traccar-server
       - fuel-api
+      - erb-api
     ports:
       - '80:80'    # HTTP (redirects to HTTPS)
       - '443:443'  # HTTPS (production traffic)
     volumes:
       - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../traccar-fleet-system/frontend/dist:/usr/share/nginx/html:ro
       # Let's Encrypt SSL certificates (host paths on Oracle Cloud server)
       - /etc/letsencrypt/live/numz.site/fullchain.pem:/etc/ssl/certs/numz.site.crt:ro
       - /etc/letsencrypt/live/numz.site/privkey.pem:/etc/ssl/private/numz.site.key:ro
@@ -175,6 +230,8 @@ volumes:
   traccar_logs:
     driver: local
   nginx_logs:
+    driver: local
+  erb_data:
     driver: local
 
 # =========================================================================

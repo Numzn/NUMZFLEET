@@ -12,6 +12,7 @@ import { testTraccarConnection } from './config/traccar.js';
 import { syncDatabase } from './models/index.js';
 import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
 import vehicleSpecsRouter from './routes/vehicleSpecs.js';
+import reportsRouter from './reports/routes/reports.js';
 import { initializeSocket } from './socket/socketHandler.js';
 
 // Load environment variables
@@ -108,6 +109,9 @@ io.engine.on('upgrade_error', (err) => {
   console.error('❌ [Socket.IO Engine] Upgrade error:', err.message);
   console.error('Stack:', err.stack);
 });
+
+// Trust Nginx reverse proxy - required for rate-limiter and correct IP detection
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet({
@@ -276,6 +280,7 @@ if (process.env.NODE_ENV === 'development') {
 // API Routes
 app.use('/api/fuel-requests', fuelRequestsRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
+app.use('/api/reports', reportsRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {

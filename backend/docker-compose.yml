@@ -98,6 +98,8 @@ services:
       NODE_ENV: production
       PORT: 3001
       SESSION_SECRET: ${SESSION_SECRET}
+      ERB_API_BASE_URL: ${ERB_API_BASE_URL:-http://erb-api:8000}
+      ERB_API_TOKEN: ${ERB_API_TOKEN}
       # Allow Netlify preview and custom app domain (comma-separated)
       CORS_ORIGIN: https://app.numz.site,https://rad-cactus-ca0409.netlify.app
     depends_on:
@@ -108,6 +110,56 @@ services:
     networks:
       - numztrak-network
     restart: unless-stopped
+
+  erb-worker:
+    build:
+      context: ../erb-fuel-monitor
+      dockerfile: Dockerfile
+    container_name: numztrak-erb-worker
+    command: ['python', 'erb_scraper_final.py', '--mode', 'schedule']
+    environment:
+      EMAIL_ENABLED: ${ERB_EMAIL_ENABLED:-true}
+      EMAIL_FROM: ${ERB_EMAIL_FROM}
+      EMAIL_PASSWORD: ${ERB_EMAIL_PASSWORD}
+      EMAIL_TO: ${ERB_EMAIL_TO}
+      SMTP_SERVER: ${ERB_SMTP_SERVER:-smtp.gmail.com}
+      SMTP_PORT: ${ERB_SMTP_PORT:-587}
+      SSL_VERIFY: ${ERB_SSL_VERIFY:-true}
+      SSL_ALLOW_INSECURE_FALLBACK: ${ERB_SSL_ALLOW_INSECURE_FALLBACK:-true}
+      S3_ENABLED: ${ERB_S3_ENABLED:-false}
+      S3_BUCKET: ${ERB_S3_BUCKET:-}
+      S3_KEY: ${ERB_S3_KEY:-fuel_prices.json}
+    volumes:
+      - erb_data:/app/data
+    networks:
+      - numztrak-network
+    restart: unless-stopped
+
+  erb-api:
+    build:
+      context: ../erb-fuel-monitor
+      dockerfile: Dockerfile
+    container_name: numztrak-erb-api
+    command: ['python', '-m', 'uvicorn', 'api_server:app', '--host', '0.0.0.0', '--port', '8000']
+    environment:
+      PORT: 8000
+      API_TOKEN: ${ERB_API_TOKEN}
+      API_ALLOWED_ORIGINS: ${ERB_API_ALLOWED_ORIGINS:-https://numz.site}
+      S3_ENABLED: ${ERB_S3_ENABLED:-false}
+      S3_BUCKET: ${ERB_S3_BUCKET:-}
+      S3_KEY: ${ERB_S3_KEY:-fuel_prices.json}
+    depends_on:
+      - erb-worker
+    volumes:
+      - erb_data:/app/data
+    networks:
+      - numztrak-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/v1/health")']
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # ===========================================
   # GATEWAY / REVERSE PROXY
@@ -126,6 +178,7 @@ services:
     depends_on:
       - traccar-server
       - fuel-api
+      - erb-api
     networks:
       - numztrak-network
     restart: unless-stopped
@@ -137,3 +190,7 @@ services:
 networks:
   numztrak-network:
     driver: bridge
+
+volumes:
+  erb_data:
+    driver: local

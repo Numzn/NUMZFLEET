@@ -1,0 +1,19 @@
+[Unit]
+Description=ERB Fuel Monitor Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/erb-fuel-monitor
+EnvironmentFile=/opt/erb-fuel-monitor/.env
+ExecStart=/usr/bin/python3 /opt/erb-fuel-monitor/erb_scraper_final.py --mode schedule
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
