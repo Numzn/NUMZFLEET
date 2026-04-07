@@ -75,8 +75,8 @@ export const showBrowserNotification = (title, options = {}) => {
 
   const defaultOptions = {
     body: '',
-    icon: '/favicon.ico', // Default icon
-    badge: '/favicon.ico',
+    icon: '/icon-192.png', // Default icon
+    badge: '/favicon-32x32.png',
     tag: undefined, // Unique tag prevents duplicate notifications
     requireInteraction: false,
     silent: false,
@@ -116,10 +116,10 @@ export const showBrowserNotification = (title, options = {}) => {
 export const getNotificationIcon = (type) => {
   // You can customize these icon paths
   const icons = {
-    success: '/favicon.ico', // Replace with success icon
-    error: '/favicon.ico',   // Replace with error icon
-    warning: '/favicon.ico', // Replace with warning icon
-    info: '/favicon.ico',    // Replace with info icon
+    success: '/icon-192.png',
+    error: '/icon-192.png',
+    warning: '/icon-192.png',
+    info: '/icon-192.png',
   };
   return icons[type] || icons.info;
 };

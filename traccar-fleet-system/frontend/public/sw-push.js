@@ -25,7 +25,7 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: data.icon || '/pwa-192x192.png',
+    icon: data.icon || '/icon-192.png',
     badge: '/pwa-64x64.png',
     image: data.image,
     actions: data.actions || [],
@@ -98,7 +98,7 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, options } = event.data;
     self.registration.showNotification(title, {
-      icon: '/pwa-192x192.png',
+      icon: '/icon-192.png',
       badge: '/pwa-64x64.png',
       ...options,
     });

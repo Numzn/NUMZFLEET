@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
   const isLocalDev = env.LOCAL_DEV === 'true';
   const isProd = mode === 'production';
   const apiBaseUrl = env.VITE_API_BASE_URL || 'http://localhost';
+  const remoteApiBaseUrl = env.REMOTE_API_BASE_URL || env.VITE_REMOTE_API_BASE_URL;
   
   // Determine backend URLs based on environment
   let traccarUrl, fuelApiUrl;
@@ -30,6 +31,14 @@ export default defineConfig(({ mode }) => {
     fuelApiUrl = `${apiBaseUrl}/api/fuel`;
     console.log('🌐 [Vite] Running in PRODUCTION mode (Netlify)');
     console.log(`   API Base: ${apiBaseUrl}`);
+    console.log(`   Traccar: ${traccarUrl}`);
+    console.log(`   Fuel API: ${fuelApiUrl}`);
+  } else if (remoteApiBaseUrl) {
+    // Local frontend + hosted backend (recommended for integration checks)
+    traccarUrl = remoteApiBaseUrl;
+    fuelApiUrl = remoteApiBaseUrl;
+    console.log('☁️ [Vite] Running in REMOTE backend mode');
+    console.log(`   Remote Base: ${remoteApiBaseUrl}`);
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
   } else if (isLocalDev) {
@@ -188,7 +197,7 @@ export default defineConfig(({ mode }) => {
     svgr(),
     react(),
     VitePWA({
-      includeAssets: ['NUMZLOGO.png', 'apple-touch-icon-180x180.png'],
+      includeAssets: ['NUMZLOGO.png', 'apple-touch-icon.png', 'favicon-32x32.png'],
       strategies: 'generateSW', // Generate service worker with workbox
       // Enable service worker in development mode
       // DISABLED: Service worker causes ERR_EMPTY_RESPONSE in dev mode
@@ -238,16 +247,22 @@ export default defineConfig(({ mode }) => {
             purpose: 'any',
           },
           {
-            src: '/pwa-192x192.png',
+            src: '/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/pwa-512x512.png',
+            src: '/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable',
+            purpose: 'any',
+          },
+          {
+            src: '/maskable-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
         categories: ['business', 'productivity', 'utilities'],

@@ -76,7 +76,7 @@ export const useServiceWorker = () => {
       }
 
       const defaultOptions = {
-        icon: '/pwa-192x192.png',
+        icon: '/icon-192.png',
         badge: '/pwa-64x64.png',
         tag: options.tag || `notification-${Date.now()}`,
         requireInteraction: options.requireInteraction || false,
