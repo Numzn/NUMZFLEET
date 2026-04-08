@@ -1,5 +1,7 @@
 # Local Frontend Development Guide
 
+> **Production releases** use a separate Git-first flow — see [`release-prod.ps1`](../release-prod.ps1) and [`.github/workflows/release-gate.yml`](../.github/workflows/release-gate.yml). Never `scp dist/` directly to the server.
+
 ## 🚀 Quick Start
 
 ### Option 1: Using Helper Scripts (Recommended)
@@ -20,7 +22,7 @@ cd traccar-fleet-system\frontend
 **Start Backend in Docker:**
 ```powershell
 cd backend
-docker-compose up -d traccar-mysql numztrak-postgres traccar-server fuel-api
+docker compose -f docker-compose.dev.yml up -d traccar-mysql fuel-postgres traccar-server fuel-api numztrak-nginx
 docker stop numztrak-frontend  # Stop Docker frontend to avoid port conflict
 ```
 
@@ -64,7 +66,7 @@ $env:LOCAL_DEV = "true"; npm start
 
 ```powershell
 cd backend
-docker-compose up -d  # Start everything including frontend
+docker compose -f docker-compose.dev.yml up -d  # Start everything including frontend
 ```
 
 **Benefits:**
@@ -133,8 +135,7 @@ docker stop numztrak-frontend
 ### Backend not accessible
 ```powershell
 # Verify backend services are running
-docker-compose ps
-
+docker compose -f docker-compose.dev.yml ps
 # Check ports
 netstat -ano | findstr "3001 8082"
 ```
@@ -150,4 +151,9 @@ netstat -ano | findstr "3001 8082"
 2. **Use local frontend for development** - Much faster!
 3. **Test in Docker before deploying** - Ensures compatibility
 4. **Use two terminals** - One for backend, one for frontend
+
+## Canonical Compose Files
+
+- Development: `backend/docker-compose.dev.yml`
+- Production: `backend/docker-compose.prod.yml`
 

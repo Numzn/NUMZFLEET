@@ -146,6 +146,38 @@ docker-compose logs -f
 docker-compose down
 ```
 
+### Production (Oracle, Same-Origin) — Git-First Release
+
+All production deployments are commit-locked. Only commits already in `origin/main` can reach the server. Never deploy local build artifacts directly.
+
+**One-command release (Windows PowerShell, from repo root):**
+
+```powershell
+# Deploy latest origin/main to numz.site
+.\release-prod.ps1
+```
+
+**Roll back to a previous known-good commit:**
+
+```powershell
+.\release-prod.ps1 -Commit <prev-sha>
+```
+
+The script enforces this flow automatically:
+1. Frontend lint → build (local gate)
+2. Nginx config syntax check (local gate)
+3. Resolve + verify SHA is in `origin/main`
+4. SSH → checkout exact SHA on server → build + deploy
+5. Live health checks (HTTPS, Traccar API, Fuel API)
+
+**CI gate** — every PR and push to `main` runs [`.github/workflows/release-gate.yml`](.github/workflows/release-gate.yml) which validates frontend and nginx config before merge is allowed.
+
+Production URLs:
+
+- Frontend: https://numz.site
+- Traccar API: https://numz.site/api
+- Fuel API (proxied): https://numz.site/api/fuel-requests
+
 ### Option 2: Local Development
 
 #### Start Backend (Traccar)

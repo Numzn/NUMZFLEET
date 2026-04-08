@@ -1,0 +1,106 @@
+name: Release Alignment Gate
+
+# Runs on every PR targeting main and on every push to main.
+# All three jobs must pass before a merge is allowed.
+# Configure branch protection: require this workflow to pass.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB A ─ Frontend: install → lint → build
+  # ─────────────────────────────────────────────────────────────
+  frontend-gate:
+    name: Frontend Lint + Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: traccar-fleet-system/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: traccar-fleet-system/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify dist/index.html exists
+        run: test -f dist/index.html && echo "dist/index.html found"
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB B ─ Nginx: validate production config syntax
+  # ─────────────────────────────────────────────────────────────
+  nginx-gate:
+    name: Nginx Config Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate backend/nginx/nginx.prod.conf
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/backend/nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:alpine nginx -t
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB C ─ Canonical production file sanity
+  # ─────────────────────────────────────────────────────────────
+  prod-files-gate:
+    name: Canonical Files Sanity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required production files exist
+        run: |
+          errors=0
+
+          check() {
+            if [ -f "$1" ]; then
+              echo "OK  $1"
+            else
+              echo "MISSING  $1"
+              errors=$((errors + 1))
+            fi
+          }
+
+          check backend/docker-compose.prod.yml
+          check backend/nginx/nginx.prod.conf
+          check backend/conf/traccar.xml
+          check backend/env.template
+          check deployment/ORACLE_RECOVERY_RUNBOOK.md
+          check traccar-fleet-system/frontend/package.json
+
+          if [ $errors -ne 0 ]; then
+            echo ""
+            echo "$errors required file(s) missing — aborting."
+            exit 1
+          fi
+
+          echo ""
+          echo "All required production files present."
