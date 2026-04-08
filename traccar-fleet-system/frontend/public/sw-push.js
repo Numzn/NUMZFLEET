@@ -26,7 +26,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body,
     icon: data.icon || '/icon-192.png',
-    badge: '/pwa-64x64.png',
+    badge: '/favicon-32x32.png',
     image: data.image,
     actions: data.actions || [],
     data: data.data || {},
@@ -99,7 +99,7 @@ self.addEventListener('message', (event) => {
     const { title, options } = event.data;
     self.registration.showNotification(title, {
       icon: '/icon-192.png',
-      badge: '/pwa-64x64.png',
+      badge: '/favicon-32x32.png',
       ...options,
     });
   }
