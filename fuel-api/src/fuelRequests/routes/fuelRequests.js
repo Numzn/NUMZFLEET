@@ -30,6 +30,11 @@ const requireManager =
     return next();
   });
 
+// Lightweight route-specific health endpoint used by ops checks.
+router.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'numztrak-fuel-api', scope: 'fuel-requests' });
+});
+
 // All routes require authentication
 router.use(authenticate);
 
