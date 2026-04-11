@@ -1,9 +1,12 @@
 import { useDispatch, useSelector, connect } from 'react-redux';
+import { useEffect } from 'react';
 import {
   geofencesActions, groupsActions, driversActions, maintenancesActions, calendarsActions, fuelRequestsActions,
 } from './store';
 import { useEffectAsync } from './reactHelper';
 import fetchOrThrow from './common/util/fetchOrThrow';
+
+const FUEL_POLL_INTERVAL_MS = 30000; // 30s fallback poll
 
 const CachingController = () => {
   const authenticated = useSelector((state) => !!state.session.user);
@@ -90,6 +93,27 @@ const CachingController = () => {
       }
     }
   }, [authenticated, user?.id]);
+
+  // Fallback poll every 30s — ensures list stays fresh if socket drops
+  useEffect(() => {
+    if (!authenticated || !user?.id) return;
+
+    const fetchFuelRequests = async () => {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (user?.id) headers['x-user-id'] = user.id.toString();
+        const response = await fetch('/api/fuel-requests', { credentials: 'include', headers });
+        if (!response.ok) return;
+        const requests = await response.json();
+        dispatch(fuelRequestsActions.refresh(requests));
+      } catch (_) {
+        // silently ignore poll errors
+      }
+    };
+
+    const timer = setInterval(fetchFuelRequests, FUEL_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [authenticated, user?.id, dispatch]);
 
   return null;
 };

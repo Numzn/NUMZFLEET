@@ -1,6 +1,5 @@
 import {
   Paper, Typography, Grid, Box, Chip, Button, Card, CardContent,
-  TextField, InputAdornment, Select, MenuItem, FormControl, InputLabel,
   Accordion, AccordionSummary, AccordionDetails, useTheme, IconButton,
   Tooltip, Snackbar, Alert
 } from '@mui/material';
@@ -10,8 +9,6 @@ import { useMemo, useState, useEffect } from 'react';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
-import PendingIcon from '@mui/icons-material/Pending';
-import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import TodayIcon from '@mui/icons-material/Today';
@@ -23,9 +20,9 @@ import PersonIcon from '@mui/icons-material/Person';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import InfoIcon from '@mui/icons-material/Info';
 import AddIcon from '@mui/icons-material/Add';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import CloseIcon from '@mui/icons-material/Close';
 import FuelApprovalDialog from './FuelApprovalDialog';
+import FuelRequestsManagementDashboard from './FuelRequestsManagementDashboard';
 import { errorsActions } from '../../store';
 import { fuelRequestsActions } from '../store/fuelRequests';
 import { snackBarDurationLongMs } from '../../common/util/duration';
@@ -903,121 +900,17 @@ const FuelRequestsCard = () => {
 
   return (
     <Paper className={classes.paper}>
-      {/* Statistics Cards */}
-      <Grid container spacing={3} className={classes.statsGrid} sx={{ width: '100%', marginLeft: 0, marginRight: 0 }}>
-        <Grid item xs={6} sm={6} md={3} sx={{ display: 'flex', flexGrow: 1 }}>
-          <Card 
-            className={`${classes.statCard} ${classes.statCardPending} ${statusFilter === 'pending' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('pending')}
-          >
-            <CardContent className={classes.statCardContent}>
-              <Box className={`${classes.statCardIconWrapper} stat-icon`}>
-                <PendingIcon className={classes.statCardIcon} />
-              </Box>
-              <Box className={classes.statCardTextWrapper}>
-                <Typography className={`${classes.statCardValue} stat-value`}>{stats.pending}</Typography>
-                <Typography className={`${classes.statCardLabel} stat-label`}>Pending</Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={6} md={3} sx={{ display: 'flex', flexGrow: 1 }}>
-          <Card 
-            className={`${classes.statCard} ${classes.statCardApproved} ${statusFilter === 'approved' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('approved')}
-          >
-            <CardContent className={classes.statCardContent}>
-              <Box className={`${classes.statCardIconWrapper} stat-icon`}>
-                <CheckCircleIcon className={classes.statCardIcon} />
-              </Box>
-              <Box className={classes.statCardTextWrapper}>
-                <Typography className={`${classes.statCardValue} stat-value`}>{stats.approved}</Typography>
-                <Typography className={`${classes.statCardLabel} stat-label`}>Approved</Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={6} md={3} sx={{ display: 'flex', flexGrow: 1 }}>
-          <Card 
-            className={`${classes.statCard} ${classes.statCardFulfilled} ${statusFilter === 'fulfilled' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('fulfilled')}
-          >
-            <CardContent className={classes.statCardContent}>
-              <Box className={`${classes.statCardIconWrapper} stat-icon`}>
-                <CheckCircleIcon className={classes.statCardIcon} />
-              </Box>
-              <Box className={classes.statCardTextWrapper}>
-                <Typography className={`${classes.statCardValue} stat-value`}>{stats.fulfilled}</Typography>
-                <Typography className={`${classes.statCardLabel} stat-label`}>Fulfilled</Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={6} md={3} sx={{ display: 'flex', flexGrow: 1 }}>
-          <Card 
-            className={`${classes.statCard} ${classes.statCardTotal} ${statusFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('all')}
-          >
-            <CardContent className={classes.statCardContent}>
-              <Box className={`${classes.statCardIconWrapper} stat-icon`}>
-                <AssessmentIcon className={classes.statCardIcon} />
-              </Box>
-              <Box className={classes.statCardTextWrapper}>
-                <Typography className={`${classes.statCardValue} stat-value`}>{stats.total}</Typography>
-                <Typography className={`${classes.statCardLabel} stat-label`}>Total</Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Search & Filter Bar */}
-      <Box className={classes.searchFilterBar}>
-        <TextField
-          className={classes.searchField}
-          placeholder="Search requests..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon color="action" />
-              </InputAdornment>
-            ),
-          }}
-          variant="outlined"
-          size="medium"
-        />
-        <FormControl className={classes.filterField} size="medium">
-          <InputLabel>Status</InputLabel>
-          <Select
-            value={statusFilter}
-            label="Status"
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <MenuItem value="all">All Status</MenuItem>
-            <MenuItem value="pending">Pending</MenuItem>
-            <MenuItem value="approved">Approved</MenuItem>
-            <MenuItem value="fulfilled">Fulfilled</MenuItem>
-            <MenuItem value="rejected">Rejected</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl className={classes.filterField} size="medium">
-          <InputLabel>Vehicle</InputLabel>
-          <Select
-            value={vehicleFilter}
-            label="Vehicle"
-            onChange={(e) => setVehicleFilter(e.target.value)}
-          >
-            <MenuItem value="all">All Vehicles</MenuItem>
-            {availableVehicles.map((vehicle) => (
-              <MenuItem key={vehicle.id} value={vehicle.id.toString()}>
-                {vehicle.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
+      <FuelRequestsManagementDashboard
+        classes={classes}
+        stats={stats}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        vehicleFilter={vehicleFilter}
+        setVehicleFilter={setVehicleFilter}
+        availableVehicles={availableVehicles}
+      />
 
         {/* Requests Section */}
         {filteredAndGroupedRequests.today.length === 0 &&
