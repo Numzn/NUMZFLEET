@@ -11,9 +11,12 @@ import {
   AccordionDetails,
   Divider,
   TextField,
+  Avatar,
 } from '@mui/material';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 
 export const DecisionHeader = ({
   classes,
@@ -23,23 +26,9 @@ export const DecisionHeader = ({
   <>
     <Box className={classes.headerTopRow}>
       <Box sx={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Box
-          sx={{
-            width: 28,
-            height: 28,
-            borderRadius: 1,
-            border: '1px solid',
-            borderColor: 'divider',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'text.secondary',
-            fontSize: 14,
-            fontWeight: 700,
-          }}
-        >
-          U
-        </Box>
+        <Avatar sx={{ width: 28, height: 28 }}>
+          <PersonOutlineIcon fontSize="small" />
+        </Avatar>
         <Typography className={classes.driverName} noWrap>{driverName}</Typography>
       </Box>
       <Chip
@@ -142,7 +131,7 @@ export const DetailsSection = ({ classes, requestReason, tankCapacity }) => (
       sx={{ '& .MuiAccordionSummary-content': { alignItems: 'center' } }}
     >
       <Typography variant="subtitle2" sx={{ fontWeight: 600, flexGrow: 1 }}>Details</Typography>
-      <Typography variant="caption" color="text.secondary">...</Typography>
+      <MoreHorizIcon fontSize="small" color="action" />
     </AccordionSummary>
     <AccordionDetails>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>Reason: {requestReason || 'No reason provided'}</Typography>

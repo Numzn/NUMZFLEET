@@ -74,6 +74,14 @@ export default defineConfig(({ mode }) => {
         ws: true,
         changeOrigin: true,
         secure: false,
+        cookieDomainRewrite: { '*': 'localhost' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+          });
+        },
       },
       // WebSocket proxy for fuel API Socket.IO
       // IMPORTANT: This must match Socket.IO requests BEFORE other routes

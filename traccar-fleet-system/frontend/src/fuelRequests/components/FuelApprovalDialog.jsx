@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogActions, DialogContent, DialogTitle, Button, Box, Typography, LinearProgress, Alert, IconButton } from '@mui/material';
+import { Dialog, DialogActions, DialogContent, DialogTitle, Button, Box, Typography, LinearProgress, Alert } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useDispatch, useSelector } from 'react-redux';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CloseIcon from '@mui/icons-material/Close';
+import IconButton from '@mui/material/IconButton';
 import { errorsActions } from '../../store';
 import { useFuelApprovalDialogStyles } from './FuelApprovalDialog.styles';
 import { DecisionHeader, LiveDataCard, RecommendationCard, ApprovalAmountSection, DetailsSection, NotesSection, ValidationAlerts } from './FuelApprovalDialog.sections';
@@ -98,17 +101,13 @@ const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => 
       <DialogTitle sx={{ pb: 0.5, pt: 1.2, px: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: 18, lineHeight: 1 }}>
-              {'<'}
-            </Typography>
+            <ArrowBackIcon fontSize="small" color="action" />
             <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '0.95rem' }} noWrap>
               {derived.deviceName}
             </Typography>
           </Box>
           <IconButton size="small" onClick={onClose}>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: 18, lineHeight: 1 }}>
-              x
-            </Typography>
+            <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
       </DialogTitle>

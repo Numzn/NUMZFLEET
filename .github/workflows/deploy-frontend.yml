@@ -1,0 +1,73 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'traccar-fleet-system/frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: traccar-fleet-system/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: traccar-fleet-system/frontend
+        run: npm ci
+
+      - name: Build production
+        working-directory: traccar-fleet-system/frontend
+        env:
+          VITE_API_BASE_URL: https://api.numz.site
+        run: npm run build
+
+      - name: Deploy to server
+        env:
+          OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+        run: |
+          # Write SSH key
+          mkdir -p ~/.ssh
+          echo "$OCI_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$OCI_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+          REMOTE="$OCI_USER@$OCI_HOST"
+          REMOTE_DIST="/home/$OCI_USER/NUMZFLEET/traccar-fleet-system/frontend/dist"
+
+          # Sync dist to server (delete old files, upload new)
+          rsync -avz --delete -e "ssh $SSH_OPTS" \
+            traccar-fleet-system/frontend/dist/ \
+            "$REMOTE:$REMOTE_DIST/"
+
+          # Clear nginx cache and reload
+          ssh $SSH_OPTS "$REMOTE" << 'EOF'
+            # Reload nginx to pick up new files (no downtime)
+            docker exec numztrak-nginx nginx -s reload
+            echo "✅ Frontend deployed and nginx reloaded"
+          EOF
+
+      - name: Verify deployment
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+        run: |
+          sleep 5
+          HTTP_CODE=$(curl -sI -o /dev/null -w "%{http_code}" "https://numz.site" || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ numz.site is live (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️ numz.site returned HTTP $HTTP_CODE — check manually"
+            exit 1
+          fi

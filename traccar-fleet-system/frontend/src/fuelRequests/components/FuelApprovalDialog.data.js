@@ -1,134 +1,109 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
-const resolveFuelPercent = ({ validationData, latestPosition, request }) => {
-  const fromValidation = validationData?.request?.currentFuelLevel;
-  const fromPosition = latestPosition?.attributes?.fuel ?? latestPosition?.attributes?.fuelLevel;
-  const fromRequest = request?.currentFuelLevel;
-
-  if (Number.isFinite(fromValidation)) return fromValidation;
-  if (Number.isFinite(fromPosition)) return fromPosition;
-  if (Number.isFinite(fromRequest)) return fromRequest;
-  return 0;
-};
-
-const resolveTankCapacity = ({ validationData, device, request }) => {
-  const fromValidation = validationData?.vehicleSpec?.tankCapacity;
-  const fromRequest = request?.vehicleSpec?.tankCapacity;
-  const fromDevice = device?.attributes?.tankCapacity;
-
-  if (Number.isFinite(fromValidation)) return fromValidation;
-  if (Number.isFinite(fromRequest)) return fromRequest;
-  if (Number.isFinite(fromDevice)) return fromDevice;
-  return null;
-};
-
+/**
+ * Fetch live validation data from the fuel-api when the dialog opens.
+ */
 export const useFuelApprovalLiveData = ({ open, request, userId }) => {
   const [validationData, setValidationData] = useState(null);
-  const [validationLoading, setValidationLoading] = useState(false);
   const [validationError, setValidationError] = useState(null);
 
   useEffect(() => {
     if (!open || !request?.id) return;
+    let cancelled = false;
 
-    let active = true;
     const fetchValidation = async () => {
-      setValidationLoading(true);
-      setValidationError(null);
       try {
-        const response = await fetch(`/api/fuel-requests/${request.id}/validation`, {
-          method: 'GET',
-          headers: {
-            ...(userId ? { 'x-user-id': userId.toString() } : {}),
-          },
+        const url = `/api/fuel/fuel-requests/${request.id}/validation`;
+        const response = await fetch(url, {
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
         });
-
-        if (!response.ok) {
-          throw new Error(`Unable to fetch live fuel data (HTTP ${response.status})`);
-        }
-
-        const payload = await response.json();
-        if (active) setValidationData(payload);
-      } catch (error) {
-        if (active) setValidationError(error.message || 'Unable to fetch live fuel data');
-      } finally {
-        if (active) setValidationLoading(false);
+        if (!response.ok) throw new Error(`Validation request failed (${response.status})`);
+        const data = await response.json();
+        if (!cancelled) setValidationData(data);
+      } catch (err) {
+        console.warn('Fuel validation fetch failed:', err.message);
+        if (!cancelled) setValidationError(err.message);
       }
     };
 
     fetchValidation();
-    return () => {
-      active = false;
-    };
-  }, [open, request?.id, userId]);
+    return () => { cancelled = true; };
+  }, [open, request?.id]);
 
-  return { validationData, validationLoading, validationError, setValidationData, setValidationError };
+  return { validationData, validationError, setValidationData, setValidationError };
 };
 
+/**
+ * Derive display values from the combination of request, device, position, and live validation data.
+ */
 export const useFuelApprovalDerivedData = ({ request, device, latestPosition, validationData, approvedAmount }) => {
   return useMemo(() => {
     if (!request) {
       return {
-        hasWarnings: false,
-        validationWarnings: [],
-        approvedExceedsMax: false,
-        suggestionDiffers: false,
-        roundedMaxPossible: 1,
-        safeApprovedAmount: 0,
+        deviceName: '', driverName: '', tankCapacity: null, currentFuelPercent: 0,
+        roundedMaxPossible: 0, approvedPercentage: 0, suggestedAmount: 0,
+        suggestionDiffers: false, hasWarnings: false, validationWarnings: [],
+        safeApprovedAmount: 0, approvedExceedsMax: false,
       };
     }
 
-    const validationWarnings = validationData?.validation?.warnings || request.validationWarnings || [];
-    const hasWarnings = validationWarnings.length > 0;
+    // Device / driver names
+    const deviceName = device?.name || request.deviceName || `Device ${request.deviceId}`;
+    const driverName = request.driverName || request.driver || 'Unknown Driver';
 
-    const currentFuelPercent = resolveFuelPercent({ validationData, latestPosition, request });
-    const tankCapacity = resolveTankCapacity({ validationData, device, request });
+    // Tank capacity: validation -> request snapshot -> device attribute -> null
+    const tankCapacity =
+      validationData?.vehicleSpec?.tankCapacity
+      ?? request?.vehicleSpec?.tankCapacity
+      ?? device?.attributes?.tankCapacity
+      ?? null;
 
-    const currentFuelLiters = Number.isFinite(tankCapacity)
-      ? (Math.max(0, currentFuelPercent) / 100) * tankCapacity
+    // Current fuel %: validation -> position attribute -> request snapshot -> 0
+    const currentFuelPercent =
+      validationData?.request?.currentFuelLevel
+      ?? latestPosition?.attributes?.fuel
+      ?? latestPosition?.attributes?.fuelLevel
+      ?? request?.currentFuelLevel
+      ?? 0;
+
+    // Max possible litres that can be added
+    const rawMaxPossible = Number.isFinite(tankCapacity)
+      ? Math.max(0, tankCapacity * (1 - currentFuelPercent / 100))
+      : request?.requestedAmount * 2 || 200;
+    const roundedMaxPossible = Math.round(rawMaxPossible);
+
+    // Clamp approved amount
+    const safeApprovedAmount = Math.max(0, Math.min(Math.round(approvedAmount), roundedMaxPossible));
+    const approvedExceedsMax = Math.round(approvedAmount) > roundedMaxPossible;
+
+    // Approved percentage after fill
+    const approvedPercentage = Number.isFinite(tankCapacity) && tankCapacity > 0
+      ? currentFuelPercent + (safeApprovedAmount / tankCapacity) * 100
       : 0;
 
-    const maxPossibleFromValidation = validationData?.validation?.maxPossible;
-    const computedMaxPossible = Number.isFinite(tankCapacity)
-      ? Math.max(0, tankCapacity - currentFuelLiters)
-      : null;
-    const maxPossible = Number.isFinite(maxPossibleFromValidation)
-      ? Math.max(0, maxPossibleFromValidation)
-      : computedMaxPossible;
+    // Suggested amount from validation or manager
+    const suggestedAmount =
+      validationData?.validation?.suggestedAmount ?? request?.managerSuggestion ?? request?.requestedAmount ?? 0;
+    const suggestionDiffers = suggestedAmount !== request?.requestedAmount;
 
-    const roundedMaxPossible = Number.isFinite(maxPossible)
-      ? Math.round(maxPossible)
-      : Math.max(1, Math.round(request.managerSuggestion || request.requestedAmount || 1));
-
-    const safeApprovedAmount = Math.max(0, approvedAmount || 0);
-    const approvedExceedsMax = Number.isFinite(maxPossible) ? safeApprovedAmount > maxPossible : false;
-
-    const approvedPercentage = Number.isFinite(tankCapacity)
-      ? Math.min(100, ((currentFuelLiters + safeApprovedAmount) / tankCapacity) * 100)
-      : Math.min(100, Math.max(0, currentFuelPercent));
-
-    const suggestedAmount = Number.isFinite(validationData?.validation?.suggestedAmount)
-      ? validationData.validation.suggestedAmount
-      : request.managerSuggestion;
-
-    const suggestionDiffers = Number.isFinite(suggestedAmount)
-      && suggestedAmount > 0
-      && suggestedAmount !== request.requestedAmount;
+    // Warnings
+    const validationWarnings = validationData?.validation?.warnings || [];
+    const hasWarnings = validationWarnings.length > 0;
 
     return {
-      validationWarnings,
-      hasWarnings,
-      currentFuelPercent,
+      deviceName,
+      driverName,
       tankCapacity,
-      currentFuelLiters,
+      currentFuelPercent,
       roundedMaxPossible,
-      safeApprovedAmount,
-      approvedExceedsMax,
       approvedPercentage,
       suggestedAmount,
       suggestionDiffers,
-      deviceName: device?.name || request.device?.name || `Device ${request.deviceId}`,
-      driverName: request.user?.name || request.driverName || `User ${request.userId}`,
+      hasWarnings,
+      validationWarnings,
+      safeApprovedAmount,
+      approvedExceedsMax,
     };
-  }, [approvedAmount, device, latestPosition, request, validationData]);
+  }, [request, device, latestPosition, validationData, approvedAmount]);
 };

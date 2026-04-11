@@ -120,7 +120,20 @@ const BottomMenu = () => {
         <BottomNavigationAction
           label={t('mapTitle')}
           icon={(
-            <Badge color="error" variant="dot" overlap="circular" invisible={socket !== false}>
+            <Badge
+              variant="dot"
+              overlap="circular"
+              invisible={socket !== false}
+              sx={{
+                '& .MuiBadge-dot': {
+                  backgroundColor: '#ef4444',
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  animation: socket === false ? 'none' : undefined,
+                },
+              }}
+            >
               <MapIcon />
             </Badge>
           )}

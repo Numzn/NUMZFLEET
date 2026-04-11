@@ -58,10 +58,10 @@ const SocketController = () => {
   }, [features, dispatch, soundEvents, soundAlarms]);
 
   const connectSocket = () => {
-    // Use configured API URL (from .env) or fallback to window location
-    // This ensures we connect directly to the backend for WebSockets, bypassing Netlify proxy
-    const apiBase = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-    const wsUrl = apiBase.replace(/^http/, 'ws');
+    // Always connect WebSocket to same origin so the session cookie is sent.
+    // Both production nginx (numz.site/api/socket) and the Vite dev proxy
+    // already forward /api/socket to the Traccar backend.
+    const wsUrl = window.location.origin.replace(/^http/, 'ws');
     
     const socket = new WebSocket(`${wsUrl}/api/socket`);
     socketRef.current = socket;

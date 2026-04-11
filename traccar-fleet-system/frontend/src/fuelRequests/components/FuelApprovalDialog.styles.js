@@ -2,182 +2,134 @@ import { makeStyles } from 'tss-react/mui';
 
 export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
   dialog: {
-    borderRadius: '10px',
-  },
-  decisionHeader: {
-    padding: theme.spacing(1.25),
-    borderRadius: theme.spacing(1),
-    border: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(148, 163, 184, 0.08)' : '#F8FAFC',
+    '& .MuiDialog-paper': {
+      maxHeight: '95vh',
+    },
   },
   headerTopRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: theme.spacing(1),
-  },
-  vehicleName: {
-    fontSize: '1rem',
-    fontWeight: 700,
-    lineHeight: 1.25,
+    marginBottom: theme.spacing(1),
+    marginTop: theme.spacing(0.5),
   },
   driverName: {
-    marginTop: theme.spacing(0.25),
-    color: theme.palette.text.secondary,
-    fontSize: '0.8rem',
+    fontWeight: 600,
+    fontSize: '0.88rem',
+    color: theme.palette.text.primary,
   },
   urgencyChip: {
-    textTransform: 'capitalize',
-    height: 22,
-    fontSize: '0.72rem',
     fontWeight: 600,
+    fontSize: '0.7rem',
+    height: 22,
+  },
+  decisionHeader: {
+    background: theme.palette.mode === 'dark'
+      ? 'rgba(255,255,255,0.04)'
+      : 'rgba(0,0,0,0.02)',
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(1.25),
+    marginBottom: theme.spacing(1),
   },
   requestLine: {
-    marginTop: theme.spacing(1.1),
-    fontSize: '0.85rem',
-    fontWeight: 600,
+    fontWeight: 700,
+    fontSize: '0.9rem',
+    marginBottom: theme.spacing(0.25),
   },
   progressionLine: {
-    marginTop: theme.spacing(0.4),
     fontSize: '0.78rem',
     color: theme.palette.text.secondary,
   },
-  compactFuelBlock: {
-    marginTop: theme.spacing(1.4),
-    padding: theme.spacing(1, 1.1),
-    borderRadius: theme.spacing(1),
-    border: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.default,
-  },
-  dataGrid: {
-    marginTop: theme.spacing(1),
-  },
-  dataCard: {
-    border: `1px solid ${theme.palette.divider}`,
-    borderRadius: theme.spacing(1),
-    padding: theme.spacing(0.75, 0.9),
-    backgroundColor: theme.palette.background.paper,
-    minHeight: 56,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-  },
-  dataLabel: {
+  helperText: {
     fontSize: '0.68rem',
-    color: theme.palette.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  },
-  dataValue: {
-    marginTop: theme.spacing(0.15),
-    fontSize: '0.84rem',
-    fontWeight: 700,
-  },
-  summaryText: {
-    marginTop: theme.spacing(0.8),
-    fontWeight: 600,
-    fontSize: '0.82rem',
-    lineHeight: 1.35,
+    color: theme.palette.text.disabled,
   },
   liveDataMeta: {
+    fontSize: '0.65rem',
+    color: theme.palette.text.disabled,
     marginTop: theme.spacing(0.5),
-    fontSize: '0.68rem',
-    color: theme.palette.text.secondary,
+    fontStyle: 'italic',
   },
   recommendationBox: {
-    marginTop: theme.spacing(1.4),
-    padding: theme.spacing(1.15),
-    borderRadius: theme.spacing(1),
-    border: `1px solid ${theme.palette.primary.main}`,
-    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(59, 130, 246, 0.10)' : 'rgba(59, 130, 246, 0.08)',
+    background: theme.palette.mode === 'dark'
+      ? 'rgba(33,150,243,0.08)'
+      : 'rgba(33,150,243,0.06)',
+    border: `1px solid ${theme.palette.primary.light}`,
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(1),
+    marginBottom: theme.spacing(1),
   },
   recommendationTitle: {
+    fontWeight: 600,
     fontSize: '0.8rem',
-    fontWeight: 700,
     color: theme.palette.primary.main,
   },
-  validationAlert: {
-    marginTop: theme.spacing(1.4),
+  compactActionButton: {
+    textTransform: 'none',
+    fontSize: '0.72rem',
+    padding: theme.spacing(0.25, 1),
+    minHeight: 26,
   },
   sliderWrap: {
-    marginTop: theme.spacing(1.45),
+    marginTop: theme.spacing(1.25),
+    marginBottom: theme.spacing(1),
   },
   sliderHeader: {
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing(0.5),
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing(0.25),
   },
   sliderValue: {
-    fontSize: '0.94rem',
     fontWeight: 700,
-  },
-  helperText: {
-    marginTop: theme.spacing(0.3),
-    fontSize: '0.72rem',
-    color: theme.palette.text.secondary,
+    fontSize: '1rem',
+    color: theme.palette.success.main,
   },
   quickActions: {
     display: 'flex',
     gap: theme.spacing(0.75),
-    marginTop: theme.spacing(0.75),
+    marginTop: theme.spacing(0.5),
     flexWrap: 'wrap',
   },
-  compactActionButton: {
-    fontSize: '0.72rem',
-    paddingTop: theme.spacing(0.35),
-    paddingBottom: theme.spacing(0.35),
-    borderRadius: theme.spacing(0.8),
-  },
   detailsAccordion: {
-    marginTop: theme.spacing(1.4),
-    border: `1px solid ${theme.palette.divider}`,
-    borderRadius: `${theme.spacing(1)} !important`,
-    '&:before': {
-      display: 'none',
-    },
-    '& .MuiAccordionSummary-root': {
-      minHeight: 42,
-      '&.Mui-expanded': {
-        minHeight: 42,
-      },
-    },
-    '& .MuiAccordionSummary-content': {
-      margin: `${theme.spacing(0.6)} 0`,
-      '&.Mui-expanded': {
-        margin: `${theme.spacing(0.6)} 0`,
-      },
-    },
+    marginTop: theme.spacing(1),
+    boxShadow: 'none',
+    '&::before': { display: 'none' },
+    background: 'transparent',
   },
   notesWrap: {
-    marginTop: theme.spacing(1.4),
-    paddingBottom: theme.spacing(0.75),
+    marginTop: theme.spacing(1),
+  },
+  validationAlert: {
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(0.5),
   },
   stickyActions: {
-    position: 'sticky',
+    position: 'fixed',
     bottom: 0,
-    borderTop: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.paper,
+    left: 0,
+    right: 0,
+    padding: theme.spacing(1, 1.5),
+    background: theme.palette.mode === 'dark'
+      ? 'rgba(30,30,30,0.92)'
+      : 'rgba(255,255,255,0.92)',
     backdropFilter: 'blur(8px)',
-    boxShadow: `0 -6px 16px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.08)'}`,
-    padding: theme.spacing(0.85),
-    gap: theme.spacing(0.75),
-    justifyContent: 'stretch',
-    zIndex: 2,
+    boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
+    display: 'flex',
+    gap: theme.spacing(1),
+    zIndex: 10,
   },
   desktopActions: {
-    borderTop: `1px solid ${theme.palette.divider}`,
-    padding: theme.spacing(0.85, 1.25),
-    gap: theme.spacing(0.75),
+    padding: theme.spacing(1, 1.5),
   },
   actionButton: {
-    borderRadius: theme.spacing(0.9),
-    minHeight: 36,
+    textTransform: 'none',
     fontWeight: 600,
+    fontSize: '0.82rem',
   },
   primaryActionButton: {
-    borderRadius: theme.spacing(0.9),
-    minHeight: 36,
+    textTransform: 'none',
     fontWeight: 700,
+    fontSize: '0.82rem',
   },
 }));

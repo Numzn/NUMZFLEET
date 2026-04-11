@@ -5,11 +5,13 @@ import {
   Box, 
   Typography, 
   IconButton, 
+  Tooltip,
   useTheme,
   useMediaQuery,
   Fade
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
+import { useSelector } from 'react-redux';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import LogoImage from '../../login/LogoImage';
 import DeviceStatsChips from './DeviceStatsChips';
@@ -21,12 +23,14 @@ import UserMenuDropdown from '../../common/components/UserMenuDropdown';
 const useStyles = makeStyles()((theme) => ({
   premiumAppBar: {
     height: 64,
-    background: 'rgba(255, 255, 255, 0.95)',
-    backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+    backgroundColor: theme.palette.background.paper,
+    backgroundImage: 'linear-gradient(180deg, rgba(6, 182, 212, 0.02) 0%, transparent 100%)',
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     zIndex: theme.zIndex.appBar,
+    borderRadius: 0,
+    width: '100vw',
   },
   toolbar: {
     minHeight: 64,
@@ -101,6 +105,18 @@ const useStyles = makeStyles()((theme) => ({
     minWidth: 'auto',
     gap: theme.spacing(0.5),
   },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: '50%',
+    flexShrink: 0,
+    transition: 'background-color 0.4s ease',
+  },
+  '@keyframes pulse': {
+    '0%': { boxShadow: '0 0 0 0 rgba(34, 197, 94, 0.5)' },
+    '70%': { boxShadow: '0 0 0 6px rgba(34, 197, 94, 0)' },
+    '100%': { boxShadow: '0 0 0 0 rgba(34, 197, 94, 0)' },
+  },
 }));
 
 const PremiumTopBar = ({ 
@@ -115,6 +131,7 @@ const PremiumTopBar = ({
 }) => {
   const { classes } = useStyles();
   const theme = useTheme();
+  const socketConnected = useSelector((state) => !!state.session.socket);
   
   // Responsive breakpoints
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -150,10 +167,6 @@ const PremiumTopBar = ({
       className={classes.premiumAppBar}
       sx={{
         height: toolbarHeight,
-        transform: isScrolled ? 'translateY(-2px)' : 'translateY(0)',
-        boxShadow: isScrolled 
-          ? '0 8px 24px rgba(0, 0, 0, 0.12)' 
-          : '0 4px 12px rgba(0, 0, 0, 0.05)',
       }}
     >
       <Toolbar 
@@ -186,6 +199,17 @@ const PremiumTopBar = ({
           >
             Live Map
           </Typography>
+          {/* Connection status indicator */}
+          <Tooltip title={socketConnected ? 'Backend connected' : 'Backend disconnected — reconnecting…'} arrow>
+            <Box
+              className={classes.connectionDot}
+              sx={{
+                backgroundColor: socketConnected ? '#22c55e' : '#ef4444',
+                animation: socketConnected ? 'pulse 2s infinite' : 'none',
+                ml: 0.5,
+              }}
+            />
+          </Tooltip>
         </Box>
 
         {/* Center Section - Stats & Search */}

@@ -24,6 +24,13 @@ const useStyles = makeStyles()((theme) => ({
     flexDirection: 'column',
     position: 'relative',
     overflow: 'hidden',
+    paddingTop: '64px', // offset for fixed PremiumTopBar
+    [theme.breakpoints.between('md', 'lg')]: {
+      paddingTop: '60px',
+    },
+    [theme.breakpoints.down('md')]: {
+      paddingTop: '56px',
+    },
   },
   mapContainer: {
     flex: 1,
@@ -31,8 +38,8 @@ const useStyles = makeStyles()((theme) => ({
     overflow: 'hidden',
     width: '100%',
     height: '100%',
-    minHeight: 0, // Allow flexbox to properly size
-    paddingBottom: 0, // No padding needed, controls handle their own positioning
+    minHeight: 0,
+    paddingBottom: 0,
   },
 }));
 
