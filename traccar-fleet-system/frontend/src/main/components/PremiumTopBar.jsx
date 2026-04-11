@@ -7,15 +7,11 @@ import {
   IconButton, 
   useTheme,
   useMediaQuery,
-  Fade,
-  Slide
+  Fade
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import { useDispatch, useSelector } from 'react-redux';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import LogoImage from '../login/LogoImage';
+import LogoImage from '../../login/LogoImage';
 import DeviceStatsChips from './DeviceStatsChips';
 import SearchWithDropdown from './SearchWithDropdown';
 import FiltersFlyout from './FiltersFlyout';
@@ -112,12 +108,13 @@ const PremiumTopBar = ({
   stats = {}, 
   onSearch, 
   onFilterChange,
-  onNavigateToDashboard 
+  onNavigateToDashboard,
+  onShowAllDevices,
+  groups = [],
+  filters = { statuses: [], groups: [], sortBy: '', mapOnly: false }
 }) => {
   const { classes } = useStyles();
   const theme = useTheme();
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
   
   // Responsive breakpoints
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -210,7 +207,7 @@ const PremiumTopBar = ({
           <SearchWithDropdown 
             devices={devices}
             onSearch={onSearch}
-            onShowAllDevices={() => {/* Handle show all devices */}}
+            onShowAllDevices={onShowAllDevices}
             compact={isMobile}
             expanded={!isMobile}
           />
@@ -248,6 +245,9 @@ const PremiumTopBar = ({
           <FiltersFlyout 
             onFilterChange={onFilterChange}
             compact={isMobile}
+            groups={groups}
+            filters={filters}
+            devices={devices}
           />
 
           {/* Notifications */}

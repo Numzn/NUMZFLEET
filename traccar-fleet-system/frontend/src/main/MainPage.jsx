@@ -12,7 +12,7 @@ import useFilter from './useFilter';
 import MainMap from './MainMap';
 import DeviceList from './DeviceList';
 import BottomMenu from '../common/components/BottomMenu';
-import MapTopbar from './components/MapTopbar';
+import PremiumTopBar from './components/PremiumTopBar';
 import DeviceDropdown from './components/DeviceDropdown';
 import MapDevicePopup from './components/MapDevicePopup';
 import { useAttributePreference } from '../common/util/preferences';
@@ -45,6 +45,7 @@ const MainPage = () => {
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
   const positions = useSelector((state) => state.session.positions);
   const devices = useSelector((state) => state.devices.items);
+  const groups = useSelector((state) => state.groups.items || {});
   const [filteredPositions, setFilteredPositions] = useState([]);
   const selectedPosition = filteredPositions.find((position) => selectedDeviceId && position.deviceId === selectedDeviceId);
 
@@ -118,24 +119,37 @@ const MainPage = () => {
     dispatch(devicesActions.selectId(null));
   }, [dispatch]);
 
+  const handlePremiumFilterChange = useCallback((nextFilter) => {
+    if (typeof nextFilter === 'string') {
+      setFilter((prev) => ({ ...prev, statuses: [nextFilter] }));
+      return;
+    }
+
+    setFilter({
+      statuses: nextFilter.statuses || [],
+      groups: nextFilter.groups || [],
+    });
+    setFilterSort(nextFilter.sortBy || '');
+    setFilterMap(Boolean(nextFilter.mapOnly));
+  }, [setFilter, setFilterSort, setFilterMap]);
+
   return (
     <Box className={classes.root}>
       {/* Topbar */}
-      <MapTopbar
-        keyword={keyword}
-        onKeywordChange={setKeyword}
-        filter={filter}
-        onFilterChange={setFilter}
-        filterSort={filterSort}
-        onFilterSortChange={setFilterSort}
-        filterMap={filterMap}
-        onFilterMapChange={setFilterMap}
-        onFilterClick={() => setFilterOpen(!filterOpen)}
-        onDevicesClick={handleDevicesClick}
-        onAddDevice={handleAddDevice}
-        onDashboardClick={handleDashboardClick}
-        deviceStats={deviceStats}
-        hasActiveFilters={filter.statuses?.length > 0 || filter.groups?.length > 0 || filterSort || filterMap}
+      <PremiumTopBar
+        devices={Object.values(devices)}
+        stats={deviceStats}
+        onSearch={setKeyword}
+        onFilterChange={handlePremiumFilterChange}
+        onNavigateToDashboard={handleDashboardClick}
+        onShowAllDevices={handleViewAllDevices}
+        groups={Object.values(groups)}
+        filters={{
+          statuses: filter.statuses,
+          groups: filter.groups,
+          sortBy: filterSort,
+          mapOnly: filterMap,
+        }}
       />
 
       {/* Device Dropdown */}
