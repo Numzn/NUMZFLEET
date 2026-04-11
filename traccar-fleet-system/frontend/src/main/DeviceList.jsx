@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { makeStyles } from 'tss-react/mui';
+import { alpha } from '@mui/material/styles';
 import { List } from 'react-window';
-import { Box, Typography, Chip, Divider } from '@mui/material';
+import { Box, Typography, Chip } from '@mui/material';
 import { devicesActions } from '../store';
 import { useEffectAsync } from '../reactHelper';
 import DeviceRow from './DeviceRow';
@@ -14,22 +15,32 @@ const useStyles = makeStyles()((theme) => ({
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: theme.palette.background.paper,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(180deg, rgba(2, 6, 23, 0.98) 0%, rgba(10, 19, 36, 0.96) 100%)'
+      : 'linear-gradient(180deg, rgba(250, 252, 255, 0.98) 0%, rgba(241, 247, 251, 0.98) 100%)',
   },
   statsBar: {
     display: 'flex',
-    gap: theme.spacing(0.5),
-    padding: theme.spacing(1, 1.25),
-    borderBottom: `1px solid ${theme.palette.divider}`,
-    backgroundColor: 'rgba(6, 182, 212, 0.03)',
+    gap: theme.spacing(0.75),
+    padding: theme.spacing(1.2, 1.25, 1.05, 1.25),
+    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.85)}`,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(180deg, rgba(14, 24, 39, 0.95) 0%, rgba(7, 14, 24, 0.9) 100%)'
+      : 'linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(245, 250, 253, 0.92) 100%)',
     flexWrap: 'wrap',
+    boxShadow: theme.palette.mode === 'dark'
+      ? 'inset 0 -1px 0 rgba(255,255,255,0.03)'
+      : 'inset 0 -1px 0 rgba(15,23,42,0.04)',
   },
   statChip: {
-    fontWeight: 600,
-    fontSize: '0.75rem',
-    height: '24px',
+    fontWeight: 700,
+    fontSize: '0.72rem',
+    height: '28px',
+    borderRadius: '999px',
+    border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
+    backdropFilter: 'blur(10px)',
     '& .MuiChip-label': {
-      padding: theme.spacing(0, 1),
+      padding: theme.spacing(0, 1.05),
     },
   },
   sectionHeader: {
@@ -68,7 +79,7 @@ const useStyles = makeStyles()((theme) => ({
   },
   listInner: {
     position: 'relative',
-    margin: theme.spacing(0.25, 0),
+    padding: theme.spacing(0.85, 0, 1.2, 0),
   },
 }));
 
@@ -141,25 +152,37 @@ const DeviceList = ({ devices }) => {
           label={`${stats.total} Total`}
           size="small"
           className={classes.statChip}
-          color="default"
+          sx={{
+            backgroundColor: alpha('#94a3b8', 0.12),
+            color: theme => theme.palette.text.primary,
+          }}
         />
         <Chip
           label={`${stats.moving} Moving`}
           size="small"
           className={classes.statChip}
-          color="success"
+          sx={{
+            backgroundColor: alpha('#22c55e', 0.12),
+            color: '#22c55e',
+          }}
         />
         <Chip
           label={`${stats.idling} Idle`}
           size="small"
           className={classes.statChip}
-          color="warning"
+          sx={{
+            backgroundColor: alpha('#f59e0b', 0.12),
+            color: '#f59e0b',
+          }}
         />
         <Chip
           label={`${stats.offline} Offline`}
           size="small"
           className={classes.statChip}
-          color="error"
+          sx={{
+            backgroundColor: alpha('#ef4444', 0.12),
+            color: '#ef4444',
+          }}
         />
       </Box>
 
@@ -174,7 +197,7 @@ const DeviceList = ({ devices }) => {
             className={classes.list}
             rowComponent={DeviceRow}
             rowCount={devices.length}
-            rowHeight={72}
+            rowHeight={96}
             rowProps={{ devices }}
             overscanCount={5}
             innerElementType={({ children, ...props }) => (
