@@ -1,22 +1,41 @@
-export const TOPBAR_HEIGHT = 64;
+export const TOPBAR_HEIGHT = 60;
 
 export const getTopbarStyles = (theme) => ({
   height: TOPBAR_HEIGHT,
   minHeight: TOPBAR_HEIGHT,
-  padding: theme.spacing(1, 2),
+  padding: theme.spacing(0.5, 1.25),
   display: 'flex',
   alignItems: 'center',
-  gap: theme.spacing(2),
-  backgroundColor: theme.palette.background.paper,
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-  backgroundImage: 'linear-gradient(180deg, rgba(6, 182, 212, 0.02) 0%, transparent 100%)',
-  zIndex: theme.zIndex.appBar,
-  borderRadius: 0, // Topbar should have straight edges (no border radius)
-  // ENSURE FULL WIDTH
-  width: '100vw', // Full viewport width
-  left: 0,
-  right: 0,
+  gap: theme.spacing(1),
+  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(5, 12, 24, 0.84)' : 'rgba(255, 255, 255, 0.86)',
+  border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(103, 232, 249, 0.16)' : 'rgba(15, 23, 42, 0.08)'}`,
+  boxShadow: theme.palette.mode === 'dark'
+    ? '0 12px 28px rgba(0, 0, 0, 0.34)'
+    : '0 12px 28px rgba(7, 89, 133, 0.14)',
+  backgroundImage: theme.palette.mode === 'dark'
+    ? 'linear-gradient(180deg, rgba(34, 211, 238, 0.08) 0%, rgba(0, 0, 0, 0) 100%)'
+    : 'linear-gradient(180deg, rgba(6, 182, 212, 0.09) 0%, rgba(255, 255, 255, 0) 100%)',
+  zIndex: theme.zIndex.appBar + 2,
+  borderRadius: 14,
+  backdropFilter: 'blur(14px)',
+  width: 'auto',
+  left: theme.spacing(1),
+  right: theme.spacing(1),
+  top: 'calc(env(safe-area-inset-top, 0px) + 6px)',
+  [theme.breakpoints.up('sm')]: {
+    left: theme.spacing(1.5),
+    right: theme.spacing(1.5),
+  },
+  [theme.breakpoints.up('md')]: {
+    left: theme.spacing(2),
+    right: theme.spacing(2),
+    borderRadius: 16,
+    top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+  },
+  [theme.breakpoints.down('md')]: {
+    height: 54,
+    minHeight: 54,
+  },
 });
 
 export const getLogoContainerStyles = (theme) => ({
@@ -67,8 +86,17 @@ export const getTopbarLayoutStyles = (theme) => ({
   alignItems: 'center',
   justifyContent: 'space-between',
   width: '100%',
+  minWidth: 0,
   height: TOPBAR_HEIGHT,
-  padding: theme.spacing(0, 2),
+  minHeight: TOPBAR_HEIGHT,
+  padding: theme.spacing(0, 1.25),
+  gap: theme.spacing(0.9),
+  [theme.breakpoints.down('md')]: {
+    height: 54,
+    minHeight: '54px !important',
+    padding: theme.spacing(0, 0.8),
+    gap: theme.spacing(0.6),
+  },
 });
 
 export const getLeftSectionStyles = (theme) => ({
@@ -76,6 +104,7 @@ export const getLeftSectionStyles = (theme) => ({
   alignItems: 'center',
   gap: theme.spacing(1),
   flexShrink: 0,
+  minWidth: 0,
 });
 
 export const getCenterSectionStyles = (theme) => ({
@@ -83,7 +112,8 @@ export const getCenterSectionStyles = (theme) => ({
   alignItems: 'center',
   flex: 1,
   justifyContent: 'center',
-  maxWidth: '500px',
+  maxWidth: '560px',
+  minWidth: 0,
   margin: theme.spacing(0, 'auto'),
 });
 
@@ -92,6 +122,7 @@ export const getRightSectionStyles = (theme) => ({
   alignItems: 'center',
   gap: theme.spacing(0.5),
   flexShrink: 0,
+  minWidth: 0,
 });
 
 export const getDividerStyles = (theme) => ({

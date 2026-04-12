@@ -22,13 +22,7 @@ const UnifiedTopbar = ({
       className={classes.container}
       position={position}
       elevation={0}
-      sx={{
-        // Ensure full width for both variants
-        width: '100vw',
-        left: 0,
-        right: 0,
-        ...props.sx
-      }}
+      sx={props.sx}
       {...props}
     >
       <Toolbar className={classes.toolbar} disableGutters>

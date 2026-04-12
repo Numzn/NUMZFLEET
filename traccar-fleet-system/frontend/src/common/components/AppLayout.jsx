@@ -10,7 +10,6 @@ import UserMenuDropdown from './UserMenuDropdown';
 import BottomMenu from './BottomMenu';
 import LogoImage from '../../login/LogoImage';
 import ModernSidebar from './ModernSidebar';
-import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
 import { 
   UnifiedTopbar, 
   TopbarLeftSection, 
@@ -20,11 +19,16 @@ import {
 } from './topbar';
 
 const DRAWER_WIDTH = 280;
+const TOP_OFFSET_DESKTOP = '76px';
+const TOP_OFFSET_TABLET = '72px';
+const TOP_OFFSET_MOBILE = '66px';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
     display: 'flex',
     minHeight: '100vh',
+    height: '100dvh',
+    overflow: 'hidden',
   },
   drawer: {
     width: DRAWER_WIDTH,
@@ -32,30 +36,44 @@ const useStyles = makeStyles()((theme) => ({
     '& .MuiDrawer-paper': {
       width: DRAWER_WIDTH,
       boxSizing: 'border-box',
-      top: `${TOPBAR_HEIGHT}px`, // Start below topbar
-      height: `calc(100vh - ${TOPBAR_HEIGHT}px)`,
+      top: TOP_OFFSET_DESKTOP,
+      height: `calc(100dvh - ${TOP_OFFSET_DESKTOP})`,
       borderRight: `1px solid ${theme.palette.divider}`,
       borderRadius: 0,
       backgroundColor: theme.palette.background.paper,
       zIndex: theme.zIndex.drawer,
       // Subtle gradient for depth
       backgroundImage: 'linear-gradient(to bottom, rgba(6, 182, 212, 0.01) 0%, transparent 100%)',
+      [theme.breakpoints.between('md', 'lg')]: {
+        top: TOP_OFFSET_TABLET,
+        height: `calc(100dvh - ${TOP_OFFSET_TABLET})`,
+      },
+      [theme.breakpoints.down('md')]: {
+        top: TOP_OFFSET_MOBILE,
+        height: `calc(100dvh - ${TOP_OFFSET_MOBILE})`,
+      },
     },
   },
   mobileMenuButton: {
     marginRight: theme.spacing(2),
   },
   content: {
-    position: 'fixed',
-    top: `${TOPBAR_HEIGHT}px`,
+    position: 'absolute',
+    top: TOP_OFFSET_DESKTOP,
     left: `${DRAWER_WIDTH}px`,
     right: 0,
     bottom: 0,
     overflow: 'auto',
+    WebkitOverflowScrolling: 'touch',
     boxSizing: 'border-box',
     backgroundColor: 'transparent',
+    [theme.breakpoints.between('md', 'lg')]: {
+      top: TOP_OFFSET_TABLET,
+    },
     [theme.breakpoints.down('md')]: {
       left: 0,  // Full width on mobile when sidebar is hidden
+      top: TOP_OFFSET_MOBILE,
+      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
     },
   },
 }));
