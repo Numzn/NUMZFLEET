@@ -18,7 +18,7 @@ import { makeStyles } from 'tss-react/mui';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import DeviceRow from '../DeviceRow';
+import DeviceItem from './DeviceItem';
 import { useTranslation } from '../../common/components/LocalizationProvider';
 
 const useStyles = makeStyles()((theme) => ({
@@ -355,13 +355,12 @@ const SearchWithDropdown = ({
                   <Typography className={classes.recentTitle}>
                     Recent Searches
                   </Typography>
-                  {recentSearches.slice(0, 3).map((device, index) => (
-                    <DeviceRow
+                  {recentSearches.slice(0, 3).map((device) => (
+                    <DeviceItem
                       key={`recent-${device.id}`}
-                      devices={[device]}
-                      index={0}
-                      style={{ height: '56px' }}
+                      device={device}
                       onClick={() => handleDeviceSelect(device)}
+                      compact
                     />
                   ))}
                 </Box>
@@ -371,13 +370,12 @@ const SearchWithDropdown = ({
               {searchTerm && (
                 <>
                   {filteredDevices.length > 0 ? (
-                    filteredDevices.slice(0, 5).map((device, index) => (
-                      <DeviceRow
+                    filteredDevices.slice(0, 5).map((device) => (
+                      <DeviceItem
                         key={device.id}
-                        devices={[device]}
-                        index={0}
-                        style={{ height: '56px' }}
+                        device={device}
                         onClick={() => handleDeviceSelect(device)}
+                        compact
                       />
                     ))
                   ) : (

@@ -22,43 +22,49 @@ import UserMenuDropdown from '../../common/components/UserMenuDropdown';
 
 const useStyles = makeStyles()((theme) => ({
   premiumAppBar: {
-    height: 64,
-    backgroundColor: theme.palette.background.paper,
-    backgroundImage: 'linear-gradient(180deg, rgba(6, 182, 212, 0.02) 0%, transparent 100%)',
-    borderBottom: `1px solid ${theme.palette.divider}`,
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    height: 60,
+    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(5, 12, 24, 0.8)' : 'rgba(255, 255, 255, 0.82)',
+    backgroundImage: theme.palette.mode === 'dark'
+      ? 'linear-gradient(180deg, rgba(34, 211, 238, 0.08) 0%, rgba(0, 0, 0, 0) 100%)'
+      : 'linear-gradient(180deg, rgba(6, 182, 212, 0.09) 0%, rgba(255, 255, 255, 0) 100%)',
+    border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(103, 232, 249, 0.18)' : 'rgba(15, 23, 42, 0.08)'}`,
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 10px 26px rgba(0, 0, 0, 0.34)'
+      : '0 10px 24px rgba(7, 89, 133, 0.14)',
+    backdropFilter: 'blur(14px)',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     zIndex: theme.zIndex.appBar,
-    borderRadius: 0,
-    width: '100vw',
+    borderRadius: 16,
+    width: 'auto',
+    overflow: 'hidden',
   },
   toolbar: {
-    minHeight: 64,
-    height: 64,
-    padding: theme.spacing(0, 3),
+    minHeight: 60,
+    height: 60,
+    padding: theme.spacing(0, 1.75),
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: theme.spacing(2),
+    gap: theme.spacing(1.15),
   },
   brandSection: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing(1.5),
-    minWidth: '200px',
+    gap: theme.spacing(1),
+    minWidth: 'auto',
   },
   logoContainer: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '48px',
-    height: '48px',
+    width: '40px',
+    height: '40px',
     overflow: 'hidden',
     padding: 0,
     margin: 0,
   },
   brandTitle: {
-    fontSize: '1.25rem',
+    fontSize: '1.05rem',
     fontWeight: 700,
     background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
     WebkitBackgroundClip: 'text',
@@ -69,16 +75,17 @@ const useStyles = makeStyles()((theme) => ({
   centerSection: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing(2),
+    gap: theme.spacing(1),
     flex: 1,
     justifyContent: 'center',
-    maxWidth: '800px',
+    maxWidth: 'none',
+    minWidth: 0,
   },
   rightSection: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing(1),
-    minWidth: '120px',
+    gap: theme.spacing(0.5),
+    minWidth: 'auto',
     justifyContent: 'flex-end',
   },
   divider: {
@@ -89,8 +96,8 @@ const useStyles = makeStyles()((theme) => ({
   },
   // Mobile responsive styles
   mobileToolbar: {
-    padding: theme.spacing(0, 2),
-    gap: theme.spacing(1),
+    padding: theme.spacing(0, 1),
+    gap: theme.spacing(0.65),
   },
   mobileBrandSection: {
     minWidth: 'auto',
@@ -98,8 +105,9 @@ const useStyles = makeStyles()((theme) => ({
   },
   mobileCenterSection: {
     flex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     maxWidth: 'none',
+    minWidth: 0,
   },
   mobileRightSection: {
     minWidth: 'auto',
@@ -154,9 +162,9 @@ const PremiumTopBar = ({
 
   // Calculate responsive height
   const getToolbarHeight = () => {
-    if (isMobile) return 56;
-    if (isTablet) return 60;
-    return 64;
+    if (isMobile) return 52;
+    if (isTablet) return 56;
+    return 60;
   };
 
   const toolbarHeight = getToolbarHeight();
@@ -167,11 +175,24 @@ const PremiumTopBar = ({
       className={classes.premiumAppBar}
       sx={{
         height: toolbarHeight,
+        top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 6 : 8}px)`,
+        left: { xs: 8, sm: 12, md: 16 },
+        right: { xs: 8, sm: 12, md: 16 },
+        borderRadius: { xs: '14px', md: '16px' },
+        boxShadow: isScrolled
+          ? (theme.palette.mode === 'dark'
+            ? '0 16px 34px rgba(0, 0, 0, 0.4)'
+            : '0 16px 34px rgba(7, 89, 133, 0.18)')
+          : undefined,
       }}
     >
       <Toolbar 
         className={`${classes.toolbar} ${isMobile ? classes.mobileToolbar : ''}`}
-        sx={{ minHeight: toolbarHeight, height: toolbarHeight }}
+        sx={{
+          minHeight: `${toolbarHeight}px !important`,
+          height: toolbarHeight,
+          px: { xs: 1, sm: 1.35, md: 1.7 },
+        }}
       >
         {/* Left Section - Brand */}
         <Box 
@@ -181,10 +202,10 @@ const PremiumTopBar = ({
             <LogoImage 
               color="#06b6d4" 
               style={{ 
-                width: isMobile ? '40px' : '48px', 
-                height: isMobile ? '40px' : '48px',
-                maxWidth: isMobile ? '40px' : '48px',
-                maxHeight: isMobile ? '40px' : '48px',
+                width: isMobile ? '32px' : '38px', 
+                height: isMobile ? '32px' : '38px',
+                maxWidth: isMobile ? '32px' : '38px',
+                maxHeight: isMobile ? '32px' : '38px',
                 objectFit: 'contain',
                 margin: 0
               }} 
@@ -193,7 +214,7 @@ const PremiumTopBar = ({
           <Typography 
             className={classes.brandTitle}
             sx={{ 
-              fontSize: isMobile ? '1.1rem' : '1.25rem',
+              fontSize: isMobile ? '0.98rem' : '1.05rem',
               display: { xs: 'none', sm: 'block' }
             }}
           >

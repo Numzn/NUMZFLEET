@@ -5,14 +5,11 @@ import {
   IconButton,
   Chip,
   Tooltip,
-  Card,
-  CardContent,
   Collapse,
   Button,
-  Divider,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import { useSelector, useDispatch } from 'react-redux';
+import { alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import CloseIcon from '@mui/icons-material/Close';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
@@ -23,21 +20,22 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { useTranslation } from '../../common/components/LocalizationProvider';
-import { useDeviceReadonly } from '../../common/util/permissions';
-import { useCatch } from '../../reactHelper';
 import { map } from '../../map/core/MapView';
 
 const useStyles = makeStyles()((theme) => ({
   popup: {
     position: 'absolute',
     zIndex: 1000,
-    minWidth: 200,
-    maxWidth: 280,
-    backgroundColor: theme.palette.background.paper,
-    borderRadius: theme.spacing(1),
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-    border: `1px solid ${theme.palette.divider}`,
+    minWidth: 260,
+    maxWidth: 340,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(155deg, rgba(6, 14, 26, 0.96) 0%, rgba(12, 28, 46, 0.95) 100%)'
+      : 'linear-gradient(155deg, rgba(255, 255, 255, 0.97) 0%, rgba(243, 249, 253, 0.97) 100%)',
+    borderRadius: theme.spacing(2),
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 26px 58px rgba(0, 0, 0, 0.38)'
+      : '0 24px 52px rgba(15, 23, 42, 0.16)',
+    border: `1px solid rgba(103, 232, 249, 0.24)`,
     overflow: 'hidden',
     userSelect: 'none',
     cursor: 'move',
@@ -49,7 +47,9 @@ const useStyles = makeStyles()((theme) => ({
   dragHandle: {
     width: '100%',
     height: 8,
-    backgroundColor: theme.palette.divider,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(90deg, rgba(103,232,249,0.18), rgba(251,191,36,0.1))'
+      : 'linear-gradient(90deg, rgba(6,182,212,0.18), rgba(245,158,11,0.1))',
     cursor: 'move',
     display: 'flex',
     alignItems: 'center',
@@ -64,8 +64,10 @@ const useStyles = makeStyles()((theme) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: theme.spacing(1, 1.5),
-    backgroundColor: 'rgba(6, 182, 212, 0.05)',
+    padding: theme.spacing(1.15, 1.6),
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(180deg, rgba(14, 33, 52, 0.94) 0%, rgba(8, 18, 30, 0.9) 100%)'
+      : 'linear-gradient(180deg, rgba(236, 249, 253, 0.92) 0%, rgba(247, 252, 255, 0.9) 100%)',
     borderBottom: `1px solid ${theme.palette.divider}`,
   },
   deviceInfo: {
@@ -77,8 +79,8 @@ const useStyles = makeStyles()((theme) => ({
     fontSize: '1.2rem',
   },
   deviceName: {
-    fontWeight: 600,
-    fontSize: '0.9rem',
+    fontWeight: 700,
+    fontSize: '0.95rem',
   },
   statusDot: {
     width: 8,
@@ -97,37 +99,75 @@ const useStyles = makeStyles()((theme) => ({
   },
   content: {
     padding: theme.spacing(1.5),
-  },
-  infoRow: {
     display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(1),
-    marginBottom: theme.spacing(0.5),
-    fontSize: '0.8rem',
+    flexDirection: 'column',
+    gap: theme.spacing(1.1),
+  },
+  metricsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: theme.spacing(0.75),
+  },
+  metricCard: {
+    borderRadius: theme.spacing(1.1),
+    padding: theme.spacing(0.75, 0.85),
+    border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+    background: theme.palette.mode === 'dark'
+      ? 'rgba(255,255,255,0.04)'
+      : 'rgba(15,23,42,0.03)',
+  },
+  metricLabel: {
+    fontSize: '0.66rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: theme.palette.text.secondary,
+    marginBottom: theme.spacing(0.25),
+    fontWeight: 600,
+  },
+  metricValue: {
+    fontSize: '0.84rem',
+    fontWeight: 700,
+    lineHeight: 1.15,
+  },
+  detailRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: theme.spacing(0.75),
+    fontSize: '0.78rem',
+    padding: theme.spacing(0.5, 0),
   },
   infoIcon: {
-    fontSize: '0.9rem',
+    fontSize: '0.85rem',
     width: 16,
     textAlign: 'center',
+    opacity: 0.8,
   },
   infoText: {
-    fontSize: '0.8rem',
+    fontSize: '0.76rem',
     color: theme.palette.text.secondary,
+    lineHeight: 1.35,
   },
   actions: {
     display: 'flex',
-    gap: theme.spacing(0.5),
-    marginTop: theme.spacing(1),
-    justifyContent: 'center',
+    gap: theme.spacing(0.6),
+    marginTop: theme.spacing(0.35),
+    justifyContent: 'space-between',
   },
   actionButton: {
-    minWidth: 32,
-    height: 32,
-    padding: theme.spacing(0.5),
-    borderRadius: theme.spacing(0.5),
-    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+    flex: 1,
+    minHeight: 34,
+    padding: theme.spacing(0.55, 0.8),
+    borderRadius: theme.spacing(1.1),
+    textTransform: 'none',
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    backgroundColor: theme.palette.mode === 'dark'
+      ? 'rgba(103, 232, 249, 0.12)'
+      : 'rgba(6, 182, 212, 0.1)',
     '&:hover': {
-      backgroundColor: 'rgba(6, 182, 212, 0.2)',
+      backgroundColor: theme.palette.mode === 'dark'
+        ? 'rgba(103, 232, 249, 0.2)'
+        : 'rgba(6, 182, 212, 0.2)',
     },
   },
   expandButton: {
@@ -138,9 +178,9 @@ const useStyles = makeStyles()((theme) => ({
     color: theme.palette.primary.main,
   },
   expandedContent: {
-    paddingTop: theme.spacing(1),
+    paddingTop: theme.spacing(0.7),
     borderTop: `1px solid ${theme.palette.divider}`,
-    marginTop: theme.spacing(1),
+    marginTop: theme.spacing(0.5),
   },
   resizeHandle: {
     position: 'absolute',
@@ -171,8 +211,6 @@ const MapDevicePopup = ({
 }) => {
   const { classes } = useStyles();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const t = useTranslation();
   
   const [popupPosition, setPopupPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
@@ -180,7 +218,6 @@ const MapDevicePopup = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
   const popupRef = useRef(null);
-  const deviceReadonly = useDeviceReadonly();
 
   // Get device icon based on type
   const getDeviceIcon = (deviceType) => {
@@ -242,7 +279,7 @@ const MapDevicePopup = ({
     const newY = e.clientY - dragOffset.y;
     
     // Keep popup within viewport bounds
-    const maxX = window.innerWidth - 280;
+    const maxX = window.innerWidth - 360;
     const maxY = window.innerHeight - 200;
     
     setPopupPosition({
@@ -306,6 +343,10 @@ const MapDevicePopup = ({
     return null;
   }
 
+  const speedKmh = Math.round((position.speed || 0) * 1.852);
+  const distanceKm = position.totalDistance ? Math.round(position.totalDistance / 1000) : 0;
+  const fuelLevel = position.attributes?.fuelLevel ?? position.attributes?.fuel ?? device.attributes?.fuelLevel;
+
   return (
     <Box
       ref={popupRef}
@@ -329,6 +370,19 @@ const MapDevicePopup = ({
           <Typography className={classes.deviceName}>
             {device.name}
           </Typography>
+          <Chip
+            label="Live"
+            size="small"
+            sx={{
+              height: 20,
+              fontSize: '0.64rem',
+              fontWeight: 700,
+              borderRadius: 999,
+              backgroundColor: 'rgba(34, 197, 94, 0.14)',
+              color: '#22c55e',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+            }}
+          />
           <Box 
             className={`${classes.statusDot} ${getStatusClass(device.status)}`}
           />
@@ -345,42 +399,42 @@ const MapDevicePopup = ({
 
       {/* Content */}
       <Box className={classes.content}>
-        {/* Essential Info */}
-        <Box className={classes.infoRow}>
-          <span className={classes.infoIcon}>🕐</span>
-          <Typography className={classes.infoText}>
-            {getTimeAgo(position.fixTime)}
-          </Typography>
-        </Box>
-        
-        <Box className={classes.infoRow}>
-          <span className={classes.infoIcon}>📍</span>
-          <Typography className={classes.infoText}>
-            {position.speed ? `${position.speed} km/h` : '0 km/h'}
-          </Typography>
-        </Box>
-        
-        <Box className={classes.infoRow}>
-          <span className={classes.infoIcon}>🏁</span>
-          <Typography className={classes.infoText}>
-            {position.totalDistance ? `${position.totalDistance} km` : '0 km'}
-          </Typography>
+        <Box className={classes.metricsGrid}>
+          <Box className={classes.metricCard}>
+            <Typography className={classes.metricLabel}>Updated</Typography>
+            <Typography className={classes.metricValue}>{getTimeAgo(position.fixTime)}</Typography>
+          </Box>
+          <Box className={classes.metricCard}>
+            <Typography className={classes.metricLabel}>Speed</Typography>
+            <Typography className={classes.metricValue}>{speedKmh} km/h</Typography>
+          </Box>
+          <Box className={classes.metricCard}>
+            <Typography className={classes.metricLabel}>Distance</Typography>
+            <Typography className={classes.metricValue}>{distanceKm} km</Typography>
+          </Box>
         </Box>
 
         {/* Expanded Content */}
         <Collapse in={isExpanded}>
           <Box className={classes.expandedContent}>
-            <Box className={classes.infoRow}>
+            <Box className={classes.detailRow}>
               <span className={classes.infoIcon}>📌</span>
               <Typography className={classes.infoText}>
                 {position.address || 'Address not available'}
               </Typography>
             </Box>
             
-            <Box className={classes.infoRow}>
+            <Box className={classes.detailRow}>
               <span className={classes.infoIcon}>⛽</span>
               <Typography className={classes.infoText}>
-                {device.attributes?.fuelLevel ? `${device.attributes.fuelLevel}% Fuel` : 'Fuel data unavailable'}
+                {Number.isFinite(Number(fuelLevel)) ? `${Math.round(Number(fuelLevel))}% Fuel` : 'Fuel data unavailable'}
+              </Typography>
+            </Box>
+
+            <Box className={classes.detailRow}>
+              <span className={classes.infoIcon}>🧭</span>
+              <Typography className={classes.infoText}>
+                {position.latitude?.toFixed?.(5)}, {position.longitude?.toFixed?.(5)}
               </Typography>
             </Box>
           </Box>
@@ -389,33 +443,33 @@ const MapDevicePopup = ({
         {/* Quick Actions */}
         <Box className={classes.actions}>
           <Tooltip title="Focus on Map">
-            <IconButton 
+            <Button
               className={classes.actionButton}
               onClick={handleFocusOnMap}
-              size="small"
+              startIcon={<MyLocationIcon fontSize="small" />}
             >
-              <MyLocationIcon fontSize="small" />
-            </IconButton>
+              Focus
+            </Button>
           </Tooltip>
           
           <Tooltip title="Live Tracking">
-            <IconButton 
+            <Button
               className={classes.actionButton}
               onClick={handleStartTracking}
-              size="small"
+              startIcon={<PlayArrowIcon fontSize="small" />}
             >
-              <PlayArrowIcon fontSize="small" />
-            </IconButton>
+              Replay
+            </Button>
           </Tooltip>
           
           <Tooltip title="Device Stats">
-            <IconButton 
+            <Button
               className={classes.actionButton}
               onClick={handleShowStats}
-              size="small"
+              startIcon={<BarChartIcon fontSize="small" />}
             >
-              <BarChartIcon fontSize="small" />
-            </IconButton>
+              Details
+            </Button>
           </Tooltip>
         </Box>
 

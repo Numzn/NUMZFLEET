@@ -10,7 +10,6 @@ import usePersistedState from '../common/util/usePersistedState';
 import EventsDrawer from './EventsDrawer';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
-import DeviceList from './DeviceList';
 import BottomMenu from '../common/components/BottomMenu';
 import PremiumTopBar from './components/PremiumTopBar';
 import DeviceDropdown from './components/DeviceDropdown';
@@ -19,17 +18,19 @@ import { useAttributePreference } from '../common/util/preferences';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
-    height: '100vh',
+    height: '100dvh',
+    minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
     position: 'relative',
     overflow: 'hidden',
-    paddingTop: '64px', // offset for fixed PremiumTopBar
+    // Offset for embedded topbar: height + top inset + breathing room
+    paddingTop: '76px',
     [theme.breakpoints.between('md', 'lg')]: {
-      paddingTop: '60px',
+      paddingTop: '72px',
     },
     [theme.breakpoints.down('md')]: {
-      paddingTop: '56px',
+      paddingTop: '66px',
     },
   },
   mapContainer: {
@@ -40,6 +41,10 @@ const useStyles = makeStyles()((theme) => ({
     height: '100%',
     minHeight: 0,
     paddingBottom: 0,
+    [theme.breakpoints.down('md')]: {
+      // Keep map controls/popups clear of fixed mobile bottom nav
+      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+    },
   },
 }));
 

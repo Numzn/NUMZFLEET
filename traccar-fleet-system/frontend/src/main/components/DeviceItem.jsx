@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useTheme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 import { useSelector } from 'react-redux';
 import BatteryFullIcon from '@mui/icons-material/BatteryFull';
 import Battery60Icon from '@mui/icons-material/Battery60';
@@ -25,39 +26,57 @@ dayjs.extend(relativeTime);
 
 const useStyles = makeStyles()((theme) => ({
   deviceItem: {
-    borderRadius: theme.spacing(0.5),
-    margin: theme.spacing(0.25, 0.5),
-    transition: 'all 0.15s',
+    borderRadius: theme.spacing(1.75),
+    margin: theme.spacing(0.5, 0.75),
+    padding: theme.spacing(0.95, 1.1),
+    border: `1px solid ${alpha(theme.palette.divider, 0.75)}`,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(145deg, rgba(7, 14, 28, 0.95) 0%, rgba(13, 24, 43, 0.93) 100%)'
+      : 'linear-gradient(145deg, rgba(255, 255, 255, 0.97) 0%, rgba(243, 248, 252, 0.97) 100%)',
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 10px 26px rgba(0, 0, 0, 0.2)'
+      : '0 10px 24px rgba(15, 23, 42, 0.08)',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
     '&:hover': {
-      backgroundColor: 'rgba(6, 182, 212, 0.08)',
+      borderColor: alpha('#22d3ee', 0.35),
+      boxShadow: theme.palette.mode === 'dark'
+        ? '0 14px 32px rgba(0, 0, 0, 0.28)'
+        : '0 14px 32px rgba(8, 47, 73, 0.12)',
+      transform: 'translateY(-1px)',
     },
   },
   deviceItemSelected: {
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.primary.contrastText,
+    background: 'linear-gradient(135deg, rgba(8, 83, 110, 0.96) 0%, rgba(11, 124, 145, 0.94) 52%, rgba(14, 165, 233, 0.9) 100%)',
+    color: '#f8fdff',
+    borderColor: alpha('#bff6ff', 0.55),
+    boxShadow: '0 18px 36px rgba(8, 145, 178, 0.3)',
     '&:hover': {
-      backgroundColor: theme.palette.primary.dark,
+      boxShadow: '0 20px 40px rgba(8, 145, 178, 0.36)',
     },
   },
   avatar: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     fontSize: '0.75rem',
+    border: `1px solid ${alpha('#22d3ee', 0.2)}`,
   },
   primaryText: {
-    fontSize: '0.875rem',
-    fontWeight: 600,
+    fontSize: '0.9rem',
+    fontWeight: 700,
     lineHeight: 1.2,
   },
   secondaryText: {
-    fontSize: '0.75rem',
+    fontSize: '0.74rem',
     lineHeight: 1.2,
-    marginTop: theme.spacing(0.25),
+    marginTop: theme.spacing(0.35),
   },
   statusChip: {
-    height: 20,
-    fontSize: '0.65rem',
-    fontWeight: 600,
+    height: 22,
+    fontSize: '0.64rem',
+    fontWeight: 700,
+    borderRadius: 999,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
   },
   batteryIcon: {
     fontSize: '0.875rem',
@@ -114,6 +133,7 @@ const DeviceItem = ({
       sx={{
         py: compact ? 0.5 : 1,
         px: compact ? 1 : 1.5,
+        alignItems: 'flex-start',
       }}
     >
       <ListItemAvatar>
@@ -141,10 +161,11 @@ const DeviceItem = ({
               size="small"
               className={classes.statusChip}
               sx={{
-                backgroundColor: getStatusColor(device.status),
-                color: 'white',
-                fontSize: '0.65rem',
-                height: 18,
+                backgroundColor: selected
+                  ? 'rgba(255,255,255,0.16)'
+                  : alpha(getStatusColor(device.status), 0.12),
+                color: selected ? '#f8fdff' : getStatusColor(device.status),
+                border: `1px solid ${selected ? 'rgba(255,255,255,0.18)' : alpha(getStatusColor(device.status), 0.22)}`,
               }}
             />
           </Box>

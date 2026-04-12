@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Paper, BottomNavigation, BottomNavigationAction, Menu, MenuItem, Typography, Badge,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 
 import DescriptionIcon from '@mui/icons-material/Description';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -110,7 +111,26 @@ const BottomMenu = () => {
   };
 
   return (
-    <Paper square elevation={3}>
+    <Paper
+      elevation={8}
+      sx={(theme) => ({
+        position: 'fixed',
+        left: 8,
+        right: 8,
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+        zIndex: theme.zIndex.modal + 1,
+        borderRadius: '14px',
+        overflow: 'hidden',
+        border: `1px solid ${theme.palette.mode === 'dark' ? alpha('#67e8f9', 0.22) : alpha('#0f172a', 0.09)}`,
+        boxShadow: theme.palette.mode === 'dark'
+          ? '0 14px 34px rgba(0, 0, 0, 0.45)'
+          : '0 14px 30px rgba(7, 89, 133, 0.18)',
+        backdropFilter: 'blur(14px)',
+        background: theme.palette.mode === 'dark'
+          ? 'linear-gradient(165deg, rgba(7, 15, 27, 0.94) 0%, rgba(11, 24, 43, 0.92) 100%)'
+          : 'linear-gradient(165deg, rgba(255, 255, 255, 0.95) 0%, rgba(242, 248, 252, 0.95) 100%)',
+      })}
+    >
       <BottomNavigation value={currentSelection()} onChange={handleSelection} showLabels>
         <BottomNavigationAction
           label="Dashboard"
