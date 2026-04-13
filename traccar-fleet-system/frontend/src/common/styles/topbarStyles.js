@@ -1,9 +1,11 @@
 export const TOPBAR_HEIGHT = 56;
 
 export const getTopbarStyles = (theme) => ({
-  height: TOPBAR_HEIGHT,
-  minHeight: TOPBAR_HEIGHT,
-  padding: theme.spacing(0.35, 1),
+  height: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
+  minHeight: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
+  paddingTop: 'env(safe-area-inset-top, 0px)',
+  paddingLeft: theme.spacing(1),
+  paddingRight: theme.spacing(1),
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(0.7),
@@ -16,25 +18,18 @@ export const getTopbarStyles = (theme) => ({
     ? 'linear-gradient(180deg, rgba(34, 211, 238, 0.08) 0%, rgba(0, 0, 0, 0) 100%)'
     : 'linear-gradient(180deg, rgba(6, 182, 212, 0.09) 0%, rgba(255, 255, 255, 0) 100%)',
   zIndex: theme.zIndex.appBar + 2,
-  borderRadius: 12,
+  borderRadius: '0 0 12px 12px',
   backdropFilter: 'blur(14px)',
-  width: 'auto',
-  left: theme.spacing(0.75),
-  right: theme.spacing(0.75),
-  top: 'env(safe-area-inset-top, 0px)',
-  [theme.breakpoints.up('sm')]: {
-    left: theme.spacing(1),
-    right: theme.spacing(1),
-  },
+  width: '100%',
+  left: 0,
+  right: 0,
+  top: 0,
   [theme.breakpoints.up('md')]: {
-    left: theme.spacing(1.5),
-    right: theme.spacing(1.5),
-    borderRadius: 14,
-    top: 'env(safe-area-inset-top, 0px)',
+    borderRadius: '0 0 14px 14px',
   },
   [theme.breakpoints.down('md')]: {
-    height: 50,
-    minHeight: 50,
+    height: `calc(env(safe-area-inset-top, 0px) + 50px)`,
+    minHeight: `calc(env(safe-area-inset-top, 0px) + 50px)`,
   },
 });
 

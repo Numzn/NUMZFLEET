@@ -174,11 +174,12 @@ const PremiumTopBar = ({
       position="fixed" 
       className={classes.premiumAppBar}
       sx={{
-        height: toolbarHeight,
-        top: 'env(safe-area-inset-top, 0px)',
-        left: { xs: 8, sm: 12, md: 16 },
-        right: { xs: 8, sm: 12, md: 16 },
-        borderRadius: { xs: '14px', md: '16px' },
+        height: `calc(env(safe-area-inset-top, 0px) + ${toolbarHeight}px)`,
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        top: 0,
+        left: 0,
+        right: 0,
+        borderRadius: '0 0 14px 14px',
         boxShadow: isScrolled
           ? (theme.palette.mode === 'dark'
             ? '0 16px 34px rgba(0, 0, 0, 0.4)'
