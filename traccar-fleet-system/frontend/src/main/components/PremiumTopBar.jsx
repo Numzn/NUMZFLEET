@@ -175,7 +175,7 @@ const PremiumTopBar = ({
       className={classes.premiumAppBar}
       sx={{
         height: toolbarHeight,
-        top: `calc(env(safe-area-inset-top, 0px) + ${isMobile ? 6 : 8}px)`,
+        top: 'env(safe-area-inset-top, 0px)',
         left: { xs: 8, sm: 12, md: 16 },
         right: { xs: 8, sm: 12, md: 16 },
         borderRadius: { xs: '14px', md: '16px' },

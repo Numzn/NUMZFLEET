@@ -21,7 +21,7 @@ export const getTopbarStyles = (theme) => ({
   width: 'auto',
   left: theme.spacing(0.75),
   right: theme.spacing(0.75),
-  top: 'calc(env(safe-area-inset-top, 0px) + 4px)',
+  top: 'env(safe-area-inset-top, 0px)',
   [theme.breakpoints.up('sm')]: {
     left: theme.spacing(1),
     right: theme.spacing(1),
@@ -30,7 +30,7 @@ export const getTopbarStyles = (theme) => ({
     left: theme.spacing(1.5),
     right: theme.spacing(1.5),
     borderRadius: 14,
-    top: 'calc(env(safe-area-inset-top, 0px) + 6px)',
+    top: 'env(safe-area-inset-top, 0px)',
   },
   [theme.breakpoints.down('md')]: {
     height: 50,

@@ -1,8 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Box } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import { useTheme } from '@mui/material/styles';
-import useMediaQuery from '@mui/material/useMediaQuery';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { devicesActions } from '../store';
@@ -10,7 +8,6 @@ import usePersistedState from '../common/util/usePersistedState';
 import EventsDrawer from './EventsDrawer';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
-import BottomMenu from '../common/components/BottomMenu';
 import PremiumTopBar from './components/PremiumTopBar';
 import DeviceDropdown from './components/DeviceDropdown';
 import MapDevicePopup from './components/MapDevicePopup';
@@ -24,13 +21,13 @@ const useStyles = makeStyles()((theme) => ({
     flexDirection: 'column',
     position: 'relative',
     overflow: 'hidden',
-    // Offset for embedded topbar: height + top inset + breathing room
-    paddingTop: '76px',
+    // Keep map content directly below fixed topbar without extra gap
+    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 60px)',
     [theme.breakpoints.between('md', 'lg')]: {
-      paddingTop: '72px',
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)',
     },
     [theme.breakpoints.down('md')]: {
-      paddingTop: '66px',
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)',
     },
   },
   mapContainer: {
@@ -42,8 +39,8 @@ const useStyles = makeStyles()((theme) => ({
     minHeight: 0,
     paddingBottom: 0,
     [theme.breakpoints.down('md')]: {
-      // Keep map controls/popups clear of fixed mobile bottom nav
-      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+      // Reserve only actual nav height + safe area
+      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)',
     },
   },
 }));
@@ -52,8 +49,6 @@ const MainPage = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const desktop = useMediaQuery(useTheme().breakpoints.up('md'));
-
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
   const positions = useSelector((state) => state.session.positions);
   const devices = useSelector((state) => state.devices.items);
@@ -196,10 +191,6 @@ const MainPage = () => {
         )}
       </Box>
 
-      {/* Bottom Menu for Mobile */}
-      {!desktop && (
-        <BottomMenu />
-      )}
     </Box>
   );
 };

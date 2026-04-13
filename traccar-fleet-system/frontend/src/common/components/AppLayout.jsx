@@ -7,7 +7,6 @@ import MenuIcon from '@mui/icons-material/Menu';
 import GlobalSearch from './GlobalSearch';
 import NotificationsDropdown from './NotificationsDropdown';
 import UserMenuDropdown from './UserMenuDropdown';
-import BottomMenu from './BottomMenu';
 import LogoImage from '../../login/LogoImage';
 import ModernSidebar from './ModernSidebar';
 import { 
@@ -19,9 +18,9 @@ import {
 } from './topbar';
 
 const DRAWER_WIDTH = 280;
-const TOP_OFFSET_DESKTOP = '70px';
-const TOP_OFFSET_TABLET = '66px';
-const TOP_OFFSET_MOBILE = '62px';
+const TOP_OFFSET_DESKTOP = 'calc(env(safe-area-inset-top, 0px) + 56px)';
+const TOP_OFFSET_TABLET = 'calc(env(safe-area-inset-top, 0px) + 56px)';
+const TOP_OFFSET_MOBILE = 'calc(env(safe-area-inset-top, 0px) + 50px)';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -74,7 +73,7 @@ const useStyles = makeStyles()((theme) => ({
     [theme.breakpoints.down('md')]: {
       left: 0,  // Full width on mobile when sidebar is hidden
       top: TOP_OFFSET_MOBILE,
-      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)',
     },
   },
 }));
@@ -152,12 +151,7 @@ const AppLayout = ({ children, showSidebar = true }) => {
           {children}
         </Box>
 
-        {/* Mobile Bottom Menu */}
-        {!desktop && (
-          <Box sx={{ zIndex: 4 }}>
-            <BottomMenu />
-          </Box>
-        )}
+
       </Box>
     </Box>
   );

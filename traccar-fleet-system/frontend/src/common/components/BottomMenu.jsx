@@ -115,11 +115,11 @@ const BottomMenu = () => {
       elevation={8}
       sx={(theme) => ({
         position: 'fixed',
-        left: 8,
-        right: 8,
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+        left: 0,
+        right: 0,
+        bottom: 'env(safe-area-inset-bottom, 0px)',
         zIndex: theme.zIndex.modal + 1,
-        borderRadius: '14px',
+        borderRadius: '14px 14px 0 0',
         overflow: 'hidden',
         border: `1px solid ${theme.palette.mode === 'dark' ? alpha('#67e8f9', 0.22) : alpha('#0f172a', 0.09)}`,
         boxShadow: theme.palette.mode === 'dark'
