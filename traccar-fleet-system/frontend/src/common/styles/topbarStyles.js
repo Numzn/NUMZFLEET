@@ -1,12 +1,12 @@
-export const TOPBAR_HEIGHT = 60;
+export const TOPBAR_HEIGHT = 56;
 
 export const getTopbarStyles = (theme) => ({
   height: TOPBAR_HEIGHT,
   minHeight: TOPBAR_HEIGHT,
-  padding: theme.spacing(0.5, 1.25),
+  padding: theme.spacing(0.35, 1),
   display: 'flex',
   alignItems: 'center',
-  gap: theme.spacing(1),
+  gap: theme.spacing(0.7),
   backgroundColor: theme.palette.mode === 'dark' ? 'rgba(5, 12, 24, 0.84)' : 'rgba(255, 255, 255, 0.86)',
   border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(103, 232, 249, 0.16)' : 'rgba(15, 23, 42, 0.08)'}`,
   boxShadow: theme.palette.mode === 'dark'
@@ -16,25 +16,25 @@ export const getTopbarStyles = (theme) => ({
     ? 'linear-gradient(180deg, rgba(34, 211, 238, 0.08) 0%, rgba(0, 0, 0, 0) 100%)'
     : 'linear-gradient(180deg, rgba(6, 182, 212, 0.09) 0%, rgba(255, 255, 255, 0) 100%)',
   zIndex: theme.zIndex.appBar + 2,
-  borderRadius: 14,
+  borderRadius: 12,
   backdropFilter: 'blur(14px)',
   width: 'auto',
-  left: theme.spacing(1),
-  right: theme.spacing(1),
-  top: 'calc(env(safe-area-inset-top, 0px) + 6px)',
+  left: theme.spacing(0.75),
+  right: theme.spacing(0.75),
+  top: 'calc(env(safe-area-inset-top, 0px) + 4px)',
   [theme.breakpoints.up('sm')]: {
-    left: theme.spacing(1.5),
-    right: theme.spacing(1.5),
+    left: theme.spacing(1),
+    right: theme.spacing(1),
   },
   [theme.breakpoints.up('md')]: {
-    left: theme.spacing(2),
-    right: theme.spacing(2),
-    borderRadius: 16,
-    top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+    left: theme.spacing(1.5),
+    right: theme.spacing(1.5),
+    borderRadius: 14,
+    top: 'calc(env(safe-area-inset-top, 0px) + 6px)',
   },
   [theme.breakpoints.down('md')]: {
-    height: 54,
-    minHeight: 54,
+    height: 50,
+    minHeight: 50,
   },
 });
 
@@ -89,13 +89,13 @@ export const getTopbarLayoutStyles = (theme) => ({
   minWidth: 0,
   height: TOPBAR_HEIGHT,
   minHeight: TOPBAR_HEIGHT,
-  padding: theme.spacing(0, 1.25),
-  gap: theme.spacing(0.9),
+  padding: theme.spacing(0, 0.9),
+  gap: theme.spacing(0.6),
   [theme.breakpoints.down('md')]: {
-    height: 54,
-    minHeight: '54px !important',
-    padding: theme.spacing(0, 0.8),
-    gap: theme.spacing(0.6),
+    height: 50,
+    minHeight: '50px !important',
+    padding: theme.spacing(0, 0.55),
+    gap: theme.spacing(0.4),
   },
 });
 
@@ -112,7 +112,7 @@ export const getCenterSectionStyles = (theme) => ({
   alignItems: 'center',
   flex: 1,
   justifyContent: 'center',
-  maxWidth: '560px',
+  maxWidth: '520px',
   minWidth: 0,
   margin: theme.spacing(0, 'auto'),
 });

@@ -19,15 +19,16 @@ import {
 } from './topbar';
 
 const DRAWER_WIDTH = 280;
-const TOP_OFFSET_DESKTOP = '76px';
-const TOP_OFFSET_TABLET = '72px';
-const TOP_OFFSET_MOBILE = '66px';
+const TOP_OFFSET_DESKTOP = '70px';
+const TOP_OFFSET_TABLET = '66px';
+const TOP_OFFSET_MOBILE = '62px';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
     display: 'flex',
-    minHeight: '100vh',
-    height: '100dvh',
+    // Use svh for stable mobile viewport height (avoids jitter when browser bars show/hide)
+    minHeight: '100svh',
+    height: '100svh',
     overflow: 'hidden',
   },
   drawer: {
@@ -37,7 +38,7 @@ const useStyles = makeStyles()((theme) => ({
       width: DRAWER_WIDTH,
       boxSizing: 'border-box',
       top: TOP_OFFSET_DESKTOP,
-      height: `calc(100dvh - ${TOP_OFFSET_DESKTOP})`,
+      height: `calc(100svh - ${TOP_OFFSET_DESKTOP})`,
       borderRight: `1px solid ${theme.palette.divider}`,
       borderRadius: 0,
       backgroundColor: theme.palette.background.paper,
@@ -46,11 +47,11 @@ const useStyles = makeStyles()((theme) => ({
       backgroundImage: 'linear-gradient(to bottom, rgba(6, 182, 212, 0.01) 0%, transparent 100%)',
       [theme.breakpoints.between('md', 'lg')]: {
         top: TOP_OFFSET_TABLET,
-        height: `calc(100dvh - ${TOP_OFFSET_TABLET})`,
+        height: `calc(100svh - ${TOP_OFFSET_TABLET})`,
       },
       [theme.breakpoints.down('md')]: {
         top: TOP_OFFSET_MOBILE,
-        height: `calc(100dvh - ${TOP_OFFSET_MOBILE})`,
+        height: `calc(100svh - ${TOP_OFFSET_MOBILE})`,
       },
     },
   },
