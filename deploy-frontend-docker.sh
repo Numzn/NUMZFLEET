@@ -11,6 +11,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND_DIR="$ROOT_DIR/traccar-fleet-system/frontend"
+# Docker Desktop on Windows + Git Bash: bind mounts need a Windows path (cygpath -w).
+FRONTEND_VOLUME="$FRONTEND_DIR"
+if command -v cygpath >/dev/null 2>&1; then
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*) FRONTEND_VOLUME="$(cygpath -w "$FRONTEND_DIR")" ;;
+  esac
+fi
 
 # --- Git safety (clean tree = traceable deploy) ---
 echo "[1/8] Checking Git state..."
@@ -82,14 +89,6 @@ fi
 if [[ ! -f "$FRONTEND_DIR/package.json" ]]; then
   echo "ERROR: Missing $FRONTEND_DIR/package.json (run from repo clone)." >&2
   exit 1
-fi
-
-# Docker Desktop on Windows + Git Bash: bind mounts need a Windows path (cygpath -w).
-FRONTEND_VOLUME="$FRONTEND_DIR"
-if command -v cygpath >/dev/null 2>&1; then
-  case "$(uname -s 2>/dev/null)" in
-    MINGW*|MSYS*|CYGWIN*) FRONTEND_VOLUME="$(cygpath -w "$FRONTEND_DIR")" ;;
-  esac
 fi
 
 echo "[2/8] Checking API is reachable..."
