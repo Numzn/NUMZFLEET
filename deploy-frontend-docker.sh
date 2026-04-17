@@ -102,9 +102,10 @@ fi
 echo ""
 
 echo "[3/8] Building frontend in Docker ($NODE_IMAGE)..."
+# Use //app so Git Bash (MSYS) does not rewrite /app to a Windows path under Git's install dir.
 docker run --rm \
   -v "$FRONTEND_VOLUME:/app" \
-  -w /app \
+  -w //app \
   -e "VITE_API_BASE_URL=$VITE_API_BASE_URL" \
   "$NODE_IMAGE" \
   bash -lc "npm ci && npm run build"
