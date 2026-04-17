@@ -34,8 +34,18 @@ import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import usePersistedState from '../util/usePersistedState';
 import { useAdministrator, useManager, useRestriction } from '../util/permissions';
 import useFeatures from '../util/useFeatures';
+import LogoImage from '../../login/LogoImage';
 
 const useStyles = makeStyles()((theme) => ({
+  brandHeader: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing(2, 2, 1.75),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    backgroundImage: 'linear-gradient(180deg, rgba(6, 182, 212, 0.06) 0%, transparent 100%)',
+  },
   root: {
     height: '100%',
     display: 'flex',
@@ -191,7 +201,7 @@ const useStyles = makeStyles()((theme) => ({
   },
 }));
 
-const ModernSidebar = () => {
+const ModernSidebar = ({ showMobileBrand = false }) => {
   const { classes } = useStyles();
   const location = useLocation();
   const navigate = useNavigate();
@@ -397,6 +407,14 @@ const ModernSidebar = () => {
 
   return (
     <Box className={classes.root}>
+      {showMobileBrand && (
+        <Box className={classes.brandHeader}>
+          <LogoImage
+            color="#06b6d4"
+            style={{ width: '48px', height: '48px', objectFit: 'contain' }}
+          />
+        </Box>
+      )}
       <List className={classes.menuList}>
         {/* Main Section */}
         {mainNavItems.map((item) => renderMenuItem(item))}

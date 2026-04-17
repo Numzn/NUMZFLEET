@@ -89,13 +89,15 @@ const AppLayout = ({ children, showSidebar = true }) => {
       {/* Use unified topbar */}
       <UnifiedTopbar variant="appbar" position="fixed">
         <TopbarLeftSection>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <LogoImage
-              color="#06b6d4"
-              style={{ width: '48px', height: '48px', objectFit: 'contain' }}
-            />
-          </Box>
-          
+          {desktop && (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <LogoImage
+                color="#06b6d4"
+                style={{ width: '48px', height: '48px', objectFit: 'contain' }}
+              />
+            </Box>
+          )}
+
           {!desktop && (
             <IconButton
               onClick={() => setSidebarOpen(true)}
@@ -134,7 +136,7 @@ const AppLayout = ({ children, showSidebar = true }) => {
           className={classes.drawer}
         >
           {/* Navigation Menu */}
-          <ModernSidebar />
+          <ModernSidebar showMobileBrand={!desktop} />
         </Drawer>
       )}
 
