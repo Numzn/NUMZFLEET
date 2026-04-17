@@ -63,6 +63,7 @@ echo "========================================"
 echo " NumzFleet frontend deploy (Docker)"
 echo "========================================"
 echo "  Frontend dir  : $FRONTEND_DIR"
+echo "  Docker volume : $FRONTEND_VOLUME"
 echo "  Server        : $SERVER"
 echo "  Remote dist   : $REMOTE_DIST"
 echo "  Remote backup : $REMOTE_BACKUP"
@@ -83,6 +84,14 @@ if [[ ! -f "$FRONTEND_DIR/package.json" ]]; then
   exit 1
 fi
 
+# Docker Desktop on Windows + Git Bash: bind mounts need a Windows path (cygpath -w).
+FRONTEND_VOLUME="$FRONTEND_DIR"
+if command -v cygpath >/dev/null 2>&1; then
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*) FRONTEND_VOLUME="$(cygpath -w "$FRONTEND_DIR")" ;;
+  esac
+fi
+
 echo "[2/8] Checking API is reachable..."
 if [[ "${SKIP_API_HEALTH_CHECK:-0}" != "1" ]]; then
   curl -sfS --max-time 15 "$API_HEALTH_URL" >/dev/null \
@@ -95,7 +104,7 @@ echo ""
 
 echo "[3/8] Building frontend in Docker ($NODE_IMAGE)..."
 docker run --rm \
-  -v "$FRONTEND_DIR:/app" \
+  -v "$FRONTEND_VOLUME:/app" \
   -w /app \
   -e "VITE_API_BASE_URL=$VITE_API_BASE_URL" \
   "$NODE_IMAGE" \
