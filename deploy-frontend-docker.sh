@@ -7,6 +7,7 @@
 # API: curls API health before build (override URL with API_HEALTH_URL; skip with SKIP_API_HEALTH_CHECK=1).
 # Server: optional dist backup before overwrite (REMOTE_BACKUP); deploy lock (LOCK_REMOTE) with trap cleanup.
 # Push to origin yourself; this script does not call git push.
+# Docker build removes node_modules/dist on the mounted folder first (Windows node_modules breaks Linux npm ci).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -108,7 +109,7 @@ docker run --rm \
   -w //app \
   -e "VITE_API_BASE_URL=$VITE_API_BASE_URL" \
   "$NODE_IMAGE" \
-  bash -lc "npm ci && npm run build"
+  bash -lc "rm -rf node_modules dist .vite && npm ci && npm run build"
 
 if [[ ! -f "$FRONTEND_DIR/dist/index.html" ]]; then
   echo "ERROR: Build did not produce dist/index.html" >&2
