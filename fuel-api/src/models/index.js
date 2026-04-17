@@ -2,13 +2,19 @@ import sequelize from '../config/database.js';
 import FuelRequestModel from './FuelRequest.js';
 import FuelStationModel from './FuelStation.js';
 import VehicleSpecModel from './VehicleSpec.js';
+import VehicleModel from './Vehicle.js';
+import DeviceAssignmentModel from './DeviceAssignment.js';
 
 // Initialize models
 const FuelRequest = FuelRequestModel(sequelize);
 const FuelStation = FuelStationModel(sequelize);
 const VehicleSpec = VehicleSpecModel(sequelize);
+const Vehicle = VehicleModel(sequelize);
+const DeviceAssignment = DeviceAssignmentModel(sequelize);
 
 // Define associations
+Vehicle.hasMany(DeviceAssignment, { foreignKey: 'vehicleId' });
+DeviceAssignment.belongsTo(Vehicle, { foreignKey: 'vehicleId' });
 // VehicleSpec belongs to device (via deviceId)
 // FuelRequest belongs to device (via deviceId)
 
@@ -108,7 +114,7 @@ export const syncDatabase = async (force = false) => {
   }
 };
 
-export { FuelRequest, FuelStation, VehicleSpec };
+export { FuelRequest, FuelStation, VehicleSpec, Vehicle, DeviceAssignment };
 export default sequelize;
 
 

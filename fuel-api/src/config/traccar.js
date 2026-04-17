@@ -225,6 +225,58 @@ export const getTraccarPosition = async (deviceId) => {
   }
 };
 
+const parsePositionAttributes = (position) => {
+  if (!position?.attributes) return;
+  if (typeof position.attributes === 'string') {
+    try {
+      position.attributes = JSON.parse(position.attributes);
+    } catch {
+      /* keep string */
+    }
+  }
+};
+
+/**
+ * Batch-load Traccar devices by integer id (tc_devices.id).
+ * @param {number[]} ids
+ * @returns {Promise<object[]>}
+ */
+export const getTraccarDevicesByIds = async (ids) => {
+  if (!ids?.length) return [];
+  const unique = [...new Set(ids.filter((id) => id != null && Number.isFinite(Number(id))).map(Number))];
+  if (!unique.length) return [];
+  const pool = getTraccarPool();
+  const placeholders = unique.map(() => '?').join(',');
+  const [rows] = await pool.execute(
+    `SELECT id, name, uniqueid, status, lastupdate, positionid FROM tc_devices WHERE id IN (${placeholders})`,
+    unique,
+  );
+  return rows;
+};
+
+/**
+ * Latest position per device using tc_devices.positionid (same semantics as getTraccarPosition).
+ * Returns rows with numeric deviceId for stable Map keys in fuel-api services.
+ * @param {number[]} ids
+ * @returns {Promise<object[]>}
+ */
+export const getTraccarLatestPositionsByDeviceIds = async (ids) => {
+  if (!ids?.length) return [];
+  const unique = [...new Set(ids.filter((id) => id != null && Number.isFinite(Number(id))).map(Number))];
+  if (!unique.length) return [];
+  const pool = getTraccarPool();
+  const placeholders = unique.map(() => '?').join(',');
+  const [rows] = await pool.execute(
+    `SELECT d.id AS deviceId, p.id, p.latitude, p.longitude, p.speed, p.course, p.altitude, p.fixtime, p.attributes
+     FROM tc_devices d
+     LEFT JOIN tc_positions p ON d.positionid = p.id
+     WHERE d.id IN (${placeholders})`,
+    unique,
+  );
+  rows.forEach((row) => parsePositionAttributes(row));
+  return rows;
+};
+
 /**
  * Get device attributes (fuel level, etc.)
  */
@@ -257,7 +309,9 @@ export default {
   getTraccarUserBySessionViaAPI,
   getTraccarDevice,
   getTraccarPosition,
+  getTraccarDevicesByIds,
+  getTraccarLatestPositionsByDeviceIds,
   getDeviceAttributes,
-  closeTraccarConnection
+  closeTraccarConnection,
 };
 

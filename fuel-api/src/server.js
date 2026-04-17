@@ -12,6 +12,7 @@ import { testTraccarConnection } from './config/traccar.js';
 import { syncDatabase } from './models/index.js';
 import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
 import vehicleSpecsRouter from './routes/vehicleSpecs.js';
+import vehiclesRouter from './routes/vehicles.js';
 import reportsRouter from './reports/routes/reports.js';
 import { initializeSocket } from './socket/socketHandler.js';
 
@@ -280,6 +281,7 @@ if (process.env.NODE_ENV === 'development') {
 // API Routes
 app.use('/api/fuel-requests', fuelRequestsRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
+app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/reports', reportsRouter);
 
 // Root endpoint
