@@ -1,6 +1,8 @@
 # Local Frontend Development Guide
 
-> **Production releases** use a separate Git-first flow — see [`release-prod.ps1`](../release-prod.ps1) and [`.github/workflows/release-gate.yml`](../.github/workflows/release-gate.yml). Never `scp dist/` directly to the server.
+> **Production UI (`dist/`):** primary path is [`deploy-frontend-docker.sh`](deploy-frontend-docker.sh) — build the Vite app inside **Node 20 Docker** (`npm ci` + `npm run build` with `VITE_API_BASE_URL`), upload to the server path nginx mounts, then `nginx -s reload` on `numztrak-nginx`. **Push to `main` first** so Git matches what you ship; this script does not commit or push.
+>
+> **Full stack / SHA-locked deploy** (backend + on-server frontend build when Node is available): [`release-prod.ps1`](release-prod.ps1) and [`.github/workflows/release-gate.yml`](.github/workflows/release-gate.yml). Optional automated UI upload: [`.github/workflows/deploy-frontend.yml`](.github/workflows/deploy-frontend.yml) when GitHub Actions are available. Legacy all-in-one script: [`deploy.sh`](deploy.sh).
 
 ## 🚀 Quick Start
 
