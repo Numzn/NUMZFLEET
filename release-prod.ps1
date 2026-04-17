@@ -231,14 +231,15 @@ Write-Ok "Commit $Commit is in origin/$Branch — safe to deploy"
 Write-Step "Phase 5 · Deploy to production  ($User@$Server)"
 Write-Host "   Commit : $Commit" -ForegroundColor Green
 
-$remoteScript = @"
+# Single-quoted here-string: bash uses $(...) — a double-quoted @"..."@ breaks PowerShell parsing.
+$remoteScript = @'
 set -euo pipefail
 
 echo ""
-echo "=== [1/6] Repo sync to $Commit ==="
+echo "=== [1/6] Repo sync to __DEPLOY_COMMIT__ ==="
 cd ~/NUMZFLEET
 git fetch origin --prune --quiet
-git checkout $Commit
+git checkout __DEPLOY_COMMIT__
 
 echo ""
 echo "=== [2/6] Build and start backend services ==="
@@ -267,23 +268,25 @@ echo ""
 echo "=== [6/6] Health checks ==="
 sleep 8
 
-http_code=\$(curl -o /dev/null -s -w "%{http_code}" https://numz.site)
-echo "numz.site HTTPS : \$http_code"
-[ "\$http_code" = "200" ] || [ "\$http_code" = "301" ] || { echo "FAIL: unexpected HTTP code \$http_code"; exit 1; }
+http_code=$(curl -o /dev/null -s -w "%{http_code}" https://numz.site)
+echo "numz.site HTTPS : $http_code"
+[ "$http_code" = "200" ] || [ "$http_code" = "301" ] || { echo "FAIL: unexpected HTTP code $http_code"; exit 1; }
 
-traccar_ver=\$(curl -sS https://numz.site/api/server 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null || echo "unreachable")
-echo "Traccar API version : \$traccar_ver"
+traccar_ver=$(curl -sS https://numz.site/api/server 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null || echo "unreachable")
+echo "Traccar API version : $traccar_ver"
 
-fuel_health=\$(curl -sS https://numz.site/api/fuel-requests/health 2>/dev/null | head -c 200 || echo "unreachable")
-echo "Fuel API health : \$fuel_health"
+fuel_health=$(curl -sS https://numz.site/api/fuel-requests/health 2>/dev/null | head -c 200 || echo "unreachable")
+echo "Fuel API health : $fuel_health"
 
 echo ""
 echo "==========================================="
-echo "  Deployed commit : $Commit"
-echo "  Server          : $Server"
-echo "  Completed at    : \$(date -u '+%Y-%m-%d %H:%M UTC')"
+echo "  Deployed commit : __DEPLOY_COMMIT__"
+echo "  Server          : __DEPLOY_SERVER__"
+echo "  Completed at    : $(date -u '+%Y-%m-%d %H:%M UTC')"
 echo "==========================================="
-"@
+'@
+
+$remoteScript = $remoteScript.Replace('__DEPLOY_COMMIT__', $Commit).Replace('__DEPLOY_SERVER__', $Server)
 
 Run-Or-Throw "Remote deploy" {
     $remoteScript | ssh -i "$KeyPath" -o "StrictHostKeyChecking=accept-new" "$User@$Server" "bash -s"
@@ -294,12 +297,11 @@ Run-Or-Throw "Remote deploy" {
 # ─────────────────────────────────────────────────────────────
 
 Write-Host ""
-Write-Host "╔═══════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║   Release complete                        ║" -ForegroundColor Green
-Write-Host "╠═══════════════════════════════════════════╣" -ForegroundColor Green
-Write-Host "║   Commit : $Commit" -ForegroundColor Green
-Write-Host "║   View   : https://numz.site              ║" -ForegroundColor Green
-Write-Host "╚═══════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "===========================================" -ForegroundColor Green
+Write-Host "  Release complete" -ForegroundColor Green
+Write-Host "  Commit : $Commit" -ForegroundColor Green
+Write-Host "  View   : https://numz.site" -ForegroundColor Green
+Write-Host "===========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "To rollback, re-run with the previous SHA:"
 Write-Host "  .\release-prod.ps1 -Commit <prev-sha>" -ForegroundColor Yellow
