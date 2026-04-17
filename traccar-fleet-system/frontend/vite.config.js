@@ -185,6 +185,24 @@ export default defineConfig(({ mode }) => {
           '*': 'localhost'
         },
       },
+      '/api/vehicles': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: {
+          '*': 'localhost'
+        },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
       '/api': {
         target: traccarUrl,
         changeOrigin: true,

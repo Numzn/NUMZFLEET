@@ -65,6 +65,7 @@ import fetchOrThrow from './common/util/fetchOrThrow';
 import AuditPage from './reports/AuditPage';
 import ToastNotificationTest from './test/ToastNotificationTest';
 import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
+import VehiclesPage from './fleet/VehiclesPage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -124,6 +125,7 @@ const Navigation = () => {
         <Route index element={<DashboardPage />} />
         <Route path="map" element={<MainPage />} />
         <Route path="fuel-requests" element={<FuelRequestsPage />} />
+        <Route path="fleet/vehicles" element={<VehiclesPage />} />
 
         <Route path="position/:id" element={<PositionPage />} />
         <Route path="network/:positionId" element={<NetworkPage />} />

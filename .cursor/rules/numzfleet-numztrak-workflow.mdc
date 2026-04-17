@@ -1,0 +1,31 @@
+---
+description: NUMZFLEET (NumzTrak) monorepo deploy, CI, and assistant habits
+alwaysApply: true
+---
+
+# NUMZFLEET (NumzTrak) — repo workflow
+
+**Repo root:** monorepo with `backend/` (Docker + nginx), `fuel-api/`, `traccar-fleet-system/frontend/`.
+
+## Production deploy (default)
+
+- **Canonical operator flow:** from repo root on Windows, after changes are **pushed and on `origin/main`**, run **`.\release-prod.ps1`** (optional **`-Commit <sha>`** for rollback). **Do not** deploy a SHA that is not on `origin/main`.
+- The script runs a **local alignment gate** (frontend `npm ci` / `lint` / `build`, nginx `nginx -t` if Docker exists) unless **`-SkipLocalChecks`**.
+- **Remote:** server uses **`~/NUMZFLEET`**, **`git checkout`** the deploy SHA, **`docker compose -f docker-compose.prod.yml up -d --build`** for the stack slice it manages, **builds frontend on the server** from that commit, restarts **`numztrak-nginx`**, then health-checks **https://numz.site** and APIs.
+- **Do not** present **`scp` / copying `dist/`** from a laptop to production as the normal path. For **emergency** hotfixes only, state that explicitly; still prefer **commit + `.\release-prod.ps1`** or fixing CI.
+
+## CI (GitHub)
+
+- **`release-gate.yml`:** required checks on PR/push to **`main`** (frontend lint+build, nginx validate, file sanity). Align guidance with **merge only when green**.
+- **`deploy-frontend.yml`:** on push to **`main`** with **frontend path** changes, CI builds and **rsyncs `dist/`** to the server — valid **frontend-only** automation; needs repo **secrets** (`OCI_*`). Do not equate this with ad-hoc laptop uploads.
+
+## Legacy scripts
+
+- **`deployment/deploy-backend-only-final.sh`** and some **`deployment/*.md`** may reference **`~/NUMZGPS`**. Unless the user confirms that layout, prefer **`~/NUMZFLEET`** + **`.\release-prod.ps1`** and **`backend/docker-compose.prod.yml`**.
+
+## Coding assistant habits (this project + user prefs)
+
+- **Windows-first** when suggesting shell steps (`.\release-prod.ps1`, PowerShell idioms).
+- **Ask before editing files** unless the user already asked for implementation or a concrete change.
+- **Do not run** `npm run build` / full production builds unless the user asked for a build, deploy, or CI-related verification.
+- When asked **how to deploy**, answer in order: **push to `main` → green `release-gate` → `.\release-prod.ps1`**; mention **frontend-only CI** only if the change is frontend-only and they rely on that workflow.

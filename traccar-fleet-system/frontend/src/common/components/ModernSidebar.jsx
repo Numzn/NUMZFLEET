@@ -255,6 +255,7 @@ const ModernSidebar = () => {
       badge: pendingFuelCount,
       submenu: [
         { title: 'Fuel Requests', path: '/fuel-requests', badge: pendingFuelCount },
+        { title: 'Vehicles', path: '/fleet/vehicles' },
         { title: 'Fuel Stations', path: '/settings/preferences' },
       ],
     },
