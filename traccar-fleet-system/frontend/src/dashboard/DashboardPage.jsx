@@ -18,7 +18,6 @@ import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutl
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import AppLayout from '../common/components/AppLayout';
-import FuelRequestsCard from '../fuelRequests/components/FuelRequestsCard';
 import KPICards from './components/KPICards';
 import ErbPricesCard from './components/ErbPricesCard';
 import useFilter from '../main/useFilter';
@@ -86,12 +85,7 @@ const DashboardPage = () => {
     },
   ];
 
-  const handleFuelQueueJump = () => {
-    document.getElementById('dashboard-fuel-queue')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  };
+  const handleFuelQueueJump = () => navigate('/fuel-requests');
 
   return (
     <AppLayout showSidebar={true}>
@@ -101,7 +95,7 @@ const DashboardPage = () => {
         background: theme.palette.mode === 'dark'
           ? 'radial-gradient(circle at top, rgba(8, 145, 178, 0.1), transparent 28%), linear-gradient(180deg, rgba(2, 6, 23, 0.96) 0%, rgba(6, 23, 42, 0.9) 100%)'
           : 'radial-gradient(circle at top, rgba(6, 182, 212, 0.1), transparent 24%), linear-gradient(180deg, #f7fbff 0%, #eef5fb 100%)',
-        minHeight: '100vh',
+        minHeight: '100%',
         width: '100%',
         maxWidth: '100%',
         height: '100%',
@@ -402,10 +396,6 @@ const DashboardPage = () => {
           <ErbPricesCard />
         </Box>
 
-        {/* Fuel Requests Section */}
-        <Box id="dashboard-fuel-queue" sx={{ mb: 5, width: '100%', maxWidth: '100%' }}>
-          <FuelRequestsCard devices={filteredDevices} positions={filteredPositions} />
-        </Box>
       </Box>
     </AppLayout>
   );

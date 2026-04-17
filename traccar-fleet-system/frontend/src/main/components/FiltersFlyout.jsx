@@ -42,8 +42,8 @@ const useStyles = makeStyles()((theme) => ({
   drawer: {
     '& .MuiDrawer-paper': {
       width: 360,
-      top: 64,
-      height: 'calc(100vh - 64px)',
+      top: 56,
+      height: 'calc(100vh - 56px)',
       borderRadius: '0 16px 16px 0',
       boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
       borderLeft: '1px solid rgba(6, 182, 212, 0.1)',

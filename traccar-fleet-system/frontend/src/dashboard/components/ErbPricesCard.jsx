@@ -76,6 +76,12 @@ const ErbPricesCard = () => {
     }
   };
 
+  const formatPrice = (value) => {
+    if (value == null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed.toFixed(2) : null;
+  };
+
   const cardBg = dark
     ? 'linear-gradient(135deg, rgba(4,15,28,0.94) 0%, rgba(8,34,56,0.92) 55%, rgba(10,79,98,0.9) 100%)'
     : 'linear-gradient(135deg, rgba(8,28,46,0.96) 0%, rgba(10,69,96,0.92) 58%, rgba(13,138,165,0.88) 100%)';
@@ -186,7 +192,7 @@ const ErbPricesCard = () => {
               </Typography>
             ) : (
               <Typography sx={{ color: '#f8fdff', fontSize: { xs: '1.1rem', sm: '1.2rem' }, fontWeight: 800, lineHeight: 1 }}>
-                {prices?.[key] != null ? `${prices[key].toFixed(2)}` : '—'}
+                {formatPrice(prices?.[key]) ?? '—'}
                 <Typography component="span" sx={{ color: alpha('#f8fdff', 0.55), fontSize: '0.68rem', fontWeight: 600, ml: 0.4 }}>
                   ZMW/L
                 </Typography>

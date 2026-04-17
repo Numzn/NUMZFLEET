@@ -10,25 +10,28 @@ import ModernKPICard from './ModernKPICard';
 
 const KPICards = ({ devices, positions }) => {
   const events = useSelector((state) => state.events.items);
+  const fuelRequests = useSelector((state) => state.fuelRequests?.items || {});
 
   // Calculate device statistics
   const deviceStats = useMemo(() => {
-    const stats = { active: 0, idle: 0, offline: 0, total: devices.length };
+    const stats = { moving: 0, online: 0, offline: 0, total: devices.length };
     
     devices.forEach((device) => {
       const position = positions.find(p => p.deviceId === device.id);
       if (!position) {
         stats.offline++;
-      } else if (position.speed > 0) {
-        stats.active++;
       } else {
-        stats.idle++;
+        stats.online++;
+        if (position.speed > 0) {
+          stats.moving++;
+        }
       }
     });
 
-    const activePercentage = stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0;
+    const onlinePercentage = stats.total > 0 ? Math.round((stats.online / stats.total) * 100) : 0;
+    const movingPercentage = stats.total > 0 ? Math.round((stats.moving / stats.total) * 100) : 0;
     
-    return { ...stats, activePercentage };
+    return { ...stats, onlinePercentage, movingPercentage };
   }, [devices, positions]);
 
   // Calculate alert statistics
@@ -48,27 +51,46 @@ const KPICards = ({ devices, positions }) => {
     return stats;
   }, [events]);
 
-  // Calculate fuel statistics
+  // Calculate fuel statistics from live request data
   const fuelStats = useMemo(() => {
-    const dailyFuel = 245; // Liters
-    const fuelPrice = 63; // Price per liter in Kwacha
-    const monthlyTotal = dailyFuel * 30;
-    const totalCost = Math.round(monthlyTotal * fuelPrice);
-    
+    const requests = Object.values(fuelRequests);
+    const pendingRequests = requests.filter((request) => {
+      const status = request.status?.toLowerCase?.() || '';
+      return status === 'pending' || status === 'submitted' || status === 'awaiting_approval';
+    }).length;
+
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const approvedLitersThisMonth = requests.reduce((sum, request) => {
+      const status = request.status?.toLowerCase?.() || '';
+      if (status !== 'approved' && status !== 'fulfilled') {
+        return sum;
+      }
+      const referenceDate = new Date(request.reviewTime || request.requestTime);
+      if (
+        Number.isNaN(referenceDate.getTime()) ||
+        referenceDate.getMonth() !== currentMonth ||
+        referenceDate.getFullYear() !== currentYear
+      ) {
+        return sum;
+      }
+      const liters = Number(request.approvedAmount ?? request.requestedAmount ?? 0);
+      return sum + (Number.isFinite(liters) ? liters : 0);
+    }, 0);
+
     return {
-      monthlyTotal,
-      totalCost,
-      trend: '+8%',
+      pendingRequests,
+      approvedLitersThisMonth: Math.round(approvedLitersThisMonth),
     };
-  }, []);
+  }, [fuelRequests]);
 
   return (
     <Grid container spacing={2.5} sx={{ alignItems: 'stretch', width: '100%' }}>
       <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
         <ModernKPICard
-          value={deviceStats.total}
-          label="Active Vehicles"
-          progress={deviceStats.activePercentage}
+          value={deviceStats.moving}
+          label="Moving Now"
+          progress={deviceStats.movingPercentage}
           icon={<DirectionsCarIcon />}
           color="primary"
           sx={{ width: '100%' }}
@@ -87,9 +109,9 @@ const KPICards = ({ devices, positions }) => {
 
       <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
         <ModernKPICard
-          value={`K${fuelStats.totalCost.toLocaleString()}`}
-          label="Monthly Fuel Cost"
-          trend={fuelStats.trend}
+          value={fuelStats.pendingRequests}
+          label="Pending Fuel Requests"
+          trend={`${fuelStats.approvedLitersThisMonth}L this month`}
           icon={<LocalGasStationIcon />}
           color="success"
           sx={{ width: '100%' }}
@@ -98,9 +120,9 @@ const KPICards = ({ devices, positions }) => {
 
       <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
         <ModernKPICard
-          value={deviceStats.active}
+          value={deviceStats.online}
           label="Online Now"
-          progress={deviceStats.activePercentage}
+          progress={deviceStats.onlinePercentage}
           icon={<DirectionsCarIcon />}
           color="info"
           sx={{ width: '100%' }}

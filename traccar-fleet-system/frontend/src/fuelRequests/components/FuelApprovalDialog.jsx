@@ -5,12 +5,11 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useDispatch, useSelector } from 'react-redux';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 import { errorsActions } from '../../store';
 import { useFuelApprovalDialogStyles } from './FuelApprovalDialog.styles';
-import { DecisionHeader, LiveDataCard, RecommendationCard, ApprovalAmountSection, DetailsSection, NotesSection, ValidationAlerts } from './FuelApprovalDialog.sections';
+import { DecisionHeader, LiveDataCard, RecommendationCard, ApprovalAmountSection, NotesSection, ValidationAlerts } from './FuelApprovalDialog.sections';
 import { useFuelApprovalLiveData, useFuelApprovalDerivedData } from './FuelApprovalDialog.data';
 
 const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => {
@@ -87,22 +86,25 @@ const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => 
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="xs"
+      maxWidth="sm"
       fullWidth
       fullScreen={isMobile}
       className={classes.dialog}
       PaperProps={{
         sx: {
-          borderRadius: isMobile ? 0 : 1.25,
+          borderRadius: isMobile ? 0 : 2,
           overflow: 'hidden',
+          margin: isMobile ? 0 : undefined,
         },
       }}
     >
-      <DialogTitle sx={{ pb: 0.5, pt: 1.2, px: 1.5 }}>
+      <DialogTitle sx={{ pb: 1, pt: 1.75, px: { xs: 2, sm: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ArrowBackIcon fontSize="small" color="action" />
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '0.95rem' }} noWrap>
+          <Box sx={{ minWidth: 0, pr: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '1rem' }} noWrap>
+              Fuel Approval
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
               {derived.deviceName}
             </Typography>
           </Box>
@@ -112,7 +114,7 @@ const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => 
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ pb: isMobile ? 8 : 1.25, px: 1.5 }}>
+      <DialogContent sx={{ pb: isMobile ? 'calc(116px + env(safe-area-inset-bottom, 0px))' : 2, px: { xs: 2, sm: 3 } }}>
         <DecisionHeader
           classes={classes}
           request={request}
@@ -153,7 +155,6 @@ const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => 
             Approved amount exceeds available space. Reduce to {derived.roundedMaxPossible}L or less.
           </Alert>
         )}
-        <DetailsSection classes={classes} requestReason={request.reason} tankCapacity={derived.tankCapacity} />
         <NotesSection classes={classes} isMobile={isMobile} notes={notes} setNotes={setNotes} />
         {error && <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>{error}</Alert>}
         {loading && <LinearProgress sx={{ mt: 2 }} />}
@@ -171,7 +172,7 @@ const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => 
           startIcon={<CancelIcon />}
           disabled={loading}
           variant={isMobile ? 'outlined' : 'text'}
-          size="small"
+          size={isMobile ? 'medium' : 'small'}
           className={classes.actionButton}
           sx={{ flex: 1 }}
         >
@@ -183,7 +184,7 @@ const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => 
           startIcon={<CheckCircleIcon />}
           disabled={loading || derived.safeApprovedAmount <= 0 || derived.approvedExceedsMax}
           variant="contained"
-          size="small"
+          size={isMobile ? 'medium' : 'small'}
           className={classes.primaryActionButton}
           sx={{ flex: 1 }}
         >

@@ -1,5 +1,23 @@
 import './switcher.css';
 
+const humanizeStyleId = (id = '') => id
+  .replace(/([a-z])([A-Z])/g, '$1 $2')
+  .replace(/[_-]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .replace(/\b\w/g, (ch) => ch.toUpperCase());
+
+const normalizeStyleTitle = (style) => {
+  const rawTitle = String(style?.title || '').trim();
+  if (!rawTitle) return humanizeStyleId(style?.id);
+
+  // Fallback when i18n key is shown as plain text (e.g. "mapOpenFreeMap")
+  if (/^map[A-Z]/.test(rawTitle)) {
+    return humanizeStyleId(rawTitle.replace(/^map/, ''));
+  }
+  return rawTitle;
+};
+
 export class SwitcherControl {
 
   constructor(onBeforeSwitch, onSwitch, onAfterSwitch) {
@@ -38,7 +56,10 @@ export class SwitcherControl {
     for (const style of this.styles) {
       const styleElement = document.createElement('button');
       styleElement.type = 'button';
-      styleElement.innerText = style.title;
+      const normalizedTitle = normalizeStyleTitle(style);
+      styleElement.innerText = normalizedTitle;
+      styleElement.title = normalizedTitle;
+      styleElement.setAttribute('aria-label', normalizedTitle);
       styleElement.dataset.id = style.id;
       styleElement.dataset.style = JSON.stringify(style.style);
       styleElement.addEventListener('click', (event) => {
@@ -57,7 +78,13 @@ export class SwitcherControl {
     if (this.currentStyle !== selectedStyle && this.map && this.mapStyleContainer) {
       this.onSelectStyle(selectedStyleElement);
       this.currentStyle = selectedStyle;
+      return true;
     }
+
+    if (selectedStyle) {
+      this.currentStyle = selectedStyle;
+    }
+    return false;
   }
 
   onSelectStyle(target) {

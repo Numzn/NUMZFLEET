@@ -3,7 +3,7 @@ import { makeStyles } from 'tss-react/mui';
 export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
   dialog: {
     '& .MuiDialog-paper': {
-      maxHeight: '95vh',
+      maxHeight: '96dvh',
     },
   },
   headerTopRow: {
@@ -12,6 +12,10 @@ export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
     justifyContent: 'space-between',
     marginBottom: theme.spacing(1),
     marginTop: theme.spacing(0.5),
+    [theme.breakpoints.down('sm')]: {
+      marginBottom: theme.spacing(0.75),
+      marginTop: theme.spacing(0.25),
+    },
   },
   driverName: {
     fontWeight: 600,
@@ -28,8 +32,12 @@ export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
       ? 'rgba(255,255,255,0.04)'
       : 'rgba(0,0,0,0.02)',
     borderRadius: theme.shape.borderRadius,
-    padding: theme.spacing(1.25),
-    marginBottom: theme.spacing(1),
+    padding: theme.spacing(1.5),
+    marginBottom: theme.spacing(1.5),
+    [theme.breakpoints.down('sm')]: {
+      padding: theme.spacing(1.25),
+      marginBottom: theme.spacing(1.25),
+    },
   },
   requestLine: {
     fontWeight: 700,
@@ -41,14 +49,8 @@ export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
     color: theme.palette.text.secondary,
   },
   helperText: {
-    fontSize: '0.68rem',
+    fontSize: '0.72rem',
     color: theme.palette.text.disabled,
-  },
-  liveDataMeta: {
-    fontSize: '0.65rem',
-    color: theme.palette.text.disabled,
-    marginTop: theme.spacing(0.5),
-    fontStyle: 'italic',
   },
   recommendationBox: {
     background: theme.palette.mode === 'dark'
@@ -58,6 +60,9 @@ export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
     borderRadius: theme.shape.borderRadius,
     padding: theme.spacing(1),
     marginBottom: theme.spacing(1),
+    [theme.breakpoints.down('sm')]: {
+      padding: theme.spacing(1.25),
+    },
   },
   recommendationTitle: {
     fontWeight: 600,
@@ -71,8 +76,8 @@ export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
     minHeight: 26,
   },
   sliderWrap: {
-    marginTop: theme.spacing(1.25),
-    marginBottom: theme.spacing(1),
+    marginTop: theme.spacing(1.5),
+    marginBottom: theme.spacing(1.25),
   },
   sliderHeader: {
     display: 'flex',
@@ -90,15 +95,20 @@ export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
     gap: theme.spacing(0.75),
     marginTop: theme.spacing(0.5),
     flexWrap: 'wrap',
-  },
-  detailsAccordion: {
-    marginTop: theme.spacing(1),
-    boxShadow: 'none',
-    '&::before': { display: 'none' },
-    background: 'transparent',
+    '& .MuiButton-root': {
+      flex: 1,
+      minWidth: 140,
+    },
+    [theme.breakpoints.down('sm')]: {
+      flexDirection: 'column',
+      '& .MuiButton-root': {
+        width: '100%',
+        minWidth: 0,
+      },
+    },
   },
   notesWrap: {
-    marginTop: theme.spacing(1),
+    marginTop: theme.spacing(1.5),
   },
   validationAlert: {
     marginTop: theme.spacing(1),
@@ -109,27 +119,39 @@ export const useFuelApprovalDialogStyles = makeStyles()((theme) => ({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: theme.spacing(1, 1.5),
+    padding: theme.spacing(1.25, 2),
     background: theme.palette.mode === 'dark'
       ? 'rgba(30,30,30,0.92)'
       : 'rgba(255,255,255,0.92)',
     backdropFilter: 'blur(8px)',
+    borderTop: `1px solid ${theme.palette.divider}`,
     boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
     display: 'flex',
     gap: theme.spacing(1),
     zIndex: 10,
+    [theme.breakpoints.down('sm')]: {
+      padding: '10px 12px calc(10px + env(safe-area-inset-bottom, 0px))',
+      gap: theme.spacing(0.75),
+    },
   },
   desktopActions: {
-    padding: theme.spacing(1, 1.5),
+    padding: theme.spacing(1.25, 3),
+    gap: theme.spacing(1),
   },
   actionButton: {
     textTransform: 'none',
     fontWeight: 600,
     fontSize: '0.82rem',
+    [theme.breakpoints.down('sm')]: {
+      fontSize: '0.8rem',
+    },
   },
   primaryActionButton: {
     textTransform: 'none',
     fontWeight: 700,
     fontSize: '0.82rem',
+    [theme.breakpoints.down('sm')]: {
+      fontSize: '0.8rem',
+    },
   },
 }));

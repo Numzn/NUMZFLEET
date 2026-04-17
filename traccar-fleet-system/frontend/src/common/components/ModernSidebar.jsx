@@ -205,7 +205,10 @@ const ModernSidebar = () => {
   
   // Get pending counts for badges
   const fuelRequests = useSelector((state) => state.fuelRequests?.items || {});
-  const pendingFuelCount = Object.values(fuelRequests).filter(r => r.status === 'pending').length;
+  const pendingFuelCount = Object.values(fuelRequests).filter((request) => {
+    const status = request.status?.toLowerCase?.() || '';
+    return status === 'pending' || status === 'submitted' || status === 'awaiting_approval';
+  }).length;
   
   // Collapsible sections state (persisted)
   const [reportsOpen, setReportsOpen] = usePersistedState('sidebarReportsOpen', false);
@@ -251,7 +254,7 @@ const ModernSidebar = () => {
       show: !readonly,
       badge: pendingFuelCount,
       submenu: [
-        { title: 'Fuel Requests', path: '/', badge: pendingFuelCount },
+        { title: 'Fuel Requests', path: '/fuel-requests', badge: pendingFuelCount },
         { title: 'Fuel Stations', path: '/settings/preferences' },
       ],
     },

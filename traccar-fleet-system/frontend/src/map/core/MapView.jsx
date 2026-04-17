@@ -2,7 +2,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibregl from 'maplibre-gl';
 import { googleProtocol } from 'maplibre-google-maps';
 import React, {
-  useRef, useLayoutEffect, useEffect, useState,
+  useRef, useLayoutEffect, useEffect, useState, useCallback,
   useMemo,
 } from 'react';
 import { useTheme } from '@mui/material';
@@ -48,7 +48,6 @@ const updateReadyValue = (value) => {
 };
 
 const initMap = async () => {
-  if (ready) return;
   if (!map.hasImage('background')) {
     // Load standard images
     Object.entries(mapImages).forEach(([key, value]) => {
@@ -141,7 +140,24 @@ const MapView = ({ children }) => {
   useEffect(() => {
     const filteredStyles = mapStyles.filter((s) => s.available && activeMapStyles.includes(s.id));
     const styles = filteredStyles.length ? filteredStyles : mapStyles.filter((s) => s.id === 'osm');
-    switcher.updateStyles(styles, defaultMapStyle);
+    const didSwitchStyle = switcher.updateStyles(styles, defaultMapStyle);
+
+    // Remount / same persisted style: switcher skips setStyle(), so styledata never runs and
+    // updateReadyValue(true) would never fire — map stays under the loading overlay (looks "white").
+    if (!didSwitchStyle) {
+      const finalizeWhenLoaded = async () => {
+        if (!map.loaded()) return;
+        await initMap();
+        updateReadyValue(true);
+      };
+      if (map.loaded()) {
+        void finalizeWhenLoaded();
+      } else {
+        map.once('load', () => {
+          void finalizeWhenLoaded();
+        });
+      }
+    }
   }, [mapStyles, defaultMapStyle, activeMapStyles, switcher]);
 
   useEffect(() => {
@@ -158,8 +174,23 @@ const MapView = ({ children }) => {
     map.resize();
     return () => {
       currentEl.removeChild(element);
+      updateReadyValue(false);
     };
   }, [containerEl]);
+
+  const [revealed, setRevealed] = useState(false);
+
+  const onRevealed = useCallback(() => {
+    if (mapReady && !revealed) setRevealed(true);
+  }, [mapReady, revealed]);
+
+  useEffect(() => {
+    if (mapReady) {
+      const raf = requestAnimationFrame(() => setRevealed(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    return undefined;
+  }, [mapReady]);
 
   return (
     <div 
@@ -167,10 +198,25 @@ const MapView = ({ children }) => {
         width: '100%', 
         height: '100%', 
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }} 
       ref={containerEl}
     >
+      {/* Smooth fade-in overlay — hides ocean/blank tiles until map is ready */}
+      <div
+        onTransitionEnd={onRevealed}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 5,
+          background: 'inherit',
+          backgroundColor: 'var(--map-loading-bg, #f0f4f8)',
+          opacity: mapReady ? 0 : 1,
+          transition: 'opacity 0.5s ease-out',
+          pointerEvents: mapReady ? 'none' : 'auto',
+          display: revealed ? 'none' : 'block',
+        }}
+      />
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child) && child.type.handlesMapReady) {
           return React.cloneElement(child, { mapReady });

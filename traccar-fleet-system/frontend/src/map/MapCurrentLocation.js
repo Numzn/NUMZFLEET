@@ -4,224 +4,243 @@ import { map } from './core/MapView';
 import { useTheme } from '@mui/material';
 import './MapCurrentLocation.css';
 
+/** Fast / network-assisted fix — succeeds much more often indoors than GPS-only. */
+const GEO_COARSE = {
+  enableHighAccuracy: false,
+  timeout: 18000,
+  maximumAge: 300000,
+};
+
+/** Slower GPS fix — only after coarse fails or is too imprecise for the map. */
+const GEO_PRECISE = {
+  enableHighAccuracy: true,
+  timeout: 28000,
+  maximumAge: 0,
+};
+
+const getCurrentPositionAsync = (options) =>
+  new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve(position.coords),
+      (err) => reject(err),
+      options,
+    );
+  });
+
 const MapCurrentLocation = () => {
   const theme = useTheme();
   const geolocateControlRef = useRef(null);
   const buttonRef = useRef(null);
+  const buttonLabelRef = useRef(null);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
-    // Check if geolocation is supported
     if (!navigator.geolocation) {
       console.warn('Geolocation is not supported by this browser.');
       return;
     }
 
-    // Note: We don't block based on HTTP/HTTPS here
-    // Modern browsers allow geolocation on localhost even over HTTP
-    // The browser will handle security and prompt the user for permission
+    let insertIntervalId = null;
 
-    const addButtonToNavigationGroup = () => {
-      // Find the navigation control group
-      const findNavigationGroup = () => {
-        const controls = map.getContainer().querySelectorAll('.maplibregl-ctrl-group');
-        for (const control of controls) {
-          // Check if this is the navigation control (has zoom buttons)
-          const hasZoomIn = control.querySelector('.maplibregl-ctrl-zoom-in');
-          const hasZoomOut = control.querySelector('.maplibregl-ctrl-zoom-out');
-          if (hasZoomIn || hasZoomOut) {
-            return control;
-          }
-        }
-        return null;
-      };
+    const setLocatingState = (isLocating) => {
+      const button = buttonRef.current;
+      if (!button) return;
+      loadingRef.current = isLocating;
+      button.classList.toggle('is-locating', isLocating);
+      button.setAttribute('aria-busy', isLocating ? 'true' : 'false');
+      if (buttonLabelRef.current) {
+        buttonLabelRef.current.textContent = isLocating ? 'Locating...' : 'Center on current location';
+      }
+    };
 
-      const navigationGroup = findNavigationGroup();
-      
-      if (!navigationGroup || buttonRef.current) {
-        // Navigation group not found yet or button already added
+    const focusToPosition = (coords) => {
+      map.easeTo({
+        center: [coords.longitude, coords.latitude],
+        zoom: Math.max(map.getZoom(), 15),
+        duration: 1200,
+        easing: (t) => 1 - (1 - t) ** 4,
+        essential: true,
+      });
+    };
+
+    /**
+     * Two-stage lookup: coarse first (Wi‑Fi / IP / last known), then GPS if needed.
+     * Avoids code 3 timeouts common with enableHighAccuracy-only on first try.
+     */
+    const requestLocationStaged = async () => {
+      try {
+        const coords = await getCurrentPositionAsync(GEO_COARSE);
+        focusToPosition(coords);
+        setLocatingState(false);
         return;
+      } catch (firstError) {
+        if (firstError?.code === 1) {
+          console.warn('Geolocation: permission denied.');
+          setLocatingState(false);
+          return;
+        }
       }
 
-      // Create the geolocate control to get its functionality
-      geolocateControlRef.current = new maplibregl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true,
-          timeout: 20000,
-          maximumAge: 15000,
-        },
-        trackUserLocation: true,
-        showUserHeading: true,
+      try {
+        const coords = await getCurrentPositionAsync(GEO_PRECISE);
+        focusToPosition(coords);
+      } catch (finalError) {
+        if (finalError?.code === 1) {
+          console.warn('Geolocation: permission denied.');
+        } else {
+          console.warn('Geolocation unavailable:', finalError?.message || finalError);
+        }
+      } finally {
+        setLocatingState(false);
+      }
+    };
+
+    /** After hidden GeolocateControl already tried coarse options — only attempt GPS. */
+    const requestPreciseOnly = async () => {
+      try {
+        const coords = await getCurrentPositionAsync(GEO_PRECISE);
+        focusToPosition(coords);
+      } catch (finalError) {
+        if (finalError?.code === 1) {
+          console.warn('Geolocation: permission denied.');
+        } else {
+          console.warn('Geolocation unavailable:', finalError?.message || finalError);
+        }
+      } finally {
+        setLocatingState(false);
+      }
+    };
+
+    const requestCurrentLocation = () => {
+      if (loadingRef.current) return;
+      setLocatingState(true);
+
+      try {
+        if (geolocateControlRef.current) {
+          geolocateControlRef.current.trigger();
+          return;
+        }
+      } catch (error) {
+        console.warn('Geolocate control trigger failed, using staged lookup:', error);
+      }
+
+      void requestLocationStaged();
+    };
+
+    const createGeolocateControl = () => {
+      if (geolocateControlRef.current) return;
+
+      const control = new maplibregl.GeolocateControl({
+        // Match “coarse first” so trigger() behaves like our staged first step.
+        positionOptions: { ...GEO_COARSE },
+        trackUserLocation: false,
+        showUserHeading: false,
         showAccuracyCircle: true,
       });
 
-      // Add error handling
-      geolocateControlRef.current.on('error', (e) => {
-        console.error('Geolocation error:', e);
-        if (e.code === 1) {
-          console.warn('User denied geolocation permission');
-        } else if (e.code === 2) {
-          console.warn('Geolocation position unavailable');
-        } else if (e.code === 3) {
-          console.warn('Geolocation timeout');
+      control.on('geolocate', ({ coords }) => {
+        if (coords?.longitude && coords?.latitude) {
+          focusToPosition(coords);
+        }
+        setLocatingState(false);
+      });
+
+      control.on('error', (error) => {
+        if (error?.code === 1) {
+          console.warn('Geolocation: permission denied.');
+          setLocatingState(false);
+          return;
+        }
+        // Control already used coarse-style options — try a GPS pass only (no duplicate coarse wait).
+        void requestPreciseOnly();
+      });
+
+      map.addControl(control, theme.direction === 'rtl' ? 'top-left' : 'top-right');
+
+      // Keep native control logic but hide its visual group.
+      if (control._container) {
+        control._container.style.display = 'none';
+      }
+
+      geolocateControlRef.current = control;
+    };
+
+    const tryInsertButton = () => {
+      const controls = map.getContainer().querySelectorAll('.maplibregl-ctrl-group');
+      let navigationGroup = null;
+      controls.forEach((controlGroup) => {
+        if (!navigationGroup && controlGroup.querySelector('.maplibregl-ctrl-zoom-in')) {
+          navigationGroup = controlGroup;
         }
       });
 
-      geolocateControlRef.current.on('geolocate', (e) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Geolocation successful:', e.coords);
-        }
+      if (!navigationGroup || buttonRef.current) return false;
+
+      const navButton = document.createElement('button');
+      navButton.type = 'button';
+      navButton.className = 'maplibregl-ctrl-geolocate map-premium-location-btn';
+      navButton.setAttribute('aria-label', 'Center on current location');
+      navButton.setAttribute('title', 'Center on current location');
+      navButton.setAttribute('aria-busy', 'false');
+      navButton.innerHTML = '<span class="maplibregl-ctrl-icon" aria-hidden="true"></span>';
+
+      const srLabel = document.createElement('span');
+      srLabel.className = 'map-premium-sr-only';
+      srLabel.textContent = 'Center on current location';
+      navButton.appendChild(srLabel);
+      buttonLabelRef.current = srLabel;
+
+      navButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        requestCurrentLocation();
       });
 
-      // Initialize the control properly - add it to the map first
-      const geolocateContainer = geolocateControlRef.current.onAdd(map);
-      const originalButton = geolocateContainer.querySelector('button');
-      
-      if (originalButton) {
-        // Hide the original geolocate control container
-        geolocateContainer.style.display = 'none';
-        
-        // Create a new button for the navigation group that looks the same
-        const navButton = originalButton.cloneNode(true);
-        buttonRef.current = navButton;
-        
-        // Ensure button is enabled (remove disabled attribute if present)
-        navButton.removeAttribute('disabled');
-        navButton.disabled = false;
-        
-        // Clear any existing onclick and add our own handler
-        navButton.onclick = null;
-        navButton.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          // Always try to trigger geolocation, regardless of original button state
-          if (geolocateControlRef.current) {
-            try {
-              // Try the control's trigger method first
-              geolocateControlRef.current.trigger();
-            } catch (error) {
-              console.warn('Control trigger failed, trying direct geolocation:', error);
-              // Fallback: manually request geolocation
-              if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                  (position) => {
-                    map.flyTo({
-                      center: [position.coords.longitude, position.coords.latitude],
-                      zoom: Math.max(map.getZoom(), 15),
-                    });
-                  },
-                  (err) => {
-                    console.error('Geolocation error:', err);
-                  },
-                  {
-                    enableHighAccuracy: true,
-                    timeout: 20000,
-                    maximumAge: 15000,
-                  }
-                );
-              }
-            }
-          }
-          
-          // Also try clicking the original button as backup
-          if (originalButton && !originalButton.disabled) {
-            try {
-              originalButton.click();
-            } catch (err) {
-              // Ignore if it fails
-            }
-          }
-        });
+      const zoomOutButton = navigationGroup.querySelector('.maplibregl-ctrl-zoom-out');
+      if (zoomOutButton) {
+        navigationGroup.insertBefore(navButton, zoomOutButton.nextSibling);
+      } else {
+        navigationGroup.appendChild(navButton);
+      }
 
-        // Also listen to the control's events to update button state
-        const updateButtonState = () => {
-          // Copy classes from original button to maintain state
-          if (originalButton) {
-            navButton.className = originalButton.className;
-            // Sync disabled state but keep our button enabled
-            // We'll handle the visual state through classes
-            if (originalButton.disabled) {
-              navButton.classList.add('maplibregl-ctrl-geolocate-disabled');
-            } else {
-              navButton.classList.remove('maplibregl-ctrl-geolocate-disabled');
-            }
-          }
-        };
-        
-        // Initial state sync
-        updateButtonState();
+      buttonRef.current = navButton;
+      return true;
+    };
 
-        // Update button state when control state changes
-        geolocateControlRef.current.on('trackuserlocationstart', updateButtonState);
-        geolocateControlRef.current.on('trackuserlocationend', updateButtonState);
-        geolocateControlRef.current.on('geolocate', updateButtonState);
-        geolocateControlRef.current.on('error', updateButtonState);
-        
-        // Ensure button stays enabled - periodically check and re-enable if needed
-        const enableCheckInterval = setInterval(() => {
-          if (navButton && navButton.disabled) {
-            navButton.disabled = false;
-            navButton.removeAttribute('disabled');
-          }
-        }, 1000);
-        
-        // Store interval ID for cleanup
-        navButton._enableCheckInterval = enableCheckInterval;
-
-        // Insert button into navigation group in the correct position
-        // Navigation control typically has: zoom-in (first), zoom-out (second)
-        // We'll add geolocate button after zoom-out (as the third/last button)
-        const zoomOutButton = navigationGroup.querySelector('.maplibregl-ctrl-zoom-out');
-        if (zoomOutButton) {
-          // Insert after zoom-out button (as the last button in the group)
-          navigationGroup.insertBefore(navButton, zoomOutButton.nextSibling);
-        } else {
-          // Fallback: append at the end if zoom-out not found
-          navigationGroup.appendChild(navButton);
-        }
+    const ensureButtonAttached = () => {
+      if (tryInsertButton() && insertIntervalId) {
+        clearInterval(insertIntervalId);
+        insertIntervalId = null;
       }
     };
 
-    // Wait for map to load and navigation control to be added
-    const tryAddButton = () => {
-      if (map.loaded()) {
-        // Give a small delay to ensure navigation control is added
-        setTimeout(addButtonToNavigationGroup, 100);
-      }
-    };
+    createGeolocateControl();
 
     if (map.loaded()) {
-      tryAddButton();
+      ensureButtonAttached();
     } else {
-      map.once('load', tryAddButton);
+      map.once('load', ensureButtonAttached);
     }
 
-    // Also try after a short delay in case navigation control is added later
-    const timeoutId = setTimeout(addButtonToNavigationGroup, 500);
+    // Retry attach because control groups can be added after async setup.
+    insertIntervalId = setInterval(ensureButtonAttached, 300);
 
-    // Cleanup function
     return () => {
-      clearTimeout(timeoutId);
+      if (insertIntervalId) clearInterval(insertIntervalId);
       if (buttonRef.current) {
-        // Clear the enable check interval if it exists
-        if (buttonRef.current._enableCheckInterval) {
-          clearInterval(buttonRef.current._enableCheckInterval);
-        }
         if (buttonRef.current.parentNode) {
           buttonRef.current.parentNode.removeChild(buttonRef.current);
         }
         buttonRef.current = null;
       }
+      buttonLabelRef.current = null;
+      loadingRef.current = false;
+
       if (geolocateControlRef.current) {
         try {
-          // Properly remove the control and its hidden container
-          const container = geolocateControlRef.current._container;
-          if (container && container.parentNode) {
-            container.parentNode.removeChild(container);
-          }
-          geolocateControlRef.current.onRemove(map);
-        } catch (e) {
-          console.warn('Error removing geolocate control:', e);
+          map.removeControl(geolocateControlRef.current);
+        } catch (error) {
+          console.warn('Failed to remove geolocate control:', error);
         }
         geolocateControlRef.current = null;
       }

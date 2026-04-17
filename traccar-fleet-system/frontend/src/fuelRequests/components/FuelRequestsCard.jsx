@@ -1,31 +1,25 @@
 import {
   Paper, Typography, Grid, Box, Chip, Button, Card, CardContent,
-  Accordion, AccordionSummary, AccordionDetails, useTheme, IconButton,
-  Tooltip, Snackbar, Alert
+  Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import TodayIcon from '@mui/icons-material/Today';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import PersonIcon from '@mui/icons-material/Person';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import InfoIcon from '@mui/icons-material/Info';
-import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
 import FuelApprovalDialog from './FuelApprovalDialog';
 import FuelRequestsManagementDashboard from './FuelRequestsManagementDashboard';
 import { errorsActions } from '../../store';
 import { fuelRequestsActions } from '../store/fuelRequests';
-import { snackBarDurationLongMs } from '../../common/util/duration';
 
 const useStyles = makeStyles()((theme) => ({
   paper: {
@@ -256,7 +250,7 @@ const useStyles = makeStyles()((theme) => ({
     height: '100%',
     borderRadius: '12px',
     border: `1px solid ${theme.palette.divider}`,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
     boxShadow: theme.palette.mode === 'dark'
       ? '0 1px 2px rgba(0, 0, 0, 0.2)'
       : '0 1px 2px rgba(0, 0, 0, 0.05)',
@@ -264,22 +258,21 @@ const useStyles = makeStyles()((theme) => ({
     flexDirection: 'column',
     '&:hover': {
       boxShadow: theme.palette.mode === 'dark'
-        ? '0 6px 16px rgba(0, 0, 0, 0.4)'
-        : '0 6px 16px rgba(0, 0, 0, 0.12)',
-      transform: 'translateY(-3px)',
+        ? '0 4px 12px rgba(0, 0, 0, 0.35)'
+        : '0 4px 12px rgba(0, 0, 0, 0.1)',
       borderColor: theme.palette.mode === 'dark' 
         ? 'rgba(255, 255, 255, 0.2)' 
         : 'rgba(0, 0, 0, 0.15)',
     },
   },
   requestCardNew: {
-    borderLeft: '4px solid #3B82F6',
+    borderLeft: '3px solid #3B82F6',
   },
   requestCardWarning: {
-    borderLeft: '4px solid #F59E0B',
+    borderLeft: '3px solid #F59E0B',
     backgroundColor: theme.palette.mode === 'dark' 
-      ? 'rgba(245, 158, 11, 0.1)' 
-      : '#FFFBEB',
+      ? 'rgba(245, 158, 11, 0.06)' 
+      : 'rgba(245, 158, 11, 0.04)',
   },
   requestCardContent: {
     padding: theme.spacing(2.5),
@@ -358,7 +351,6 @@ const useStyles = makeStyles()((theme) => ({
 }));
 
 const FuelRequestsCard = () => {
-  const theme = useTheme();
   const { classes } = useStyles();
   const dispatch = useDispatch();
   
@@ -387,7 +379,6 @@ const FuelRequestsCard = () => {
   const [expandedSections, setExpandedSections] = useState({});
   const [approvalDialog, setApprovalDialog] = useState({ open: false, request: null });
   const [processingRequests, setProcessingRequests] = useState(new Set()); // Track requests being processed
-  const [popupNotifications, setPopupNotifications] = useState([]); // Popup notifications
 
 
   // Calculate statistics
@@ -515,17 +506,17 @@ const FuelRequestsCard = () => {
   // Get status badge
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { label: 'Pending', className: classes.statusPending, icon: '⏳' },
-      approved: { label: 'Approved', className: classes.statusApproved, icon: '✅' },
-      fulfilled: { label: 'Fulfilled', className: classes.statusFulfilled, icon: '🎯' },
-      rejected: { label: 'Rejected', className: classes.statusRejected, icon: '❌' },
-      cancelled: { label: 'Cancelled', className: classes.statusRejected, icon: '🚫' },
+      pending: { label: 'Pending', className: classes.statusPending },
+      approved: { label: 'Approved', className: classes.statusApproved },
+      fulfilled: { label: 'Fulfilled', className: classes.statusFulfilled },
+      rejected: { label: 'Rejected', className: classes.statusRejected },
+      cancelled: { label: 'Cancelled', className: classes.statusRejected },
     };
 
     const config = statusConfig[status] || statusConfig.pending;
     return (
       <Chip
-        label={`${config.icon} ${config.label}`}
+        label={config.label}
         size="small"
         className={`${classes.statusBadge} ${config.className}`}
       />
@@ -542,9 +533,10 @@ const FuelRequestsCard = () => {
     const config = urgencyConfig[urgency] || urgencyConfig.normal;
     return (
       <Chip
-        label={`⚡ ${config.label}`}
+        label={config.label}
         size="small"
         color={config.color}
+        variant="outlined"
       />
     );
   };
@@ -703,17 +695,18 @@ const FuelRequestsCard = () => {
         <CardContent className={classes.requestCardContent}>
           {isNew && (
             <Chip 
-              label="🆕 NEW REQUEST" 
+              label="New Request" 
               size="small" 
               color="primary" 
+              variant="outlined"
               sx={{ mb: 1, fontWeight: 600 }}
             />
           )}
           
           <Box className={classes.requestHeader}>
             <Box className={classes.requestTitle}>
-              <Typography variant="h6" fontWeight="bold">
-                🚙 {device?.name || `Device ${request.deviceId}`}
+              <Typography variant="h6" fontWeight={700}>
+                {device?.name || `Device ${request.deviceId}`}
               </Typography>
               {getUrgencyChip(request.urgency)}
               {getStatusBadge(request.status)}
@@ -724,18 +717,18 @@ const FuelRequestsCard = () => {
             <Box className={classes.requestInfoRow}>
               <PersonIcon fontSize="small" />
               <Typography variant="body2">
-                Driver: User ID {request.userId}
+                Driver ID: {request.userId}
               </Typography>
             </Box>
             
             <Box className={classes.requestInfoRow}>
               <LocalGasStationIcon fontSize="small" />
               <Typography variant="body2">
-                📍 {request.requestedAmount}L
+                Requested: {request.requestedAmount} L
               </Typography>
               {request.currentFuelLevel && (
                 <Typography variant="body2" color="text.secondary">
-                  • Current: {Math.round(request.currentFuelLevel)}%
+                  Current: {Math.round(request.currentFuelLevel)}%
                 </Typography>
               )}
             </Box>
@@ -743,7 +736,7 @@ const FuelRequestsCard = () => {
             <Box className={classes.requestInfoRow}>
               <AccessTimeIcon fontSize="small" />
               <Typography variant="body2">
-                ⏰ {formatDate(request.requestTime)}
+                {formatDate(request.requestTime)}
               </Typography>
             </Box>
 
@@ -751,7 +744,7 @@ const FuelRequestsCard = () => {
               <Box className={classes.requestInfoRow}>
                 <LocationOnIcon fontSize="small" />
                 <Typography variant="body2">
-                  🏢 {request.address}
+                  {request.address}
                 </Typography>
               </Box>
             )}
@@ -768,11 +761,11 @@ const FuelRequestsCard = () => {
             {hasWarnings && (
               <Box sx={{ mt: 1, p: 1, bgcolor: 'warning.light', borderRadius: 1 }}>
                 <Typography variant="caption" fontWeight="bold">
-                  ⚠️ Excessive Request Detected
+                  Validation Warning
                 </Typography>
                 {request.managerSuggestion && (
                   <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                    💡 System suggests: {request.managerSuggestion}L
+                    Suggested approval: {request.managerSuggestion} L
                   </Typography>
                 )}
               </Box>
@@ -799,7 +792,7 @@ const FuelRequestsCard = () => {
                 onClick={() => handleReject(request.id, 'Rejected by manager')}
                 disabled={processingRequests.has(request.id)}
               >
-                {processingRequests.has(request.id) ? 'Processing...' : 'Deny'}
+                {processingRequests.has(request.id) ? 'Processing...' : 'Reject'}
               </Button>
               <Button
                 size="small"
@@ -808,7 +801,7 @@ const FuelRequestsCard = () => {
                 onClick={() => openDetailsDialog(request)}
                 disabled={processingRequests.has(request.id)}
               >
-                Details
+                Review
               </Button>
             </Box>
           )}
@@ -965,44 +958,6 @@ const FuelRequestsCard = () => {
         onApprove={handleApprove}
         onReject={handleReject}
       />
-      
-      {/* Popup notifications - works immediately without Socket.IO! */}
-      {popupNotifications.map((notification, index) => (
-        <Snackbar
-          key={notification.id}
-          open={notification.show}
-          autoHideDuration={snackBarDurationLongMs}
-          onClose={() => setPopupNotifications((prev) => prev.filter((e) => e.id !== notification.id))}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-          sx={{ 
-            mt: index * 7 + 1, // Stack notifications vertically with spacing
-            zIndex: 9999, // Ensure toasts appear above all content
-          }}
-        >
-          <Alert
-            onClose={() => setPopupNotifications((prev) => prev.filter((e) => e.id !== notification.id))}
-            severity={notification.type || 'info'}
-            sx={{ 
-              width: '100%',
-              minWidth: '300px',
-              maxWidth: '500px',
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            }}
-            action={
-              <IconButton
-                size="small"
-                aria-label="close"
-                color="inherit"
-                onClick={() => setPopupNotifications((prev) => prev.filter((e) => e.id !== notification.id))}
-              >
-                <CloseIcon fontSize="small" />
-              </IconButton>
-            }
-          >
-            {notification.message}
-          </Alert>
-        </Snackbar>
-      ))}
     </Paper>
   );
 };

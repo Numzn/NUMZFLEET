@@ -22,12 +22,12 @@ const useStyles = makeStyles()((theme) => ({
     position: 'relative',
     overflow: 'hidden',
     // Keep map content directly below fixed topbar without extra gap
-    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 60px)',
+    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)',
     [theme.breakpoints.between('md', 'lg')]: {
       paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)',
     },
     [theme.breakpoints.down('md')]: {
-      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 52px)',
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 50px)',
     },
   },
   mapContainer: {

@@ -22,6 +22,12 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { map } from '../../map/core/MapView';
 
+const easeInOutCirc = (t) => (
+  t < 0.5
+    ? (1 - Math.sqrt(1 - (2 * t) ** 2)) / 2
+    : (Math.sqrt(1 - (-2 * t + 2) ** 2) + 1) / 2
+);
+
 const useStyles = makeStyles()((theme) => ({
   popup: {
     position: 'absolute',
@@ -311,11 +317,12 @@ const MapDevicePopup = ({
   // Quick actions
   const handleFocusOnMap = () => {
     if (position && position.latitude && position.longitude) {
-      // Focus map on device position with smooth animation
       map.easeTo({
         center: [position.longitude, position.latitude],
-        zoom: Math.max(map.getZoom(), 12), // Ensure minimum zoom level
-        duration: 1000, // 1 second smooth animation
+        zoom: Math.max(map.getZoom(), 12),
+        duration: 1500,
+        easing: easeInOutCirc,
+        essential: true,
       });
     }
   };

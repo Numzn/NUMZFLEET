@@ -1,25 +1,51 @@
-/* Geolocate button is now inside the navigation control group */
-/* It will inherit all styling from .maplibregl-ctrl-group button */
-/* Only add custom styling for active/tracking state */
-
-/* Ensure button is always enabled and clickable */
-.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate {
-  cursor: pointer !important;
-  pointer-events: auto !important;
+/* Premium controls skin for zoom + center buttons */
+.maplibregl-ctrl-top-right .maplibregl-ctrl-group {
+  border-radius: 14px !important;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.2) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
-/* Active/tracking state - subtle highlight when tracking location */
-.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate-active {
-  background-color: #06b6d4 !important;
+.maplibregl-ctrl-top-right .maplibregl-ctrl-group > button {
+  width: 36px;
+  height: 36px;
+  transition: background-color 0.2s ease, transform 0.15s ease;
 }
 
-.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate-active:hover {
-  background-color: #0891b2 !important;
+.maplibregl-ctrl-top-right .maplibregl-ctrl-group > button:hover {
+  transform: translateY(-1px);
 }
 
-/* Disabled state visual (but button still works) */
-.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate-disabled {
-  opacity: 0.6 !important;
-  cursor: not-allowed !important;
+.maplibregl-ctrl-group .map-premium-location-btn {
+  cursor: pointer;
+  pointer-events: auto;
+  position: relative;
+}
+
+.maplibregl-ctrl-group .map-premium-location-btn.is-locating {
+  cursor: progress;
+}
+
+.maplibregl-ctrl-group .map-premium-location-btn.is-locating .maplibregl-ctrl-icon {
+  animation: map-location-pulse 1s ease-in-out infinite;
+}
+
+.map-premium-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+@keyframes map-location-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.16); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
 }
 

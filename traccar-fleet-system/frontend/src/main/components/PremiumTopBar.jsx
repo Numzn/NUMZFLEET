@@ -22,7 +22,7 @@ import UserMenuDropdown from '../../common/components/UserMenuDropdown';
 
 const useStyles = makeStyles()((theme) => ({
   premiumAppBar: {
-    height: 60,
+    height: 56,
     backgroundColor: theme.palette.mode === 'dark' ? 'rgba(5, 12, 24, 0.8)' : 'rgba(255, 255, 255, 0.82)',
     backgroundImage: theme.palette.mode === 'dark'
       ? 'linear-gradient(180deg, rgba(34, 211, 238, 0.08) 0%, rgba(0, 0, 0, 0) 100%)'
@@ -39,8 +39,8 @@ const useStyles = makeStyles()((theme) => ({
     overflow: 'hidden',
   },
   toolbar: {
-    minHeight: 60,
-    height: 60,
+    minHeight: 56,
+    height: 56,
     padding: theme.spacing(0, 1.75),
     display: 'flex',
     justifyContent: 'space-between',
@@ -162,9 +162,9 @@ const PremiumTopBar = ({
 
   // Calculate responsive height
   const getToolbarHeight = () => {
-    if (isMobile) return 52;
+    if (isMobile) return 50;
     if (isTablet) return 56;
-    return 60;
+    return 56;
   };
 
   const toolbarHeight = getToolbarHeight();

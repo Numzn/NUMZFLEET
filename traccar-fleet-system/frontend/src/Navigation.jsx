@@ -64,6 +64,7 @@ import { useLocalization } from './common/components/LocalizationProvider';
 import fetchOrThrow from './common/util/fetchOrThrow';
 import AuditPage from './reports/AuditPage';
 import ToastNotificationTest from './test/ToastNotificationTest';
+import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -122,6 +123,7 @@ const Navigation = () => {
       <Route path="/" element={<App />}>
         <Route index element={<DashboardPage />} />
         <Route path="map" element={<MainPage />} />
+        <Route path="fuel-requests" element={<FuelRequestsPage />} />
 
         <Route path="position/:id" element={<PositionPage />} />
         <Route path="network/:positionId" element={<NetworkPage />} />

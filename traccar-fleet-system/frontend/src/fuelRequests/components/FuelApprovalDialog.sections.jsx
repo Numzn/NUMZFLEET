@@ -6,17 +6,12 @@ import {
   Alert,
   Button,
   Slider,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Divider,
   TextField,
   Avatar,
 } from '@mui/material';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 
 export const DecisionHeader = ({
   classes,
@@ -64,14 +59,7 @@ export const LiveDataCard = ({
         size="small"
         aria-label="fuel projection"
       />
-      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Typography className={classes.helperText}>0%</Typography>
-        <Typography className={classes.helperText}>100%</Typography>
-      </Box>
     </Box>
-    <Typography className={classes.liveDataMeta}>
-      Live data source: Traccar position + vehicle spec
-    </Typography>
   </Box>
 );
 
@@ -122,22 +110,6 @@ export const ApprovalAmountSection = ({
       </Button>
     </Box>
   </Box>
-);
-
-export const DetailsSection = ({ classes, requestReason, tankCapacity }) => (
-  <Accordion className={classes.detailsAccordion}>
-    <AccordionSummary
-      expandIcon={<ExpandMoreIcon />}
-      sx={{ '& .MuiAccordionSummary-content': { alignItems: 'center' } }}
-    >
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, flexGrow: 1 }}>Details</Typography>
-      <MoreHorizIcon fontSize="small" color="action" />
-    </AccordionSummary>
-    <AccordionDetails>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>Reason: {requestReason || 'No reason provided'}</Typography>
-      <Typography variant="body2" color="text.secondary">Tank Capacity: {Number.isFinite(tankCapacity) ? `${Math.round(tankCapacity)}L` : 'Not configured'}</Typography>
-    </AccordionDetails>
-  </Accordion>
 );
 
 export const NotesSection = ({ classes, isMobile, notes, setNotes }) => (

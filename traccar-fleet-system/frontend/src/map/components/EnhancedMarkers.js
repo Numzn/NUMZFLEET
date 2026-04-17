@@ -1,4 +1,4 @@
-import { useId, useCallback, useEffect } from 'react';
+import { useId, useCallback, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -8,6 +8,11 @@ import { mapIconKey } from '../core/preloadImages';
 import { useAttributePreference } from '../../common/util/preferences';
 import { useCatchCallback } from '../../reactHelper';
 import { findFonts } from '../core/mapUtil';
+
+const LERP_DURATION = 1200;
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 
 const EnhancedMarkers = ({ 
   positions, 
@@ -116,6 +121,8 @@ const EnhancedMarkers = ({
       center: features[0].geometry.coordinates,
       zoom,
       duration: 1000,
+      easing: easeOutCubic,
+      essential: true,
     });
   }, [clusters]);
 
@@ -368,34 +375,92 @@ const EnhancedMarkers = ({
     };
   }, [mapCluster, clusters, onMarkerClickCallback, onClusterClick, onMouseEnter, onMouseLeave]);
 
-  // Update marker data
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[EnhancedMarkers] Updating with', safePositions.length, 'positions');
-    }
-    
-    [id, selected].forEach((source) => {
-      const features = safePositions
-        .filter((it) => devices.hasOwnProperty(it.deviceId))
-        .filter((it) => (source === id ? it.deviceId !== selectedDeviceId : it.deviceId === selectedDeviceId))
-        .map((position) => ({
+  const prevCoordsRef = useRef({});
+  const animFrameRef = useRef(null);
+
+  const buildFeatures = useCallback((source, coords) => {
+    return safePositions
+      .filter((it) => devices.hasOwnProperty(it.deviceId))
+      .filter((it) => (source === id ? it.deviceId !== selectedDeviceId : it.deviceId === selectedDeviceId))
+      .map((position) => {
+        const c = coords[position.deviceId];
+        return {
           type: 'Feature',
           geometry: {
             type: 'Point',
-            coordinates: [position.longitude, position.latitude],
+            coordinates: c ? [c.lng, c.lat] : [position.longitude, position.latitude],
           },
           properties: createFeature(devices, position, selectedPosition && selectedPosition.id),
-        }));
-        
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[EnhancedMarkers] ${source}: ${features.length} features`);
-      }
-      map.getSource(source)?.setData({
-        type: 'FeatureCollection',
-        features,
+        };
       });
+  }, [safePositions, devices, selectedDeviceId, selectedPosition, id]);
+
+  useEffect(() => {
+    const prev = prevCoordsRef.current;
+    const targets = {};
+    let needsAnimation = false;
+
+    safePositions.forEach((pos) => {
+      const old = prev[pos.deviceId];
+      if (old && (old.lng !== pos.longitude || old.lat !== pos.latitude)) {
+        targets[pos.deviceId] = {
+          fromLng: old.lng, fromLat: old.lat,
+          toLng: pos.longitude, toLat: pos.latitude,
+        };
+        needsAnimation = true;
+      }
+      prev[pos.deviceId] = { lng: pos.longitude, lat: pos.latitude };
     });
-  }, [safePositions, devices, selectedDeviceId, selectedPosition]);
+
+    if (!needsAnimation) {
+      [id, selected].forEach((source) => {
+        const features = buildFeatures(source, prev);
+        map.getSource(source)?.setData({ type: 'FeatureCollection', features });
+      });
+      return;
+    }
+
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+
+    const startTime = performance.now();
+
+    const animate = (now) => {
+      const elapsed = now - startTime;
+      const rawT = Math.min(elapsed / LERP_DURATION, 1);
+      const t = easeOutCubic(rawT);
+
+      const interpolated = { ...prev };
+      Object.entries(targets).forEach(([deviceId, tgt]) => {
+        interpolated[deviceId] = {
+          lng: lerp(tgt.fromLng, tgt.toLng, t),
+          lat: lerp(tgt.fromLat, tgt.toLat, t),
+        };
+      });
+
+      [id, selected].forEach((source) => {
+        const features = buildFeatures(source, interpolated);
+        map.getSource(source)?.setData({ type: 'FeatureCollection', features });
+      });
+
+      if (rawT < 1) {
+        animFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        Object.entries(targets).forEach(([deviceId, tgt]) => {
+          prev[deviceId] = { lng: tgt.toLng, lat: tgt.toLat };
+        });
+        animFrameRef.current = null;
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+    };
+  }, [safePositions, devices, selectedDeviceId, selectedPosition, id, selected, buildFeatures]);
 
   return null;
 };
