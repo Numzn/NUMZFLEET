@@ -19,9 +19,10 @@ if ! git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ "${DEPLOY_ALLOW_DIRTY:-0}" != "1" ]] && [[ -n "$(git -C "$ROOT_DIR" status --porcelain)" ]]; then
-  echo "ERROR: Uncommitted changes (deploy would not match a single Git revision):" >&2
-  git -C "$ROOT_DIR" status --short >&2
+# Only tracked-file changes block deploy; untracked (e.g. .cursor/plans) is ignored.
+if [[ "${DEPLOY_ALLOW_DIRTY:-0}" != "1" ]] && [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=no)" ]]; then
+  echo "ERROR: Uncommitted changes to tracked files (deploy would not match a single Git revision):" >&2
+  git -C "$ROOT_DIR" status --short --untracked-files=no >&2
   echo "Commit or stash, then retry. Emergency only: DEPLOY_ALLOW_DIRTY=1 ./deploy-frontend-docker.sh" >&2
   exit 1
 fi
