@@ -244,25 +244,32 @@ git checkout __DEPLOY_COMMIT__
 echo ""
 echo "=== [2/6] Build and start backend services ==="
 cd ~/NUMZFLEET/backend
-docker compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api erb-api numztrak-nginx 2>&1 || \
-  docker-compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api erb-api numztrak-nginx 2>&1
+docker-compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api erb-api numztrak-nginx 2>&1 || \
+  docker compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api erb-api numztrak-nginx 2>&1
 
 echo ""
 echo "=== [3/6] Build frontend from same commit ==="
-cd ~/NUMZFLEET/traccar-fleet-system/frontend
-npm ci --quiet
-npm run build
+FRONT="$HOME/NUMZFLEET/traccar-fleet-system/frontend"
+cd "$FRONT"
+if command -v npm >/dev/null 2>&1; then
+  npm ci --quiet
+  npm run build
+else
+  echo "npm not on PATH; using Node 20 image to write dist/ (matches local dev toolchain)."
+  docker pull node:20-bookworm
+  docker run --rm -v "$FRONT:/app" -w /app node:20-bookworm bash -lc "npm ci && npm run build"
+fi
 
 echo ""
 echo "=== [4/6] Reload edge (pick up new static bundle) ==="
 cd ~/NUMZFLEET/backend
-docker compose -f docker-compose.prod.yml restart numztrak-nginx 2>&1 || \
-  docker-compose -f docker-compose.prod.yml restart numztrak-nginx 2>&1
+docker-compose -f docker-compose.prod.yml restart numztrak-nginx 2>&1 || \
+  docker compose -f docker-compose.prod.yml restart numztrak-nginx 2>&1
 
 echo ""
 echo "=== [5/6] Service status ==="
-docker compose -f docker-compose.prod.yml ps 2>&1 || \
-  docker-compose -f docker-compose.prod.yml ps 2>&1
+docker-compose -f docker-compose.prod.yml ps 2>&1 || \
+  docker compose -f docker-compose.prod.yml ps 2>&1
 
 echo ""
 echo "=== [6/6] Health checks ==="
