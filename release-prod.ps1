@@ -98,9 +98,9 @@ function Run-Or-Throw($description, [scriptblock]$block) {
 # ─────────────────────────────────────────────────────────────
 
 Write-Host ""
-Write-Host "╔═══════════════════════════════════════════════╗" -ForegroundColor Magenta
-Write-Host "║   NUMZFLEET  ·  Git-First Production Release  ║" -ForegroundColor Magenta
-Write-Host "╚═══════════════════════════════════════════════╝" -ForegroundColor Magenta
+Write-Host "=================================================" -ForegroundColor Magenta
+Write-Host "  NUMZFLEET - Git-First Production Release" -ForegroundColor Magenta
+Write-Host "=================================================" -ForegroundColor Magenta
 Write-Host "   Server : $Server"
 Write-Host "   Branch : $Branch"
 Write-Host "   Key    : $KeyPath"
@@ -198,11 +198,11 @@ Write-Ok "Fetched latest origin refs"
 
 if ([string]::IsNullOrWhiteSpace($Commit)) {
     $Commit = (git -C $RepoRoot rev-parse "origin/$Branch").Trim()
-    Write-Ok "Resolved tip of origin/$Branch → $Commit"
+    Write-Ok "Resolved tip of origin/$Branch -> $Commit"
 } else {
     # Expand partial SHA
     $Commit = (git -C $RepoRoot rev-parse $Commit).Trim()
-    Write-Ok "Resolved explicit SHA → $Commit"
+    Write-Ok "Resolved explicit SHA -> $Commit"
 }
 
 if ([string]::IsNullOrWhiteSpace($Commit)) {
@@ -222,7 +222,7 @@ if (-not $contains) {
     Write-Fail "Push your changes and merge to $Branch before deploying."
     exit 1
 }
-Write-Ok "Commit $Commit is in origin/$Branch — safe to deploy"
+Write-Ok "Commit $Commit is in origin/$Branch - safe to deploy"
 
 # ─────────────────────────────────────────────────────────────
 # PHASE 5 — Server deploy (Git-first, SHA-locked)
