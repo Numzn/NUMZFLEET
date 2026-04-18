@@ -9,19 +9,21 @@ export default defineConfig(({ mode }) => {
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '');
   
-  // Allow configurable HMR host for mobile device access
-  // Set VITE_HMR_EXTERNAL env var to your host IP (e.g., 10.152.184.242) for mobile access
-  // If not set, defaults to 'localhost' for local development
-  // Use process.env in config file (import.meta.env is for runtime, not config time)
-  const hmrHost = env.VITE_HMR_EXTERNAL || env.VITE_HMR_HOST || 'localhost';
-  const hmrPort = env.VITE_HMR_PORT || 3002;
+  // Dev server port (`vite --port` still overrides this at runtime).
+  const devServerPort = parseInt(env.VITE_DEV_SERVER_PORT || '3002', 10);
+  // Mobile / LAN: set VITE_HMR_EXTERNAL to this machine’s IP so phones can reach the HMR WebSocket.
+  // Otherwise use `hmr: true` so the WebSocket uses the same port as the page (fixes e.g. page on :3003 but ws on :3002).
+  const hmrExternal = String(env.VITE_HMR_EXTERNAL || '').trim();
+  const useCustomHmr = Boolean(hmrExternal);
 
   // Detect environment mode
   const isLocalDev = env.LOCAL_DEV === 'true';
   const isProd = mode === 'production';
   const apiBaseUrl = env.VITE_API_BASE_URL || 'http://localhost';
   const remoteApiBaseUrl = env.REMOTE_API_BASE_URL || env.VITE_REMOTE_API_BASE_URL;
-  
+  /** When using REMOTE_API_BASE_URL for Traccar, point fuel-only routes to a host that serves fuel-api (e.g. http://localhost:3001). */
+  const explicitFuelApiUrl = env.VITE_FUEL_API_URL || env.VITE_FUEL_API_BASE_URL;
+
   // Determine backend URLs based on environment
   let traccarUrl, fuelApiUrl;
   
@@ -34,13 +36,24 @@ export default defineConfig(({ mode }) => {
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
   } else if (remoteApiBaseUrl) {
-    // Local frontend + hosted backend (recommended for integration checks)
+    // Local frontend + hosted Traccar: fuel-api usually runs on Docker localhost:3001, not on the remote host.
+    const fuelUsesRemote = env.VITE_FUEL_PROXY_USE_REMOTE === 'true';
     traccarUrl = remoteApiBaseUrl;
-    fuelApiUrl = remoteApiBaseUrl;
+    fuelApiUrl =
+      explicitFuelApiUrl ||
+      (fuelUsesRemote ? remoteApiBaseUrl : 'http://localhost:3001');
     console.log('☁️ [Vite] Running in REMOTE backend mode');
     console.log(`   Remote Base: ${remoteApiBaseUrl}`);
     console.log(`   Traccar: ${traccarUrl}`);
-    console.log(`   Fuel API: ${fuelApiUrl}`);
+    console.log(
+      `   Fuel API: ${fuelApiUrl}${
+        explicitFuelApiUrl
+          ? ' (VITE_FUEL_API_URL)'
+          : fuelUsesRemote
+            ? ' (VITE_FUEL_PROXY_USE_REMOTE)'
+            : ' (default localhost:3001)'
+      }`
+    );
   } else if (isLocalDev) {
     // Local development
     traccarUrl = 'http://localhost:8082';
@@ -49,23 +62,32 @@ export default defineConfig(({ mode }) => {
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
   } else {
-    // Docker development
-    traccarUrl = 'http://traccar-server:8082';
-    fuelApiUrl = 'http://fuel-api:3001';
-    console.log('🐳 [Vite] Running in DOCKER mode');
+    // Vite runs on the host; Compose maps traccar:8082 and fuel-api:3001 to localhost.
+    // Set VITE_PROXY_INTERNAL_DOCKER=true only if the dev server runs inside the Compose network.
+    const internalDocker = env.VITE_PROXY_INTERNAL_DOCKER === 'true';
+    traccarUrl = internalDocker ? 'http://traccar-server:8082' : 'http://localhost:8082';
+    fuelApiUrl = internalDocker ? 'http://fuel-api:3001' : 'http://localhost:3001';
+    console.log(internalDocker ? '🐳 [Vite] Running in DOCKER (internal) proxy mode' : '🐳 [Vite] Running in DOCKER-style dev (localhost proxy targets)');
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
   }
 
   return {
     server: {
-      port: 3002,
+      port: devServerPort,
       host: '0.0.0.0',
-      hmr: {
-        port: parseInt(hmrPort, 10),
-        host: hmrHost,
-        clientPort: parseInt(hmrPort, 10),
-      },
+      ...(useCustomHmr
+        ? {
+            hmr: {
+              host: hmrExternal,
+              port: parseInt(env.VITE_HMR_PORT || String(devServerPort), 10),
+              clientPort: parseInt(
+                env.VITE_HMR_CLIENT_PORT || env.VITE_HMR_PORT || String(devServerPort),
+                10
+              ),
+            },
+          }
+        : { hmr: true }),
       proxy: {
       // IMPORTANT: Order matters! More specific routes should come first
       // Socket.IO proxy MUST come before /api routes to avoid conflicts
@@ -186,6 +208,30 @@ export default defineConfig(({ mode }) => {
         },
       },
       '/api/vehicles': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: {
+          '*': 'localhost'
+        },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
+      // Fuel API: public login insight (must be before catch-all /api → Traccar)
+      '/api/public': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/reports': {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,

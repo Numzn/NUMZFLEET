@@ -24,6 +24,7 @@ from config import Config
 from price_comparator import PriceComparator
 from email_notifier import EmailNotifier
 from scheduler import ERBScheduler
+from monitor_cycle import run_monitor_tick
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -154,8 +155,12 @@ class ERBFuelPriceMonitor:
 
         return result
     
+    def tick(self):
+        """Single lean-monitor step (Lusaka window, detect vs publish)."""
+        return run_monitor_tick(self)
+
     def monitor_prices(self):
-        """Fetch current ERB prices and email them immediately."""
+        """Fetch current ERB prices, save to published file, and email (legacy one-shot)."""
         try:
             self.logger.info("Fetching ERB fuel prices...")
 
@@ -186,16 +191,15 @@ class ERBFuelPriceMonitor:
     def start_scheduled_monitoring(self):
         """Start the scheduled monitoring system."""
         try:
-            scheduler = ERBScheduler(self.monitor_prices)
+            scheduler = ERBScheduler(self.tick)
             scheduler.start_scheduler()
-            
+
             self.logger.info("Scheduled monitoring started")
             self.logger.info(f"Next run: {scheduler.get_next_run()}")
 
-            # Run immediately on startup, then daily at 08:00
-            self.logger.info("Running immediate check on startup...")
-            self.monitor_prices()
-            
+            self.logger.info("Running recovery tick on startup...")
+            self.tick()
+
             return scheduler
             
         except Exception as e:
@@ -206,8 +210,12 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='ERB Fuel Price Monitoring System - Zambia')
-    parser.add_argument('--mode', choices=['once', 'schedule'], default='once',
-                       help='Run mode: once (single check), schedule (run now then daily at 08:00)')
+    parser.add_argument(
+        '--mode',
+        choices=['once', 'schedule'],
+        default='once',
+        help='once = one lean-monitor tick; schedule = 1-min tick loop (Lusaka window in code)',
+    )
     
     args = parser.parse_args()
     
@@ -218,20 +226,15 @@ if __name__ == "__main__":
     print("=" * 50)
     
     if args.mode == 'once':
-        print("Running single price check...")
-        result = monitor.monitor_prices()
-        
-        if result['status'] == 'success':
-            print("\n✅ Current Fuel Prices:")
-            print("-" * 30)
-            for fuel, price in result['data'].items():
-                print(f"{fuel:12}: {price} ZMW")
-        else:
-            print(f"\n❌ Error: {result['message']}")
+        print("Running single lean-monitor tick...")
+        result = monitor.tick()
+        print(f"Tick result: {result}")
+        if result.get('status') == 'error':
+            print(f"\n❌ Error: {result.get('message', result)}")
     
     elif args.mode == 'schedule':
         print("Starting scheduled monitoring...")
-        print("Monitoring runs every day at 08:00 and once immediately on startup")
+        print("1-minute scheduler tick; ERB scrapes only inside Lusaka window (see README / Config)")
         print("Press Ctrl+C to stop...")
         
         scheduler = monitor.start_scheduled_monitoring()

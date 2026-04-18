@@ -66,12 +66,12 @@ $RepoRoot = $PSScriptRoot
 
 function Write-Step($msg) {
     Write-Host ""
-    Write-Host "▶  $msg" -ForegroundColor Cyan
+    Write-Host ">> $msg" -ForegroundColor Cyan
 }
 
-function Write-Ok($msg) { Write-Host "   ✓  $msg" -ForegroundColor Green }
-function Write-Warn($msg) { Write-Host "   ⚠  $msg" -ForegroundColor Yellow }
-function Write-Fail($msg) { Write-Host "   ✗  $msg" -ForegroundColor Red }
+function Write-Ok($msg) { Write-Host "   [OK] $msg" -ForegroundColor Green }
+function Write-Warn($msg) { Write-Host "   [!] $msg" -ForegroundColor Yellow }
+function Write-Fail($msg) { Write-Host "   [X] $msg" -ForegroundColor Red }
 
 function Assert-Command($name) {
     if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
@@ -110,7 +110,7 @@ Write-Host "   Date   : $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 # PHASE 1 — Preflight checks
 # ─────────────────────────────────────────────────────────────
 
-Write-Step "Phase 1 · Preflight"
+Write-Step "Phase 1 - Preflight"
 
 Assert-Command git
 Assert-Command ssh
@@ -150,23 +150,23 @@ foreach ($f in $requiredFiles) {
 # ─────────────────────────────────────────────────────────────
 
 if ($SkipLocalChecks) {
-    Write-Step "Phase 2 · Local alignment gate  [SKIPPED — -SkipLocalChecks]"
+    Write-Step "Phase 2 - Local alignment gate  [SKIPPED: -SkipLocalChecks]"
     Write-Warn "SHA-on-main validation will still be enforced."
 } else {
-    Write-Step "Phase 2 · Local alignment gate"
+    Write-Step "Phase 2 - Local alignment gate"
 
     $frontendDir = Join-Path $RepoRoot "traccar-fleet-system/frontend"
     Push-Location $frontendDir
 
-    Write-Host "   → npm ci" -ForegroundColor DarkGray
+    Write-Host "   -> npm ci" -ForegroundColor DarkGray
     Run-Or-Throw "npm ci" { npm ci }
     Write-Ok "Dependencies installed"
 
-    Write-Host "   → npm run lint" -ForegroundColor DarkGray
+    Write-Host "   -> npm run lint" -ForegroundColor DarkGray
     Run-Or-Throw "ESLint" { npm run lint }
     Write-Ok "Lint passed"
 
-    Write-Host "   → npm run build" -ForegroundColor DarkGray
+    Write-Host "   -> npm run build" -ForegroundColor DarkGray
     Run-Or-Throw "Vite build" { npm run build }
     Write-Ok "Build passed"
 
@@ -174,7 +174,7 @@ if ($SkipLocalChecks) {
 
     # Nginx config syntax check (requires docker locally, optional)
     if (Get-Command docker -ErrorAction SilentlyContinue) {
-        Write-Host "   → nginx -t on nginx.prod.conf" -ForegroundColor DarkGray
+        Write-Host "   -> nginx -t on nginx.prod.conf" -ForegroundColor DarkGray
         $nginxConf = (Join-Path $RepoRoot "backend/nginx/nginx.prod.conf").Replace('\', '/')
         Run-Or-Throw "nginx config check" {
             docker run --rm `
@@ -183,7 +183,7 @@ if ($SkipLocalChecks) {
         }
         Write-Ok "Nginx config valid"
     } else {
-        Write-Warn "Docker not found locally — skipping nginx config check (CI will catch this)."
+        Write-Warn "Docker not found locally - skipping nginx config check (CI will catch this)."
     }
 }
 
@@ -191,7 +191,7 @@ if ($SkipLocalChecks) {
 # PHASE 3 — Commit SHA resolution
 # ─────────────────────────────────────────────────────────────
 
-Write-Step "Phase 3 · Resolve deploy commit"
+Write-Step "Phase 3 - Resolve deploy commit"
 
 Run-Or-Throw "git fetch" { git -C $RepoRoot fetch origin --prune --quiet }
 Write-Ok "Fetched latest origin refs"
@@ -214,7 +214,7 @@ if ([string]::IsNullOrWhiteSpace($Commit)) {
 # PHASE 4 — Safety: SHA must be in origin/main
 # ─────────────────────────────────────────────────────────────
 
-Write-Step "Phase 4 · Verify commit is in origin/$Branch"
+Write-Step "Phase 4 - Verify commit is in origin/$Branch"
 
 $contains = git -C $RepoRoot branch -r --contains $Commit 2>&1 | Select-String "origin/$Branch"
 if (-not $contains) {
@@ -228,7 +228,7 @@ Write-Ok "Commit $Commit is in origin/$Branch — safe to deploy"
 # PHASE 5 — Server deploy (Git-first, SHA-locked)
 # ─────────────────────────────────────────────────────────────
 
-Write-Step "Phase 5 · Deploy to production  ($User@$Server)"
+Write-Step "Phase 5 - Deploy to production  ($User@$Server)"
 Write-Host "   Commit : $Commit" -ForegroundColor Green
 
 # Single-quoted here-string: bash uses $(...) — a double-quoted @"..."@ breaks PowerShell parsing.

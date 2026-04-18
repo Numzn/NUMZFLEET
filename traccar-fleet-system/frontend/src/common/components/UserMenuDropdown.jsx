@@ -18,15 +18,17 @@ import HelpIcon from '@mui/icons-material/Help';
 import LogoutIcon from '@mui/icons-material/Logout';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { sessionActions } from '../../store';
 import { nativePostMessage } from './NativeInterface';
+import LogoImage from '../../login/LogoImage';
 
 const UserMenuDropdown = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+  const location = useLocation();
+
   const user = useSelector((state) => state.session.user);
 
   const handleClick = (event) => {
@@ -164,6 +166,27 @@ const UserMenuDropdown = () => {
               </Box>
             </Box>
           </Box>
+
+          {location.pathname === '/map' && (
+            <Box
+              sx={{
+                display: { xs: 'flex', md: 'none' },
+                justifyContent: 'center',
+                alignItems: 'center',
+                py: 1.25,
+                px: 1,
+              }}
+            >
+              <LogoImage
+                color="#06b6d4"
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  objectFit: 'contain',
+                }}
+              />
+            </Box>
+          )}
 
           <Divider sx={{ my: 1 }} />
 

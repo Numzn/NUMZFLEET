@@ -4,12 +4,14 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Zambia](https://img.shields.io/badge/Country-Zambia-red.svg)](https://en.wikipedia.org/wiki/Zambia)
 
-An automated fuel price monitoring system for the Energy Regulation Board (ERB) of Zambia. This system automatically checks for fuel price changes at month-end and sends email notifications.
+An automated fuel price monitoring system for the Energy Regulation Board (ERB) of Zambia. It uses a **lean monitor** (Lusaka window, soft day-of-month guard) to detect price changes, notify promptly, and **publish** to the API file at midnight.
+
+**Production source of truth (OCI and GitHub):** this app lives inside the **NUMZGPS** monorepo at [`erb-fuel-monitor`](https://github.com/Numzn/NUMZGPS/tree/main/erb-fuel-monitor). Deploy servers should pull that path on `main`; ship updates by committing under `erb-fuel-monitor/` in **Numzn/NUMZGPS**, not only in a separate standalone repo.
 
 ## ✨ Features
 
 - 🔍 **Automated Price Scraping** - Extracts current fuel prices from ERB website
-- 📅 **Smart Scheduling** - Monitors prices on month-end days (15:00-00:00)
+- 📅 **Smart Scheduling** - Lusaka afternoon window from `MONITOR_MIN_DAY` with bounded polling
 - 📧 **Email Notifications** - Sends alerts when prices change or are maintained
 - 📊 **Price Comparison** - Tracks changes between monitoring sessions
 - 📝 **Comprehensive Logging** - Detailed logs for debugging and monitoring
@@ -20,38 +22,37 @@ An automated fuel price monitoring system for the Energy Regulation Board (ERB) 
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/erb-fuel-monitor.git
-   cd erb-fuel-monitor
+1. **Clone the monorepo and enter this app**
+   ```powershell
+   git clone https://github.com/Numzn/NUMZGPS.git
+   cd NUMZGPS\erb-fuel-monitor
    ```
 
 2. **Install dependencies**
-   ```bash
+   ```powershell
    pip install -r requirements.txt
    ```
 
-3. **Configure email settings**
-   ```bash
-   cp config_template.py config_local.py
-   # Edit config_local.py with your email settings
+3. **Configure environment**
+   ```powershell
+   copy .env.example .env
+   # Edit .env (email, MONITOR_*, API_TOKEN, S3_* as needed)
    ```
 
 ### Usage
 
-#### Single Price Check
-```bash
+#### Single lean-monitor tick
+Runs one decision step (Lusaka window, soft day-of-month guard, pending vs published). Safe for GitHub Actions cron.
+
+```powershell
 python erb_scraper_final.py --mode once
 ```
 
-#### Start Scheduled Monitoring
-```bash
-python erb_scraper_final.py --mode schedule
-```
+#### Start scheduled worker
+Runs a 1-minute scheduler loop; each tick applies window logic so the ERB site is only scraped during the monitoring window.
 
-#### Test Email Configuration
-```bash
-python erb_scraper_final.py --email-test
+```powershell
+python erb_scraper_final.py --mode schedule
 ```
 
 ## 📁 Project Structure
@@ -59,15 +60,17 @@ python erb_scraper_final.py --email-test
 ```
 erb-fuel-monitor/
 ├── erb_scraper_final.py      # Main monitoring system
+├── monitor_cycle.py          # Lean window state machine (Lusaka), detect vs publish
 ├── config.py                 # Configuration settings
 ├── price_comparator.py       # Price comparison logic
 ├── email_notifier.py         # Email notification system
-├── scheduler.py              # Scheduling system
-├── config_template.py        # Email configuration template
+├── scheduler.py              # 1-minute tick driver
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # This file
 └── data/                     # Data directory (created automatically)
-    ├── fuel_prices.json      # Current price data
+    ├── fuel_prices.json      # Published prices (API reads this file)
+    ├── fuel_prices_pending.json  # Detected prices until midnight publish
+    ├── monitor_state.json    # Persisted window / monitor flags
     └── monitoring.log        # System logs
 ```
 
@@ -100,47 +103,42 @@ EMAIL_TO = "recipient@example.com"
 - **Kerosene** - Kerosene fuel
 - **Jet A-1** - Aviation fuel (KKIA)
 
-## 🕐 Scheduling
+## 🕐 Scheduling (lean monitor)
 
-The system automatically monitors prices on:
-- **Month-end days** (30th for 31-day months, 29th for 30-day months, etc.)
-- **Time window**: 15:00 to 00:00 (3 PM to midnight)
-- **Frequency**: Every 30 minutes during monitoring window
+All window boundaries use **`MONITOR_TZ`** (default **Africa/Lusaka**).
+
+- **Soft day-of-month guard**: from the **`MONITOR_MIN_DAY`** of each month (default **25**), after **15:00** local, the first successful scrape establishes an intraday baseline. If prices already differ from the **published** file, a change is recorded immediately (pending + email), and aggressive polling stops.
+- **Polling**: while in monitor mode, the ERB site is scraped at most every **`MONITOR_POLL_MINUTES`** (default **10**), only until **midnight** local.
+- **Before 15:00** or on calendar days **before `MONITOR_MIN_DAY`**: no scrapes (idle or guard skip).
+- **Midnight (hour 0)**: pending detection (if any) is promoted to **`fuel_prices.json`** (the file the API serves), then optional **publish** email. State resets for the next day.
+- **Worker**: `python erb_scraper_final.py --mode schedule` runs a **1-minute** scheduler loop; each tick is cheap when outside the window.
+- **Cron / Actions**: `python erb_scraper_final.py --mode once` runs a **single** tick; use a modest cron if multiple runners might overlap—prefer one primary runner and shared persistence (**S3**) if more than one host exists.
 
 ## 📧 Email Notifications
 
-### Price Change Notification
-- Sent when fuel prices change
-- Includes old vs new prices
-- Shows price differences
-- Beautiful HTML formatting
+### Change detected (pending)
+- Sent when scraped prices differ from the published snapshot at window open, or from the intraday baseline during polling.
+- Explains that values are **pending** until midnight publish.
 
-### No Change Notification
-- Sent when prices are maintained
-- Confirms system is working
-- Shows current prices
+### Published at midnight
+- Sent after pending prices are successfully promoted to the live **`fuel_prices.json`** (optional; respects `EMAIL_ENABLED`).
+
+### Legacy “current prices” email
+- The `monitor_prices()` helper (not used by the lean tick) can still send a one-off snapshot if you call it from custom code.
 
 ### Error Notifications
-- Sent when system errors occur
-- Includes error details
-- Helps with troubleshooting
+- Sent when a scrape fails or other errors occur (unchanged).
 
 ## 🔧 Advanced Usage
 
 ### Command Line Options
 
-```bash
-# Single check
+```powershell
+# Single lean-monitor tick (cron-friendly)
 python erb_scraper_final.py --mode once
 
-# Continuous monitoring
+# Continuous worker (1-minute scheduler loop)
 python erb_scraper_final.py --mode schedule
-
-# Test mode
-python erb_scraper_final.py --mode test
-
-# Test email
-python erb_scraper_final.py --email-test
 ```
 
 ### Running as a Service
@@ -189,7 +187,7 @@ sudo systemctl start erb-monitor.service
 2. **Email Not Sending**
    - Verify email configuration
    - Check Gmail App Password
-   - Test with `--email-test` flag
+   - Confirm `EMAIL_ENABLED` and SMTP settings in the environment
 
 3. **No Prices Found**
    - Check ERB website accessibility
@@ -197,8 +195,8 @@ sudo systemctl start erb-monitor.service
    - Website structure may have changed
 
 4. **Scheduling Not Working**
-   - Check system time and timezone
-   - Verify month-end date calculation
+   - Confirm `MONITOR_TZ` (default Africa/Lusaka) matches your intent
+   - Check `MONITOR_MIN_DAY`, `MONITOR_WINDOW_START`, and logs for `Tick: ...` actions
    - Review logs for errors
 
 ## ☁️ Deploying to Render (recommended)
@@ -220,14 +218,24 @@ Environment variables to set in Render (Dashboard → Environment):
 - `S3_ENABLED` - set to `true` if you want to persist `fuel_prices.json` to S3
 - `S3_BUCKET` - name of the S3 bucket (if S3_ENABLED)
 - `S3_KEY` - object key for prices file (default: fuel_prices.json)
+- `MONITOR_TZ` - IANA timezone for the window (default: `Africa/Lusaka`)
+- `MONITOR_WINDOW_START` - local start of window (default: `15:00`)
+- `MONITOR_WINDOW_END_HOUR` - hour that starts the finalize window (default: `0` = midnight)
+- `MONITOR_POLL_MINUTES` - minimum minutes between scrapes while monitoring (default: `10`)
+- `MONITOR_MIN_DAY` - first calendar day of month to allow the afternoon window (default: `25`)
 
-Deploy steps (from GitHub repo):
-1. Push your changes to GitHub.
+Deploy steps (from GitHub):
+1. Push your changes under `erb-fuel-monitor/` in repo **`Numzn/NUMZGPS`** (`main`).
 2. In Render, create a new service:
-   - Connect your GitHub repo `Numzn/NumzERB`
+   - Connect GitHub repo **`Numzn/NUMZGPS`**
+   - Set **Root directory** (or equivalent) to **`erb-fuel-monitor`** so build and start commands run from this folder.
    - Choose "Background Worker" (start command above) or "Cron Job" (command above).
    - Set environment variables in the Render Dashboard.
 3. Deploy and watch the logs in Render.
+
+### OCI (Oracle Cloud) and other VMs
+
+Use the same code path: deploy from **`NUMZGPS`** at `erb-fuel-monitor/` (see [`deploy/systemd/`](deploy/systemd/) for example unit files). After `git pull` on the instance, restart the worker and API services so they pick up changes.
 
 Notes:
 - The repository now supports optional S3 persistence via `boto3` (install via `requirements.txt`). If `S3_ENABLED=true`, the app will try to download the latest `fuel_prices.json` at startup and upload it after saves.
@@ -283,18 +291,18 @@ For support, email [your-email@example.com] or create an issue on GitHub.
 
 If you want to host this with minimal fuss, use GitHub + GitHub Actions to run the monitor and optionally build/push a container for AWS ECS.
 
-1) Create a GitHub repository and push this project:
+1) **NUMZGPS monorepo (recommended):** clone **`Numzn/NUMZGPS`**, edit `erb-fuel-monitor/`, commit, and push to `main` (same tree OCI should pull):
 
 ```bash
-git init
-git add .
-git commit -m "Initial import"
-git branch -M main
-git remote add origin https://github.com/<your-username>/<repo-name>.git
-git push -u origin main
+git clone https://github.com/Numzn/NUMZGPS.git
+cd NUMZGPS
+# apply your changes under erb-fuel-monitor/
+git add erb-fuel-monitor
+git commit -m "erb-fuel-monitor: describe your update"
+git push origin main
 ```
 
-2) Add Secrets in your repository (Settings → Secrets and variables → Actions):
+2) Add Secrets in repository **Numzn/NUMZGPS** (Settings → Secrets and variables → Actions) if workflows under `erb-fuel-monitor/.github` or repo root Actions need them:
 - EMAIL_FROM
 - EMAIL_PASSWORD (Gmail App Password if using Gmail)
 - EMAIL_TO

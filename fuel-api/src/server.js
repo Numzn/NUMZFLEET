@@ -15,6 +15,11 @@ import vehicleSpecsRouter from './routes/vehicleSpecs.js';
 import vehiclesRouter from './routes/vehicles.js';
 import reportsRouter from './reports/routes/reports.js';
 import { initializeSocket } from './socket/socketHandler.js';
+import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.js';
+import {
+  ensurePublicLoginInsightFromErb,
+  getPublicLoginInsight,
+} from './services/traccarLoginInsightSync.js';
 
 // Load environment variables
 dotenv.config();
@@ -165,6 +170,16 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'numztrak-fuel-api' });
 });
 
+/** Unauthenticated: ERB fuel lines for login (same adapter as /api/reports/erb/latest; fills cache on demand). */
+app.get('/api/public/login-insight', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    res.json(await ensurePublicLoginInsightFromErb());
+  } catch {
+    res.json(getPublicLoginInsight());
+  }
+});
+
 // Diagnostic endpoint to check authentication (development only)
 if (process.env.NODE_ENV === 'development') {
   app.get('/api/auth-check', async (req, res) => {
@@ -312,6 +327,9 @@ try {
 }
 
 // Start server with retry logic for database connections
+/** Stops ERB → login insight interval (if started). */
+let stopErbLoginInsightScheduler = () => {};
+
 const startServer = async () => {
   const MAX_RETRIES = 5;
   const RETRY_DELAY = 5000; // 5 seconds
@@ -396,6 +414,7 @@ const startServer = async () => {
       if (!pgConnected) console.log(`❌ PostgreSQL: NOT CONNECTED`);
       if (!traccarConnected) console.log(`❌ Traccar MySQL: NOT CONNECTED`);
       console.log('');
+      stopErbLoginInsightScheduler = startErbLoginInsightScheduler();
     });
     
     return; // Exit early, don't try to sync database
@@ -423,6 +442,7 @@ const startServer = async () => {
       console.log(`🗄️ Traccar MySQL: Connected (read-only)`);
       console.log('\n🎯 Ready to accept fuel requests!\n');
     }
+    stopErbLoginInsightScheduler = startErbLoginInsightScheduler();
   });
 };
 
@@ -433,6 +453,7 @@ process.on('SIGTERM', () => {
   if (isDev) {
     console.log('\n📴 SIGTERM received, shutting down gracefully...');
   }
+  stopErbLoginInsightScheduler();
   httpServer.close(() => {
     if (isDev) {
       console.log('✅ Server closed');

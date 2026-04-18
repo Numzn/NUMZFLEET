@@ -8,7 +8,7 @@ import MapAccuracy from '../map/main/MapAccuracy';
 import MapGeofence from '../map/MapGeofence';
 import MapCurrentLocation from '../map/MapCurrentLocation';
 import PoiMap from '../map/main/PoiMap';
-import MapPadding from '../map/MapPadding';
+import MapChromePadding from '../map/MapChromePadding.jsx';
 import { devicesActions } from '../store';
 import MapDefaultCamera from '../map/main/MapDefaultCamera';
 import MapLiveRoutes from '../map/main/MapLiveRoutes';
@@ -41,6 +41,7 @@ const MainMap = ({ filteredPositions, selectedPosition, devicesOpen }) => {
   return (
     <MapErrorBoundary>
       <MapView>
+        <MapChromePadding sidebarInset={desktop && devicesOpen ? 320 : 0} isDesktop={desktop} />
         <MapOverlay />
         <MapGeofence />
         <MapAccuracy positions={filteredPositions} />
@@ -58,9 +59,6 @@ const MainMap = ({ filteredPositions, selectedPosition, devicesOpen }) => {
       </MapView>
       <MapScale />
       <MapCurrentLocation />
-      {desktop && devicesOpen && (
-        <MapPadding start={320} />
-      )}
     </MapErrorBoundary>
   );
 };

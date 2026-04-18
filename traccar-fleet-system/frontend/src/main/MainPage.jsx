@@ -13,7 +13,7 @@ import DeviceDropdown from './components/DeviceDropdown';
 import MapDevicePopup from './components/MapDevicePopup';
 import { useAttributePreference } from '../common/util/preferences';
 
-const useStyles = makeStyles()((theme) => ({
+const useStyles = makeStyles()(() => ({
   root: {
     height: '100dvh',
     minHeight: '100vh',
@@ -21,14 +21,8 @@ const useStyles = makeStyles()((theme) => ({
     flexDirection: 'column',
     position: 'relative',
     overflow: 'hidden',
-    // Keep map content directly below fixed topbar without extra gap
-    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)',
-    [theme.breakpoints.between('md', 'lg')]: {
-      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)',
-    },
-    [theme.breakpoints.down('md')]: {
-      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 50px)',
-    },
+    // PremiumTopBar + BottomMenu are fixed and draw on top of the map; no layout padding here
+    // (avoids empty strips between chrome and tiles — MapChromePadding handles map insets).
   },
   mapContainer: {
     flex: 1,
@@ -37,11 +31,6 @@ const useStyles = makeStyles()((theme) => ({
     width: '100%',
     height: '100%',
     minHeight: 0,
-    paddingBottom: 0,
-    [theme.breakpoints.down('md')]: {
-      // Reserve only actual nav height + safe area
-      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)',
-    },
   },
 }));
 
@@ -144,6 +133,7 @@ const MainPage = () => {
     <Box className={classes.root}>
       {/* Topbar */}
       <PremiumTopBar
+        flatBottomOnMobile
         devices={Object.values(devices)}
         stats={deviceStats}
         onSearch={setKeyword}

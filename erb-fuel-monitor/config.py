@@ -36,7 +36,16 @@ class Config:
     # File Paths
     DATA_DIR = "data"
     PRICES_FILE = os.path.join(DATA_DIR, "fuel_prices.json")
+    PENDING_PRICES_FILE = os.path.join(DATA_DIR, "fuel_prices_pending.json")
+    MONITOR_STATE_FILE = os.path.join(DATA_DIR, "monitor_state.json")
     LOG_FILE = os.path.join(DATA_DIR, "monitoring.log")
+
+    # Lean monitor: Africa/Lusaka window, soft day-of-month guard, poll cadence
+    MONITOR_TZ = os.getenv("MONITOR_TZ", "Africa/Lusaka")
+    MONITOR_WINDOW_START = os.getenv("MONITOR_WINDOW_START", "15:00")
+    MONITOR_WINDOW_END_HOUR = int(os.getenv("MONITOR_WINDOW_END_HOUR", "0"))  # midnight = 0
+    MONITOR_POLL_MINUTES = int(os.getenv("MONITOR_POLL_MINUTES", "10"))
+    MONITOR_MIN_DAY = int(os.getenv("MONITOR_MIN_DAY", "25"))
     # S3 / external storage configuration (optional)
     S3_ENABLED = os.getenv('S3_ENABLED', 'false').lower() in ('1', 'true', 'yes')
     S3_BUCKET = os.getenv('S3_BUCKET', '')

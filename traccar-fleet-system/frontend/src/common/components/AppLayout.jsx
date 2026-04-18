@@ -136,7 +136,7 @@ const AppLayout = ({ children, showSidebar = true }) => {
           className={classes.drawer}
         >
           {/* Navigation Menu */}
-          <ModernSidebar showMobileBrand={!desktop} />
+          <ModernSidebar />
         </Drawer>
       )}
 

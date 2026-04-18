@@ -9,7 +9,6 @@ import VpnLockIcon from '@mui/icons-material/VpnLock';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { sessionActions } from '../store';
@@ -24,14 +23,6 @@ import QrCodeDialog from '../common/components/QrCodeDialog';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 
 const useStyles = makeStyles()((theme) => ({
-  options: {
-    position: 'fixed',
-    top: theme.spacing(2),
-    right: theme.spacing(2),
-    display: 'flex',
-    flexDirection: 'row',
-    gap: theme.spacing(1),
-  },
   container: {
     display: 'flex',
     flexDirection: 'column',
@@ -56,7 +47,6 @@ const LoginPage = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const theme = useTheme();
   const t = useTranslation();
 
   const { languages, language, setLocalLanguage } = useLocalization();
@@ -139,45 +129,55 @@ const LoginPage = () => {
     }
   }, []);
 
+  const showTopBar =
+    !nativeEnvironment ||
+    (nativeEnvironment && changeEnabled) ||
+    languageEnabled;
+
+  const topBar = (
+    <>
+      {nativeEnvironment && changeEnabled && (
+        <IconButton color="primary" size="small" onClick={() => navigate('/change-server')} sx={{ bgcolor: 'rgba(6, 182, 212, 0.08)' }}>
+          <Tooltip
+            title={`${t('settingsServer')}: ${window.location.hostname}`}
+            open={showServerTooltip}
+            arrow
+          >
+            <VpnLockIcon fontSize="small" />
+          </Tooltip>
+        </IconButton>
+      )}
+      {!nativeEnvironment && (
+        <IconButton color="primary" size="small" onClick={() => setShowQr(true)} sx={{ bgcolor: 'rgba(6, 182, 212, 0.08)' }}>
+          <QrCode2Icon fontSize="small" />
+        </IconButton>
+      )}
+      {languageEnabled && (
+        <FormControl size="small" sx={{ minWidth: 0, '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'rgba(6, 182, 212, 0.06)' } }}>
+          <Select value={language} onChange={(e) => setLocalLanguage(e.target.value)} variant="outlined">
+            {languageList.map((it) => (
+              <MenuItem key={it.code} value={it.code}>
+                <Box component="span" sx={{ mr: 1, display: 'inline-flex', alignItems: 'center' }}>
+                  <ReactCountryFlag countryCode={it.country} svg />
+                </Box>
+                {it.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
+    </>
+  );
+
   return (
-    <LoginLayout>
-      <div className={classes.options}>
-        {nativeEnvironment && changeEnabled && (
-          <IconButton color="primary" onClick={() => navigate('/change-server')}>
-            <Tooltip
-              title={`${t('settingsServer')}: ${window.location.hostname}`}
-              open={showServerTooltip}
-              arrow
-            >
-              <VpnLockIcon />
-            </Tooltip>
-          </IconButton>
-        )}
-        {!nativeEnvironment && (
-          <IconButton color="primary" onClick={() => setShowQr(true)}>
-            <QrCode2Icon />
-          </IconButton>
-        )}
-        {languageEnabled && (
-          <FormControl>
-            <Select value={language} onChange={(e) => setLocalLanguage(e.target.value)}>
-              {languageList.map((it) => (
-                <MenuItem key={it.code} value={it.code}>
-                  <Box component="span" sx={{ mr: 1 }}>
-                    <ReactCountryFlag countryCode={it.country} svg />
-                  </Box>
-                  {it.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        )}
-      </div>
+    <>
+    <LoginLayout topBar={showTopBar ? topBar : null}>
       <div className={classes.container}>
         {!openIdForced && (
           <>
             <TextField
               required
+              fullWidth
               error={failed}
               label={t('userEmail')}
               name="email"
@@ -189,6 +189,7 @@ const LoginPage = () => {
             />
             <TextField
               required
+              fullWidth
               error={failed}
               label={t('userPassword')}
               name="password"
@@ -216,6 +217,7 @@ const LoginPage = () => {
             {codeEnabled && (
               <TextField
                 required
+                fullWidth
                 error={failed}
                 label={t('loginTotpCode')}
                 name="code"
@@ -228,8 +230,12 @@ const LoginPage = () => {
               onClick={handlePasswordLogin}
               type="submit"
               variant="contained"
-              color="secondary"
+              color="primary"
+              size="large"
+              fullWidth
+              disableElevation
               disabled={!email || !password || (codeEnabled && !code)}
+              sx={{ mt: 0.5, py: 1.25, borderRadius: 2, fontWeight: 700 }}
             >
               {t('loginLogin')}
             </Button>
@@ -238,8 +244,11 @@ const LoginPage = () => {
         {openIdEnabled && (
           <Button
             onClick={() => handleOpenIdLogin()}
-            variant="contained"
-            color="secondary"
+            variant="outlined"
+            color="primary"
+            size="large"
+            fullWidth
+            sx={{ py: 1.1, borderRadius: 2, fontWeight: 600 }}
           >
             {t('loginOpenId')}
           </Button>
@@ -269,17 +278,18 @@ const LoginPage = () => {
           </div>
         )}
       </div>
-      <QrCodeDialog open={showQr} onClose={() => setShowQr(false)} />
-      <Snackbar
-        open={!!announcement && !announcementShown}
-        message={announcement}
-        action={(
-          <IconButton size="small" color="inherit" onClick={() => setAnnouncementShown(true)}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        )}
-      />
     </LoginLayout>
+    <QrCodeDialog open={showQr} onClose={() => setShowQr(false)} />
+    <Snackbar
+      open={!!announcement && !announcementShown}
+      message={announcement}
+      action={(
+        <IconButton size="small" color="inherit" onClick={() => setAnnouncementShown(true)}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      )}
+    />
+    </>
   );
 };
 

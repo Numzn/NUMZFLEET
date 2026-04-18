@@ -13,28 +13,33 @@ import logging
 class ERBScheduler:
     """Handles scheduling of ERB price monitoring tasks."""
     
-    def __init__(self, scraper_function: Callable):
+    def __init__(self, tick_function: Callable):
         self.logger = logging.getLogger(__name__)
-        self.scraper_function = scraper_function
+        self.tick_function = tick_function
         self.is_running = False
         self.scheduler_thread = None
     
     def setup_schedule(self):
-        """Schedule a daily price fetch and email at 08:00."""
-        schedule.every().day.at("08:00").do(self._run).tag("daily")
-        self.logger.info("Scheduled daily price check at 08:00")
+        """
+        Drive the lean monitor with a 1-minute cadence.
+        Window, day-of-month guard, and poll spacing are enforced inside tick() (Lusaka TZ).
+        """
+        schedule.every(1).minutes.do(self._run_tick).tag("tick")
+        self.logger.info(
+            "Scheduled monitor: 1-minute tick (lean window logic, see MONITOR_* env / Config)"
+        )
 
-    def _run(self):
-        """Fetch prices and send email."""
+    def _run_tick(self):
         try:
-            self.logger.info("Running scheduled ERB price check...")
-            result = self.scraper_function()
-            if result and result.get('status') == 'success':
-                self.logger.info("Scheduled price check completed successfully")
-            else:
-                self.logger.warning(f"Scheduled price check failed: {result.get('message', 'Unknown error')}")
+            result = self.tick_function()
+            if isinstance(result, dict):
+                action = result.get("action", "")
+                if result.get("status") == "error":
+                    self.logger.warning("Tick error: %s", result.get("message", result))
+                elif action and action != "poll_wait":
+                    self.logger.info("Tick: %s", action)
         except Exception as e:
-            self.logger.error(f"Error in scheduled check: {e}")
+            self.logger.error("Error in scheduled tick: %s", e)
     
     def start_scheduler(self):
         """Start the scheduler in a separate thread."""
@@ -48,7 +53,7 @@ class ERBScheduler:
         def run_scheduler():
             while self.is_running:
                 schedule.run_pending()
-                time.sleep(60)  # Check every minute
+                time.sleep(1)
         
         self.scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
         self.scheduler_thread.start()
@@ -67,7 +72,7 @@ class ERBScheduler:
     def run_immediate_check(self):
         """Run an immediate price check (for testing or manual execution)."""
         self.logger.info("Running immediate ERB price check...")
-        return self.scraper_function()
+        return self.tick_function()
     
     def get_next_run(self) -> str:
         """Return the next scheduled run time as a readable string."""

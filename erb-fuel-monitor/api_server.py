@@ -2,6 +2,8 @@
 """
 Public API service for ERB Fuel Monitor.
 Provides a secure endpoint for the latest cached prices.
+
+Serves only the published snapshot (Config.PRICES_FILE), not fuel_prices_pending.json.
 """
 
 import json

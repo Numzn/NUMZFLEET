@@ -97,17 +97,21 @@ const useStyles = makeStyles()((theme) => ({
   // Mobile responsive styles
   mobileToolbar: {
     padding: theme.spacing(0, 1),
-    gap: theme.spacing(0.65),
+    gap: theme.spacing(1),
+    justifyContent: 'flex-start',
   },
   mobileBrandSection: {
-    minWidth: 'auto',
-    gap: theme.spacing(1),
+    minWidth: 0,
+    flexShrink: 0,
+    gap: theme.spacing(0.75),
   },
   mobileCenterSection: {
     flex: 1,
     justifyContent: 'center',
     maxWidth: 'none',
     minWidth: 0,
+    marginLeft: theme.spacing(0.5),
+    marginRight: theme.spacing(0.5),
   },
   mobileRightSection: {
     minWidth: 'auto',
@@ -135,7 +139,9 @@ const PremiumTopBar = ({
   onNavigateToDashboard,
   onShowAllDevices,
   groups = [],
-  filters = { statuses: [], groups: [], sortBy: '', mapOnly: false }
+  filters = { statuses: [], groups: [], sortBy: '', mapOnly: false },
+  /** When true (e.g. live map), square off the bottom on small screens so tiles meet the bar with no curved gap. */
+  flatBottomOnMobile = false,
 }) => {
   const { classes } = useStyles();
   const theme = useTheme();
@@ -179,7 +185,7 @@ const PremiumTopBar = ({
         top: 0,
         left: 0,
         right: 0,
-        borderRadius: '0 0 14px 14px',
+        borderRadius: flatBottomOnMobile && isMobile ? 0 : '0 0 14px 14px',
         boxShadow: isScrolled
           ? (theme.palette.mode === 'dark'
             ? '0 16px 34px rgba(0, 0, 0, 0.4)'
@@ -198,15 +204,20 @@ const PremiumTopBar = ({
         {/* Left Section - Brand */}
         <Box 
           className={`${classes.brandSection} ${isMobile ? classes.mobileBrandSection : ''}`}
+          sx={isMobile ? { pr: 0 } : undefined}
         >
-          <Box className={classes.logoContainer}>
+          {/* Match dashboard: hide below md via CSS so SSR/first paint never flashes the logo on phones */}
+          <Box
+            className={classes.logoContainer}
+            sx={{ display: { xs: 'none', md: 'flex' } }}
+          >
             <LogoImage 
               color="#06b6d4" 
               style={{ 
-                width: isMobile ? '32px' : '38px', 
-                height: isMobile ? '32px' : '38px',
-                maxWidth: isMobile ? '32px' : '38px',
-                maxHeight: isMobile ? '32px' : '38px',
+                width: '38px', 
+                height: '38px',
+                maxWidth: '38px',
+                maxHeight: '38px',
                 objectFit: 'contain',
                 margin: 0
               }} 
@@ -214,9 +225,11 @@ const PremiumTopBar = ({
           </Box>
           <Typography 
             className={classes.brandTitle}
+            component="span"
             sx={{ 
               fontSize: isMobile ? '0.98rem' : '1.05rem',
-              display: { xs: 'none', sm: 'block' }
+              display: 'block',
+              whiteSpace: 'nowrap',
             }}
           >
             Live Map
@@ -228,7 +241,6 @@ const PremiumTopBar = ({
               sx={{
                 backgroundColor: socketConnected ? '#22c55e' : '#ef4444',
                 animation: socketConnected ? 'pulse 2s infinite' : 'none',
-                ml: 0.5,
               }}
             />
           </Tooltip>
@@ -237,17 +249,22 @@ const PremiumTopBar = ({
         {/* Center Section - Stats & Search */}
         <Box 
           className={`${classes.centerSection} ${isMobile ? classes.mobileCenterSection : ''}`}
+          sx={{
+            gap: isMobile ? theme.spacing(0.75) : undefined,
+          }}
         >
-          {/* Device Stats Chips - Hidden on mobile, shown in hamburger menu */}
-          <Fade in={showStats && !isMobile} timeout={300}>
-            <Box>
-              <DeviceStatsChips 
-                stats={stats}
-                onFilterClick={onFilterChange}
-                compact={isTablet}
-              />
-            </Box>
-          </Fade>
+          {/* Device stats: omit on mobile so flex gap does not reserve empty space */}
+          {!isMobile && (
+            <Fade in={showStats} timeout={300}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <DeviceStatsChips 
+                  stats={stats}
+                  onFilterClick={onFilterChange}
+                  compact={isTablet}
+                />
+              </Box>
+            </Fade>
+          )}
 
           {/* Search with Dropdown */}
           <SearchWithDropdown 
@@ -262,6 +279,7 @@ const PremiumTopBar = ({
         {/* Right Section - Actions */}
         <Box 
           className={`${classes.rightSection} ${isMobile ? classes.mobileRightSection : ''}`}
+          sx={isMobile ? { flexShrink: 0, ml: 'auto', pl: 0.5 } : undefined}
         >
           {/* Dashboard Navigation - Hidden on mobile */}
           <IconButton
