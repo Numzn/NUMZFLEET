@@ -14,6 +14,13 @@ import { getLatestErbPrices } from '../reports/adapters/erbAdapter.js';
 const ATTR_PRIMARY = 'web.loginInsight';
 const ATTR_SECONDARY = 'web.loginInsightSub';
 
+/**
+ * Previous prices used to compute ▲/▼ deltas on next sync.
+ * Persists in memory across hourly scheduler ticks; resets on restart.
+ * Only updated when prices actually change.
+ */
+let storedPrices = { petrol: null, diesel: null };
+
 /** Last formatted ERB lines — exposed via GET /api/public/login-insight (no Traccar required to read). */
 let publicCache = {
   primary: null,
@@ -96,43 +103,64 @@ const getBasicAuthHeader = () => {
   return `Basic ${token}`;
 };
 
-const formatBand = (label, value) => {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  if (!Number.isNaN(n) && Number.isFinite(n)) {
-    return `${label} K${n.toFixed(2)}/L`;
-  }
-  return `${label} ${String(value)}`;
-};
-
 const buildInsightLines = (erbResult) => {
-  const { prices = {}, meta = {} } = erbResult || {};
-  const bands = [
-    formatBand('Petrol', prices.petrol),
-    formatBand('Diesel', prices.diesel),
-    // Keep login copy lean: focus on the two fuels most drivers check first.
-  ].filter(Boolean);
+  const { prices = {}, timestamp } = erbResult || {};
 
-  const primary = bands.join(' · ');
-  if (!primary) {
+  const petrol = Number(prices.petrol);
+  const diesel = Number(prices.diesel);
+
+  if (!Number.isFinite(petrol) || !Number.isFinite(diesel)) {
     return { primary: null, secondary: null };
   }
 
-  let sub = 'Source: ERB';
-  if (meta.fetchedAt) {
-    const d = new Date(meta.fetchedAt);
+  // Compute deltas against previously stored prices (null on first run after restart)
+  const petrolDiff =
+    storedPrices.petrol !== null ? +(petrol - storedPrices.petrol).toFixed(2) : null;
+  const dieselDiff =
+    storedPrices.diesel !== null ? +(diesel - storedPrices.diesel).toFixed(2) : null;
+
+  // Advance stored prices for next comparison
+  storedPrices = { petrol, diesel };
+
+  const fmtDelta = (diff) => {
+    if (diff === null || Math.abs(diff) < 0.005) return '';
+    return ` ${diff > 0 ? '\u25b2' : '\u25bc'} ${diff > 0 ? '+' : ''}${diff.toFixed(2)}`;
+  };
+
+  const primary =
+    `Petrol K${petrol.toFixed(2)}${fmtDelta(petrolDiff)}` +
+    ` | Diesel K${diesel.toFixed(2)}${fmtDelta(dieselDiff)}`;
+
+  // Optional summary: only shown when a price actually moved
+  const dir = (diff) =>
+    diff !== null && Math.abs(diff) >= 0.005 ? (diff > 0 ? 'up' : 'down') : null;
+  const pDir = dir(petrolDiff);
+  const dDir = dir(dieselDiff);
+  let summary = null;
+  if (pDir && dDir)
+    summary = pDir === dDir ? `Both prices ${pDir}` : `Petrol ${pDir}, Diesel ${dDir}`;
+  else if (pDir) summary = `Petrol ${pDir}`;
+  else if (dDir) summary = `Diesel ${dDir}`;
+
+  // Compact timestamp: "Updated: 20 Apr 21:12"
+  let tsLabel = '';
+  const rawTs = timestamp;
+  if (rawTs) {
+    const d = new Date(rawTs);
     if (!Number.isNaN(d.getTime())) {
-      sub += ` · ${d.toLocaleString('en-GB', {
+      tsLabel = `Updated: ${d.toLocaleString('en-GB', {
         day: 'numeric',
         month: 'short',
-        year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        hour12: false,
       })}`;
     }
   }
 
-  return { primary, secondary: sub };
+  const secondary = [summary, tsLabel].filter(Boolean).join(' · ') || null;
+
+  return { primary, secondary };
 };
 
 /**
