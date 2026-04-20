@@ -32,6 +32,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - traccar_mysql_data:/var/lib/mysql
+      - ./mysql/conf.d/numztrak-low-memory.cnf:/etc/mysql/conf.d/numztrak-low-memory.cnf:ro
     networks:
       - numztrak-network
     healthcheck:

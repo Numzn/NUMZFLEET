@@ -1,0 +1,12 @@
+[mysqld]
+# Keep MySQL startup within the limits of the 1 GB OCI VM.
+innodb_buffer_pool_size=64M
+innodb_buffer_pool_instances=1
+innodb_log_buffer_size=8M
+tmp_table_size=16M
+max_heap_table_size=16M
+table_open_cache=256
+table_definition_cache=256
+thread_cache_size=8
+max_connections=40
+performance_schema=OFF

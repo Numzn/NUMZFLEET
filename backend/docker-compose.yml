@@ -13,6 +13,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - /opt/numztrak/mysql:/var/lib/mysql
+      - ./mysql/conf.d/numztrak-low-memory.cnf:/etc/mysql/conf.d/numztrak-low-memory.cnf:ro
     networks:
       - numztrak-network
     restart: unless-stopped
@@ -168,6 +169,8 @@ services:
   numztrak-nginx:
     image: nginx:alpine
     container_name: numztrak-nginx
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "80:80"
       - "443:443"

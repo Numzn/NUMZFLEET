@@ -242,13 +242,25 @@ git fetch origin --prune --quiet
 git checkout __DEPLOY_COMMIT__
 
 echo ""
-echo "=== [2/6] Build and start backend services ==="
+echo "=== [2/7] Start databases ==="
 cd ~/NUMZFLEET/backend
-docker-compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api erb-api numztrak-nginx 2>&1 || \
-  docker compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api erb-api numztrak-nginx 2>&1
+docker-compose -f docker-compose.prod.yml up -d traccar-mysql fuel-postgres 2>&1 || \
+    docker compose -f docker-compose.prod.yml up -d traccar-mysql fuel-postgres 2>&1
 
 echo ""
-echo "=== [3/6] Build frontend from same commit ==="
+echo "=== [3/7] Start core backend services ==="
+cd ~/NUMZFLEET/backend
+docker-compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api 2>&1 || \
+    docker compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api 2>&1
+
+echo ""
+echo "=== [4/7] Start ERB services ==="
+cd ~/NUMZFLEET/backend
+docker-compose -f docker-compose.prod.yml up -d --build erb-worker erb-api 2>&1 || \
+    docker compose -f docker-compose.prod.yml up -d --build erb-worker erb-api 2>&1
+
+echo ""
+echo "=== [5/7] Build frontend from same commit ==="
 FRONT="$HOME/NUMZFLEET/traccar-fleet-system/frontend"
 cd "$FRONT"
 if command -v npm >/dev/null 2>&1; then
@@ -261,29 +273,31 @@ else
 fi
 
 echo ""
-echo "=== [4/6] Reload edge (pick up new static bundle) ==="
+echo "=== [6/7] Reload edge (pick up new static bundle) ==="
 cd ~/NUMZFLEET/backend
-docker-compose -f docker-compose.prod.yml restart numztrak-nginx 2>&1 || \
-  docker compose -f docker-compose.prod.yml restart numztrak-nginx 2>&1
+docker-compose -f docker-compose.prod.yml up -d numztrak-nginx 2>&1 || \
+    docker compose -f docker-compose.prod.yml up -d numztrak-nginx 2>&1
 
 echo ""
-echo "=== [5/6] Service status ==="
+echo "=== [7/7] Service status ==="
 docker-compose -f docker-compose.prod.yml ps 2>&1 || \
   docker compose -f docker-compose.prod.yml ps 2>&1
 
 echo ""
-echo "=== [6/6] Health checks ==="
+echo "=== Health checks ==="
 sleep 8
 
 http_code=$(curl -o /dev/null -s -w "%{http_code}" https://numz.site)
 echo "numz.site HTTPS : $http_code"
 [ "$http_code" = "200" ] || [ "$http_code" = "301" ] || { echo "FAIL: unexpected HTTP code $http_code"; exit 1; }
 
-traccar_ver=$(curl -sS https://numz.site/api/server 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null || echo "unreachable")
+traccar_ver=$(curl -fsS https://numz.site/api/server 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null || echo "unreachable")
 echo "Traccar API version : $traccar_ver"
+[ "$traccar_ver" != "unreachable" ] || { echo "FAIL: Traccar API unreachable"; exit 1; }
 
-fuel_health=$(curl -sS https://numz.site/api/fuel-requests/health 2>/dev/null | head -c 200 || echo "unreachable")
+fuel_health=$(curl -fsS http://127.0.0.1:3001/health 2>/dev/null | head -c 200 || echo "unreachable")
 echo "Fuel API health : $fuel_health"
+[ "$fuel_health" != "unreachable" ] || { echo "FAIL: Fuel API health check failed"; exit 1; }
 
 echo ""
 echo "==========================================="
