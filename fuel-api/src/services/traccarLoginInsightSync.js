@@ -110,8 +110,7 @@ const buildInsightLines = (erbResult) => {
   const bands = [
     formatBand('Petrol', prices.petrol),
     formatBand('Diesel', prices.diesel),
-    formatBand('Kerosene', prices.kerosene),
-    formatBand('Jet A-1', prices.jetA1),
+    // Keep login copy lean: focus on the two fuels most drivers check first.
   ].filter(Boolean);
 
   const primary = bands.join(' · ');
