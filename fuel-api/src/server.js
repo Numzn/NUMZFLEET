@@ -20,6 +20,7 @@ import {
   ensurePublicLoginInsightFromErb,
   getPublicLoginInsight,
 } from './services/traccarLoginInsightSync.js';
+import { getFleetSummary } from './services/fleetSummaryService.js';
 
 // Load environment variables
 dotenv.config();
@@ -316,6 +317,16 @@ app.use((err, req, res, next) => {
 
 // Initialize WebSocket with error handling
 try {
+
+  /** Unauthenticated: aggregated fleet stats for login page widget (2-min server-side cache). */
+  app.get('/api/public/fleet-summary', async (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=120');
+    try {
+      res.json(await getFleetSummary());
+    } catch {
+      res.json({ totalVehicles: 0, onlineVehicles: 0, pendingFuelRequests: 0, updatedAt: null });
+    }
+  });
   initializeSocket(io);
   if (process.env.NODE_ENV === 'development') {
     console.log('✅ [Socket.IO] Socket handler initialized successfully');

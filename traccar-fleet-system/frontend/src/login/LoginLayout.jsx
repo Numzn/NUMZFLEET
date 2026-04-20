@@ -3,6 +3,7 @@ import { makeStyles } from 'tss-react/mui';
 import { useTheme } from '@mui/material/styles';
 import LogoImage from './LogoImage';
 import LoginInsights from './LoginInsights';
+import FleetSummary from './FleetSummary';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -81,6 +82,7 @@ const LoginLayout = ({ topBar = null, children }) => {
         <LogoImage color={theme.palette.primary.main} />
       </div>
       <LoginInsights />
+        <FleetSummary />
       <Paper className={classes.paper} elevation={0} component={Box}>
         <form className={classes.form} noValidate>
           {children}
