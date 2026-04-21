@@ -345,8 +345,8 @@ try {
 let stopErbLoginInsightScheduler = () => {};
 
 const startServer = async () => {
-  const MAX_RETRIES = 5;
-  const RETRY_DELAY = 5000; // 5 seconds
+  const MAX_RETRIES = 8;
+  const RETRY_DELAY = 10000; // 10 seconds
   
   if (isDev) {
     console.log('\n🚀 NumzTrak Fuel API Starting...\n');
