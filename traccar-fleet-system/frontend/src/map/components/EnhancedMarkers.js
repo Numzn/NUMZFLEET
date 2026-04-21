@@ -217,11 +217,11 @@ const EnhancedMarkers = ({
             20, 6
           ],
           'circle-color': [
-            'case',
-            ['==', ['get', 'isOnline'], true],
-            '#4caf50', // Green for online
-            '#f44336', // Red for offline
-            '#9e9e9e'  // Gray for unknown
+            'match',
+            ['get', 'isOnline'],
+            true, '#4caf50', // Green for online
+            false, '#f44336', // Red for offline
+            '#9e9e9e' // Gray for unknown
           ],
           'circle-stroke-width': 2,
           'circle-stroke-color': 'white',
@@ -257,7 +257,7 @@ const EnhancedMarkers = ({
         filter: [
           'all',
           ['!has', 'point_count'],
-          ['>', ['get', 'speed'], 0],
+          ['>', 'speed', 0],
         ],
         layout: {
           'icon-image': 'direction', // Use existing direction icon instead of non-existent speed-indicator

@@ -154,7 +154,9 @@ export default async () => {
                      status === 'warning' ? '#ff9800' :
                      status === 'info' ? '#2196f3' :
                      '#9e9e9e';
-        mapImages[`${category}-${status}`] = prepareEnhancedIcon(background, icon, color, status);
+        return prepareEnhancedIcon(background, icon, color, status).then((preparedIcon) => {
+          mapImages[`${category}-${status}`] = preparedIcon;
+        });
       }));
     });
     await Promise.all(results);
