@@ -5,8 +5,9 @@ import {
   getTraccarDevice,
   getTraccarDevicesByIds,
   getTraccarLatestPositionsByDeviceIds,
-  upsertTraccarDeviceAttribute,
 } from '../config/traccar.js';
+import { emitDomainEvent } from '../events/eventBus.js';
+import { EVENT_NAMES } from '../events/eventNames.js';
 
 /**
  * v1 merged vehicle DTO — single shape for list and get-by-id.
@@ -136,9 +137,10 @@ export async function getVehicleMerged(id) {
 /**
  * Deactivate active rows for this vehicle and this device, then insert a new active row.
  */
-export async function assignDevice(vehicleId, deviceId) {
+export async function assignDevice(vehicleId, deviceId, options = {}) {
   const vid = String(vehicleId);
   const did = Number(deviceId);
+  const actorUserId = options.actorUserId != null ? Number(options.actorUserId) : null;
   if (!Number.isFinite(did) || did <= 0) {
     const err = new Error('deviceId must be a positive Traccar device id');
     err.statusCode = 400;
@@ -163,14 +165,15 @@ export async function assignDevice(vehicleId, deviceId) {
     where: { vehicleId: vid, isActive: true },
   });
 
+  const assignedAt = new Date();
+
   await sequelize.transaction(async (t) => {
-    const now = new Date();
     await DeviceAssignment.update(
-      { isActive: false, unassignedAt: now },
+      { isActive: false, unassignedAt: assignedAt },
       { where: { vehicleId: vid, isActive: true }, transaction: t },
     );
     await DeviceAssignment.update(
-      { isActive: false, unassignedAt: now },
+      { isActive: false, unassignedAt: assignedAt },
       { where: { deviceId: did, isActive: true }, transaction: t },
     );
     await DeviceAssignment.create(
@@ -178,30 +181,20 @@ export async function assignDevice(vehicleId, deviceId) {
         vehicleId: vid,
         deviceId: did,
         isActive: true,
-        assignedAt: now,
+        assignedAt,
       },
       { transaction: t },
     );
   });
 
-  // Keep Traccar device labels in sync with fleet assignment for map rendering.
-  // This runs after DB commit and is best-effort; assignment should not fail if label sync fails.
-  try {
-    // 1) Clear stale label on previously assigned device (if vehicle moved to another device).
-    if (
-      previousVehicleAssignment
-      && Number(previousVehicleAssignment.deviceId) !== did
-    ) {
-      await upsertTraccarDeviceAttribute(Number(previousVehicleAssignment.deviceId), 'vehicleName', null);
-      await upsertTraccarDeviceAttribute(Number(previousVehicleAssignment.deviceId), 'fleetVehicleId', null);
-    }
-
-    // 2) Set active assignment label on current device.
-    await upsertTraccarDeviceAttribute(did, 'vehicleName', vehicle.name);
-    await upsertTraccarDeviceAttribute(did, 'fleetVehicleId', Number(vid));
-  } catch (error) {
-    console.warn('[vehicleFleetService] Device label sync failed after assignment commit:', error?.message || error);
-  }
+  emitDomainEvent(EVENT_NAMES.VEHICLE_ASSIGNED, {
+    vehicleId: Number(vid),
+    deviceId: did,
+    vehicleName: vehicle.name,
+    previousDeviceId: previousVehicleAssignment ? Number(previousVehicleAssignment.deviceId) : null,
+    assignedAt: assignedAt.toISOString(),
+    actorUserId: Number.isFinite(actorUserId) ? actorUserId : null,
+  });
 
   return getVehicleMerged(vid);
 }

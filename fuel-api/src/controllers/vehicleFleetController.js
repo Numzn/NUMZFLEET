@@ -61,7 +61,9 @@ export const assignDevice = async (req, res) => {
     if (deviceId == null) {
       return res.status(400).json({ error: 'deviceId is required' });
     }
-    const merged = await assignDeviceService(vehicleId, deviceId);
+    const merged = await assignDeviceService(vehicleId, deviceId, {
+      actorUserId: req.user?.id,
+    });
     return res.json(merged);
   } catch (error) {
     const status = error.statusCode || 500;

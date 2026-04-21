@@ -15,6 +15,7 @@ import vehicleSpecsRouter from './routes/vehicleSpecs.js';
 import vehiclesRouter from './routes/vehicles.js';
 import reportsRouter from './reports/routes/reports.js';
 import { initializeSocket } from './socket/socketHandler.js';
+import { registerEventListeners } from './events/registerEventListeners.js';
 import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.js';
 import { reconcileDeviceAssignmentLabels } from './services/vehicleFleetService.js';
 import {
@@ -329,6 +330,7 @@ try {
     }
   });
   initializeSocket(io);
+  registerEventListeners({ io });
   if (process.env.NODE_ENV === 'development') {
     console.log('✅ [Socket.IO] Socket handler initialized successfully');
   }
