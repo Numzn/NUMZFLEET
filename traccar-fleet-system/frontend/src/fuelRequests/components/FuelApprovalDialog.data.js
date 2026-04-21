@@ -13,7 +13,7 @@ export const useFuelApprovalLiveData = ({ open, request, userId }) => {
 
     const fetchValidation = async () => {
       try {
-        const url = `/api/fuel/fuel-requests/${request.id}/validation`;
+        const url = `/api/fuel-requests/${request.id}/validation`;
         const response = await fetch(url, {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
