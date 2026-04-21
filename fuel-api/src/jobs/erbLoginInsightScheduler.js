@@ -1,5 +1,7 @@
 import { getLatestErbPrices } from '../reports/adapters/erbAdapter.js';
 import { syncLoginInsightFromErbPrices } from '../services/traccarLoginInsightSync.js';
+import { emitDomainEvent } from '../events/eventBus.js';
+import { EVENT_NAMES } from '../events/eventNames.js';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -41,6 +43,16 @@ export function startErbLoginInsightScheduler() {
       .then((out) => {
         if (isDev && out && !out.ok && out.reason !== 'traccar_api_not_configured' && out.reason !== 'unchanged') {
           console.warn('[erbLoginInsightScheduler]', out.reason);
+        }
+        // Fire domain event if prices changed so downstream listeners react immediately
+        if (out?.ok && out.reason === 'updated') {
+          // tickErbLoginInsightSync already called getLatestErbPrices; re-fetch for the payload
+          getLatestErbPrices().then((result) => {
+            emitDomainEvent(EVENT_NAMES.ERB_PRICES_UPDATED, {
+              ...result,
+              trigger: 'scheduler',
+            });
+          }).catch(() => {/* non-critical */});
         }
       })
       .catch((err) => {

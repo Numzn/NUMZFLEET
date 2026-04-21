@@ -61,6 +61,13 @@ export const registerFuelRequestListeners = (io) => {
         approvedAmount: request.approvedAmount,
         previousStatus,
         actorUserId,
+        // ── Locked pricing snapshot ──
+        lockedPricePerUnit:    request.lockedPricePerUnit,
+        lockedCurrency:        request.lockedCurrency,
+        lockedFuelType:        request.lockedFuelType,
+        lockedApprovedCost:    request.lockedApprovedCost,
+        priceSourceAtApproval: request.priceSourceAtApproval,
+        priceAuditTimestamp:   request.priceAuditTimestamp,
         at: new Date().toISOString(),
       });
     }),
@@ -84,6 +91,13 @@ export const registerFuelRequestListeners = (io) => {
         approvedAmount: request.approvedAmount,
         previousStatus,
         actorUserId,
+        // ── Reconciliation vs locked snapshot ──
+        lockedApprovedCost:   request.lockedApprovedCost,
+        actualFulfilledAmount: request.actualFulfilledAmount,
+        actualFulfilledCost:   request.actualFulfilledCost,
+        variance: request.actualFulfilledCost != null && request.lockedApprovedCost != null
+          ? Number((request.actualFulfilledCost - request.lockedApprovedCost).toFixed(2))
+          : null,
         at: new Date().toISOString(),
       });
     }),

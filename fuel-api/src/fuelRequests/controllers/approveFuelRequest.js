@@ -1,6 +1,7 @@
 import { FuelRequest } from '../../models/index.js';
 import { emitDomainEvent } from '../../events/eventBus.js';
 import { EVENT_NAMES } from '../../events/eventNames.js';
+import { captureApprovalPriceSnapshot } from '../../services/fuelPriceSnapshotService.js';
 
 /**
  * Approve fuel request (Manager only)
@@ -25,12 +26,25 @@ export const approveFuelRequest = async (req, res) => {
     // Update request with approved amount (can differ from requested)
     const finalAmount = approvedAmount || request.requestedAmount;
     const previousStatus = request.status;
-    
+
+    // ── Lock ERB price at this instant (non-blocking — ERB outage must not block approval) ──
+    const snapshot = await captureApprovalPriceSnapshot(finalAmount, request.lockedFuelType || 'diesel');
+
     request.status = 'approved';
     request.approvedAmount = finalAmount;
     request.reviewTime = new Date();
     request.reviewerId = req.user.id;
     request.notes = notes || `Approved ${finalAmount}L`;
+
+    // Only set locked fields once (immutability guard: re-approvals must not overwrite)
+    if (!request.lockedApprovedCost) {
+      request.lockedPricePerUnit    = snapshot.pricePerUnit;
+      request.lockedCurrency        = snapshot.currency;
+      request.lockedFuelType        = snapshot.fuelType;
+      request.lockedApprovedCost    = snapshot.approvedCost;
+      request.priceSourceAtApproval = snapshot.source;
+      request.priceAuditTimestamp   = snapshot.capturedAt;
+    }
 
     await request.save();
 

@@ -1,11 +1,13 @@
-import { Op, fn, col } from 'sequelize';
+import { Op, fn, col, literal } from 'sequelize';
 import { FuelRequest } from '../../models/index.js';
 
 export const getFuelSummary = async ({ deviceId, from, to }) => {
   const summary = await FuelRequest.findOne({
     attributes: [
-      [fn('COALESCE', fn('SUM', col('requestedAmount')), 0), 'totalFuel'],
-      [fn('COALESCE', fn('SUM', col('estimatedCost')), 0), 'totalCost'],
+      // Sum approved litres (not requested) — only for financially committed statuses
+      [fn('COALESCE', fn('SUM', col('approvedAmount')), 0), 'totalFuel'],
+      // Authoritative spend: locked cost at approval; falls back to 0 for null rows (pre-feature data)
+      [fn('COALESCE', fn('SUM', col('lockedApprovedCost')), 0), 'totalCost'],
       [fn('COUNT', col('id')), 'fuelRequestCount'],
     ],
     where: {
@@ -14,8 +16,9 @@ export const getFuelSummary = async ({ deviceId, from, to }) => {
         [Op.gte]: from,
         [Op.lte]: to,
       },
+      // Only count requests that actually consumed budget (approved waiting fulfillment, or done)
       status: {
-        [Op.notIn]: ['rejected', 'cancelled'],
+        [Op.in]: ['approved', 'fulfilled'],
       },
     },
     raw: true,

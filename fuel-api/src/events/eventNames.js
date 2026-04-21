@@ -7,4 +7,7 @@ export const EVENT_NAMES = {
   FUEL_REQUEST_FULFILLED: 'fuel.request.fulfilled',
   FUEL_REQUEST_REJECTED:  'fuel.request.rejected',
   FUEL_REQUEST_CANCELLED: 'fuel.request.cancelled',
+
+  // ERB fuel price feed
+  ERB_PRICES_UPDATED: 'erb.prices.updated',
 };

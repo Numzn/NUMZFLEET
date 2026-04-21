@@ -22,9 +22,21 @@ export const fulfillFuelRequest = async (req, res) => {
     }
 
     const previousStatus = request.status;
+    const { actualFulfilledAmount } = req.body || {};
+
     request.status = 'fulfilled';
     request.fulfillmentTime = new Date();
-    
+
+    // ── Reconciliation: record actual quantity dispensed if provided ──
+    if (actualFulfilledAmount !== undefined && Number.isFinite(Number(actualFulfilledAmount))) {
+      const actual = Number(actualFulfilledAmount);
+      request.actualFulfilledAmount = actual;
+      // Derive actual cost from the locked rate so comparison is apples-to-apples
+      if (request.lockedPricePerUnit) {
+        request.actualFulfilledCost = Number((actual * request.lockedPricePerUnit).toFixed(2));
+      }
+    }
+
     await request.save();
 
     emitDomainEvent(EVENT_NAMES.FUEL_REQUEST_FULFILLED, {

@@ -97,6 +97,51 @@ export default (sequelize) => {
     overrideReason: {
       type: DataTypes.TEXT,
       comment: 'Reason for overriding validation warnings'
+    },
+
+    // ── Financial snapshot (locked at approval, never mutated afterwards) ──
+    lockedPricePerUnit: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'Fuel unit price frozen at approval time (ZMW per litre)'
+    },
+    lockedCurrency: {
+      type: DataTypes.STRING(3),
+      allowNull: true,
+      defaultValue: 'ZMW',
+      comment: 'ISO 4217 currency code for the locked price'
+    },
+    lockedFuelType: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      comment: 'Fuel grade locked at approval (petrol / diesel / kerosene / jetA1)'
+    },
+    lockedApprovedCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'approvedAmount × lockedPricePerUnit — authoritative spend figure'
+    },
+    priceSourceAtApproval: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: 'Origin of the locked price: erb-latest | manual | backfill'
+    },
+    priceAuditTimestamp: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'When the price snapshot was captured'
+    },
+
+    // ── Reconciliation fields (set at fulfillment, never affect locked snapshot) ──
+    actualFulfilledAmount: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'Actual litres dispensed (may differ from approvedAmount)'
+    },
+    actualFulfilledCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'Actual cost: actualFulfilledAmount × lockedPricePerUnit'
     }
   }, {
     tableName: 'fuel_requests',
