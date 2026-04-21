@@ -25,7 +25,7 @@
     <entry key='filter.enable'>true</entry>
     <entry key='filter.invalid'>true</entry>
     <entry key='filter.duplicate'>true</entry>
-    <entry key='filter.accuracy'>10</entry>
+    <entry key='filter.accuracy'>200</entry>
     
     <!-- Enable GPS Protocol Ports for Mobile Apps -->
     <!-- OsmAnd Protocol (HTTP) - Recommended for React Native/Mobile Apps -->
