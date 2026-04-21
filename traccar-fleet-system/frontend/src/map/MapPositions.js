@@ -29,6 +29,7 @@ const MapPositions = ({ positions, onMapClick, onMarkerClick, showStatus, select
 
   const createFeature = (devices, position, selectedPositionId) => {
     const device = devices[position.deviceId];
+    const displayName = device?.attributes?.vehicleName || device?.name || `Device ${position.deviceId}`;
     let showDirection;
     switch (directionType) {
       case 'none':
@@ -44,7 +45,7 @@ const MapPositions = ({ positions, onMapClick, onMarkerClick, showStatus, select
     return {
       id: position.id,
       deviceId: position.deviceId,
-      name: device.name,
+      name: displayName,
       fixTime: formatTime(position.fixTime, 'seconds'),
       category: mapIconKey(device.category),
       color: showStatus ? position.attributes.color || getStatusColor(device.status) : 'neutral',

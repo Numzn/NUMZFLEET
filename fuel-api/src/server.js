@@ -16,6 +16,7 @@ import vehiclesRouter from './routes/vehicles.js';
 import reportsRouter from './reports/routes/reports.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.js';
+import { reconcileDeviceAssignmentLabels } from './services/vehicleFleetService.js';
 import {
   ensurePublicLoginInsightFromErb,
   getPublicLoginInsight,
@@ -454,6 +455,15 @@ const startServer = async () => {
       console.log('\n🎯 Ready to accept fuel requests!\n');
     }
     stopErbLoginInsightScheduler = startErbLoginInsightScheduler();
+    reconcileDeviceAssignmentLabels()
+      .then((stats) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[vehicle-label-reconcile]', stats);
+        }
+      })
+      .catch((error) => {
+        console.warn('[vehicle-label-reconcile] skipped:', error?.message || error);
+      });
   });
 };
 

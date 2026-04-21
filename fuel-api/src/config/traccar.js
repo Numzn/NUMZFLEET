@@ -189,6 +189,50 @@ export const getTraccarDevice = async (deviceId) => {
 };
 
 /**
+ * Upsert one attribute key on tc_devices.attributes JSON.
+ * If value is null/undefined/empty, the key is removed.
+ */
+export const upsertTraccarDeviceAttribute = async (deviceId, key, value) => {
+  const pool = getTraccarPool();
+  const [rows] = await pool.execute(
+    'SELECT attributes FROM tc_devices WHERE id = ? LIMIT 1',
+    [deviceId],
+  );
+
+  if (!rows.length) {
+    return false;
+  }
+
+  let attrs = {};
+  const raw = rows[0].attributes;
+  if (raw && typeof raw === 'string') {
+    try {
+      attrs = JSON.parse(raw);
+      if (!attrs || Array.isArray(attrs) || typeof attrs !== 'object') {
+        attrs = {};
+      }
+    } catch {
+      attrs = {};
+    }
+  } else if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    attrs = { ...raw };
+  }
+
+  if (value === null || value === undefined || value === '') {
+    delete attrs[key];
+  } else {
+    attrs[key] = value;
+  }
+
+  await pool.execute(
+    'UPDATE tc_devices SET attributes = ? WHERE id = ?',
+    [JSON.stringify(attrs), deviceId],
+  );
+
+  return true;
+};
+
+/**
  * Get latest position for a device
  */
 export const getTraccarPosition = async (deviceId) => {
@@ -308,6 +352,7 @@ export default {
   getTraccarUserBySessionToken,
   getTraccarUserBySessionViaAPI,
   getTraccarDevice,
+  upsertTraccarDeviceAttribute,
   getTraccarPosition,
   getTraccarDevicesByIds,
   getTraccarLatestPositionsByDeviceIds,

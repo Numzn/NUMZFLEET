@@ -5,6 +5,7 @@ import {
   getTraccarDevice,
   getTraccarDevicesByIds,
   getTraccarLatestPositionsByDeviceIds,
+  upsertTraccarDeviceAttribute,
 } from '../config/traccar.js';
 
 /**
@@ -158,6 +159,10 @@ export async function assignDevice(vehicleId, deviceId) {
     throw err;
   }
 
+  const previousVehicleAssignment = await DeviceAssignment.findOne({
+    where: { vehicleId: vid, isActive: true },
+  });
+
   await sequelize.transaction(async (t) => {
     const now = new Date();
     await DeviceAssignment.update(
@@ -179,5 +184,73 @@ export async function assignDevice(vehicleId, deviceId) {
     );
   });
 
+  // Keep Traccar device labels in sync with fleet assignment for map rendering.
+  // This runs after DB commit and is best-effort; assignment should not fail if label sync fails.
+  try {
+    // 1) Clear stale label on previously assigned device (if vehicle moved to another device).
+    if (
+      previousVehicleAssignment
+      && Number(previousVehicleAssignment.deviceId) !== did
+    ) {
+      await upsertTraccarDeviceAttribute(Number(previousVehicleAssignment.deviceId), 'vehicleName', null);
+      await upsertTraccarDeviceAttribute(Number(previousVehicleAssignment.deviceId), 'fleetVehicleId', null);
+    }
+
+    // 2) Set active assignment label on current device.
+    await upsertTraccarDeviceAttribute(did, 'vehicleName', vehicle.name);
+    await upsertTraccarDeviceAttribute(did, 'fleetVehicleId', Number(vid));
+  } catch (error) {
+    console.warn('[vehicleFleetService] Device label sync failed after assignment commit:', error?.message || error);
+  }
+
   return getVehicleMerged(vid);
+}
+
+/**
+ * Backfills Traccar device label attributes from active assignments.
+ * Safe to run at startup to reconcile labels for assignments created before label-sync existed.
+ */
+export async function reconcileDeviceAssignmentLabels() {
+  const activeAssignments = await DeviceAssignment.findAll({
+    where: { isActive: true },
+    attributes: ['vehicleId', 'deviceId'],
+  });
+
+  if (!activeAssignments.length) {
+    return { total: 0, synced: 0, failed: 0 };
+  }
+
+  const vehicleIds = [...new Set(activeAssignments.map((a) => String(a.vehicleId)))];
+  const vehicles = await Vehicle.findAll({
+    where: { id: { [Op.in]: vehicleIds } },
+    attributes: ['id', 'name'],
+  });
+  const vehicleNameById = new Map(vehicles.map((v) => [String(v.id), v.name]));
+
+  let synced = 0;
+  let failed = 0;
+
+  for (const assignment of activeAssignments) {
+    const deviceId = Number(assignment.deviceId);
+    const vehicleId = String(assignment.vehicleId);
+    const vehicleName = vehicleNameById.get(vehicleId);
+    if (!Number.isFinite(deviceId) || !vehicleName) {
+      failed += 1;
+      continue;
+    }
+
+    try {
+      await upsertTraccarDeviceAttribute(deviceId, 'vehicleName', vehicleName);
+      await upsertTraccarDeviceAttribute(deviceId, 'fleetVehicleId', Number(vehicleId));
+      synced += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+
+  return {
+    total: activeAssignments.length,
+    synced,
+    failed,
+  };
 }
