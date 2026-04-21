@@ -1,5 +1,6 @@
 import { FuelRequest } from '../../models/index.js';
-import { emitFuelRequestUpdated } from '../handlers/socketEvents.js';
+import { emitDomainEvent } from '../../events/eventBus.js';
+import { EVENT_NAMES } from '../../events/eventNames.js';
 
 /**
  * Approve fuel request (Manager only)
@@ -33,18 +34,16 @@ export const approveFuelRequest = async (req, res) => {
 
     await request.save();
 
-    // Emit WebSocket event with enhanced feedback
-    const message = notes 
+    const message = notes
       ? `Your fuel request for ${finalAmount}L has been approved: ${notes}`
       : `Your fuel request for ${finalAmount}L has been approved`;
-    
-    if (!req.io) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('❌ [DEBUG] req.io is UNDEFINED - WebSocket events will not be sent!');
-      }
-    }
-    
-    emitFuelRequestUpdated(req.io, request, 'approved', previousStatus, req.user.id, message);
+
+    emitDomainEvent(EVENT_NAMES.FUEL_REQUEST_APPROVED, {
+      request,
+      previousStatus,
+      actorUserId: req.user.id,
+      message,
+    });
 
     res.json(request);
   } catch (error) {

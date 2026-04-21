@@ -1,5 +1,6 @@
 import { FuelRequest } from '../../models/index.js';
-import { emitFuelRequestCancelled } from '../handlers/socketEvents.js';
+import { emitDomainEvent } from '../../events/eventBus.js';
+import { EVENT_NAMES } from '../../events/eventNames.js';
 
 /**
  * Cancel fuel request (Driver only - can only cancel own pending requests)
@@ -33,8 +34,11 @@ export const cancelFuelRequest = async (req, res) => {
     
     await request.save();
 
-    // Emit WebSocket event - notify both driver and managers
-    emitFuelRequestCancelled(req.io, request, previousStatus, req.user.id);
+    emitDomainEvent(EVENT_NAMES.FUEL_REQUEST_CANCELLED, {
+      request,
+      previousStatus,
+      actorUserId: req.user.id,
+    });
 
     res.json(request);
   } catch (error) {

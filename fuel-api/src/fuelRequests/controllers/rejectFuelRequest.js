@@ -1,5 +1,6 @@
 import { FuelRequest } from '../../models/index.js';
-import { emitFuelRequestUpdated } from '../handlers/socketEvents.js';
+import { emitDomainEvent } from '../../events/eventBus.js';
+import { EVENT_NAMES } from '../../events/eventNames.js';
 
 /**
  * Reject fuel request (Manager only)
@@ -30,12 +31,16 @@ export const rejectFuelRequest = async (req, res) => {
 
     await request.save();
 
-    // Emit WebSocket event with enhanced feedback
-    const message = notes 
+    const message = notes
       ? `Your fuel request has been rejected: ${notes}`
       : `Your fuel request has been rejected`;
-    
-    emitFuelRequestUpdated(req.io, request, 'rejected', previousStatus, req.user.id, message);
+
+    emitDomainEvent(EVENT_NAMES.FUEL_REQUEST_REJECTED, {
+      request,
+      previousStatus,
+      actorUserId: req.user.id,
+      message,
+    });
 
     res.json(request);
   } catch (error) {

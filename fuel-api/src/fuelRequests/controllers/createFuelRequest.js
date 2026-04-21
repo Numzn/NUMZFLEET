@@ -2,7 +2,8 @@ import { FuelRequest } from '../../models/index.js';
 import { getTraccarDevice, getTraccarPosition } from '../../config/traccar.js';
 import { getVehicleSpec } from '../../services/vehicleSpecService.js';
 import { validateFuelRequest } from '../services/fuelValidationService.js';
-import { emitFuelRequestCreated } from '../handlers/socketEvents.js';
+import { emitDomainEvent } from '../../events/eventBus.js';
+import { EVENT_NAMES } from '../../events/eventNames.js';
 
 /**
  * Create a new fuel request (Driver)
@@ -68,14 +69,10 @@ export const createFuelRequest = async (req, res) => {
       managerSuggestion: validation.suggestedAmount
     });
 
-    if (!req.io) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('❌ [DEBUG CREATE] req.io is UNDEFINED - WebSocket events will not be sent!');
-      }
-    }
-    
-    // Emit WebSocket event to managers
-    emitFuelRequestCreated(req.io, fuelRequest, req.user.id);
+    emitDomainEvent(EVENT_NAMES.FUEL_REQUEST_CREATED, {
+      request: fuelRequest,
+      actorUserId: req.user.id,
+    });
 
     res.status(201).json(fuelRequest);
   } catch (error) {

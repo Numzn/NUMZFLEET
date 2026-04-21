@@ -1,5 +1,6 @@
 import { FuelRequest } from '../../models/index.js';
-import { emitFuelRequestUpdated } from '../handlers/socketEvents.js';
+import { emitDomainEvent } from '../../events/eventBus.js';
+import { EVENT_NAMES } from '../../events/eventNames.js';
 
 /**
  * Mark fuel request as fulfilled
@@ -26,8 +27,11 @@ export const fulfillFuelRequest = async (req, res) => {
     
     await request.save();
 
-    // Emit WebSocket event with enhanced feedback
-    emitFuelRequestUpdated(req.io, request, 'fulfilled', previousStatus, req.user.id);
+    emitDomainEvent(EVENT_NAMES.FUEL_REQUEST_FULFILLED, {
+      request,
+      previousStatus,
+      actorUserId: req.user.id,
+    });
 
     res.json(request);
   } catch (error) {

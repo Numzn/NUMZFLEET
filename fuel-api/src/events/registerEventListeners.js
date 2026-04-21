@@ -1,4 +1,5 @@
 import { registerVehicleAssignedListeners } from './listeners/vehicleAssignedListeners.js';
+import { registerFuelRequestListeners } from './listeners/fuelRequestListeners.js';
 
 let listenersRegistered = false;
 
@@ -8,5 +9,6 @@ export const registerEventListeners = ({ io }) => {
   }
 
   registerVehicleAssignedListeners(io);
+  registerFuelRequestListeners(io);
   listenersRegistered = true;
 };
