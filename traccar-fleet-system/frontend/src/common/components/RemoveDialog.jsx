@@ -5,6 +5,7 @@ import { useTranslation } from './LocalizationProvider';
 import { useCatch } from '../../reactHelper';
 import { snackBarDurationLongMs } from '../util/duration';
 import fetchOrThrow from '../util/fetchOrThrow';
+import { traccarPath } from '../../config/traccarApi.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -26,7 +27,7 @@ const RemoveDialog = ({
   const t = useTranslation();
 
   const handleRemove = useCatch(async () => {
-    await fetchOrThrow(`/api/${endpoint}/${itemId}`, { method: 'DELETE' });
+    await fetchOrThrow(traccarPath(`/api/${endpoint}/${itemId}`), { method: 'DELETE' });
     onResult(true);
   });
 

@@ -1,5 +1,6 @@
-import { useDispatch, useSelector, connect } from 'react-redux';
 import { useEffect } from 'react';
+import { useDispatch, useSelector, connect } from 'react-redux';
+import { traccarPath } from './config/traccarApi.js';
 import {
   geofencesActions, groupsActions, driversActions, maintenancesActions, calendarsActions, fuelRequestsActions,
 } from './store';
@@ -15,35 +16,35 @@ const CachingController = () => {
 
   useEffectAsync(async () => {
     if (authenticated) {
-      const response = await fetchOrThrow('/api/geofences');
+      const response = await fetchOrThrow(traccarPath('/api/geofences'));
       dispatch(geofencesActions.refresh(await response.json()));
     }
   }, [authenticated]);
 
   useEffectAsync(async () => {
     if (authenticated) {
-      const response = await fetchOrThrow('/api/groups');
+      const response = await fetchOrThrow(traccarPath('/api/groups'));
       dispatch(groupsActions.refresh(await response.json()));
     }
   }, [authenticated]);
 
   useEffectAsync(async () => {
     if (authenticated) {
-      const response = await fetchOrThrow('/api/drivers');
+      const response = await fetchOrThrow(traccarPath('/api/drivers'));
       dispatch(driversActions.refresh(await response.json()));
     }
   }, [authenticated]);
 
   useEffectAsync(async () => {
     if (authenticated) {
-      const response = await fetchOrThrow('/api/maintenance');
+      const response = await fetchOrThrow(traccarPath('/api/maintenance'));
       dispatch(maintenancesActions.refresh(await response.json()));
     }
   }, [authenticated]);
 
   useEffectAsync(async () => {
     if (authenticated) {
-      const response = await fetchOrThrow('/api/calendars');
+      const response = await fetchOrThrow(traccarPath('/api/calendars'));
       dispatch(calendarsActions.refresh(await response.json()));
     }
   }, [authenticated]);

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import dayjs from 'dayjs';
 import {
   Table, TableRow, TableCell, TableHead, TableBody,
@@ -32,7 +34,7 @@ const MaintenacesPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow('/api/maintenance');
+      const response = await fetchOrThrow(traccarPath('/api/maintenance'));
       setItems(await response.json());
     } finally {
       setLoading(false);

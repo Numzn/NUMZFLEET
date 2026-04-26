@@ -23,6 +23,7 @@ import SettingsMenu from './components/SettingsMenu';
 import { useCatch } from '../reactHelper';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const CommandDevicePage = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ const CommandDevicePage = () => {
 
   const handleSend = useCatch(async () => {
     const query = new URLSearchParams({ groupId: id });
-    await fetchOrThrow(`/api/commands/send?${query.toString()}`, {
+    await fetchOrThrow(`${traccarPath('/api/commands/send')}?${query.toString()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),

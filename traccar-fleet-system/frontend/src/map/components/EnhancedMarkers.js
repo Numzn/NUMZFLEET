@@ -60,6 +60,7 @@ const EnhancedMarkers = ({
     const isOnline = device?.status === 'online';
     const isMoving = position.speed > 0;
     const isSelected = selectedPositionId === position.id;
+    const onlineState = isOnline ? 'online' : 'offline';
     
     return {
       id: position.id,
@@ -72,6 +73,7 @@ const EnhancedMarkers = ({
       direction: showDirection,
       // Enhanced properties
       isOnline,
+      onlineState,
       isMoving,
       isSelected,
       speed: position.speed || 0,
@@ -218,9 +220,9 @@ const EnhancedMarkers = ({
           ],
           'circle-color': [
             'match',
-            ['get', 'isOnline'],
-            true, '#4caf50', // Green for online
-            false, '#f44336', // Red for offline
+            ['get', 'onlineState'],
+            'online', '#4caf50',
+            'offline', '#f44336',
             '#9e9e9e' // Gray for unknown
           ],
           'circle-stroke-width': 2,

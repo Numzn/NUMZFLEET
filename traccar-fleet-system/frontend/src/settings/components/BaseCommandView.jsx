@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { traccarPath } from '../../config/traccarApi.js';
+
 import { useSelector } from 'react-redux';
 import {
   Autocomplete,
@@ -34,17 +36,17 @@ const BaseCommandView = ({
 
   useEffectAsync(async () => {
     if (includeSaved) {
-      const savedResponse = await fetchOrThrow(`/api/commands/send?deviceId=${deviceId}`);
+      const savedResponse = await fetchOrThrow(`${traccarPath('/api/commands/send')}?deviceId=${deviceId}`);
       const saved = await savedResponse.json();
       let combined = saved.map((it) => ({ ...it, optionType: 'saved', key: `saved-${it.id}` }));
       if (!limitCommands) {
-        const typesResponse = await fetchOrThrow(`/api/commands/types?${new URLSearchParams({ deviceId }).toString()}`);
+        const typesResponse = await fetchOrThrow(`${traccarPath('/api/commands/types')}?${new URLSearchParams({ deviceId }).toString()}`);
         const types = await typesResponse.json();
         combined = combined.concat(types.map((it) => ({ ...it, optionType: 'type', key: `type-${it.type}` })));
       }
       setOptions(combined);
     } else {
-      const typesResponse = await fetchOrThrow('/api/commands/types');
+      const typesResponse = await fetchOrThrow(traccarPath('/api/commands/types'));
       const types = await typesResponse.json();
       setOptions(types.map((it) => ({ ...it, optionType: 'type', key: `type-${it.type}` })));
     }

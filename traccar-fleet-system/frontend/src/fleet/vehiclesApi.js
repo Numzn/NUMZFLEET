@@ -48,3 +48,33 @@ export async function assignVehicleDevice(user, vehicleId, deviceId) {
   }
   return res.json();
 }
+
+export async function updateVehicle(user, vehicleId, { name, plateNumber }) {
+  const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: vehiclesAuthHeaders(user),
+    body: JSON.stringify({ name, plateNumber: plateNumber || null }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    let msg;
+    try { msg = JSON.parse(body).error; } catch { msg = body; }
+    throw new Error(msg || res.statusText);
+  }
+  return res.json();
+}
+
+export async function deleteVehicle(user, vehicleId) {
+  const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: vehiclesAuthHeaders(user),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    let msg;
+    try { msg = JSON.parse(body).error; } catch { msg = body; }
+    throw new Error(msg || res.statusText);
+  }
+}

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useDispatch } from 'react-redux';
 import {
   Divider, Typography, IconButton, Toolbar,
@@ -6,7 +8,7 @@ import {
 } from '@mui/material';
 import Tooltip from '@mui/material/Tooltip';
 import { makeStyles } from 'tss-react/mui';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
+import UploadFileIcon from '@mui/icons-material/FileUpload';
 import { useNavigate } from 'react-router-dom';
 import MapView from '../map/core/MapView';
 import MapCurrentLocation from '../map/MapCurrentLocation';
@@ -76,7 +78,7 @@ const GeofencesPage = () => {
       const area = `LINESTRING (${coordinates})`;
       const newItem = { name: t('sharedGeofence'), area };
       try {
-        const response = await fetchOrThrow('/api/geofences', {
+        const response = await fetchOrThrow(traccarPath('/api/geofences'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newItem),

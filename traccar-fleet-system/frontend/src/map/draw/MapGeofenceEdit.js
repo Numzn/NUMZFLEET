@@ -1,4 +1,6 @@
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
+import { traccarPath } from '../../config/traccarApi.js';
+
 import maplibregl from 'maplibre-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import { useEffect, useMemo } from 'react';
@@ -51,7 +53,7 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
   const geofences = useSelector((state) => state.geofences.items);
 
   const refreshGeofences = useCatchCallback(async () => {
-    const response = await fetchOrThrow('/api/geofences');
+    const response = await fetchOrThrow(traccarPath('/api/geofences'));
     dispatch(geofencesActions.refresh(await response.json()));
   }, [dispatch]);
 
@@ -68,7 +70,7 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
       const newItem = { name: t('sharedGeofence'), area: geometryToArea(feature.geometry) };
       draw.delete(feature.id);
       try {
-        const response = await fetchOrThrow('/api/geofences', {
+        const response = await fetchOrThrow(traccarPath('/api/geofences'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newItem),
@@ -88,7 +90,7 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
     const listener = async (event) => {
       const feature = event.features[0];
       try {
-        await fetchOrThrow(`/api/geofences/${feature.id}`, { method: 'DELETE' });
+        await fetchOrThrow(traccarPath(`/api/geofences/${feature.id}`), { method: 'DELETE' });
         refreshGeofences();
       } catch (error) {
         dispatch(errorsActions.push(error.message));
@@ -106,7 +108,7 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
       if (item) {
         const updatedItem = { ...item, area: geometryToArea(feature.geometry) };
         try {
-          await fetchOrThrow(`/api/geofences/${feature.id}`, {
+          await fetchOrThrow(traccarPath(`/api/geofences/${feature.id}`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updatedItem),

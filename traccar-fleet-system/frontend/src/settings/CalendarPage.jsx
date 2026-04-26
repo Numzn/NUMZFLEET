@@ -1,4 +1,6 @@
 import dayjs from 'dayjs';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import TextField from '@mui/material/TextField';
@@ -91,7 +93,7 @@ const CalendarPage = () => {
   };
 
   const onItemSaved = useCatch(async () => {
-    const response = await fetchOrThrow('/api/calendars');
+    const response = await fetchOrThrow(traccarPath('/api/calendars'));
     dispatch(calendarsActions.refresh(await response.json()));
   });
 

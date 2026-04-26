@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { traccarPath } from '../../config/traccarApi.js';
+
 import dayjs from 'dayjs';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffectAsync } from '../../reactHelper';
@@ -20,7 +22,7 @@ export const generateLoginToken = async () => {
     let token = '';
     try {
       const expiration = dayjs().add(6, 'months').toISOString();
-      const response = await fetch('/api/session/token', {
+      const response = await fetch(traccarPath('/api/session/token'), {
         method: 'POST',
         body: new URLSearchParams(`expiration=${expiration}`),
       });
@@ -76,7 +78,7 @@ const NativeInterface = () => {
           },
         };
 
-        const response = await fetchOrThrow(`/api/users/${user.id}`, {
+        const response = await fetchOrThrow(traccarPath(`/api/users/${user.id}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedUser),

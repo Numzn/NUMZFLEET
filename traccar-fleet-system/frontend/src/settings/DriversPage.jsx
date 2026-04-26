@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import {
   Table, TableRow, TableCell, TableHead, TableBody,
 } from '@mui/material';
@@ -24,7 +26,7 @@ const DriversPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow('/api/drivers');
+      const response = await fetchOrThrow(traccarPath('/api/drivers'));
       setItems(await response.json());
     } finally {
       setLoading(false);

@@ -2,6 +2,12 @@
 node_modules/
 **/node_modules/
 
+# Recovery / secrets docs (never commit)
+RECOVERY.md
+*RECOVERY*.md
+*PASSWORDS*.md
+*SECRETS*.md
+
 # Environment variables
 backend/.env
 .env

@@ -12,6 +12,7 @@ import ReportsMenu from './components/ReportsMenu';
 import TableShimmer from '../common/components/TableShimmer';
 import RemoveDialog from '../common/components/RemoveDialog';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const useStyles = makeStyles()((theme) => ({
   columnAction: {
@@ -34,7 +35,7 @@ const ScheduledPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow('/api/reports');
+      const response = await fetchOrThrow(traccarPath('/api/reports'));
       setItems(await response.json());
     } finally {
       setLoading(false);

@@ -7,6 +7,7 @@ import { useTranslation } from '../../common/components/LocalizationProvider';
 import AppLayout from '../../common/components/AppLayout';
 import useSettingsStyles from '../common/useSettingsStyles';
 import fetchOrThrow from '../../common/util/fetchOrThrow';
+import { traccarPath } from '../../config/traccarApi.js';
 
 const EditItemView = ({
   children, endpoint, item, setItem, defaultItem, validate, onItemSaved, menu, breadcrumbs,
@@ -20,7 +21,7 @@ const EditItemView = ({
   useEffectAsync(async () => {
     if (!item) {
       if (id) {
-        const response = await fetchOrThrow(`/api/${endpoint}/${id}`);
+        const response = await fetchOrThrow(traccarPath(`/api/${endpoint}/${id}`));
         setItem(await response.json());
       } else {
         setItem(defaultItem || {});
@@ -29,12 +30,12 @@ const EditItemView = ({
   }, [id, item, defaultItem]);
 
   const handleSave = useCatch(async () => {
-    let url = `/api/${endpoint}`;
+    let path = `/api/${endpoint}`;
     if (id) {
-      url += `/${id}`;
+      path += `/${id}`;
     }
 
-    const response = await fetchOrThrow(url, {
+    const response = await fetchOrThrow(traccarPath(path), {
       method: !id ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),

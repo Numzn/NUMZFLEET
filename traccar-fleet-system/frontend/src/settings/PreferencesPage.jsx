@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import dayjs from 'dayjs';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -57,7 +59,7 @@ const PreferencesPage = () => {
 
   const generateToken = useCatch(async () => {
     const expiration = dayjs(tokenExpiration, 'YYYY-MM-DD').toISOString();
-    const response = await fetchOrThrow('/api/session/token', {
+    const response = await fetchOrThrow(traccarPath('/api/session/token'), {
       method: 'POST',
       body: new URLSearchParams(`expiration=${expiration}`),
     });
@@ -70,7 +72,7 @@ const PreferencesPage = () => {
   }));
 
   const handleSave = useCatch(async () => {
-    const response = await fetchOrThrow(`/api/users/${user.id}`, {
+    const response = await fetchOrThrow(traccarPath(`/api/users/${user.id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...user, attributes }),
@@ -80,7 +82,7 @@ const PreferencesPage = () => {
   });
 
   const handleReboot = useCatch(async () => {
-    const response = await fetch('/api/server/reboot', { method: 'POST' });
+    const response = await fetch(traccarPath('/api/server/reboot'), { method: 'POST' });
     throw Error(response.statusText);
   });
 
@@ -293,7 +295,7 @@ const PreferencesPage = () => {
                   multiple
                   value={attributes.soundEvents?.split(',') || []}
                   onChange={(e) => setAttributes({ ...attributes, soundEvents: e.target.value.join(',') })}
-                  endpoint="/api/notifications/types"
+                  endpoint={traccarPath('/api/notifications/types')}
                   keyGetter={(it) => it.type}
                   titleGetter={(it) => t(prefixString('event', it.type))}
                   label={t('eventsSoundEvents')}

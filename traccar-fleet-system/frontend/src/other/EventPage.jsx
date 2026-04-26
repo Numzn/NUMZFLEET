@@ -16,6 +16,7 @@ import { formatNotificationTitle } from '../common/util/formatter';
 import MapScale from '../map/MapScale';
 import BackIcon from '../common/components/BackIcon';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const useStyles = makeStyles()(() => ({
   root: {
@@ -55,14 +56,14 @@ const EventPage = () => {
 
   useEffectAsync(async () => {
     if (id) {
-      const response = await fetchOrThrow(`/api/events/${id}`);
+      const response = await fetchOrThrow(traccarPath(`/api/events/${id}`));
       setEvent(await response.json());
     }
   }, [id]);
 
   useEffectAsync(async () => {
     if (event && event.positionId) {
-      const response = await fetchOrThrow(`/api/positions?id=${event.positionId}`);
+      const response = await fetchOrThrow(`${traccarPath('/api/positions')}?id=${event.positionId}`);
       const positions = await response.json();
       if (positions.length > 0) {
         setPosition(positions[0]);

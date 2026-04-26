@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useNavigate } from 'react-router-dom';
 import {
   Accordion,
@@ -30,7 +32,7 @@ const AnnouncementPage = () => {
   const handleSend = useCatchCallback(async () => {
     const query = new URLSearchParams();
     users.forEach((userId) => query.append('userId', userId));
-    await fetchOrThrow(`/api/notifications/send/${notificator}?${query.toString()}`, {
+    await fetchOrThrow(`${traccarPath(`/api/notifications/send/${notificator}`)}?${query.toString()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message),
@@ -52,13 +54,13 @@ const AnnouncementPage = () => {
               multiple
               value={users}
               onChange={(e) => setUsers(e.target.value)}
-              endpoint="/api/users"
+              endpoint={traccarPath('/api/users')}
               label={t('settingsUsers')}
             />
             <SelectField
               value={notificator}
               onChange={(e) => setNotificator(e.target.value)}
-              endpoint="/api/notifications/notificators?announcement=true"
+              endpoint={traccarPath('/api/notifications/notificators?announcement=true')}
               keyGetter={(it) => it.type}
               titleGetter={(it) => t(prefixString('notificator', it.type))}
               label={t('notificationNotificators')}

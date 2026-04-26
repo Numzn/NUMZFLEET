@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Accordion,
@@ -67,7 +69,7 @@ const UserPage = () => {
   const handleDelete = useCatch(async () => {
     if (deleteEmail === currentUser.email) {
       setDeleteFailed(false);
-      await fetchOrThrow(`/api/users/${currentUser.id}`, { method: 'DELETE' });
+      await fetchOrThrow(traccarPath(`/api/users/${currentUser.id}`), { method: 'DELETE' });
       navigate('/login');
       dispatch(sessionActions.updateUser(null));
     } else {
@@ -76,7 +78,7 @@ const UserPage = () => {
   });
 
   const handleGenerateTotp = useCatch(async () => {
-    const response = await fetchOrThrow('/api/users/totp', { method: 'POST' });
+    const response = await fetchOrThrow(traccarPath('/api/users/totp'), { method: 'POST' });
     setItem({ ...item, totpKey: await response.text() });
   });
 
@@ -251,7 +253,7 @@ const UserPage = () => {
               <SelectField
                 value={item.attributes && item.attributes.timezone}
                 onChange={(e) => setItem({ ...item, attributes: { ...item.attributes, timezone: e.target.value } })}
-                endpoint="/api/server/timezones"
+                endpoint={traccarPath('/api/server/timezones')}
                 keyGetter={(it) => it}
                 titleGetter={(it) => it}
                 label={t('sharedTimezone')}

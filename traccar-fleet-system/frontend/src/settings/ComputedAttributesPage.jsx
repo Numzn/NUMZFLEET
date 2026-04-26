@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import {
   Table, TableRow, TableCell, TableHead, TableBody,
 } from '@mui/material';
@@ -26,7 +28,7 @@ const ComputedAttributesPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow('/api/attributes/computed');
+      const response = await fetchOrThrow(traccarPath('/api/attributes/computed'));
       setItems(await response.json());
     } finally {
       setLoading(false);

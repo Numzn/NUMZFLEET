@@ -7,10 +7,11 @@ import {
   bulkUpdateSpecs
 } from '../controllers/vehicleSpecController.js';
 import * as authMiddleware from '../middleware/auth.js';
+import { requireAuth as _requireAuth } from '../middleware/authGates.js';
 
 const router = express.Router();
 const authenticate = authMiddleware.authenticate;
-const requireAuth = authMiddleware.requireAuth;
+const requireAuth = authMiddleware.requireAuth || _requireAuth;
 const requireManager =
   authMiddleware.requireManager ||
   ((req, res, next) => {

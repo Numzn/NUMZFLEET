@@ -1,10 +1,11 @@
 import {
   useCallback, useEffect, useRef, useState,
 } from 'react';
+import { traccarPath } from './config/traccarApi.js';
 import { useDispatch, useSelector, connect } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Snackbar } from '@mui/material';
-import { devicesActions, sessionActions, fuelRequestsActions } from './store';
+import { devicesActions, sessionActions } from './store';
 import { useCatchCallback, useEffectAsync } from './reactHelper';
 import { snackBarDurationLongMs } from './common/util/duration';
 import alarm from './resources/alarm.mp3';
@@ -12,7 +13,6 @@ import { eventsActions } from './store/events';
 import useFeatures from './common/util/useFeatures';
 import { useAttributePreference } from './common/util/preferences';
 import { handleNativeNotificationListeners, nativePostMessage } from './common/components/NativeInterface';
-import fetchOrThrow from './common/util/fetchOrThrow';
 
 const logoutCode = 4000;
 
@@ -32,6 +32,28 @@ const SocketController = () => {
   const soundAlarms = useAttributePreference('soundAlarms', 'sos');
 
   const features = useFeatures();
+
+  const refreshSnapshot = useCallback(async () => {
+    try {
+      const [devicesResponse, positionsResponse] = await Promise.all([
+        fetch(traccarPath('/api/devices')),
+        fetch(traccarPath('/api/positions')),
+      ]);
+
+      if (devicesResponse.ok) {
+        dispatch(devicesActions.refresh(await devicesResponse.json()));
+      }
+      if (positionsResponse.ok) {
+        dispatch(sessionActions.updatePositions(await positionsResponse.json()));
+      }
+
+      if (devicesResponse.status === 401 || positionsResponse.status === 401) {
+        navigate('/login');
+      }
+    } catch {
+      // ignore refresh errors; websocket will retry independently
+    }
+  }, [dispatch, navigate]);
 
   const handleEvents = useCallback((events) => {
     if (!features.disableEvents) {
@@ -59,11 +81,10 @@ const SocketController = () => {
 
   const connectSocket = () => {
     // Always connect WebSocket to same origin so the session cookie is sent.
-    // Both production nginx (numz.site/api/socket) and the Vite dev proxy
-    // already forward /api/socket to the Traccar backend.
+    // Production: nginx maps /traccar/api/socket -> Traccar. Dev: Vite proxies /traccar and /api/socket.
     const wsUrl = window.location.origin.replace(/^http/, 'ws');
     
-    const socket = new WebSocket(`${wsUrl}/api/socket`);
+    const socket = new WebSocket(`${wsUrl}${traccarPath('/api/socket')}`);
     socketRef.current = socket;
 
     socket.onopen = () => {
@@ -79,21 +100,7 @@ const SocketController = () => {
       console.warn('[WebSocket] Disconnected, code:', event.code);
       dispatch(sessionActions.updateSocket(false));
       if (event.code !== logoutCode) {
-        try {
-          const devicesResponse = await fetch('/api/devices');
-          if (devicesResponse.ok) {
-            dispatch(devicesActions.update(await devicesResponse.json()));
-          }
-          const positionsResponse = await fetch('/api/positions');
-          if (positionsResponse.ok) {
-            dispatch(sessionActions.updatePositions(await positionsResponse.json()));
-          }
-          if (devicesResponse.status === 401 || positionsResponse.status === 401) {
-            navigate('/login');
-          }
-        } catch {
-          // ignore errors
-        }
+        await refreshSnapshot();
         // Implement exponential backoff with faster initial retry
         const retryDelay = Math.min(1000 * Math.pow(2, retryCountRef.current), 60000);
         retryCountRef.current++;
@@ -124,8 +131,7 @@ const SocketController = () => {
 
   useEffectAsync(async () => {
     if (authenticated) {
-      const response = await fetchOrThrow('/api/devices');
-      dispatch(devicesActions.refresh(await response.json()));
+      await refreshSnapshot();
       nativePostMessage('authenticated');
       connectSocket();
       return () => {
@@ -138,7 +144,7 @@ const SocketController = () => {
   const handleNativeNotification = useCatchCallback(async (message) => {
     const eventId = message.data.eventId;
     if (eventId) {
-      const response = await fetch(`/api/events/${eventId}`);
+      const response = await fetch(traccarPath(`/api/events/${eventId}`));
       if (response.ok) {
         const event = await response.json();
         const eventWithMessage = {
@@ -162,11 +168,7 @@ const SocketController = () => {
       if (!socket || socket.readyState === WebSocket.CLOSED) {
         connectSocket();
       } else if (socket.readyState === WebSocket.OPEN) {
-        try {
-          socket.send('{}');
-        } catch {
-          // test connection
-        }
+        void refreshSnapshot();
       }
     };
     const onVisibility = () => {
@@ -180,7 +182,7 @@ const SocketController = () => {
       window.removeEventListener('online', reconnectIfNeeded);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [authenticated]);
+  }, [authenticated, refreshSnapshot]);
 
   return (
     <>

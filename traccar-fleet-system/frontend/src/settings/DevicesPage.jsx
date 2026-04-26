@@ -19,6 +19,7 @@ import useSettingsStyles from './common/useSettingsStyles';
 import DeviceUsersValue from './components/DeviceUsersValue';
 import usePersistedState from '../common/util/usePersistedState';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 import AddressValue from '../common/components/AddressValue';
 import exportExcel from '../common/util/exportExcel';
 
@@ -45,7 +46,7 @@ const DevicesPage = () => {
     setLoading(true);
     try {
       const query = new URLSearchParams({ all: showAll });
-      const response = await fetchOrThrow(`/api/devices?${query.toString()}`);
+      const response = await fetchOrThrow(`${traccarPath('/api/devices')}?${query.toString()}`);
       setItems(await response.json());
     } finally {
       setLoading(false);

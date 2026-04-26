@@ -12,11 +12,15 @@ import {
   listVehicles,
   getVehicle,
   assignDevice,
+  updateVehicle,
+  deleteVehicle,
 } from '../controllers/vehicleFleetController.js';
 import * as authMiddleware from '../middleware/auth.js';
+import { requireAuth, requireManager as _requireManager } from '../middleware/authGates.js';
 
 const router = express.Router();
-const { authenticate, requireAuth, requireManager } = authMiddleware;
+const { authenticate } = authMiddleware;
+const requireManager = authMiddleware.requireManager || _requireManager;
 
 router.use(authenticate);
 
@@ -26,5 +30,7 @@ router.get('/', requireAuth, requireManager, listVehicles);
 // assign-device before :id so "assign-device" is never captured as id
 router.post('/:vehicleId/assign-device', requireAuth, requireManager, assignDevice);
 router.get('/:id', requireAuth, requireManager, getVehicle);
+router.put('/:id', requireAuth, requireManager, updateVehicle);
+router.delete('/:id', requireAuth, requireManager, deleteVehicle);
 
 export default router;

@@ -75,10 +75,8 @@ const FuelSocketController = () => {
     }
 
     // Determine fuel API WebSocket URL.
-    // IMPORTANT: the /socket.io/ proxy only lives on the FRONTEND host (numz.site),
-    // NOT on api.numz.site. Using VITE_API_BASE_URL would send ws to api.numz.site
-    // which routes to Traccar, not fuel-api. Always use same origin.
-    const fuelApiUrl = window.location.origin;
+    // With new service-based routing, Socket.IO is at /socket.io on the same origin
+    const fuelApiUrl = '/';
 
     // Only create new socket if one doesn't exist or is disconnected
     let socket = socketRef.current;

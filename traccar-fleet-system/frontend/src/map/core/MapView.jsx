@@ -47,13 +47,22 @@ const updateReadyValue = (value) => {
   readyListeners.forEach((listener) => listener(value));
 };
 
+const isValidMapImage = (value) => value && (
+  value instanceof HTMLImageElement
+  || value instanceof ImageBitmap
+  || value instanceof ImageData
+  || (typeof value === 'object' && typeof value.width === 'number' && typeof value.height === 'number' && value.data)
+);
+
 const initMap = async () => {
   if (!map.hasImage('background')) {
     // Load standard images
     Object.entries(mapImages).forEach(([key, value]) => {
-      map.addImage(key, value, {
-        pixelRatio: window.devicePixelRatio,
-      });
+      if (isValidMapImage(value)) {
+        map.addImage(key, value, {
+          pixelRatio: window.devicePixelRatio,
+        });
+      }
     });
     
     // Load enhanced images and wait for completion
@@ -68,7 +77,7 @@ const initMap = async () => {
     
     // Add enhanced images to map
     Object.entries(enhancedMapImages).forEach(([key, value]) => {
-      if (!map.hasImage(key)) {
+      if (!map.hasImage(key) && isValidMapImage(value)) {
         map.addImage(key, value, {
           pixelRatio: window.devicePixelRatio,
         });

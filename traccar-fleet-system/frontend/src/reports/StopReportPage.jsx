@@ -30,6 +30,7 @@ import scheduleReport from './common/scheduleReport';
 import MapScale from '../map/MapScale';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import exportExcel from '../common/util/exportExcel';
+import { traccarPath } from '../config/traccarApi.js';
 
 const columnsArray = [
   ['startTime', 'reportStartTime'],
@@ -64,7 +65,7 @@ const StopReportPage = () => {
     groupIds.forEach((groupId) => query.append('groupId', groupId));
     setLoading(true);
     try {
-      const response = await fetchOrThrow(`/api/reports/stops?${query.toString()}`, {
+      const response = await fetchOrThrow(`${traccarPath('/api/reports/stops')}?${query.toString()}`, {
         headers: { Accept: 'application/json' },
       });
       setItems(await response.json());

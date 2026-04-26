@@ -13,6 +13,7 @@ import { useCatch } from '../reactHelper';
 import useReportStyles from './common/useReportStyles';
 import TableShimmer from '../common/components/TableShimmer';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const columnsArray = [
   ['actionTime', 'positionServerTime'],
@@ -36,7 +37,7 @@ const AuditPage = () => {
     setLoading(true);
     try {
       const query = new URLSearchParams({ from, to });
-      const response = await fetchOrThrow(`/api/audit?${query.toString()}`);
+      const response = await fetchOrThrow(`${traccarPath('/api/audit')}?${query.toString()}`);
       setItems(await response.json());
     } finally {
       setLoading(false);

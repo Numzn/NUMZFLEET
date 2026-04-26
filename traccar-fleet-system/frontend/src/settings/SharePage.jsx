@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -32,7 +34,7 @@ const SharePage = () => {
 
   const handleShare = useCatchCallback(async () => {
     const expirationTime = dayjs(expiration).toISOString();
-    const response = await fetchOrThrow('/api/devices/share', {
+    const response = await fetchOrThrow(traccarPath('/api/devices/share'), {
       method: 'POST',
       body: new URLSearchParams(`deviceId=${id}&expiration=${expirationTime}`),
     });

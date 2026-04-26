@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import {
   Table, TableRow, TableCell, TableHead, TableBody,
 } from '@mui/material';
@@ -26,7 +28,7 @@ const NotificationsPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow('/api/notifications');
+      const response = await fetchOrThrow(traccarPath('/api/notifications'));
       setItems(await response.json());
     } finally {
       setLoading(false);

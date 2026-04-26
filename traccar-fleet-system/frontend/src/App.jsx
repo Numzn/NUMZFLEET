@@ -1,4 +1,6 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { traccarPath } from './config/traccarApi.js';
+
 import { useDispatch, useSelector } from 'react-redux';
 import { useMediaQuery, useTheme } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
@@ -41,7 +43,7 @@ const App = () => {
   const user = useSelector((state) => state.session.user);
 
   const acceptTerms = useCatch(async () => {
-    const response = await fetchOrThrow(`/api/users/${user.id}`, {
+    const response = await fetchOrThrow(traccarPath(`/api/users/${user.id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...user, attributes: { ...user.attributes, termsAccepted: true } }),
@@ -51,7 +53,7 @@ const App = () => {
 
   useEffectAsync(async () => {
     if (!user) {
-      const response = await fetch('/api/session', { credentials: 'include' });
+      const response = await fetch(traccarPath('/api/session'), { credentials: 'include' });
       if (response.ok) {
         dispatch(sessionActions.updateUser(await response.json()));
       } else {

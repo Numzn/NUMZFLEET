@@ -23,6 +23,7 @@ import { useAttributePreference, usePreference } from '../util/preferences';
 import { useTranslation } from './LocalizationProvider';
 import { useDeviceReadonly } from '../util/permissions';
 import AddressValue from './AddressValue';
+import { traccarPath } from '../../config/traccarApi.js';
 import GeofencesValue from './GeofencesValue';
 import DriverValue from './DriverValue';
 
@@ -104,7 +105,7 @@ const PositionValue = ({ position, property, attribute }) => {
     case 'image':
     case 'video':
     case 'audio':
-      return <Link href={`/api/media/${device.uniqueId}/${value}`} target="_blank">{value}</Link>;
+      return <Link href={traccarPath(`/api/media/${device.uniqueId}/${value}`)} target="_blank">{value}</Link>;
     case 'totalDistance':
     case 'hours':
       return (

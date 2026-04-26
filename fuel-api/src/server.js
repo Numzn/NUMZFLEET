@@ -8,11 +8,13 @@ import rateLimit from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
 import sequelize, { testConnection } from './config/database.js';
-import { testTraccarConnection } from './config/traccar.js';
+import { testTraccarConnection } from './services/userService.js';
+import { initializeAuth } from './middleware/auth.js';
 import { syncDatabase } from './models/index.js';
 import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
 import vehicleSpecsRouter from './routes/vehicleSpecs.js';
 import vehiclesRouter from './routes/vehicles.js';
+import operationSessionsRouter from './routes/operationSessions.js';
 import reportsRouter from './reports/routes/reports.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
@@ -29,10 +31,10 @@ dotenv.config();
 
 // Get database URLs from environment (matching docker-compose)
 const DATABASE_URL = process.env.DATABASE_URL || 
-  `postgresql://numztrak:${process.env.POSTGRES_PASSWORD || 'NumzFuel2025'}@fuel-postgres:5432/numztrak_fuel`;
+  `postgresql://numztrak:${process.env.POSTGRES_PASSWORD || 'NumzFuel2025'}@numztrak-postgres:5432/numztrak_fuel`;
 
 const TRACCAR_MYSQL_CONFIG = {
-  host: process.env.TRACCAR_MYSQL_HOST || 'traccar-mysql',
+  host: process.env.TRACCAR_MYSQL_HOST || 'numztrak-mysql',
   port: process.env.TRACCAR_MYSQL_PORT || 3306,
   database: process.env.TRACCAR_MYSQL_DATABASE || process.env.MYSQL_DATABASE || 'traccar',
   user: process.env.TRACCAR_MYSQL_USER || process.env.MYSQL_USER || 'traccar',
@@ -300,6 +302,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/fuel-requests', fuelRequestsRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
 app.use('/api/vehicles', vehiclesRouter);
+app.use('/api/operation-sessions', operationSessionsRouter);
 app.use('/api/reports', reportsRouter);
 
 // Root endpoint
@@ -443,6 +446,16 @@ const startServer = async () => {
   } catch (error) {
     console.error('❌ Database sync failed:', error.message);
     console.error('   Server will continue but database operations may fail.');
+
+    // Initialize authentication system
+    try {
+      await initializeAuth();
+    } catch (error) {
+      console.error('❌ Authentication initialization failed:', error.message);
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      }
+    }
   }
 
   // Start HTTP server

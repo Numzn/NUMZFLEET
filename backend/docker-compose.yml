@@ -97,6 +97,10 @@ services:
       TRACCAR_MYSQL_USER: traccar
       TRACCAR_MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       NODE_ENV: production
+      AUTH_STRATEGY: ${AUTH_STRATEGY:-permissive}
+      DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-true}
+      TRACCAR_ENABLED: ${TRACCAR_ENABLED:-false}
+      LOG_AUTH: ${LOG_AUTH:-false}
       PORT: 3001
       SESSION_SECRET: ${SESSION_SECRET}
       ERB_API_BASE_URL: ${ERB_API_BASE_URL:-http://erb-api:8000}
@@ -175,10 +179,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.oci.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./ssl/server.crt:/etc/nginx/ssl/server.crt:ro
-      - ./ssl/server.key:/etc/nginx/ssl/server.key:ro
-      - ../traccar-fleet-system/frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - /c/Users/NUMERI/NUMZFLEET/traccar-fleet-system/frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - traccar-server
       - fuel-api

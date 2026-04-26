@@ -12,6 +12,7 @@ import PositionValue from '../common/components/PositionValue';
 import usePositionAttributes from '../common/attributes/usePositionAttributes';
 import BackIcon from '../common/components/BackIcon';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -39,7 +40,7 @@ const PositionPage = () => {
 
   useEffectAsync(async () => {
     if (id) {
-      const response = await fetchOrThrow(`/api/positions?id=${id}`);
+      const response = await fetchOrThrow(`${traccarPath('/api/positions')}?id=${id}`);
       const positions = await response.json();
       if (positions.length > 0) {
         setItem(positions[0]);

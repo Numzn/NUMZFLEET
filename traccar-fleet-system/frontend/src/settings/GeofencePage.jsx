@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useDispatch } from 'react-redux';
 import {
   Accordion,
@@ -75,7 +77,7 @@ const GeofencePage = () => {
               <SelectField
                 value={item.calendarId}
                 onChange={(event) => setItem({ ...item, calendarId: Number(event.target.value) })}
-                endpoint="/api/calendars"
+                endpoint={traccarPath('/api/calendars')}
                 label={t('sharedCalendar')}
               />
               <FormControlLabel

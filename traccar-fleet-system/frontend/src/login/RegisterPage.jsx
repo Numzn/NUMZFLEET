@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Button, TextField, Typography, Snackbar, IconButton,
@@ -48,14 +50,14 @@ const RegisterPage = () => {
 
   useEffectAsync(async () => {
     if (totpForce) {
-      const response = await fetchOrThrow('/api/users/totp', { method: 'POST' });
+      const response = await fetchOrThrow(traccarPath('/api/users/totp'), { method: 'POST' });
       setTotpKey(await response.text());
     }
   }, [totpForce, setTotpKey]);
 
   const handleSubmit = useCatch(async (event) => {
     event.preventDefault();
-    await fetchOrThrow('/api/users', {
+    await fetchOrThrow(traccarPath('/api/users'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password, totpKey }),

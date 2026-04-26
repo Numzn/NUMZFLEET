@@ -115,7 +115,7 @@ const prepareEnhancedIcon = async (background, icon, color, status = 'neutral') 
   ctx.lineWidth = 1;
   ctx.stroke();
   
-  return canvas.toDataURL();
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
 };
 
 export default async () => {

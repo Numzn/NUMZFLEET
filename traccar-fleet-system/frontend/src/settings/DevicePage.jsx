@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useSearchParams } from 'react-router-dom';
 import {
   Accordion,
@@ -45,7 +47,7 @@ const DevicePage = () => {
   const handleFileInput = useCatch(async (newFile) => {
     setImageFile(newFile);
     if (newFile && item?.id) {
-      const response = await fetchOrThrow(`/api/devices/${item.id}/image`, {
+      const response = await fetchOrThrow(traccarPath(`/api/devices/${item.id}/image`), {
         method: 'POST',
         body: newFile,
       });
@@ -101,7 +103,7 @@ const DevicePage = () => {
               <SelectField
                 value={item.groupId}
                 onChange={(event) => setItem({ ...item, groupId: Number(event.target.value) })}
-                endpoint="/api/groups"
+                endpoint={traccarPath('/api/groups')}
                 label={t('groupParent')}
               />
               <TextField
@@ -131,7 +133,7 @@ const DevicePage = () => {
               <SelectField
                 value={item.calendarId}
                 onChange={(event) => setItem({ ...item, calendarId: Number(event.target.value) })}
-                endpoint="/api/calendars"
+                endpoint={traccarPath('/api/calendars')}
                 label={t('sharedCalendar')}
               />
               <TextField

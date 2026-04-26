@@ -1,4 +1,6 @@
 import { Autocomplete, Snackbar, TextField } from '@mui/material';
+import { traccarPath } from '../../config/traccarApi.js';
+
 import { useState } from 'react';
 import { useCatchCallback, useEffectAsync } from '../../reactHelper';
 import { snackBarDurationShortMs } from '../util/duration';
@@ -49,14 +51,14 @@ const LinkField = ({
     if (!newValue.find((it) => it < 0)) {
       const results = [];
       newValue.filter((it) => !oldValue.includes(it)).forEach((added) => {
-        results.push(fetchOrThrow('/api/permissions', {
+        results.push(fetchOrThrow(traccarPath('/api/permissions'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(createBody(added)),
         }));
       });
       oldValue.filter((it) => !newValue.includes(it)).forEach((removed) => {
-        results.push(fetchOrThrow('/api/permissions', {
+        results.push(fetchOrThrow(traccarPath('/api/permissions'), {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(createBody(removed)),

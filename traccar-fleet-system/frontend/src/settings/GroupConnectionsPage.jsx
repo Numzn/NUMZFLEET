@@ -14,6 +14,7 @@ import { formatNotificationTitle } from '../common/util/formatter';
 import AppLayout from '../common/components/AppLayout';
 import useFeatures from '../common/util/useFeatures';
 import useSettingsStyles from './common/useSettingsStyles';
+import { traccarPath } from '../config/traccarApi.js';
 
 const GroupConnectionsPage = () => {
   const { classes } = useSettingsStyles();
@@ -34,16 +35,16 @@ const GroupConnectionsPage = () => {
           </AccordionSummary>
           <AccordionDetails className={classes.details}>
             <LinkField
-              endpointAll="/api/geofences"
-              endpointLinked={`/api/geofences?groupId=${id}`}
+              endpointAll={traccarPath('/api/geofences?all=true')}
+              endpointLinked={`${traccarPath('/api/geofences')}?groupId=${id}`}
               baseId={id}
               keyBase="groupId"
               keyLink="geofenceId"
               label={t('sharedGeofences')}
             />
             <LinkField
-              endpointAll="/api/notifications"
-              endpointLinked={`/api/notifications?groupId=${id}`}
+              endpointAll={traccarPath('/api/notifications?all=true')}
+              endpointLinked={`${traccarPath('/api/notifications')}?groupId=${id}`}
               baseId={id}
               keyBase="groupId"
               keyLink="notificationId"
@@ -52,8 +53,8 @@ const GroupConnectionsPage = () => {
             />
             {!features.disableDrivers && (
               <LinkField
-                endpointAll="/api/drivers"
-                endpointLinked={`/api/drivers?groupId=${id}`}
+                endpointAll={traccarPath('/api/drivers?all=true')}
+                endpointLinked={`${traccarPath('/api/drivers')}?groupId=${id}`}
                 baseId={id}
                 keyBase="groupId"
                 keyLink="driverId"
@@ -63,8 +64,8 @@ const GroupConnectionsPage = () => {
             )}
             {!features.disableComputedAttributes && (
               <LinkField
-                endpointAll="/api/attributes/computed"
-                endpointLinked={`/api/attributes/computed?groupId=${id}`}
+                endpointAll={traccarPath('/api/attributes/computed?all=true')}
+                endpointLinked={`${traccarPath('/api/attributes/computed')}?groupId=${id}`}
                 baseId={id}
                 keyBase="groupId"
                 keyLink="attributeId"
@@ -74,8 +75,8 @@ const GroupConnectionsPage = () => {
             )}
             {!features.disableSavedCommands && (
               <LinkField
-                endpointAll="/api/commands"
-                endpointLinked={`/api/commands?groupId=${id}`}
+                endpointAll={traccarPath('/api/commands?all=true')}
+                endpointLinked={`${traccarPath('/api/commands')}?groupId=${id}`}
                 baseId={id}
                 keyBase="groupId"
                 keyLink="commandId"
@@ -85,8 +86,8 @@ const GroupConnectionsPage = () => {
             )}
             {!features.disableMaintenance && (
               <LinkField
-                endpointAll="/api/maintenance"
-                endpointLinked={`/api/maintenance?groupId=${id}`}
+                endpointAll={traccarPath('/api/maintenance?all=true')}
+                endpointLinked={`${traccarPath('/api/maintenance')}?groupId=${id}`}
                 baseId={id}
                 keyBase="groupId"
                 keyLink="maintenanceId"

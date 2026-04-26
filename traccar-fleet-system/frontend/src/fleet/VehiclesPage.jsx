@@ -31,10 +31,12 @@ import { makeStyles } from 'tss-react/mui';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
 import LinkIcon from '@mui/icons-material/Link';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import AppLayout from '../common/components/AppLayout';
 import Breadcrumbs from '../common/components/Breadcrumbs';
 import { useManager } from '../common/util/permissions';
-import { fetchVehicles, createVehicle, assignVehicleDevice } from './vehiclesApi';
+import { fetchVehicles, createVehicle, assignVehicleDevice, updateVehicle, deleteVehicle } from './vehiclesApi';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -83,6 +85,14 @@ const VehiclesPage = () => {
   const [assignVehicleId, setAssignVehicleId] = useState(null);
   const [assignDeviceId, setAssignDeviceId] = useState('');
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editVehicle, setEditVehicle] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editPlate, setEditPlate] = useState('');
+
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteVehicleRow, setDeleteVehicleRow] = useState(null);
+
   const load = useCallback(async () => {
     if (!manager) return;
     setLoading(true);
@@ -111,6 +121,42 @@ const VehiclesPage = () => {
       await load();
     } catch (e) {
       setError(e.message || 'Create failed');
+    }
+  };
+
+  const openEdit = (row) => {
+    setEditVehicle(row);
+    setEditName(row.name);
+    setEditPlate(row.plateNumber || '');
+    setEditOpen(true);
+  };
+
+  const handleEdit = async () => {
+    if (!editVehicle) return;
+    try {
+      await updateVehicle(user, editVehicle.id, { name: editName, plateNumber: editPlate });
+      setEditOpen(false);
+      setEditVehicle(null);
+      await load();
+    } catch (e) {
+      setError(e.message || 'Update failed');
+    }
+  };
+
+  const openDeleteConfirm = (row) => {
+    setDeleteVehicleRow(row);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteVehicleRow) return;
+    try {
+      await deleteVehicle(user, deleteVehicleRow.id);
+      setDeleteConfirmOpen(false);
+      setDeleteVehicleRow(null);
+      await load();
+    } catch (e) {
+      setError(e.message || 'Delete failed');
     }
   };
 
@@ -228,13 +274,25 @@ const VehiclesPage = () => {
                       {row.vehicleSpec?.tankCapacity != null ? row.vehicleSpec.tankCapacity : '—'}
                     </TableCell>
                     <TableCell align="right">
-                      <Button
-                        size="small"
-                        startIcon={<LinkIcon />}
-                        onClick={() => openAssign(row.id, row.assignment?.deviceId)}
-                      >
-                        {row.assignment ? 'Change device' : 'Assign device'}
-                      </Button>
+                      <Box display="flex" justifyContent="flex-end" gap={0.5}>
+                        <Tooltip title="Edit vehicle">
+                          <IconButton size="small" onClick={() => openEdit(row)} aria-label="Edit vehicle">
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete vehicle">
+                          <IconButton size="small" color="error" onClick={() => openDeleteConfirm(row)} aria-label="Delete vehicle">
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Button
+                          size="small"
+                          startIcon={<LinkIcon />}
+                          onClick={() => openAssign(row.id, row.assignment?.deviceId)}
+                        >
+                          {row.assignment ? 'Change device' : 'Assign device'}
+                        </Button>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
@@ -297,6 +355,49 @@ const VehiclesPage = () => {
             <Button onClick={() => setAssignOpen(false)}>Cancel</Button>
             <Button variant="contained" onClick={handleAssign} disabled={!assignDeviceId}>
               Assign
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit dialog */}
+        <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Edit vehicle</DialogTitle>
+          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <TextField
+              label="Name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+              fullWidth
+              autoFocus
+            />
+            <TextField
+              label="Plate number"
+              value={editPlate}
+              onChange={(e) => setEditPlate(e.target.value)}
+              fullWidth
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handleEdit} disabled={!editName.trim()}>
+              Save
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete confirmation dialog */}
+        <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Delete vehicle</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete <strong>{deleteVehicleRow?.name}</strong>? This cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="contained" color="error" onClick={handleDelete}>
+              Delete
             </Button>
           </DialogActions>
         </Dialog>

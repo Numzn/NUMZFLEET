@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from './config/traccarApi.js';
+
 import { Alert, IconButton } from '@mui/material';
 import ReplayIcon from '@mui/icons-material/Replay';
 import { useDispatch, useSelector } from 'react-redux';
@@ -17,7 +19,7 @@ const ServerProvider = ({
   useEffectAsync(async () => {
     if (!error) {
       try {
-        const response = await fetch('/api/server');
+        const response = await fetch(traccarPath('/api/server'));
         if (response.ok) {
           dispatch(sessionActions.updateServer(await response.json()));
         } else {

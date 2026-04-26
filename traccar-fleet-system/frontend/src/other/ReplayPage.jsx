@@ -27,6 +27,7 @@ import StatusCard from '../common/components/StatusCard';
 import MapScale from '../map/MapScale';
 import BackIcon from '../common/components/BackIcon';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -147,7 +148,7 @@ const ReplayPage = () => {
     setSelectedDeviceId(deviceId);
     const query = new URLSearchParams({ deviceId, from, to });
     try {
-      const response = await fetchOrThrow(`/api/positions?${query.toString()}`);
+      const response = await fetchOrThrow(`${traccarPath('/api/positions')}?${query.toString()}`);
       setIndex(0);
       const positions = await response.json();
       setPositions(positions);
@@ -161,7 +162,7 @@ const ReplayPage = () => {
 
   const handleDownload = () => {
     const query = new URLSearchParams({ deviceId: selectedDeviceId, from, to });
-    window.location.assign(`/api/positions/kml?${query.toString()}`);
+    window.location.assign(`${traccarPath('/api/positions/kml')}?${query.toString()}`);
   };
 
   return (

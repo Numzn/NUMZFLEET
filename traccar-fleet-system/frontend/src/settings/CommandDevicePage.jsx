@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Accordion,
@@ -29,7 +31,7 @@ const CommandDevicePage = () => {
   const handleSend = useCatch(async () => {
     let command;
     if (savedId) {
-      const response = await fetchOrThrow(`/api/commands/${savedId}`);
+      const response = await fetchOrThrow(traccarPath(`/api/commands/${savedId}`));
       command = await response.json();
     } else {
       command = item;
@@ -37,7 +39,7 @@ const CommandDevicePage = () => {
 
     command.deviceId = parseInt(id, 10);
 
-    await fetchOrThrow('/api/commands/send', {
+    await fetchOrThrow(traccarPath('/api/commands/send'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(command),

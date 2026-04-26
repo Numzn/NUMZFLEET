@@ -13,6 +13,7 @@ import SettingsMenu from './components/SettingsMenu';
 import { formatNotificationTitle } from '../common/util/formatter';
 import AppLayout from '../common/components/AppLayout';
 import useSettingsStyles from './common/useSettingsStyles';
+import { traccarPath } from '../config/traccarApi.js';
 
 const UserConnectionsPage = () => {
   const { classes } = useSettingsStyles();
@@ -31,8 +32,8 @@ const UserConnectionsPage = () => {
           </AccordionSummary>
           <AccordionDetails className={classes.details}>
             <LinkField
-              endpointAll="/api/devices?all=true&excludeAttributes=true"
-              endpointLinked={`/api/devices?userId=${id}&excludeAttributes=true`}
+              endpointAll={traccarPath('/api/devices?all=true&excludeAttributes=true')}
+              endpointLinked={`${traccarPath('/api/devices')}?userId=${id}&excludeAttributes=true`}
               baseId={id}
               keyBase="userId"
               keyLink="deviceId"
@@ -40,24 +41,24 @@ const UserConnectionsPage = () => {
               label={t('deviceTitle')}
             />
             <LinkField
-              endpointAll="/api/groups?all=true"
-              endpointLinked={`/api/groups?userId=${id}`}
+              endpointAll={traccarPath('/api/groups?all=true')}
+              endpointLinked={`${traccarPath('/api/groups')}?userId=${id}`}
               baseId={id}
               keyBase="userId"
               keyLink="groupId"
               label={t('settingsGroups')}
             />
             <LinkField
-              endpointAll="/api/geofences?all=true"
-              endpointLinked={`/api/geofences?userId=${id}`}
+              endpointAll={traccarPath('/api/geofences?all=true')}
+              endpointLinked={`${traccarPath('/api/geofences')}?userId=${id}`}
               baseId={id}
               keyBase="userId"
               keyLink="geofenceId"
               label={t('sharedGeofences')}
             />
             <LinkField
-              endpointAll="/api/notifications?all=true"
-              endpointLinked={`/api/notifications?userId=${id}`}
+              endpointAll={traccarPath('/api/notifications?all=true')}
+              endpointLinked={`${traccarPath('/api/notifications')}?userId=${id}`}
               baseId={id}
               keyBase="userId"
               keyLink="notificationId"
@@ -65,24 +66,24 @@ const UserConnectionsPage = () => {
               label={t('sharedNotifications')}
             />
             <LinkField
-              endpointAll="/api/calendars?all=true"
-              endpointLinked={`/api/calendars?userId=${id}`}
+              endpointAll={traccarPath('/api/calendars?all=true')}
+              endpointLinked={`${traccarPath('/api/calendars')}?userId=${id}`}
               baseId={id}
               keyBase="userId"
               keyLink="calendarId"
               label={t('sharedCalendars')}
             />
             <LinkField
-              endpointAll="/api/users?all=true&excludeAttributes=true"
-              endpointLinked={`/api/users?userId=${id}&excludeAttributes=true`}
+              endpointAll={traccarPath('/api/users?all=true&excludeAttributes=true')}
+              endpointLinked={`${traccarPath('/api/users')}?userId=${id}&excludeAttributes=true`}
               baseId={id}
               keyBase="userId"
               keyLink="managedUserId"
               label={t('settingsUsers')}
             />
             <LinkField
-              endpointAll="/api/attributes/computed?all=true"
-              endpointLinked={`/api/attributes/computed?userId=${id}`}
+              endpointAll={traccarPath('/api/attributes/computed?all=true')}
+              endpointLinked={`${traccarPath('/api/attributes/computed')}?userId=${id}`}
               baseId={id}
               keyBase="userId"
               keyLink="attributeId"
@@ -90,8 +91,8 @@ const UserConnectionsPage = () => {
               label={t('sharedComputedAttributes')}
             />
             <LinkField
-              endpointAll="/api/drivers?all=true"
-              endpointLinked={`/api/drivers?userId=${id}`}
+              endpointAll={traccarPath('/api/drivers?all=true')}
+              endpointLinked={`${traccarPath('/api/drivers')}?userId=${id}`}
               baseId={id}
               keyBase="userId"
               keyLink="driverId"
@@ -99,8 +100,8 @@ const UserConnectionsPage = () => {
               label={t('sharedDrivers')}
             />
             <LinkField
-              endpointAll="/api/commands?all=true"
-              endpointLinked={`/api/commands?userId=${id}`}
+              endpointAll={traccarPath('/api/commands?all=true')}
+              endpointLinked={`${traccarPath('/api/commands')}?userId=${id}`}
               baseId={id}
               keyBase="userId"
               keyLink="commandId"
@@ -108,8 +109,8 @@ const UserConnectionsPage = () => {
               label={t('sharedSavedCommands')}
             />
             <LinkField
-              endpointAll="/api/maintenance?all=true"
-              endpointLinked={`/api/maintenance?userId=${id}`}
+              endpointAll={traccarPath('/api/maintenance?all=true')}
+              endpointLinked={`${traccarPath('/api/maintenance')}?userId=${id}`}
               baseId={id}
               keyBase="userId"
               keyLink="maintenanceId"

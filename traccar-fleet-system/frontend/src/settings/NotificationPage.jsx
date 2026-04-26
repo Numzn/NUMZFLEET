@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 
 import {
   Accordion,
@@ -34,7 +36,7 @@ const NotificationPage = () => {
 
   const testNotificators = useCatch(async () => {
     await Promise.all(item.notificators.split(/[, ]+/).map(async (notificator) => {
-      await fetchOrThrow(`/api/notifications/test/${notificator}`, {
+      await fetchOrThrow(traccarPath(`/api/notifications/test/${notificator}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(item),
@@ -65,7 +67,7 @@ const NotificationPage = () => {
               <SelectField
                 value={item.type}
                 onChange={(e) => setItem({ ...item, type: e.target.value })}
-                endpoint="/api/notifications/types"
+                endpoint={traccarPath('/api/notifications/types')}
                 keyGetter={(it) => it.type}
                 titleGetter={(it) => t(prefixString('event', it.type))}
                 label={t('sharedType')}
@@ -84,7 +86,7 @@ const NotificationPage = () => {
                 multiple
                 value={item.notificators ? item.notificators.split(/[, ]+/) : []}
                 onChange={(e) => setItem({ ...item, notificators: e.target.value.join() })}
-                endpoint="/api/notifications/notificators"
+                endpoint={traccarPath('/api/notifications/notificators')}
                 keyGetter={(it) => it.type}
                 titleGetter={(it) => t(prefixString('notificator', it.type))}
                 label={t('notificationNotificators')}
@@ -93,7 +95,7 @@ const NotificationPage = () => {
                 <SelectField
                   value={item.commandId}
                   onChange={(e) => setItem({ ...item, commandId: Number(e.target.value) })}
-                  endpoint="/api/commands"
+                  endpoint={traccarPath('/api/commands')}
                   titleGetter={(it) => it.description}
                   label={t('sharedSavedCommand')}
                 />
@@ -134,7 +136,7 @@ const NotificationPage = () => {
               <SelectField
                 value={item.calendarId}
                 onChange={(e) => setItem({ ...item, calendarId: Number(e.target.value) })}
-                endpoint="/api/calendars"
+                endpoint={traccarPath('/api/calendars')}
                 label={t('sharedCalendar')}
               />
               <FormGroup>

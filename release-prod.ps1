@@ -166,7 +166,8 @@ if ($SkipLocalChecks) {
     Run-Or-Throw "ESLint" { npm run lint }
     Write-Ok "Lint passed"
 
-    Write-Host "   -> npm run build" -ForegroundColor DarkGray
+    Write-Host "   -> npm run build (VITE_TRACCAR_PREFIX=/traccar)" -ForegroundColor DarkGray
+    $env:VITE_TRACCAR_PREFIX = '/traccar'
     Run-Or-Throw "Vite build" { npm run build }
     Write-Ok "Build passed"
 
@@ -265,11 +266,12 @@ FRONT="$HOME/NUMZFLEET/traccar-fleet-system/frontend"
 cd "$FRONT"
 if command -v npm >/dev/null 2>&1; then
   npm ci --quiet
+  export VITE_TRACCAR_PREFIX=/traccar
   npm run build
 else
   echo "npm not on PATH; using Node 20 image to write dist/ (matches local dev toolchain)."
   docker pull node:20-bookworm
-  docker run --rm -v "$FRONT:/app" -w /app node:20-bookworm bash -lc "npm ci && npm run build"
+  docker run --rm -v "$FRONT:/app" -w /app node:20-bookworm bash -lc "export VITE_TRACCAR_PREFIX=/traccar && npm ci && npm run build"
 fi
 
 echo ""
@@ -291,7 +293,7 @@ http_code=$(curl -o /dev/null -s -w "%{http_code}" https://numz.site)
 echo "numz.site HTTPS : $http_code"
 [ "$http_code" = "200" ] || [ "$http_code" = "301" ] || { echo "FAIL: unexpected HTTP code $http_code"; exit 1; }
 
-traccar_ver=$(curl -fsS https://numz.site/api/server 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null || echo "unreachable")
+traccar_ver=$(curl -fsS https://numz.site/traccar/api/server 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','?'))" 2>/dev/null || echo "unreachable")
 echo "Traccar API version : $traccar_ver"
 [ "$traccar_ver" != "unreachable" ] || { echo "FAIL: Traccar API unreachable"; exit 1; }
 

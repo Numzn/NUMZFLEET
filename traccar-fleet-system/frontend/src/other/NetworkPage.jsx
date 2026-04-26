@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useEffectAsync } from '../reactHelper';
 import BackIcon from '../common/components/BackIcon';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -36,7 +37,7 @@ const NetworkPage = () => {
 
   useEffectAsync(async () => {
     if (positionId) {
-      const response = await fetchOrThrow(`/api/positions?id=${positionId}`);
+      const response = await fetchOrThrow(`${traccarPath('/api/positions')}?id=${positionId}`);
       const positions = await response.json();
       if (positions.length > 0) {
         setItem(positions[0]);

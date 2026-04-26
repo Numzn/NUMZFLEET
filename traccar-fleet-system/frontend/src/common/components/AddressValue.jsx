@@ -4,6 +4,7 @@ import { Link } from '@mui/material';
 import { useTranslation } from './LocalizationProvider';
 import { useCatch } from '../../reactHelper';
 import fetchOrThrow from '../util/fetchOrThrow';
+import { traccarPath } from '../../config/traccarApi.js';
 
 const AddressValue = ({ latitude, longitude, originalAddress }) => {
   const t = useTranslation();
@@ -19,7 +20,7 @@ const AddressValue = ({ latitude, longitude, originalAddress }) => {
   const showAddress = useCatch(async (event) => {
     event.preventDefault();
     const query = new URLSearchParams({ latitude, longitude });
-    const response = await fetchOrThrow(`/api/server/geocode?${query.toString()}`);
+    const response = await fetchOrThrow(`${traccarPath('/api/server/geocode')}?${query.toString()}`);
     setAddress(await response.text());
   });
 

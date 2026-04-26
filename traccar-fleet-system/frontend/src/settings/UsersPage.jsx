@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useNavigate } from 'react-router-dom';
 import {
   Table, TableRow, TableCell, TableHead, TableBody, Switch, TableFooter, FormControlLabel,
@@ -31,7 +33,7 @@ const UsersPage = () => {
   const [temporary, setTemporary] = useState(false);
 
   const handleLogin = useCatch(async (userId) => {
-    await fetchOrThrow(`/api/session/${userId}`);
+    await fetchOrThrow(traccarPath(`/api/session/${userId}`));
     window.location.replace('/');
   });
 
@@ -52,7 +54,7 @@ const UsersPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow('/api/users?excludeAttributes=true');
+      const response = await fetchOrThrow(traccarPath('/api/users?excludeAttributes=true'));
       setItems(await response.json());
     } finally {
       setLoading(false);

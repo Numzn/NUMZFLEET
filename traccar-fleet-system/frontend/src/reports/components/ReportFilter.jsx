@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { traccarPath } from '../../config/traccarApi.js';
+
 import { useSearchParams } from 'react-router-dom';
 import {
   FormControl, InputLabel, Select, MenuItem, Button, TextField, Typography,
@@ -233,7 +235,7 @@ const ReportFilter = ({
             <SelectField
               value={calendarId}
               onChange={(event) => setCalendarId(Number(event.target.value))}
-              endpoint="/api/calendars"
+              endpoint={traccarPath('/api/calendars')}
               label={t('sharedCalendar')}
               fullWidth
             />

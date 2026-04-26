@@ -175,8 +175,8 @@ The script enforces this flow automatically:
 Production URLs:
 
 - Frontend: https://numz.site
-- Traccar API: https://numz.site/api
-- Fuel API (proxied): https://numz.site/api/fuel-requests
+- Traccar API (cemented): https://numz.site/traccar/api/... (see [ROUTING.md](ROUTING.md))
+- Fuel API (same origin): https://numz.site/api/... (e.g. `/api/fuel-requests`)
 
 ### Option 2: Local Development
 

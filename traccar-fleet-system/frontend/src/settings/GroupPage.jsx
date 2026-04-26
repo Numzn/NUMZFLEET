@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useDispatch } from 'react-redux';
 import TextField from '@mui/material/TextField';
 
@@ -29,7 +31,7 @@ const GroupPage = () => {
   const [item, setItem] = useState();
 
   const onItemSaved = useCatch(async () => {
-    const response = await fetchOrThrow('/api/groups');
+    const response = await fetchOrThrow(traccarPath('/api/groups'));
     dispatch(groupsActions.refresh(await response.json()));
   });
 
@@ -71,7 +73,7 @@ const GroupPage = () => {
               <SelectField
                 value={item.groupId}
                 onChange={(event) => setItem({ ...item, groupId: Number(event.target.value) })}
-                endpoint="/api/groups"
+                endpoint={traccarPath('/api/groups')}
                 label={t('groupParent')}
               />
             </AccordionDetails>

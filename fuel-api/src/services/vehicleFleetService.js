@@ -96,12 +96,68 @@ export async function createVehicle({ name, plateNumber }) {
     err.statusCode = 400;
     throw err;
   }
-  return Vehicle.create({
-    name: trimmed,
-    plateNumber: plateNumber != null && String(plateNumber).trim() !== ''
-      ? String(plateNumber).trim()
-      : null,
+  const plate = plateNumber != null && String(plateNumber).trim() !== ''
+    ? String(plateNumber).trim()
+    : null;
+
+  // Duplicate check: same name (case-insensitive) or same plate
+  const orConditions = [{ name: trimmed }];
+  if (plate) orConditions.push({ plateNumber: plate });
+  const existing = await Vehicle.findOne({ where: { [Op.or]: orConditions } });
+  if (existing) {
+    const field = existing.name.toLowerCase() === trimmed.toLowerCase() ? 'name' : 'plate number';
+    const err = new Error(`A vehicle with that ${field} already exists`);
+    err.statusCode = 409;
+    throw err;
+  }
+
+  return Vehicle.create({ name: trimmed, plateNumber: plate });
+}
+
+export async function updateVehicle(id, { name, plateNumber }) {
+  const vehicle = await Vehicle.findByPk(id);
+  if (!vehicle) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  const trimmed = (name || '').trim();
+  if (!trimmed) {
+    const err = new Error('name is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  const plate = plateNumber != null && String(plateNumber).trim() !== ''
+    ? String(plateNumber).trim()
+    : null;
+
+  // Duplicate check: exclude this vehicle
+  const orConditions = [{ name: trimmed }];
+  if (plate) orConditions.push({ plateNumber: plate });
+  const existing = await Vehicle.findOne({
+    where: { [Op.or]: orConditions, id: { [Op.ne]: id } },
   });
+  if (existing) {
+    const field = existing.name.toLowerCase() === trimmed.toLowerCase() ? 'name' : 'plate number';
+    const err = new Error(`A vehicle with that ${field} already exists`);
+    err.statusCode = 409;
+    throw err;
+  }
+
+  await vehicle.update({ name: trimmed, plateNumber: plate });
+  return getVehicleMerged(id);
+}
+
+export async function deleteVehicle(id) {
+  const vehicle = await Vehicle.findByPk(id);
+  if (!vehicle) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  // Deactivate any device assignments first
+  await DeviceAssignment.update({ isActive: false }, { where: { vehicleId: id } });
+  await vehicle.destroy();
 }
 
 export async function listVehiclesMerged() {

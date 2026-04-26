@@ -1,4 +1,6 @@
 import { Fragment } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useDispatch, useSelector } from 'react-redux';
 import { makeStyles } from 'tss-react/mui';
 import {
@@ -29,7 +31,7 @@ const GeofencesList = ({ onGeofenceSelected }) => {
   const items = useSelector((state) => state.geofences.items);
 
   const refreshGeofences = useCatchCallback(async () => {
-    const response = await fetchOrThrow('/api/geofences');
+    const response = await fetchOrThrow(traccarPath('/api/geofences'));
     dispatch(geofencesActions.refresh(await response.json()));
   }, [dispatch]);
 

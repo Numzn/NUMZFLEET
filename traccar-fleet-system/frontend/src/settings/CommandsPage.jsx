@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import {
   Table, TableRow, TableCell, TableHead, TableBody,
 } from '@mui/material';
@@ -28,7 +30,7 @@ const CommandsPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow('/api/commands');
+      const response = await fetchOrThrow(traccarPath('/api/commands'));
       setItems(await response.json());
     } finally {
       setLoading(false);

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useNavigate } from 'react-router-dom';
 import {
   Table, TableRow, TableCell, TableHead, TableBody,
@@ -31,7 +33,7 @@ const GroupsPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow('/api/groups');
+      const response = await fetchOrThrow(traccarPath('/api/groups'));
       setItems(await response.json());
     } finally {
       setLoading(false);

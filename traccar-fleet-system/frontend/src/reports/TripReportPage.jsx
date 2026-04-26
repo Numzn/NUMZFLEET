@@ -30,6 +30,7 @@ import scheduleReport from './common/scheduleReport';
 import MapScale from '../map/MapScale';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import exportExcel from '../common/util/exportExcel';
+import { traccarPath } from '../config/traccarApi.js';
 
 const columnsArray = [
   ['startTime', 'reportStartTime'],
@@ -85,7 +86,7 @@ const TripReportPage = () => {
         from: selectedItem.startTime,
         to: selectedItem.endTime,
       });
-      const response = await fetchOrThrow(`/api/reports/route?${query.toString()}`, {
+      const response = await fetchOrThrow(`${traccarPath('/api/reports/route')}?${query.toString()}`, {
         headers: { Accept: 'application/json' },
       });
       setRoute(await response.json());

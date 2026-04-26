@@ -18,6 +18,7 @@ import { useAttributePreference } from '../common/util/preferences';
 import { distanceFromMeters, distanceToMeters, distanceUnitString } from '../common/util/converter';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const AccumulatorsPage = () => {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ const AccumulatorsPage = () => {
   }, [deviceId, position]);
 
   const handleSave = useCatch(async () => {
-    await fetchOrThrow(`/api/devices/${deviceId}/accumulators`, {
+    await fetchOrThrow(traccarPath(`/api/devices/${deviceId}/accumulators`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),

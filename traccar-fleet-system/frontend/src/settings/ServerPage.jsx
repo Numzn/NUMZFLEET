@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import TextField from '@mui/material/TextField';
 import {
   Accordion,
@@ -49,7 +51,7 @@ const ServerPage = () => {
 
   const handleFileChange = useCatch(async (newFile) => {
     if (newFile) {
-      await fetchOrThrow(`/api/server/file/${newFile.name}`, {
+      await fetchOrThrow(traccarPath(`/api/server/file/${newFile.name}`), {
         method: 'POST',
         body: newFile,
       });
@@ -57,7 +59,7 @@ const ServerPage = () => {
   });
 
   const handleSave = useCatch(async () => {
-    const response = await fetchOrThrow('/api/server', {
+    const response = await fetchOrThrow(traccarPath('/api/server'), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
@@ -164,7 +166,7 @@ const ServerPage = () => {
                 <SelectField
                   value={item.attributes.timezone}
                   onChange={(e) => setItem({ ...item, attributes: { ...item.attributes, timezone: e.target.value } })}
-                  endpoint="/api/server/timezones"
+                  endpoint={traccarPath('/api/server/timezones')}
                   keyGetter={(it) => it}
                   titleGetter={(it) => it}
                   label={t('sharedTimezone')}

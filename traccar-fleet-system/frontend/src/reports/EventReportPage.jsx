@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FormControl, InputLabel, Select, MenuItem, Table, TableHead, TableRow, TableCell, TableBody, Link, IconButton,
@@ -84,7 +86,7 @@ const EventReportPage = () => {
   }, [selectedItem, positions]);
 
   useEffectAsync(async () => {
-    const response = await fetchOrThrow('/api/notifications/types');
+    const response = await fetchOrThrow(traccarPath('/api/notifications/types'));
     const types = await response.json();
     setAllEventTypes([...allEventTypes, ...types.map((it) => [it.type, prefixString('event', it.type)])]);
   }, []);
@@ -101,7 +103,7 @@ const EventReportPage = () => {
     setPosition(null);
     setLoading(true);
     try {
-      const response = await fetchOrThrow(`/api/reports/events?${query.toString()}`, {
+      const response = await fetchOrThrow(`${traccarPath('/api/reports/events')}?${query.toString()}`, {
         headers: { Accept: 'application/json' },
       });
       const events = await response.json();
@@ -113,7 +115,7 @@ const EventReportPage = () => {
       if (positionIds.length > 0) {
         const positionsQuery = new URLSearchParams();
         positionIds.slice(0, 128).forEach((id) => positionsQuery.append('id', id));
-        const positionsResponse = await fetchOrThrow(`/api/positions?${positionsQuery.toString()}`);
+        const positionsResponse = await fetchOrThrow(`${traccarPath('/api/positions')}?${positionsQuery.toString()}`);
         const positionsArray = await positionsResponse.json();
         positionsArray.forEach((p) => positionsMap[p.id] = p);
       }
@@ -194,7 +196,7 @@ const EventReportPage = () => {
           case 'driverChanged':
             return item.attributes.driverUniqueId;
           case 'media':
-            return (<Link href={`/api/media/${devices[item.deviceId]?.uniqueId}/${item.attributes.file}`} target="_blank">{item.attributes.file}</Link>);
+            return (<Link href={traccarPath(`/api/media/${devices[item.deviceId]?.uniqueId}/${item.attributes.file}`)} target="_blank">{item.attributes.file}</Link>);
           case 'commandResult':
             return item.attributes.result;
           default:

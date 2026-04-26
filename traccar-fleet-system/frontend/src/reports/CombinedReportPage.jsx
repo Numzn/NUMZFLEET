@@ -19,6 +19,7 @@ import MapMarkers from '../map/MapMarkers';
 import MapRouteCoordinates from '../map/MapRouteCoordinates';
 import MapScale from '../map/MapScale';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const CombinedReportPage = () => {
   const { classes } = useReportStyles();
@@ -45,7 +46,7 @@ const CombinedReportPage = () => {
     groupIds.forEach((groupId) => query.append('groupId', groupId));
     setLoading(true);
     try {
-      const response = await fetchOrThrow(`/api/reports/combined?${query.toString()}`);
+      const response = await fetchOrThrow(`${traccarPath('/api/reports/combined')}?${query.toString()}`);
       setItems(await response.json());
     } finally {
       setLoading(false);

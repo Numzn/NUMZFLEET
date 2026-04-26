@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { traccarPath } from '../config/traccarApi.js';
+
 import {
   Button, TextField, Typography, Snackbar, IconButton,
 } from '@mui/material';
@@ -44,12 +46,12 @@ const ResetPasswordPage = () => {
   const handleSubmit = useCatch(async (event) => {
     event.preventDefault();
     if (!token) {
-      await fetchOrThrow('/api/password/reset', {
+      await fetchOrThrow(traccarPath('/api/password/reset'), {
         method: 'POST',
         body: new URLSearchParams(`email=${encodeURIComponent(email)}`),
       });
     } else {
-      await fetchOrThrow('/api/password/update', {
+      await fetchOrThrow(traccarPath('/api/password/update'), {
         method: 'POST',
         body: new URLSearchParams(`token=${encodeURIComponent(token)}&password=${encodeURIComponent(password)}`),
       });

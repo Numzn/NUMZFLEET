@@ -21,6 +21,7 @@ import {
 import { useCatch } from '../reactHelper';
 import QrCodeDialog from '../common/components/QrCodeDialog';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { traccarPath } from '../config/traccarApi.js';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -80,7 +81,7 @@ const LoginPage = () => {
     setFailed(false);
     try {
       const query = `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
-      const response = await fetch('/api/session', {
+      const response = await fetch(traccarPath('/api/session'), {
         method: 'POST',
         credentials: 'include',
         body: new URLSearchParams(code.length ? `${query}&code=${code}` : query),
@@ -104,14 +105,14 @@ const LoginPage = () => {
   };
 
   const handleTokenLogin = useCatch(async (token) => {
-    const response = await fetchOrThrow(`/api/session?token=${encodeURIComponent(token)}`);
+    const response = await fetchOrThrow(`${traccarPath('/api/session')}?token=${encodeURIComponent(token)}`);
     const user = await response.json();
     dispatch(sessionActions.updateUser(user));
     navigate('/');
   });
 
   const handleOpenIdLogin = () => {
-    document.location = '/api/session/openid/auth';
+    document.location = traccarPath('/api/session/openid/auth');
   };
 
   useEffect(() => nativePostMessage('authentication'), []);

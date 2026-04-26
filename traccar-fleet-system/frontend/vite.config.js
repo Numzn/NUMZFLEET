@@ -231,7 +231,72 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
       },
-      '/api/reports': {
+      // fuel-api report routes only (Traccar uses /api/reports/stops, /route, POST /api/reports, etc.)
+      '/api/reports/trips': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: { '*': 'localhost' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
+      '/api/reports/summary': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: { '*': 'localhost' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
+      '/api/reports/fuel-summary': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: { '*': 'localhost' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
+      '/api/reports/erb/latest': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: { '*': 'localhost' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
+      '/api/operation-sessions': {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
@@ -245,6 +310,22 @@ export default defineConfig(({ mode }) => {
             }
             if (req.headers['x-user-id']) {
               proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
+      // Traccar when VITE_TRACCAR_PREFIX=/traccar (strip prefix; same as nginx location /traccar/)
+      '/traccar': {
+        target: traccarUrl,
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: { '*': 'localhost' },
+        rewrite: (path) => path.replace(/^\/traccar/, '') || '/',
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
             }
           });
         },
@@ -282,7 +363,7 @@ export default defineConfig(({ mode }) => {
       // Register service worker automatically
       registerType: 'autoUpdate',
       workbox: {
-        navigateFallbackDenylist: [/^\/api/],
+        navigateFallbackDenylist: [/^\/api/, /^\/traccar/],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,woff,woff2,mp3,png,svg,ico}'],
         runtimeCaching: [

@@ -62,10 +62,12 @@ import Loader from './common/components/Loader';
 import { generateLoginToken } from './common/components/NativeInterface';
 import { useLocalization } from './common/components/LocalizationProvider';
 import fetchOrThrow from './common/util/fetchOrThrow';
+import { traccarPath } from './config/traccarApi.js';
 import AuditPage from './reports/AuditPage';
 import ToastNotificationTest from './test/ToastNotificationTest';
 import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
 import VehiclesPage from './fleet/VehiclesPage';
+import OperationSessionsPage from './operationSessions/OperationSessionsPage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -89,12 +91,12 @@ const Navigation = () => {
 
     if (searchParams.has('token')) {
       const token = searchParams.get('token');
-      await fetch(`/api/session?token=${encodeURIComponent(token)}`);
+      await fetch(`${traccarPath('/api/session')}?token=${encodeURIComponent(token)}`);
       newParams.delete('token');
     }
 
     if (searchParams.has('uniqueId')) {
-      const response = await fetchOrThrow(`/api/devices?uniqueId=${searchParams.get('uniqueId')}`);
+      const response = await fetchOrThrow(`${traccarPath('/api/devices')}?uniqueId=${searchParams.get('uniqueId')}`);
       const items = await response.json();
       if (items.length > 0) {
         dispatch(devicesActions.selectId(items[0].id));
@@ -126,6 +128,7 @@ const Navigation = () => {
         <Route path="map" element={<MainPage />} />
         <Route path="fuel-requests" element={<FuelRequestsPage />} />
         <Route path="fleet/vehicles" element={<VehiclesPage />} />
+        <Route path="fleet/operation-sessions" element={<OperationSessionsPage />} />
 
         <Route path="position/:id" element={<PositionPage />} />
         <Route path="network/:positionId" element={<NetworkPage />} />

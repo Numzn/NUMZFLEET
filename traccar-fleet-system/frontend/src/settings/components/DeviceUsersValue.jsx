@@ -3,6 +3,7 @@ import { Link } from '@mui/material';
 import { useCatch } from '../../reactHelper';
 import { useTranslation } from '../../common/components/LocalizationProvider';
 import fetchOrThrow from '../../common/util/fetchOrThrow';
+import { traccarPath } from '../../config/traccarApi.js';
 
 const DeviceUsersValue = ({ deviceId }) => {
   const t = useTranslation();
@@ -11,7 +12,7 @@ const DeviceUsersValue = ({ deviceId }) => {
 
   const loadUsers = useCatch(async () => {
     const query = new URLSearchParams({ deviceId });
-    const response = await fetchOrThrow(`/api/users?${query.toString()}`);
+    const response = await fetchOrThrow(`${traccarPath('/api/users')}?${query.toString()}`);
     setUsers(await response.json());
   });
 
