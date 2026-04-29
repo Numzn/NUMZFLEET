@@ -62,12 +62,15 @@ import Loader from './common/components/Loader';
 import { generateLoginToken } from './common/components/NativeInterface';
 import { useLocalization } from './common/components/LocalizationProvider';
 import fetchOrThrow from './common/util/fetchOrThrow';
-import { traccarPath } from './config/traccarApi.js';
+import { traccarPath, traccarFetch } from './config/traccarApi.js';
 import AuditPage from './reports/AuditPage';
 import ToastNotificationTest from './test/ToastNotificationTest';
 import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
 import VehiclesPage from './fleet/VehiclesPage';
 import OperationSessionsPage from './operationSessions/OperationSessionsPage';
+import PlanningPage from './operationSessions/PlanningPage';
+import OperationRunPage from './operationSessions/OperationRunPage';
+import OperationSessionsHistoryPage from './operationSessions/HistoryPage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -91,7 +94,7 @@ const Navigation = () => {
 
     if (searchParams.has('token')) {
       const token = searchParams.get('token');
-      await fetch(`${traccarPath('/api/session')}?token=${encodeURIComponent(token)}`);
+      await traccarFetch(`/api/session?token=${encodeURIComponent(token)}`);
       newParams.delete('token');
     }
 
@@ -129,6 +132,9 @@ const Navigation = () => {
         <Route path="fuel-requests" element={<FuelRequestsPage />} />
         <Route path="fleet/vehicles" element={<VehiclesPage />} />
         <Route path="fleet/operation-sessions" element={<OperationSessionsPage />} />
+        <Route path="fleet/operation-sessions/plan" element={<PlanningPage />} />
+        <Route path="fleet/operation-sessions/run/:sessionId" element={<OperationRunPage />} />
+        <Route path="fleet/operation-sessions/history" element={<OperationSessionsHistoryPage />} />
 
         <Route path="position/:id" element={<PositionPage />} />
         <Route path="network/:positionId" element={<NetworkPage />} />

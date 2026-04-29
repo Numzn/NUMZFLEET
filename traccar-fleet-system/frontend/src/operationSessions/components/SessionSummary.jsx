@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Box,
@@ -16,6 +17,7 @@ import LockIcon from '@mui/icons-material/Lock';
 import { closeOperationSession } from '../api/operationSessionsApi';
 
 const SessionSummary = ({ sessions = [], selectedSessionId, onSelectSession, onSessionClosed }) => {
+  const navigate = useNavigate();
   const user = useSelector((state) => state.session.user);
   const [closing, setClosing] = useState(false);
   const [closeError, setCloseError] = useState(null);
@@ -38,20 +40,31 @@ const SessionSummary = ({ sessions = [], selectedSessionId, onSelectSession, onS
 
   return (
     <Stack spacing={1}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h6">Sessions</Typography>
-        {selectedSession?.status === 'active' && (
-          <Button
-            size="small"
-            variant="outlined"
-            color="warning"
-            startIcon={closing ? <CircularProgress size={14} /> : <LockIcon />}
-            onClick={handleClose}
-            disabled={closing}
-          >
-            {closing ? 'Closing...' : 'Close Session'}
-          </Button>
-        )}
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          {selectedSessionId && selectedSession?.status === 'active' && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => navigate(`/fleet/operation-sessions/run/${selectedSessionId}`)}
+            >
+              Open run
+            </Button>
+          )}
+          {selectedSession?.status === 'active' && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              startIcon={closing ? <CircularProgress size={14} /> : <LockIcon />}
+              onClick={handleClose}
+              disabled={closing}
+            >
+              {closing ? 'Closing...' : 'Close session'}
+            </Button>
+          )}
+        </Stack>
       </Box>
       {closeError && (
         <Typography variant="caption" color="error">{closeError}</Typography>
@@ -60,7 +73,7 @@ const SessionSummary = ({ sessions = [], selectedSessionId, onSelectSession, onS
         <List dense disablePadding>
           {sessions.length === 0 && (
             <ListItemButton disabled>
-              <ListItemText primary="No sessions found" secondary="Create a session to start logging refuels." />
+              <ListItemText primary="No sessions found" secondary="Use Hub → Start operation or Plan operation." />
             </ListItemButton>
           )}
           {sessions.map((session) => (

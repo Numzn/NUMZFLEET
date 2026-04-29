@@ -6,17 +6,10 @@ import {
   getErbLatestPrices,
 } from '../controllers/index.js';
 import * as authMiddleware from '../../middleware/auth.js';
+import { requireAuth } from '../../middleware/authGates.js';
 
 const router = express.Router();
 const authenticate = authMiddleware.authenticate;
-const requireAuth =
-  authMiddleware.requireAuth ||
-  ((req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    return next();
-  });
 
 router.use(authenticate);
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { traccarPath } from '../../config/traccarApi.js';
+import { traccarFetch } from '../../config/traccarApi.js';
 
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -69,7 +69,7 @@ const BottomMenu = () => {
             notificationTokens: tokens.length > 1 ? tokens.filter((it) => it !== notificationToken).join(',') : undefined,
           },
         };
-        await fetch(traccarPath(`/api/users/${user.id}`), {
+        await traccarFetch(`/api/users/${user.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedUser),
@@ -77,7 +77,7 @@ const BottomMenu = () => {
       }
     }
 
-    await fetch(traccarPath('/api/session'), { method: 'DELETE' });
+    await traccarFetch('/api/session', { method: 'DELETE' });
     nativePostMessage('logout');
     navigate('/login');
     dispatch(sessionActions.updateUser(null));

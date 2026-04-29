@@ -96,17 +96,19 @@ services:
       TRACCAR_MYSQL_DATABASE: traccar
       TRACCAR_MYSQL_USER: traccar
       TRACCAR_MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      NODE_ENV: production
+      # development: required for permissive auth — production + permissive triggers process.exit(1) in fuel-api initializeAuth.
+      NODE_ENV: ${FUEL_API_NODE_ENV:-development}
       AUTH_STRATEGY: ${AUTH_STRATEGY:-permissive}
       DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-true}
-      TRACCAR_ENABLED: ${TRACCAR_ENABLED:-false}
+      TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
       LOG_AUTH: ${LOG_AUTH:-false}
       PORT: 3001
       SESSION_SECRET: ${SESSION_SECRET}
       ERB_API_BASE_URL: ${ERB_API_BASE_URL:-http://erb-api:8000}
-      ERB_API_TOKEN: ${ERB_API_TOKEN}
-      # Allow all production origins (comma-separated)
-      CORS_ORIGIN: https://numz.site,https://www.numz.site,https://app.numz.site,https://api.numz.site,https://rad-cactus-ca0409.netlify.app
+      # MUST match erb-api API_TOKEN (same value in backend/.env for compose substitution).
+      ERB_API_TOKEN: ${ERB_API_TOKEN:?Set ERB_API_TOKEN in backend/.env}
+      # Production origins + local Vite (fuel-api also merges localhost/127.0.0.1 in getCorsOrigin unless CORS_STRICT=true)
+      CORS_ORIGIN: https://numz.site,https://www.numz.site,https://app.numz.site,https://api.numz.site,https://rad-cactus-ca0409.netlify.app,http://localhost:3002,http://127.0.0.1:3002
     depends_on:
       fuel-postgres:
         condition: service_healthy
@@ -148,7 +150,8 @@ services:
     command: ['python', '-m', 'uvicorn', 'api_server:app', '--host', '0.0.0.0', '--port', '8000']
     environment:
       PORT: 8000
-      API_TOKEN: ${ERB_API_TOKEN}
+      # Same shared secret as fuel-api ERB_API_TOKEN (Bearer on /v1/prices/latest).
+      API_TOKEN: ${ERB_API_TOKEN:?Set ERB_API_TOKEN in backend/.env}
       API_ALLOWED_ORIGINS: ${ERB_API_ALLOWED_ORIGINS:-https://numz.site}
       S3_ENABLED: ${ERB_S3_ENABLED:-false}
       S3_BUCKET: ${ERB_S3_BUCKET:-}

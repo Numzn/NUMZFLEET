@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { traccarPath } from '../config/traccarApi.js';
+import { traccarPath, traccarFetch } from '../config/traccarApi.js';
 
 import dayjs from 'dayjs';
 import { useDispatch, useSelector } from 'react-redux';
@@ -82,7 +82,7 @@ const PreferencesPage = () => {
   });
 
   const handleReboot = useCatch(async () => {
-    const response = await fetch(traccarPath('/api/server/reboot'), { method: 'POST' });
+    const response = await traccarFetch('/api/server/reboot', { method: 'POST' });
     throw Error(response.statusText);
   });
 

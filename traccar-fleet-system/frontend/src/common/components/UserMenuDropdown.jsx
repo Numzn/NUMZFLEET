@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { traccarPath } from '../../config/traccarApi.js';
+import { traccarFetch } from '../../config/traccarApi.js';
 
 import {
   IconButton,
@@ -42,7 +42,7 @@ const UserMenuDropdown = () => {
   };
 
   const handleLogout = async () => {
-    await fetch(traccarPath('/api/session'), { method: 'DELETE' });
+    await traccarFetch('/api/session', { method: 'DELETE' });
     nativePostMessage('logout');
     navigate('/login');
     dispatch(sessionActions.updateUser(null));

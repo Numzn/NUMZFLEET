@@ -1,7 +1,7 @@
 import {
   Divider, List,
 } from '@mui/material';
-import { traccarPath } from '../../config/traccarApi.js';
+import { traccarFetch } from '../../config/traccarApi.js';
 import TuneIcon from '@mui/icons-material/Tune';
 import DrawIcon from '@mui/icons-material/Draw';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -58,7 +58,7 @@ const SettingsMenu = () => {
             notificationTokens: tokens.length > 1 ? tokens.filter((it) => it !== notificationToken).join(',') : undefined,
           },
         };
-        await fetch(traccarPath(`/api/users/${user.id}`), {
+        await traccarFetch(`/api/users/${user.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedUser),
@@ -66,7 +66,7 @@ const SettingsMenu = () => {
       }
     }
 
-    await fetch(traccarPath('/api/session'), { method: 'DELETE' });
+    await traccarFetch('/api/session', { method: 'DELETE' });
     nativePostMessage('logout');
     navigate('/login');
     dispatch(sessionActions.updateUser(null));

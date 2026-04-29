@@ -86,7 +86,7 @@ const KPICards = ({ devices, positions }) => {
 
   return (
     <Grid container spacing={2.5} sx={{ alignItems: 'stretch', width: '100%' }}>
-      <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ display: 'flex' }}>
         <ModernKPICard
           value={deviceStats.moving}
           label="Moving Now"
@@ -97,7 +97,7 @@ const KPICards = ({ devices, positions }) => {
         />
       </Grid>
 
-      <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ display: 'flex' }}>
         <ModernKPICard
           value={alertStats.urgent}
           label="Urgent Alerts"
@@ -107,7 +107,7 @@ const KPICards = ({ devices, positions }) => {
         />
       </Grid>
 
-      <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ display: 'flex' }}>
         <ModernKPICard
           value={fuelStats.pendingRequests}
           label="Pending Fuel Requests"
@@ -118,7 +118,7 @@ const KPICards = ({ devices, positions }) => {
         />
       </Grid>
 
-      <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ display: 'flex' }}>
         <ModernKPICard
           value={deviceStats.online}
           label="Online Now"

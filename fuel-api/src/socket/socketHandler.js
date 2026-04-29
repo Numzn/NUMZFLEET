@@ -1,51 +1,61 @@
 /**
  * WebSocket handler for real-time fuel request updates
  */
+import { validateSessionToken } from '../services/sessionService.js';
+
+const getSessionTokenFromCookieHeader = (cookieHeader) => {
+  if (!cookieHeader || typeof cookieHeader !== 'string') {
+    return null;
+  }
+
+  const cookies = cookieHeader.split(';');
+  for (const item of cookies) {
+    const [rawKey, ...rest] = item.trim().split('=');
+    if (rawKey === 'JSESSIONID') {
+      return rest.join('=') || null;
+    }
+  }
+
+  return null;
+};
+
 export const initializeSocket = (io) => {
   const isDev = process.env.NODE_ENV === 'development';
   
   // Socket.IO v4+ standard: Use middleware for authentication
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
-      console.log(`🔍 [Socket] Middleware start for socket ${socket.id}`);
-
       // Initialize socket.data if it doesn't exist
       if (!socket.data) {
         socket.data = {};
-        console.log(`🔍 [Socket] Initialized socket.data`);
       }
 
-      // Debug: Log the handshake data
-      console.log('🔍 [Socket] Handshake debug:', {
-        auth: socket.handshake.auth,
-        query: socket.handshake.query,
-        headers: Object.keys(socket.handshake.headers),
-        url: socket.handshake.url,
-      });
+      const cookieHeader = socket.handshake?.headers?.cookie;
+      const sessionToken = getSessionTokenFromCookieHeader(cookieHeader);
+      const user = await validateSessionToken(sessionToken);
 
-      // Auth data is sent from client in connection options (Socket.IO v4+ standard)
-      const auth = socket.handshake.auth || {};
-
-      // Store auth data in socket for later use
-      socket.data.userId = auth.userId || null;
-      socket.data.administrator = auth.administrator || false;
-
-      console.log(`🔍 [Socket] Set auth data: userId=${socket.data.userId}, admin=${socket.data.administrator}`);
-
-      // Log if auth is missing
-      if (!auth.userId && !auth.administrator && process.env.NODE_ENV === 'development') {
-        console.warn(`⚠️ [Socket] No auth data received from socket ${socket.id}`);
+      if (user) {
+        socket.data.userId = user.id || null;
+        socket.data.administrator = !!user.administrator;
+      } else {
+        socket.data.userId = null;
+        socket.data.administrator = false;
       }
 
-      console.log(`🔍 [Socket] Calling next() for socket ${socket.id}`);
-      // Allow connection (you can add validation here)
+      if (!user && isDev) {
+        console.warn(`⚠️ [Socket] No valid session cookie for socket ${socket.id}`);
+      }
+
+      // Always allow connection; route-level and room-level checks handle authorization.
       next();
-      console.log(`🔍 [Socket] next() called successfully for socket ${socket.id}`);
     } catch (error) {
       console.error(`❌ [Socket] Middleware error for ${socket.id}:`, error);
       console.error('Stack:', error.stack);
-      // Reject connection on middleware error
-      next(new Error('Authentication middleware failed'));
+      // Do not fail the Socket.IO handshake on middleware parsing errors.
+      socket.data = socket.data || {};
+      socket.data.userId = null;
+      socket.data.administrator = false;
+      next();
     }
   });
 

@@ -1,7 +1,7 @@
 import {
   useCallback, useEffect, useRef, useState,
 } from 'react';
-import { traccarPath } from './config/traccarApi.js';
+import { traccarPath, traccarFetch } from './config/traccarApi.js';
 import { useDispatch, useSelector, connect } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Snackbar } from '@mui/material';
@@ -36,8 +36,8 @@ const SocketController = () => {
   const refreshSnapshot = useCallback(async () => {
     try {
       const [devicesResponse, positionsResponse] = await Promise.all([
-        fetch(traccarPath('/api/devices')),
-        fetch(traccarPath('/api/positions')),
+        traccarFetch('/api/devices'),
+        traccarFetch('/api/positions'),
       ]);
 
       if (devicesResponse.ok) {
@@ -144,7 +144,7 @@ const SocketController = () => {
   const handleNativeNotification = useCatchCallback(async (message) => {
     const eventId = message.data.eventId;
     if (eventId) {
-      const response = await fetch(traccarPath(`/api/events/${eventId}`));
+      const response = await traccarFetch(`/api/events/${eventId}`);
       if (response.ok) {
         const event = await response.json();
         const eventWithMessage = {

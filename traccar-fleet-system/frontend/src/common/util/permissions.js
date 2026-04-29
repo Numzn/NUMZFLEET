@@ -7,7 +7,8 @@ export const useAdministrator = () => useSelector((state) => {
 
 export const useManager = () => useSelector((state) => {
   const admin = state.session.user.administrator;
-  const manager = (state.session.user.userLimit || 0) !== 0;
+  // Keep frontend manager semantics aligned with fuel-api requireManager gate.
+  const manager = state.session.user.isManager || false;
   return admin || manager;
 });
 

@@ -78,10 +78,10 @@ const FuelSocketController = () => {
     // With new service-based routing, Socket.IO is at /socket.io on the same origin
     const fuelApiUrl = '/';
 
-    // Only create new socket if one doesn't exist or is disconnected
+    // Reuse socket while connected or actively reconnecting.
     let socket = socketRef.current;
-    
-    if (!socket || !socket.connected) {
+
+    if (!socket || (!socket.connected && !socket.active)) {
       // Disconnect existing socket if any
       if (socket) {
         socket.removeAllListeners();
@@ -97,6 +97,8 @@ const FuelSocketController = () => {
         path: '/socket.io', // Socket.IO standard path (NO trailing slash - this is critical!)
         reconnection: true,
         reconnectionDelay: 1000,
+        reconnectionDelayMax: 10000,
+        randomizationFactor: 0.5,
         reconnectionAttempts: Infinity, // Keep trying to reconnect
         withCredentials: true, // Important: send cookies for authentication
         upgrade: true, // Allow upgrade from polling to websocket
@@ -390,7 +392,7 @@ const FuelSocketController = () => {
       notificationTimeoutRef.current = {};
       shownNotificationsRef.current.clear();
     };
-  }, [authenticated, user?.id, user?.administrator]);
+  }, [authenticated, user?.id]);
 
   // Render toast notifications only (popup notifications handled by FuelRequestsCard)
   return <ToastNotification />;

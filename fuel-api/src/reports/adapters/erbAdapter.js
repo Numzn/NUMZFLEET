@@ -1,10 +1,20 @@
 const ERB_API_BASE_URL = process.env.ERB_API_BASE_URL || 'http://erb-api:8000';
 const ERB_API_TIMEOUT_MS = Number(process.env.ERB_API_TIMEOUT_MS || 10000);
 
+const logErb = (level, msg, extra = {}) => {
+  const line = `[erbAdapter] ${msg}`;
+  if (level === 'error') console.error(line, extra);
+  else if (level === 'warn') console.warn(line, extra);
+  else console.info(line, extra);
+};
+
 const requestErb = async (path) => {
   const token = process.env.ERB_API_TOKEN;
 
-  if (!token) {
+  if (!token || !String(token).trim()) {
+    logErb('warn', 'ERB_API_TOKEN missing or empty on fuel-api; cannot call erb-api', {
+      hint: 'Set ERB_API_TOKEN in env (must match erb-api API_TOKEN)',
+    });
     const error = new Error('ERB API token is not configured on server');
     error.statusCode = 503;
     throw error;
@@ -33,6 +43,8 @@ const requestErb = async (path) => {
     }
 
     if (!response.ok) {
+      const detail = payload?.detail || response.statusText || '';
+      logErb('warn', 'erb-api request failed', { path, status: response.status, detail: String(detail).slice(0, 200) });
       const error = new Error(payload?.detail || `ERB API request failed with status ${response.status}`);
       error.statusCode = response.status;
       throw error;
@@ -41,6 +53,7 @@ const requestErb = async (path) => {
     return payload;
   } catch (error) {
     if (error.name === 'AbortError') {
+      logErb('warn', 'erb-api request timed out', { path, timeoutMs: ERB_API_TIMEOUT_MS });
       const timeoutError = new Error('ERB API request timed out');
       timeoutError.statusCode = 504;
       throw timeoutError;
@@ -50,6 +63,7 @@ const requestErb = async (path) => {
       throw error;
     }
 
+    logErb('error', 'erb-api network/unexpected error', { path, message: error?.message || String(error) });
     const upstreamError = new Error('Failed to fetch ERB prices');
     upstreamError.statusCode = 502;
     throw upstreamError;
@@ -63,7 +77,9 @@ export const getLatestErbPrices = async () => {
   const data = payload?.data || {};
 
   return {
+    ok: true,
     source: 'erb',
+    currency: 'ZMW',
     timestamp: payload?.timestamp || null,
     prices: {
       petrol: data.Petrol ?? null,

@@ -108,7 +108,7 @@ export const getStrategy = (strategyName = authConfig.AUTH_STRATEGY) => {
   if (!strategy) {
     console.error(`Unknown auth strategy: ${strategyName}`);
     // Fallback to safe default
-    return isProduction ? STRATEGIES.strict : STRATEGIES.permissive;
+    return authConfig.isProduction ? STRATEGIES.strict : STRATEGIES.permissive;
   }
   
   // In hybrid mode, allow synthetic users if flag is set

@@ -53,6 +53,9 @@ const LoginInsights = () => {
   useEffect(() => {
     let cancelled = false;
     const load = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
       fetch('/api/public/login-insight', { credentials: 'omit' })
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => {
@@ -65,10 +68,21 @@ const LoginInsights = () => {
     };
     load();
     // Fuel-api may populate cache a few seconds after boot; poll briefly so login picks it up without refresh
-    const intervalId = setInterval(load, 15000);
+    const intervalId = setInterval(load, 60000);
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        load();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+    }
     return () => {
       cancelled = true;
       clearInterval(intervalId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
     };
   }, []);
 

@@ -57,11 +57,12 @@ async function queryDeviceStats() {
 async function queryPendingFuelRequests() {
   try {
     const [row] = await sequelize.query(
-      `SELECT COUNT(*) AS cnt FROM "FuelRequests" WHERE status = 'pending'`,
+      `SELECT COUNT(*) AS cnt FROM fuel_requests WHERE status = 'pending'`,
       { type: QueryTypes.SELECT },
     );
     return Number(row?.cnt || 0);
-  } catch {
+  } catch (error) {
+    console.warn('[fleetSummary] Failed to query pending fuel requests:', error?.message || error);
     return 0;
   }
 }

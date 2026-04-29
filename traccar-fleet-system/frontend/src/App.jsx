@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { traccarPath } from './config/traccarApi.js';
+import { traccarPath, traccarFetch } from './config/traccarApi.js';
 
 import { useDispatch, useSelector } from 'react-redux';
 import { useMediaQuery, useTheme } from '@mui/material';
@@ -53,7 +53,7 @@ const App = () => {
 
   useEffectAsync(async () => {
     if (!user) {
-      const response = await fetch(traccarPath('/api/session'), { credentials: 'include' });
+      const response = await traccarFetch('/api/session');
       if (response.ok) {
         dispatch(sessionActions.updateUser(await response.json()));
       } else {

@@ -7,6 +7,13 @@ export const getFuelRequest = async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'Please log in to Traccar first',
+      });
+    }
+
     const request = await FuelRequest.findByPk(id);
 
     if (!request) {

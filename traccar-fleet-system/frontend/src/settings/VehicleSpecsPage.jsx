@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import {
   Container,
   Paper,
@@ -31,6 +32,7 @@ import SyncIcon from '@mui/icons-material/Sync';
 import AddIcon from '@mui/icons-material/Add';
 import AppLayout from '../common/components/AppLayout';
 import Breadcrumbs from '../common/components/Breadcrumbs';
+import { fuelApiAuthHeaders } from '../config/fuelApiAuth.js';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -61,7 +63,10 @@ const useStyles = makeStyles()((theme) => ({
 
 const VehicleSpecsPage = () => {
   const { classes } = useStyles();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const lastOpenedDeviceQuery = useRef(null);
   const devices = useSelector((state) => state.devices.items);
+  const user = useSelector((state) => state.session.user);
   const [vehicleSpecs, setVehicleSpecs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editDialog, setEditDialog] = useState({ open: false, spec: null });
@@ -72,18 +77,13 @@ const VehicleSpecsPage = () => {
     fuelType: 'Petrol'
   });
 
-  // Get authenticated user from Redux store
-  const user = useSelector((state) => state.session.user);
-
   // Fetch vehicle specifications
   const fetchVehicleSpecs = async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/vehicle-specs', {
-        headers: {
-          ...(user?.id ? { 'X-User-Id': user.id.toString() } : {})
-        },
         credentials: 'include',
+        headers: fuelApiAuthHeaders(user),
       });
       const specs = await response.json();
       setVehicleSpecs(specs);
@@ -96,7 +96,7 @@ const VehicleSpecsPage = () => {
 
   useEffect(() => {
     fetchVehicleSpecs();
-  }, []);
+  }, [user?.id]);
 
   // Open edit dialog
   const openEditDialog = (spec = null) => {
@@ -123,6 +123,44 @@ const VehicleSpecsPage = () => {
     setEditDialog({ open: false, spec: null });
   };
 
+  /** Open editor when linked from Fleet → Vehicles (?deviceId=). */
+  useEffect(() => {
+    if (loading) return;
+    const raw = searchParams.get('deviceId');
+    if (!raw) {
+      lastOpenedDeviceQuery.current = null;
+      return;
+    }
+    if (lastOpenedDeviceQuery.current === raw) return;
+    const idNum = Number(raw);
+    if (!Number.isFinite(idNum) || idNum <= 0) return;
+
+    lastOpenedDeviceQuery.current = raw;
+    const spec = vehicleSpecs.find((s) => Number(s.deviceId) === idNum);
+    if (spec) {
+      setFormData({
+        deviceId: spec.deviceId,
+        tankCapacity: spec.tankCapacity,
+        fuelEfficiency: spec.fuelEfficiency,
+        fuelType: spec.fuelType,
+      });
+      setEditDialog({ open: true, spec });
+    } else {
+      setFormData({
+        deviceId: String(idNum),
+        tankCapacity: '',
+        fuelEfficiency: '',
+        fuelType: 'Petrol',
+      });
+      setEditDialog({ open: true, spec: null });
+    }
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('deviceId');
+      return next;
+    }, { replace: true });
+  }, [loading, vehicleSpecs, searchParams, setSearchParams]);
+
   // Save vehicle specification
   const saveVehicleSpec = async () => {
     try {
@@ -134,10 +172,7 @@ const VehicleSpecsPage = () => {
 
       await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(user?.id ? { 'X-User-Id': user.id.toString() } : {})
-        },
+        headers: fuelApiAuthHeaders(user),
         credentials: 'include',
         body: JSON.stringify({
           deviceId: parseInt(formData.deviceId),
@@ -159,10 +194,8 @@ const VehicleSpecsPage = () => {
     try {
       await fetch(`/api/vehicle-specs/${deviceId}/sync`, {
         method: 'POST',
-        headers: {
-          ...(user?.id ? { 'X-User-Id': user.id.toString() } : {})
-        },
         credentials: 'include',
+        headers: fuelApiAuthHeaders(user),
       });
       fetchVehicleSpecs();
     } catch (error) {

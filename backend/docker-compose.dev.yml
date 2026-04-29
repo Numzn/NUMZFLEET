@@ -90,11 +90,20 @@ services:
       TRACCAR_MYSQL_DATABASE: traccar
       TRACCAR_MYSQL_USER: traccar
       TRACCAR_MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      NODE_ENV: production
+      # Must not be production while AUTH_STRATEGY is permissive — fuel-api validateAuthConfig calls process.exit(1).
+      NODE_ENV: development
+      # Dev compose: app often runs Vite on :3002; without permissive + local CORS, REST returns 401
+      # (strict ignores x-user-id) and Socket.IO handshakes fail (CORS).
+      AUTH_STRATEGY: permissive
+      DEV_AUTH_BYPASS: "true"
+      TRACCAR_ENABLED: "true"
       PORT: 3001
       SESSION_SECRET: ${SESSION_SECRET}
-      # Allow Netlify preview and custom app domain (comma-separated)
-      CORS_ORIGIN: https://app.numz.site,https://rad-cactus-ca0409.netlify.app
+      # Vite default port + previews (comma-separated). 127.0.0.1 and localhost differ for CORS.
+      CORS_ORIGIN: http://localhost:3002,http://127.0.0.1:3002,https://app.numz.site,https://rad-cactus-ca0409.netlify.app
+      # Optional: point fuel-api at ERB when not using main docker-compose.yml (which wires erb-api + shared ERB_API_TOKEN).
+      # ERB_API_BASE_URL: http://host.docker.internal:8000
+      # ERB_API_TOKEN: ${ERB_API_TOKEN}
     depends_on:
       fuel-postgres:
         condition: service_healthy

@@ -6,20 +6,10 @@ import {
   syncFromTraccarAttributes,
   bulkUpdateSpecs
 } from '../controllers/vehicleSpecController.js';
-import * as authMiddleware from '../middleware/auth.js';
-import { requireAuth as _requireAuth } from '../middleware/authGates.js';
+import { authenticate } from '../middleware/auth.js';
+import { requireAuth, requireManager } from '../middleware/authGates.js';
 
 const router = express.Router();
-const authenticate = authMiddleware.authenticate;
-const requireAuth = authMiddleware.requireAuth || _requireAuth;
-const requireManager =
-  authMiddleware.requireManager ||
-  ((req, res, next) => {
-    if (!req.user || (!req.user.isManager && !req.user.administrator)) {
-      return res.status(403).json({ error: 'Forbidden - Manager access required' });
-    }
-    return next();
-  });
 
 // All routes require authentication
 router.use(authenticate);
@@ -28,7 +18,7 @@ router.use(authenticate);
 router.get('/', requireManager, listVehicleSpecs);
 
 // Get single vehicle specification
-router.get('/:deviceId', getVehicleSpec);
+router.get('/:deviceId', requireAuth, getVehicleSpec);
 
 // Update vehicle specification (managers only)
 router.put('/:deviceId', requireAuth, requireManager, updateVehicleSpecification);

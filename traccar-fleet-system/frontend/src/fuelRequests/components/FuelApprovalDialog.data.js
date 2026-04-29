@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 
 /**
  * Fetch live validation data from the fuel-api when the dialog opens.
@@ -15,7 +16,7 @@ export const useFuelApprovalLiveData = ({ open, request, userId }) => {
       try {
         const url = `/api/fuel-requests/${request.id}/validation`;
         const response = await fetch(url, {
-          headers: { 'Content-Type': 'application/json' },
+          headers: fuelApiAuthHeaders({ id: userId }),
           credentials: 'include',
         });
         if (!response.ok) throw new Error(`Validation request failed (${response.status})`);
@@ -29,7 +30,7 @@ export const useFuelApprovalLiveData = ({ open, request, userId }) => {
 
     fetchValidation();
     return () => { cancelled = true; };
-  }, [open, request?.id]);
+  }, [open, request?.id, userId]);
 
   return { validationData, validationError, setValidationData, setValidationError };
 };

@@ -27,6 +27,43 @@ const getTraccarPool = () => {
   return traccarPool;
 };
 
+function parseTcUserAttributes(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw;
+  }
+  if (typeof raw === 'string') {
+    try {
+      const o = JSON.parse(raw);
+      return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+/**
+ * Match Traccar session + frontend useManager(): administrator OR attributes.isManager / top-level isManager.
+ */
+export function roleFlagsFromTraccar({
+  administrator: adminRaw,
+  attributes,
+  isManager: topLevelManager,
+}) {
+  const administrator = !!adminRaw;
+  const attrs = parseTcUserAttributes(attributes);
+  let isManager = administrator;
+  if (topLevelManager === true || topLevelManager === 'true') {
+    isManager = true;
+  }
+  if (attrs.isManager === true || attrs.isManager === 'true') {
+    isManager = true;
+  }
+  const isDriver = !administrator && !isManager;
+  return { administrator, isManager, isDriver };
+}
+
 /**
  * Test Traccar MySQL connection on startup
  */
@@ -49,7 +86,7 @@ export const getTraccarUser = async (userId) => {
   try {
     const pool = getTraccarPool();
     const [rows] = await pool.execute(
-      'SELECT id, name, email, administrator, readonly, disabled FROM tc_users WHERE id = ? AND disabled = 0',
+      'SELECT id, name, email, administrator, readonly, disabled, attributes FROM tc_users WHERE id = ? AND disabled = 0',
       [userId]
     );
     
@@ -57,14 +94,21 @@ export const getTraccarUser = async (userId) => {
       throw new Error(`User with ID ${userId} not found`);
     }
     
+    const row = rows[0];
+    const { administrator, isManager, isDriver } = roleFlagsFromTraccar({
+      administrator: row.administrator,
+      attributes: row.attributes,
+      isManager: undefined,
+    });
+
     return {
-      id: rows[0].id,
-      name: rows[0].name,
-      email: rows[0].email,
-      administrator: rows[0].administrator,
-      readonly: rows[0].readonly,
-      isManager: rows[0].administrator,
-      isDriver: !rows[0].administrator,
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      administrator,
+      readonly: row.readonly,
+      isManager,
+      isDriver,
     };
   } catch (error) {
     console.error('Error getting Traccar user:', error);
@@ -141,16 +185,21 @@ export const getTraccarUserBySessionViaAPI = async (
     }
     
     const user = await response.json();
-    
-    // Normalize response
+    const attrs = parseTcUserAttributes(user.attributes);
+    const { administrator, isManager, isDriver } = roleFlagsFromTraccar({
+      administrator: user.administrator,
+      attributes: attrs,
+      isManager: user.isManager,
+    });
+
     return {
       id: user.id,
       name: user.name,
       email: user.email,
-      administrator: user.administrator,
+      administrator,
       readonly: user.readonly,
-      isManager: user.administrator,
-      isDriver: !user.administrator,
+      isManager,
+      isDriver,
     };
   } catch (error) {
     console.error('Error validating session with Traccar API:', error);

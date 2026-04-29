@@ -21,7 +21,7 @@ import {
 import { useCatch } from '../reactHelper';
 import QrCodeDialog from '../common/components/QrCodeDialog';
 import fetchOrThrow from '../common/util/fetchOrThrow';
-import { traccarPath } from '../config/traccarApi.js';
+import { traccarPath, traccarFetch } from '../config/traccarApi.js';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -81,9 +81,8 @@ const LoginPage = () => {
     setFailed(false);
     try {
       const query = `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
-      const response = await fetch(traccarPath('/api/session'), {
+      const response = await traccarFetch('/api/session', {
         method: 'POST',
-        credentials: 'include',
         body: new URLSearchParams(code.length ? `${query}&code=${code}` : query),
       });
       if (response.ok) {

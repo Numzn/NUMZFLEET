@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { traccarPath } from '../../config/traccarApi.js';
+import { traccarPath, traccarFetch } from '../../config/traccarApi.js';
 
 import dayjs from 'dayjs';
 import { useDispatch, useSelector } from 'react-redux';
@@ -22,7 +22,7 @@ export const generateLoginToken = async () => {
     let token = '';
     try {
       const expiration = dayjs().add(6, 'months').toISOString();
-      const response = await fetch(traccarPath('/api/session/token'), {
+      const response = await traccarFetch('/api/session/token', {
         method: 'POST',
         body: new URLSearchParams(`expiration=${expiration}`),
       });

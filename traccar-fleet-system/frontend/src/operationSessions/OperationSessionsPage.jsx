@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Alert,
@@ -7,10 +8,12 @@ import {
   CircularProgress,
   Container,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
 import AppLayout from '../common/components/AppLayout';
+import Breadcrumbs from '../common/components/Breadcrumbs';
+import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import SessionSummary from './components/SessionSummary';
 import SessionStats from './components/SessionStats';
 import RefuelTable from './components/RefuelTable';
@@ -22,10 +25,13 @@ import {
 import { operationSessionsActions } from './store/operationSessions';
 import { buildVehicleBudgetIndex, calculateFleetEfficiency } from './utils/sessionCalculations';
 import { summarizeSessions } from './utils/sessionGrouping';
+import { collectDeviceIdsForQuickStart } from './utils/operationVehicleContext';
 
 const OperationSessionsPage = () => {
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.session.user);
+  const devicesItems = useSelector((state) => state.devices.items || {});
   const vehicles = useSelector((state) => Object.values(state.devices.items || {}));
   const sessionsMap = useSelector((state) => state.operationSessions.items);
   const detailsMap = useSelector((state) => state.operationSessions.details);
@@ -33,10 +39,16 @@ const OperationSessionsPage = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState(null);
+  const [quickStarting, setQuickStarting] = useState(false);
+  const [quickStartMessage, setQuickStartMessage] = useState(null);
 
   const sessions = useMemo(() => Object.values(sessionsMap || {}), [sessionsMap]);
+  const activeSession = useMemo(
+    () => sessions.find((s) => String(s.status).toLowerCase() === 'active'),
+    [sessions],
+  );
+  const resumeSessionId = activeSession?.id ?? null;
+
   const currentSession = currentSessionId ? detailsMap[currentSessionId] : null;
   const currentRefuels = currentSession?.refuels || [];
 
@@ -46,6 +58,8 @@ const OperationSessionsPage = () => {
     [currentRefuels, vehiclesByBudget],
   );
   const fleetEfficiency = useMemo(() => calculateFleetEfficiency(currentRefuels), [currentRefuels]);
+
+  const quickStartIds = useMemo(() => collectDeviceIdsForQuickStart(devicesItems), [devicesItems]);
 
   const loadSessionDetails = useCallback(async (sessionId) => {
     if (!user || !sessionId) return;
@@ -73,9 +87,11 @@ const OperationSessionsPage = () => {
 
       try {
         const data = await reloadAllSessions();
-        const firstSessionId = data?.[0]?.id || null;
-        if (firstSessionId) {
-          await loadSessionDetails(firstSessionId);
+        const list = Array.isArray(data) ? data : [];
+        const active = list.find((s) => String(s.status).toLowerCase() === 'active');
+        const pickId = active?.id ?? list[0]?.id ?? null;
+        if (pickId) {
+          await loadSessionDetails(pickId);
         }
       } catch (requestError) {
         setError(requestError.message || 'Failed to load operation sessions');
@@ -87,22 +103,34 @@ const OperationSessionsPage = () => {
     loadSessions();
   }, [dispatch, user, reloadAllSessions, loadSessionDetails]);
 
-  const handleNewSession = async () => {
-    if (!user) return;
-    setCreating(true);
-    setCreateError(null);
+  const handleQuickStart = async () => {
+    if (!user || resumeSessionId) return;
+    setQuickStartMessage(null);
+    if (!quickStartIds.length) {
+      setQuickStartMessage('No vehicles loaded yet. Open the map or device list so Traccar devices sync, then try again.');
+      return;
+    }
+    setQuickStarting(true);
+    setError(null);
     try {
-      const newSession = await createOperationSession(user, {
-        name: `Fuel Session ${new Date().toLocaleDateString()}`,
+      const created = await createOperationSession(user, {
+        name: `Quick operation ${new Date().toLocaleString()}`,
         sessionDate: new Date(),
         notes: '',
+        vehicleIds: quickStartIds,
       });
-      const data = await reloadAllSessions();
-      await loadSessionDetails(newSession.id);
+      await reloadAllSessions();
+      dispatch(operationSessionsActions.setCurrentSession(created.id));
+      navigate(`/fleet/operation-sessions/run/${created.id}`);
     } catch (err) {
-      setCreateError(err.message || 'Failed to create session');
+      const msg = err?.message || 'Could not start operation';
+      if (/409|Close the current active session/i.test(msg)) {
+        setQuickStartMessage('You already have an active session — use Resume active session or close it first.');
+      } else {
+        setQuickStartMessage(msg);
+      }
     } finally {
-      setCreating(false);
+      setQuickStarting(false);
     }
   };
 
@@ -120,21 +148,70 @@ const OperationSessionsPage = () => {
   return (
     <AppLayout showSidebar>
       <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Stack spacing={2}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h4">Operation Sessions</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleNewSession}
-              disabled={creating || !user}
-            >
-              {creating ? 'Creating...' : 'New Session'}
-            </Button>
+        <Breadcrumbs />
+        <FleetWorkspaceShell>
+          <Stack spacing={2}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 1,
+            }}
+          >
+            <Box>
+              <Typography variant="h4">Operations</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Control center — quick start, planned runs, or resume the active session.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {resumeSessionId && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => navigate(`/fleet/operation-sessions/run/${resumeSessionId}`)}
+                >
+                  Resume active session
+                </Button>
+              )}
+              <Tooltip
+                title={
+                  resumeSessionId
+                    ? 'Close or finish the active session before starting another.'
+                    : ''
+                }
+              >
+                <span>
+                  <Button
+                    variant={resumeSessionId ? 'outlined' : 'contained'}
+                    color="secondary"
+                    onClick={handleQuickStart}
+                    disabled={Boolean(resumeSessionId) || quickStarting || !user}
+                  >
+                    {quickStarting ? 'Starting…' : 'Start operation'}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/fleet/operation-sessions/plan')}
+              >
+                Plan operation
+              </Button>
+              <Button variant="outlined" onClick={() => navigate('/fleet/operation-sessions/history')}>
+                History
+              </Button>
+            </Stack>
           </Box>
 
           {error && <Alert severity="error">{error}</Alert>}
-          {createError && <Alert severity="error" onClose={() => setCreateError(null)}>{createError}</Alert>}
+          {quickStartMessage && (
+            <Alert severity="warning" onClose={() => setQuickStartMessage(null)}>
+              {quickStartMessage}
+            </Alert>
+          )}
 
           {loading ? (
             <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
@@ -142,8 +219,22 @@ const OperationSessionsPage = () => {
             </Box>
           ) : (
             <>
-              {sessions.length === 0 && (
-                <Alert severity="info">No sessions yet. Click "New Session" to start logging refuels.</Alert>
+              {!sessions.length && (
+                <Alert severity="info">
+                  No sessions yet. Use Start operation for a quick run with loaded devices, or Plan operation to
+                  choose vehicles with intelligence.
+                </Alert>
+              )}
+              {!quickStartIds.length && (
+                <Alert severity="info">
+                  No Traccar devices in memory — open Live Map or refresh devices, then quick start or plan.
+                </Alert>
+              )}
+              {resumeSessionId && (
+                <Alert severity="info" sx={{ py: 0.75 }}>
+                  Active session #{resumeSessionId} — resume to continue refueling, or close it from the run screen
+                  before starting another.
+                </Alert>
               )}
               <SessionStats sessions={summarizedSessions} fleetEfficiency={fleetEfficiency} />
               <SessionSummary
@@ -162,6 +253,7 @@ const OperationSessionsPage = () => {
             </>
           )}
         </Stack>
+        </FleetWorkspaceShell>
       </Container>
     </AppLayout>
   );

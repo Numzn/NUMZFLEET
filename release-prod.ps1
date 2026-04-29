@@ -73,6 +73,27 @@ function Write-Ok($msg) { Write-Host "   [OK] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "   [!] $msg" -ForegroundColor Yellow }
 function Write-Fail($msg) { Write-Host "   [X] $msg" -ForegroundColor Red }
 
+function Resolve-SshCommand() {
+    $candidates = @(
+        "C:\Program Files\Git\usr\bin\ssh.exe",
+        "C:\Windows\System32\OpenSSH\ssh.exe"
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    $sshCmd = Get-Command ssh -ErrorAction SilentlyContinue
+    if ($sshCmd -and $sshCmd.Path -and (Test-Path $sshCmd.Path)) {
+        $item = Get-Item $sshCmd.Path -ErrorAction SilentlyContinue
+        if ($item -and $item.Length -gt 0) {
+            return $sshCmd.Path
+        }
+    }
+    throw "Unable to locate a valid ssh executable. Install OpenSSH Client or Git for Windows."
+}
+
 function Assert-Command($name) {
     if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
         Write-Fail "Required command not found: $name"
@@ -113,8 +134,10 @@ Write-Host "   Date   : $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 Write-Step "Phase 1 - Preflight"
 
 Assert-Command git
-Assert-Command ssh
 Assert-Command npm
+
+$SshCommand = Resolve-SshCommand
+Write-Ok "ssh found: $SshCommand"
 
 if (-not (Test-Path (Join-Path $RepoRoot ".git"))) {
     Write-Fail "Not a git repository root. Run this script from the repo root."
@@ -236,6 +259,19 @@ Write-Host "   Commit : $Commit" -ForegroundColor Green
 $remoteScript = @'
 set -euo pipefail
 
+# Prefer Docker Compose v2 (`docker compose`). Legacy python `docker-compose` 1.29.x can throw
+# KeyError: ContainerConfig against newer Docker Engine; v2 avoids that path.
+compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f docker-compose.prod.yml "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose -f docker-compose.prod.yml "$@"
+  else
+    echo "FAIL: install Docker Compose v2 (docker compose plugin) or docker-compose." >&2
+    exit 1
+  fi
+}
+
 echo ""
 echo "=== [1/6] Repo sync to __DEPLOY_COMMIT__ ==="
 cd ~/NUMZFLEET
@@ -245,20 +281,17 @@ git checkout __DEPLOY_COMMIT__
 echo ""
 echo "=== [2/7] Start databases ==="
 cd ~/NUMZFLEET/backend
-docker-compose -f docker-compose.prod.yml up -d traccar-mysql fuel-postgres 2>&1 || \
-    docker compose -f docker-compose.prod.yml up -d traccar-mysql fuel-postgres 2>&1
+compose up -d traccar-mysql fuel-postgres
 
 echo ""
 echo "=== [3/7] Start core backend services ==="
 cd ~/NUMZFLEET/backend
-docker-compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api 2>&1 || \
-    docker compose -f docker-compose.prod.yml up -d --build traccar-server fuel-api 2>&1
+compose up -d --build traccar-server fuel-api
 
 echo ""
 echo "=== [4/7] Start ERB services ==="
 cd ~/NUMZFLEET/backend
-docker-compose -f docker-compose.prod.yml up -d --build erb-worker erb-api 2>&1 || \
-    docker compose -f docker-compose.prod.yml up -d --build erb-worker erb-api 2>&1
+compose up -d --build erb-worker erb-api
 
 echo ""
 echo "=== [5/7] Build frontend from same commit ==="
@@ -275,15 +308,15 @@ else
 fi
 
 echo ""
-echo "=== [6/7] Reload edge (pick up new static bundle) ==="
+echo "=== [6/7] Reload edge (pick up new static bundle + nginx config) ==="
 cd ~/NUMZFLEET/backend
-docker-compose -f docker-compose.prod.yml up -d numztrak-nginx 2>&1 || \
-    docker compose -f docker-compose.prod.yml up -d numztrak-nginx 2>&1
+compose up -d numztrak-nginx
+docker exec numztrak-nginx nginx -s reload 2>&1 || true
 
 echo ""
 echo "=== [7/7] Service status ==="
-docker-compose -f docker-compose.prod.yml ps 2>&1 || \
-  docker compose -f docker-compose.prod.yml ps 2>&1
+cd ~/NUMZFLEET/backend
+compose ps
 
 echo ""
 echo "=== Health checks ==="
@@ -312,7 +345,7 @@ echo "==========================================="
 $remoteScript = $remoteScript.Replace('__DEPLOY_COMMIT__', $Commit).Replace('__DEPLOY_SERVER__', $Server)
 
 Run-Or-Throw "Remote deploy" {
-    $remoteScript | ssh -i "$KeyPath" -o "StrictHostKeyChecking=accept-new" "$User@$Server" "bash -s"
+    $remoteScript | & "$SshCommand" -i "$KeyPath" -o "StrictHostKeyChecking=accept-new" "$User@$Server" "bash -s"
 }
 
 # ─────────────────────────────────────────────────────────────

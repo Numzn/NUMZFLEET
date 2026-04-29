@@ -9,26 +9,10 @@ import {
   fulfillFuelRequest,
   getValidationDetails
 } from '../controllers/index.js';
-import * as authMiddleware from '../../middleware/auth.js';
+import { authenticate } from '../../middleware/auth.js';
+import { requireAuth, requireManager } from '../../middleware/authGates.js';
 
 const router = express.Router();
-const authenticate = authMiddleware.authenticate;
-const requireAuth =
-  authMiddleware.requireAuth ||
-  ((req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    return next();
-  });
-const requireManager =
-  authMiddleware.requireManager ||
-  ((req, res, next) => {
-    if (!req.user || (!req.user.isManager && !req.user.administrator)) {
-      return res.status(403).json({ error: 'Forbidden - Manager access required' });
-    }
-    return next();
-  });
 
 // Lightweight route-specific health endpoint used by ops checks.
 router.get('/health', (req, res) => {
@@ -39,13 +23,13 @@ router.get('/health', (req, res) => {
 router.use(authenticate);
 
 // List fuel requests (filtered by role automatically)
-router.get('/', listFuelRequests);
+router.get('/', requireAuth, listFuelRequests);
 
 // Get single fuel request
-router.get('/:id', getFuelRequest);
+router.get('/:id', requireAuth, getFuelRequest);
 
 // Get validation details for fuel request
-router.get('/:id/validation', getValidationDetails);
+router.get('/:id/validation', requireAuth, getValidationDetails);
 
 // Create fuel request (drivers)
 router.post('/', requireAuth, createFuelRequest);

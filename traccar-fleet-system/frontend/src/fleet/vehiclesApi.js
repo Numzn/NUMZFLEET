@@ -1,80 +1,49 @@
 /**
  * Fleet vehicles (fuel-api / Postgres + Traccar merge). Same auth as fuel-requests / vehicle-specs.
  */
-
-export function vehiclesAuthHeaders(user) {
-  return {
-    'Content-Type': 'application/json',
-    ...(user?.id ? { 'X-User-Id': String(user.id) } : {}),
-  };
-}
+import fetchOrThrow from '../common/util/fetchOrThrow';
+import { fuelApiAuthHeaders } from '../config/fuelApiAuth.js';
 
 export async function fetchVehicles(user) {
-  const res = await fetch('/api/vehicles', {
-    credentials: 'include',
-    headers: vehiclesAuthHeaders(user),
+  const res = await fetchOrThrow('/api/vehicles', {
+    headers: fuelApiAuthHeaders(user),
   });
-  if (!res.ok) {
-    throw new Error((await res.text()) || res.statusText);
-  }
   return res.json();
 }
 
 export async function createVehicle(user, { name, plateNumber }) {
-  const res = await fetch('/api/vehicles', {
+  const res = await fetchOrThrow('/api/vehicles', {
     method: 'POST',
-    credentials: 'include',
-    headers: vehiclesAuthHeaders(user),
+    headers: fuelApiAuthHeaders(user),
     body: JSON.stringify({
       name,
       plateNumber: plateNumber || null,
     }),
   });
-  if (!res.ok) {
-    throw new Error((await res.text()) || res.statusText);
-  }
   return res.json();
 }
 
 export async function assignVehicleDevice(user, vehicleId, deviceId) {
-  const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}/assign-device`, {
+  const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}/assign-device`, {
     method: 'POST',
-    credentials: 'include',
-    headers: vehiclesAuthHeaders(user),
+    headers: fuelApiAuthHeaders(user),
     body: JSON.stringify({ deviceId: Number(deviceId) }),
   });
-  if (!res.ok) {
-    throw new Error((await res.text()) || res.statusText);
-  }
   return res.json();
 }
 
 export async function updateVehicle(user, vehicleId, { name, plateNumber }) {
-  const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
+  const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
     method: 'PUT',
-    credentials: 'include',
-    headers: vehiclesAuthHeaders(user),
+    headers: fuelApiAuthHeaders(user),
     body: JSON.stringify({ name, plateNumber: plateNumber || null }),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    let msg;
-    try { msg = JSON.parse(body).error; } catch { msg = body; }
-    throw new Error(msg || res.statusText);
-  }
   return res.json();
 }
 
 export async function deleteVehicle(user, vehicleId) {
-  const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
+  await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
     method: 'DELETE',
-    credentials: 'include',
-    headers: vehiclesAuthHeaders(user),
+    headers: fuelApiAuthHeaders(user),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    let msg;
-    try { msg = JSON.parse(body).error; } catch { msg = body; }
-    throw new Error(msg || res.statusText);
-  }
 }

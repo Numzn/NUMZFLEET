@@ -20,6 +20,7 @@ import FuelApprovalDialog from './FuelApprovalDialog';
 import FuelRequestsManagementDashboard from './FuelRequestsManagementDashboard';
 import { errorsActions } from '../../store';
 import { fuelRequestsActions } from '../store/fuelRequests';
+import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 
 const useStyles = makeStyles()((theme) => ({
   paper: {
@@ -565,10 +566,7 @@ const FuelRequestsCard = () => {
     try {
       const response = await fetch(`/api/fuel-requests/${requestId}/approve`, {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(user?.id ? { 'x-user-id': user.id.toString() } : {})
-        },
+        headers: fuelApiAuthHeaders(user),
         credentials: 'include',
         body: JSON.stringify({ 
           approvedAmount,
@@ -629,10 +627,7 @@ const FuelRequestsCard = () => {
     try {
       const response = await fetch(`/api/fuel-requests/${requestId}/reject`, {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(user?.id ? { 'x-user-id': user.id.toString() } : {})
-        },
+        headers: fuelApiAuthHeaders(user),
         credentials: 'include',
         body: JSON.stringify({ notes: notes || 'Rejected by manager' }),
       });

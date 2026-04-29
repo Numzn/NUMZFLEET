@@ -246,7 +246,7 @@ const ModernSidebar = () => {
       tooltip: 'Manage Vehicles',
     },
     {
-      title: 'Fuel Management',
+      title: 'Operations',
       icon: <LocalGasStationIcon />,
       hasSubmenu: true,
       open: fuelOpen,
@@ -254,10 +254,10 @@ const ModernSidebar = () => {
       show: !readonly,
       badge: pendingFuelCount,
       submenu: [
-        { title: 'Fuel Requests', path: '/fuel-requests', badge: pendingFuelCount },
+        { title: 'Operations hub', path: '/fleet/operation-sessions' },
+        { title: 'Fuel requests', path: '/fuel-requests', badge: pendingFuelCount },
         { title: 'Vehicles', path: '/fleet/vehicles' },
-        { title: 'Operation Sessions', path: '/fleet/operation-sessions' },
-        { title: 'Fuel Stations', path: '/settings/preferences' },
+        { title: 'Tank & fuel specs', path: '/settings/vehicle-specs' },
       ],
     },
     {

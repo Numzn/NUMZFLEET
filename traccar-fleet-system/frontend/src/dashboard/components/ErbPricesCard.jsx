@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import {
   Box,
   Chip,
@@ -11,6 +12,7 @@ import { alpha } from '@mui/material/styles';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 
 const FUEL_ITEMS = [
   { key: 'petrol',   label: 'Petrol',   color: '#67e8f9' },
@@ -19,9 +21,44 @@ const FUEL_ITEMS = [
   { key: 'jetA1',    label: 'Jet A-1',  color: '#c4b5fd' },
 ];
 
+const parsePublicInsightPrices = (text) => {
+  if (!text) return null;
+  const out = {};
+  const pairs = [
+    { key: 'petrol', re: /petrol\s*K?\s*([0-9]+(?:\.[0-9]+)?)/i },
+    { key: 'diesel', re: /diesel\s*K?\s*([0-9]+(?:\.[0-9]+)?)/i },
+    { key: 'kerosene', re: /kerosene\s*K?\s*([0-9]+(?:\.[0-9]+)?)/i },
+    { key: 'jetA1', re: /jet[\s-]*a1\s*K?\s*([0-9]+(?:\.[0-9]+)?)/i },
+  ];
+  pairs.forEach(({ key, re }) => {
+    const match = text.match(re);
+    if (match?.[1]) {
+      out[key] = Number(match[1]);
+    }
+  });
+  return Object.keys(out).length ? out : null;
+};
+
+/** Merge fuel-api `prices` objects (nullable per key) into a card-friendly map. */
+const normalizePricesMap = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {};
+  let any = false;
+  for (const key of ['petrol', 'diesel', 'kerosene', 'jetA1']) {
+    const v = raw[key];
+    const n = v != null && v !== '' ? Number(v) : NaN;
+    if (Number.isFinite(n)) {
+      out[key] = n;
+      any = true;
+    }
+  }
+  return any ? out : null;
+};
+
 const ErbPricesCard = () => {
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
+  const user = useSelector((state) => state.session.user);
 
   const [prices, setPrices] = useState(null);
   const [timestamp, setTimestamp] = useState(null);
@@ -35,16 +72,64 @@ const ErbPricesCard = () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/reports/erb/latest', {
-          credentials: 'include',
+        // Public ERB snapshot should work for all users (login + dashboard parity).
+        const publicRes = await fetch('/api/public/login-insight', {
+          credentials: 'omit',
           headers: { Accept: 'application/json' },
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!cancelled) {
-          setPrices(data.prices ?? null);
-          setTimestamp(data.timestamp ?? null);
+        const publicData = publicRes.ok ? await publicRes.json().catch(() => null) : null;
+        const fromPublicStructured = normalizePricesMap(publicData?.prices);
+        const fromPublicParsed = parsePublicInsightPrices(publicData?.primary || '');
+        const fromPublic =
+          fromPublicStructured
+          ?? (fromPublicParsed && Object.keys(fromPublicParsed).length ? fromPublicParsed : null);
+
+        // Same as fleet APIs: rely on authenticated session cookies.
+        const authRes = await fetch('/api/reports/erb/latest', {
+          credentials: 'include',
+          headers: { Accept: 'application/json', ...fuelApiAuthHeaders(user) },
+        });
+        let authPayload = null;
+        try {
+          authPayload = await authRes.json();
+        } catch {
+          authPayload = null;
         }
+        const authPrices = normalizePricesMap(authPayload?.prices);
+
+        if (authPrices) {
+          if (!cancelled) {
+            setPrices(authPrices);
+            setTimestamp(authPayload?.timestamp ?? publicData?.updatedAt ?? null);
+          }
+          return;
+        }
+
+        if (fromPublic) {
+          if (!cancelled) {
+            setPrices(fromPublic);
+            setTimestamp(publicData?.updatedAt ?? null);
+          }
+          return;
+        }
+
+        if (!publicRes.ok) {
+          throw new Error(`Login insight HTTP ${publicRes.status}`);
+        }
+        if (authRes.status === 401 || authRes.status === 403) {
+          throw new Error('Session not reaching fuel API (try refresh after login)');
+        }
+        const apiMsg =
+          typeof authPayload?.error === 'string' && authPayload.error.trim()
+            ? authPayload.error.trim()
+            : null;
+        if (apiMsg) {
+          throw new Error(apiMsg);
+        }
+        if (authRes.status >= 400) {
+          throw new Error(`Fuel API returned ${authRes.status} (check ERB_API_TOKEN and erb-api)`);
+        }
+        throw new Error('No ERB prices available yet');
       } catch (err) {
         if (!cancelled) setError(err.message);
       } finally {
@@ -59,7 +144,7 @@ const ErbPricesCard = () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [user?.id]);
 
   const formatTimestamp = (ts) => {
     if (!ts) return null;

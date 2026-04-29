@@ -1,13 +1,26 @@
-import { Box } from '@mui/material';
+import { Box, Container } from '@mui/material';
 import AppLayout from '../common/components/AppLayout';
+import Breadcrumbs from '../common/components/Breadcrumbs';
+import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import FuelRequestsCard from './components/FuelRequestsCard';
 
 const FuelRequestsPage = () => {
   return (
-    <AppLayout showSidebar={true}>
-      <Box sx={{ px: { xs: 1.5, sm: 2.5, md: 3.5, lg: 4 }, py: { xs: 1.5, sm: 2.5, md: 3 }, minHeight: '100%', boxSizing: 'border-box' }}>
-        <FuelRequestsCard />
-      </Box>
+    <AppLayout showSidebar>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Breadcrumbs />
+        <FleetWorkspaceShell>
+          <Box
+            sx={{
+              px: { xs: 0, sm: 0.5 },
+              minHeight: '100%',
+              boxSizing: 'border-box',
+            }}
+          >
+            <FuelRequestsCard />
+          </Box>
+        </FleetWorkspaceShell>
+      </Container>
     </AppLayout>
   );
 };

@@ -30,6 +30,35 @@ export default (sequelize) => {
       allowNull: false,
       defaultValue: 'active',
     },
+    totalEstimatedFuel: {
+      type: DataTypes.DOUBLE,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    totalActualFuel: {
+      type: DataTypes.DOUBLE,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    totalEstimatedCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    totalActualCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    totalVarianceCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    totalsFrozenAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   }, {
     tableName: 'operation_sessions',
     timestamps: true,

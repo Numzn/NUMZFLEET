@@ -11,18 +11,19 @@ const syntheticSessions = new Map();
 
 /**
  * Extract credentials from request
- * Looks for JSESSIONID cookie, x-user-id header, userId query param
+ * Looks for JSESSIONID cookie and x-user-id header.
  */
 export const extractCredentials = async (req) => {
   const sessionToken = req.cookies?.JSESSIONID;
-  const userIdFromHeader = req.headers['x-user-id'];
-  const userIdFromQuery = req.query.userId; // Dev-only convenience
-  
+  const rawHeader = req.headers['x-user-id'];
+  const trimmed = rawHeader != null ? String(rawHeader).trim() : '';
+  const parsed = trimmed !== '' ? Number.parseInt(trimmed, 10) : NaN;
+  const userIdHeader = Number.isFinite(parsed) ? parsed : null;
+
   return {
     sessionToken,
-    userIdHeader: userIdFromHeader ? parseInt(userIdFromHeader) : null,
-    userIdQuery: userIdFromQuery ? parseInt(userIdFromQuery) : null,
-    method: sessionToken ? 'sessionToken' : userIdFromHeader ? 'header' : 'none',
+    userIdHeader,
+    method: sessionToken ? 'sessionToken' : userIdHeader != null ? 'header' : 'none',
   };
 };
 
@@ -95,14 +96,18 @@ export const createSyntheticUser = (userId) => {
   if (!userId) {
     return null;
   }
-  
+
+  // Permissive: allow manager-only routes (fleet vehicles, approvals) when Traccar falls back to synthetic + x-user-id.
+  // Hybrid: keep driver-only synthetic (least privilege).
+  const asManager = authConfig.AUTH_STRATEGY === 'permissive';
+
   return {
     id: userId,
     email: `user${userId}@fleet.local`,
     name: `Dev User ${userId}`,
     administrator: false,
-    isManager: false,
-    isDriver: true,
+    isManager: asManager,
+    isDriver: !asManager,
     synthetic: true,
     validationMethod: 'synthetic',
     createdAt: new Date(),

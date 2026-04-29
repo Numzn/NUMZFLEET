@@ -120,17 +120,20 @@ services:
       TRACCAR_MYSQL_DATABASE: traccar
       TRACCAR_MYSQL_USER: traccar
       TRACCAR_MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      # App configuration
+      # App configuration — production must not use AUTH_STRATEGY=permissive (fuel-api will exit).
       NODE_ENV: production
       PORT: 3001
       SESSION_SECRET: ${SESSION_SECRET}
-      # Same-origin default. Add extra origins only for temporary previews.
+      AUTH_STRATEGY: ${AUTH_STRATEGY:-strict}
+      TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
+      DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
+      HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://numz.site}
       # Optional: for external Traccar connections
       TRACCAR_SERVER_URL: ${TRACCAR_SERVER_URL:-http://traccar-server:8082}
       # ERB API relay (server-side only)
       ERB_API_BASE_URL: ${ERB_API_BASE_URL:-http://erb-api:8000}
-      ERB_API_TOKEN: ${ERB_API_TOKEN}
+      ERB_API_TOKEN: ${ERB_API_TOKEN:?Set ERB_API_TOKEN in backend/.env or CI secrets}
     networks:
       - numztrak-network
     healthcheck:
@@ -172,7 +175,7 @@ services:
     command: ['python', '-m', 'uvicorn', 'api_server:app', '--host', '0.0.0.0', '--port', '8000']
     environment:
       PORT: 8000
-      API_TOKEN: ${ERB_API_TOKEN}
+      API_TOKEN: ${ERB_API_TOKEN:?Set ERB_API_TOKEN in backend/.env or CI secrets}
       API_ALLOWED_ORIGINS: ${ERB_API_ALLOWED_ORIGINS:-https://numz.site}
       S3_ENABLED: ${ERB_S3_ENABLED:-false}
       S3_BUCKET: ${ERB_S3_BUCKET:-}

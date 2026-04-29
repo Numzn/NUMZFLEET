@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Alert,
@@ -33,8 +34,10 @@ import AddIcon from '@mui/icons-material/Add';
 import LinkIcon from '@mui/icons-material/Link';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import AppLayout from '../common/components/AppLayout';
 import Breadcrumbs from '../common/components/Breadcrumbs';
+import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import { useManager } from '../common/util/permissions';
 import { fetchVehicles, createVehicle, assignVehicleDevice, updateVehicle, deleteVehicle } from './vehiclesApi';
 
@@ -69,6 +72,7 @@ const formatFix = (iso) => {
 
 const VehiclesPage = () => {
   const { classes } = useStyles();
+  const navigate = useNavigate();
   const manager = useManager();
   const user = useSelector((state) => state.session.user);
   const devices = useSelector((state) => state.devices.items) || {};
@@ -185,7 +189,9 @@ const VehiclesPage = () => {
       <AppLayout showSidebar>
         <Container maxWidth="md" className={classes.container}>
           <Breadcrumbs />
-          <Alert severity="info">Fleet vehicles are available to managers and administrators only.</Alert>
+          <FleetWorkspaceShell>
+            <Alert severity="info">Fleet vehicles are available to managers and administrators only.</Alert>
+          </FleetWorkspaceShell>
         </Container>
       </AppLayout>
     );
@@ -195,15 +201,24 @@ const VehiclesPage = () => {
     <AppLayout showSidebar>
       <Container maxWidth="xl" className={classes.container}>
         <Breadcrumbs />
-
+        <FleetWorkspaceShell>
         <Box className={classes.header}>
           <Typography variant="h4">Fleet vehicles</Typography>
-          <Box display="flex" gap={1}>
+          <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
             <Tooltip title="Refresh">
-              <IconButton onClick={() => load()} disabled={loading} aria-label="Refresh list">
-                <RefreshIcon />
-              </IconButton>
+              <span style={{ display: 'inline-flex' }}>
+                <IconButton onClick={() => load()} disabled={loading} aria-label="Refresh list">
+                  <RefreshIcon />
+                </IconButton>
+              </span>
             </Tooltip>
+            <Button
+              variant="outlined"
+              startIcon={<LocalGasStationIcon />}
+              onClick={() => navigate('/settings/vehicle-specs')}
+            >
+              Tank &amp; fuel specs
+            </Button>
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
               Add vehicle
             </Button>
@@ -211,8 +226,13 @@ const VehiclesPage = () => {
         </Box>
 
         <Typography variant="body2" className={classes.muted} paragraph>
-          Business vehicles in NumzTrak. Device and GPS data come from Traccar; tank and efficiency from vehicle specs
-          when a device is assigned.
+          Business vehicles in NumzTrak. Device and GPS data come from Traccar; tank capacity and fuel type for operations
+          are stored in{' '}
+          <Button variant="text" size="small" sx={{ p: 0, minWidth: 0, verticalAlign: 'baseline' }} onClick={() => navigate('/settings/vehicle-specs')}>
+            vehicle specs
+          </Button>
+          {' '}
+          (per Traccar device). Use the fuel icon on a row after a device is assigned to edit that device&apos;s specs.
         </Typography>
 
         {error && (
@@ -275,6 +295,23 @@ const VehiclesPage = () => {
                     </TableCell>
                     <TableCell align="right">
                       <Box display="flex" justifyContent="flex-end" gap={0.5}>
+                        <Tooltip title={row.assignment?.deviceId ? 'Tank & fuel specs (this device)' : 'Assign a device first to edit specs'}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                const did = row.assignment?.deviceId;
+                                if (did != null) {
+                                  navigate(`/settings/vehicle-specs?deviceId=${encodeURIComponent(did)}`);
+                                }
+                              }}
+                              disabled={row.assignment?.deviceId == null}
+                              aria-label="Tank and fuel specs"
+                            >
+                              <LocalGasStationIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                         <Tooltip title="Edit vehicle">
                           <IconButton size="small" onClick={() => openEdit(row)} aria-label="Edit vehicle">
                             <EditIcon fontSize="small" />
@@ -401,6 +438,7 @@ const VehiclesPage = () => {
             </Button>
           </DialogActions>
         </Dialog>
+        </FleetWorkspaceShell>
       </Container>
     </AppLayout>
   );

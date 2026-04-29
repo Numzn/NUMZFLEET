@@ -26,10 +26,26 @@ let publicCache = {
   primary: null,
   secondary: null,
   updatedAt: null,
+  /** Same numeric shape as GET /api/reports/erb/latest (when ERB fetch succeeded). */
+  prices: null,
 };
 
 export function getPublicLoginInsight() {
   return { ...publicCache };
+}
+
+function hasAnyNumericPrice(prices) {
+  if (!prices || typeof prices !== 'object') return false;
+  return ['petrol', 'diesel', 'kerosene', 'jetA1'].some(
+    (k) => prices[k] != null && Number.isFinite(Number(prices[k])),
+  );
+}
+
+/** True if public login-insight payload has usable text or numeric prices. */
+export function isLoginInsightPopulated(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (data.primary) return true;
+  return hasAnyNumericPrice(data.prices);
 }
 
 /** Throttle on-demand ERB fetches from the public login endpoint (LoginInsights polls). */
@@ -41,7 +57,7 @@ let lastOnDemandErbAttemptMs = 0;
  */
 export async function ensurePublicLoginInsightFromErb() {
   const cur = getPublicLoginInsight();
-  if (cur.primary) {
+  if (cur.primary || hasAnyNumericPrice(cur.prices)) {
     return cur;
   }
 
@@ -66,11 +82,25 @@ export async function ensurePublicLoginInsightFromErb() {
   return getPublicLoginInsight();
 }
 
-function setPublicLoginInsight(primary, secondary) {
+function normalizePricesForCache(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {
+    petrol: raw.petrol != null && Number.isFinite(Number(raw.petrol)) ? Number(raw.petrol) : null,
+    diesel: raw.diesel != null && Number.isFinite(Number(raw.diesel)) ? Number(raw.diesel) : null,
+    kerosene: raw.kerosene != null && Number.isFinite(Number(raw.kerosene)) ? Number(raw.kerosene) : null,
+    jetA1: raw.jetA1 != null && Number.isFinite(Number(raw.jetA1)) ? Number(raw.jetA1) : null,
+  };
+  return hasAnyNumericPrice(out) ? out : null;
+}
+
+function setPublicLoginInsight(primary, secondary, pricesFromErb = undefined) {
+  const nextPrices =
+    pricesFromErb !== undefined ? normalizePricesForCache(pricesFromErb) : publicCache.prices;
   publicCache = {
     primary: primary || null,
     secondary: secondary || null,
     updatedAt: new Date().toISOString(),
+    prices: nextPrices,
   };
 }
 
@@ -169,13 +199,18 @@ const buildInsightLines = (erbResult) => {
  */
 export async function syncLoginInsightFromErbPrices(erbResult) {
   const { primary, secondary } = buildInsightLines(erbResult);
+
   if (!primary) {
+    if (hasAnyNumericPrice(erbResult?.prices)) {
+      setPublicLoginInsight(null, null, erbResult.prices);
+      return { ok: false, reason: 'insight_strings_incomplete' };
+    }
     return { ok: false, reason: 'no_price_values' };
   }
 
   // Always publish to in-memory cache so the login page can read /api/public/login-insight
   // even when Traccar HTTP credentials are not set or PUT fails.
-  setPublicLoginInsight(primary, secondary);
+  setPublicLoginInsight(primary, secondary, erbResult?.prices ?? null);
 
   const baseUrl = getBaseUrl();
   const authorization = getBasicAuthHeader();

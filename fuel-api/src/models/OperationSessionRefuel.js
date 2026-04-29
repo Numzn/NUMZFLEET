@@ -30,6 +30,60 @@ export default (sequelize) => {
       type: DataTypes.DOUBLE,
       allowNull: false,
     },
+    estimatedFuelLitres: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    actualFuelLitres: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    varianceLitres: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    variancePercent: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.ENUM('normal', 'warning', 'flagged', 'incomplete'),
+      allowNull: false,
+      defaultValue: 'normal',
+    },
+    erbPricePerLitre: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    estimatedCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    actualCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    tankLevelStart: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    tankCapacitySnapshot: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    meterFuelLitres: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    meterVariance: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    locked: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
     currentMileage: {
       type: DataTypes.DOUBLE,
       allowNull: true,
@@ -54,6 +108,7 @@ export default (sequelize) => {
       { fields: ['sessionId'] },
       { fields: ['vehicleId'] },
       { fields: ['sessionDate'] },
+      { fields: ['sessionId', 'vehicleId'] },
     ],
   });
 

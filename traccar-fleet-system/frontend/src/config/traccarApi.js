@@ -24,8 +24,34 @@ export const FUEL_API_PREFIXES = [
 ];
 
 const raw = String(import.meta.env.VITE_TRACCAR_PREFIX ?? '').trim();
-/** Normalized: "" or "/traccar" (no trailing slash). */
-export const TRACCAR_PREFIX = raw.replace(/\/+$/, '');
+const normalizedEnvPrefix = raw.replace(/\/+$/, '');
+
+function inferRuntimePrefix() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  const host = window.location.hostname || '';
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  // Safety net for production same-origin routing: Traccar is only under /traccar.
+  if (
+    isLocal ||
+    host === 'numz.site' ||
+    host === 'www.numz.site' ||
+    host === 'api.numz.site' ||
+    host === '129.151.163.95'
+  ) {
+    return '/traccar';
+  }
+  return '';
+}
+
+/**
+ * Normalized: "" or "/traccar" (no trailing slash).
+ * Production bundles default to /traccar when env + hostname infer are empty so Traccar
+ * never falls through to the fuel-api /api/* catch-all on same-origin deploys.
+ */
+export const TRACCAR_PREFIX =
+  normalizedEnvPrefix || inferRuntimePrefix() || (import.meta.env.PROD ? '/traccar' : '');
 
 /** True if this URL path (no origin) should stay on fuel/ERB, not Traccar prefix. */
 export function isFuelApiPath(path) {
@@ -45,4 +71,16 @@ export function traccarPath(path) {
     return p;
   }
   return `${TRACCAR_PREFIX}${p}`;
+}
+
+/**
+ * Same-origin fetch to Traccar (under traccarPath). Always sends session cookies.
+ * Use for any Traccar HTTP call not going through fetchOrThrow.
+ *
+ * @param {string} path - Path including optional query (e.g. "/api/session?token=...")
+ * @param {RequestInit} [init]
+ */
+export function traccarFetch(path, init = {}) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return fetch(traccarPath(p), { credentials: 'include', ...init });
 }

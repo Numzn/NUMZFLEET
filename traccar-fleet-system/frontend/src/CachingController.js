@@ -1,13 +1,14 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector, connect } from 'react-redux';
 import { traccarPath } from './config/traccarApi.js';
+import { fuelApiAuthHeaders } from './config/fuelApiAuth.js';
 import {
   geofencesActions, groupsActions, driversActions, maintenancesActions, calendarsActions, fuelRequestsActions,
 } from './store';
 import { useEffectAsync } from './reactHelper';
 import fetchOrThrow from './common/util/fetchOrThrow';
 
-const FUEL_POLL_INTERVAL_MS = 30000; // 30s fallback poll
+const FUEL_POLL_INTERVAL_MS = 60000; // 60s fallback poll
 
 const CachingController = () => {
   const authenticated = useSelector((state) => !!state.session.user);
@@ -52,24 +53,15 @@ const CachingController = () => {
   useEffectAsync(async () => {
     if (authenticated) {
       try {
-        // Prepare headers with fallback authentication
-        const headers = {
-          'Content-Type': 'application/json',
-        };
-        
-        // FALLBACK: Send user ID as header if cookies don't work
-        // This ensures authentication works even if cookie forwarding fails
-        if (user?.id) {
-          headers['x-user-id'] = user.id.toString();
-          if (process.env.NODE_ENV === 'development') {
-            console.log('🔑 Sending user ID header as fallback:', user.id);
-          }
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          return;
         }
-        
+
         // Fetch fuel requests with credentials to ensure session cookies are sent
         const response = await fetchOrThrow('/api/fuel-requests', {
           credentials: 'include', // Important: sends session cookies
-          headers: headers,
+          redirectOnUnauthorized: false, // Background cache refresh must not force global logout
+          headers: fuelApiAuthHeaders(user),
         });
         const requests = await response.json();
         if (process.env.NODE_ENV === 'development') {
@@ -101,9 +93,13 @@ const CachingController = () => {
 
     const fetchFuelRequests = async () => {
       try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (user?.id) headers['x-user-id'] = user.id.toString();
-        const response = await fetch('/api/fuel-requests', { credentials: 'include', headers });
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          return;
+        }
+        const response = await fetch('/api/fuel-requests', {
+          credentials: 'include',
+          headers: fuelApiAuthHeaders(user),
+        });
         if (!response.ok) return;
         const requests = await response.json();
         dispatch(fuelRequestsActions.refresh(requests));

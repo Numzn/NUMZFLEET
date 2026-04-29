@@ -9,7 +9,9 @@ import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
 import sequelize, { testConnection } from './config/database.js';
 import { testTraccarConnection } from './services/userService.js';
-import { initializeAuth } from './middleware/auth.js';
+import { initializeAuth, authenticate } from './middleware/auth.js';
+import { requireAuth } from './middleware/authGates.js';
+import { suggestVehicles } from './controllers/operationSessionController.js';
 import { syncDatabase } from './models/index.js';
 import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
 import vehicleSpecsRouter from './routes/vehicleSpecs.js';
@@ -23,6 +25,7 @@ import { reconcileDeviceAssignmentLabels } from './services/vehicleFleetService.
 import {
   ensurePublicLoginInsightFromErb,
   getPublicLoginInsight,
+  isLoginInsightPopulated,
 } from './services/traccarLoginInsightSync.js';
 import { getFleetSummary } from './services/fleetSummaryService.js';
 
@@ -54,18 +57,32 @@ const isDev = process.env.NODE_ENV === 'development';
 const app = express();
 const httpServer = createServer(app);
 
+/** Browsers send these when Vite (or similar) runs on the host and fuel-api is in Docker. */
+const LOCAL_VITE_ORIGINS = [
+  'http://localhost:3002',
+  'http://127.0.0.1:3002',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
+
 // CORS configuration - support multiple origins for mobile apps
 const getCorsOrigin = () => {
   const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3002';
-  const origins = corsOrigin.split(',').map(origin => origin.trim());
-  
+  let origins = corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
+  // Union local SPA dev origins so Socket.IO + REST from Vite are not rejected when CORS_ORIGIN is prod-only.
+  if (process.env.CORS_STRICT !== 'true') {
+    for (const o of LOCAL_VITE_ORIGINS) {
+      if (!origins.includes(o)) origins.push(o);
+    }
+  }
+
   // If '*' is in the list, allow all origins (development only)
   if (origins.includes('*')) {
     return (origin, callback) => {
       callback(null, true);
     };
   }
-  
+
   return (origin, callback) => {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin || origins.includes(origin)) {
@@ -81,8 +98,8 @@ const io = new Server(httpServer, {
   cors: {
     origin: getCorsOrigin(),
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'Cookie']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'x-user-id'],
   },
   // Add additional options for stability
   allowEIO3: true, // Allow Engine.IO v3 clients for compatibility
@@ -94,11 +111,6 @@ const io = new Server(httpServer, {
   path: '/socket.io',
   // Add transports
   transports: ['polling', 'websocket'],
-  // Add connection state recovery
-  connectionStateRecovery: {
-    maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
-    skipMiddlewares: true,
-  }
 });
 
 // Add global error handlers BEFORE initializing socket handler
@@ -143,22 +155,73 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
 })); // Security headers with relaxed CSP for map tiles
+// Include x-user-id so permissive/hybrid dev auth works when browsers preflight (JSON Content-Type, etc.).
+const ALLOWED_API_HEADERS = ['Content-Type', 'Authorization', 'Cookie', 'x-user-id'];
+
 app.use(cors({
   origin: getCorsOrigin(),
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'Cookie']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ALLOWED_API_HEADERS,
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
+const RATE_WINDOW_MS = 15 * 60 * 1000;
+const rateLimitMessage = 'Too many requests from this IP, please try again later.';
+
+// Public endpoints are intentionally read-heavy (login widgets, summaries).
+const relaxedLimiter = rateLimit({
+  windowMs: RATE_WINDOW_MS,
+  max: 1000,
+  message: rateLimitMessage,
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use('/api/', limiter);
+
+// General API traffic limiter.
+const standardLimiter = rateLimit({
+  windowMs: RATE_WINDOW_MS,
+  max: 300,
+  message: rateLimitMessage,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Public endpoints have their own relaxed limiter.
+  skip: (req) => req.path.startsWith('/public/'),
+});
+
+// Sensitive write actions are throttled more aggressively.
+const strictLimiter = rateLimit({
+  windowMs: RATE_WINDOW_MS,
+  max: 100,
+  message: rateLimitMessage,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const STRICT_PATH_PREFIXES = [
+  '/fuel-requests',
+  '/operation-sessions',
+  '/vehicles',
+  '/vehicle-specs',
+];
+
+const shouldUseStrictLimiter = (req) => {
+  const method = req.method.toUpperCase();
+  const isMutation = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+  if (!isMutation) {
+    return false;
+  }
+  return STRICT_PATH_PREFIXES.some((prefix) => req.path.startsWith(prefix));
+};
+
+// Rate limiting
+app.use('/api/public', relaxedLimiter);
+app.use('/api', (req, res, next) => {
+  if (shouldUseStrictLimiter(req)) {
+    return strictLimiter(req, res, next);
+  }
+  return next();
+});
+app.use('/api', standardLimiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -179,9 +242,18 @@ app.get('/health', (req, res) => {
 app.get('/api/public/login-insight', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    res.json(await ensurePublicLoginInsightFromErb());
-  } catch {
-    res.json(getPublicLoginInsight());
+    const data = await ensurePublicLoginInsightFromErb();
+    res.json({
+      ...data,
+      erbAvailable: isLoginInsightPopulated(data),
+    });
+  } catch (err) {
+    console.warn('[login-insight] fallback to cache:', err?.message || err);
+    const fallback = getPublicLoginInsight();
+    res.json({
+      ...fallback,
+      erbAvailable: isLoginInsightPopulated(fallback),
+    });
   }
 });
 
@@ -302,6 +374,8 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/fuel-requests', fuelRequestsRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
 app.use('/api/vehicles', vehiclesRouter);
+// Nested path registered on app first so it is never missed if an older router snapshot omits it.
+app.get('/api/operation-sessions/suggestions/vehicles', authenticate, requireAuth, suggestVehicles);
 app.use('/api/operation-sessions', operationSessionsRouter);
 app.use('/api/reports', reportsRouter);
 
@@ -446,15 +520,15 @@ const startServer = async () => {
   } catch (error) {
     console.error('❌ Database sync failed:', error.message);
     console.error('   Server will continue but database operations may fail.');
+  }
 
-    // Initialize authentication system
-    try {
-      await initializeAuth();
-    } catch (error) {
-      console.error('❌ Authentication initialization failed:', error.message);
-      if (process.env.NODE_ENV === 'production') {
-        process.exit(1);
-      }
+  // Initialize authentication system
+  try {
+    await initializeAuth();
+  } catch (error) {
+    console.error('❌ Authentication initialization failed:', error.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
     }
   }
 

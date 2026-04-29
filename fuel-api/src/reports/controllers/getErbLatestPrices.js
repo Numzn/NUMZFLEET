@@ -3,6 +3,25 @@ import { tickErbLoginInsightSync } from '../../jobs/erbLoginInsightScheduler.js'
 import { emitDomainEvent } from '../../events/eventBus.js';
 import { EVENT_NAMES } from '../../events/eventNames.js';
 
+/** Same keys as success body so clients can always read `prices` + `currency`. */
+const erbRelayFailureBody = (message) => ({
+  ok: false,
+  source: 'erb',
+  currency: 'ZMW',
+  timestamp: null,
+  prices: {
+    petrol: null,
+    diesel: null,
+    kerosene: null,
+    jetA1: null,
+  },
+  meta: {
+    message: null,
+    fetchedAt: new Date().toISOString(),
+  },
+  error: message,
+});
+
 export const getErbLatestPrices = async (req, res) => {
   try {
     const result = await getLatestErbPrices();
@@ -22,11 +41,15 @@ export const getErbLatestPrices = async (req, res) => {
     });
     return res.json(result);
   } catch (error) {
-    if (error.statusCode) {
-      return res.status(error.statusCode).json({ error: error.message });
+    const message = error.message || 'Failed to fetch ERB latest prices';
+    const status = error.statusCode && Number.isInteger(error.statusCode) ? error.statusCode : 500;
+
+    if (!error.statusCode) {
+      console.error('❌ ERB latest prices relay error:', error);
+    } else {
+      console.warn('[getErbLatestPrices] erb-api relay failed:', { status, message });
     }
 
-    console.error('❌ ERB latest prices relay error:', error);
-    return res.status(500).json({ error: 'Failed to fetch ERB latest prices' });
+    return res.status(status).json(erbRelayFailureBody(message));
   }
 };

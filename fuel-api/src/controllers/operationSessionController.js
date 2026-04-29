@@ -4,6 +4,7 @@ import {
   getOperationSessionDetails,
   createSessionRefuels,
   closeOperationSession,
+  suggestVehiclesForFueling,
 } from '../services/operationSessionService.js';
 
 export const listSessions = async (req, res) => {
@@ -60,7 +61,7 @@ export const closeSession = async (req, res) => {
 
 export const addRefuels = async (req, res) => {
   try {
-    const result = await createSessionRefuels(req.user, req.params.id, req.body?.records);
+    const result = await createSessionRefuels(req.user, req.params.id, req.body || {});
     return res.status(201).json(result);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -68,5 +69,18 @@ export const addRefuels = async (req, res) => {
       console.error('Add operation session refuels error:', error);
     }
     return res.status(status).json({ error: error.message || 'Failed to add operation session refuels' });
+  }
+};
+
+export const suggestVehicles = async (req, res) => {
+  try {
+    const data = await suggestVehiclesForFueling(req.user, req.query || {});
+    return res.json(data);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) {
+      console.error('Suggest vehicles for fueling error:', error);
+    }
+    return res.status(status).json({ error: error.message || 'Failed to suggest vehicles' });
   }
 };
