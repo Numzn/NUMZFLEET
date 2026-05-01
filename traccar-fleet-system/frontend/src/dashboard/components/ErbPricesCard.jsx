@@ -116,13 +116,19 @@ const ErbPricesCard = () => {
         if (!publicRes.ok) {
           throw new Error(`Login insight HTTP ${publicRes.status}`);
         }
-        if (authRes.status === 401 || authRes.status === 403) {
-          throw new Error('Session not reaching fuel API (try refresh after login)');
-        }
         const apiMsg =
           typeof authPayload?.error === 'string' && authPayload.error.trim()
             ? authPayload.error.trim()
             : null;
+        if (authRes.status === 401 || authRes.status === 403) {
+          if (!user?.id && !user?.userId) {
+            throw new Error('Sign in first, then refresh to load ERB prices');
+          }
+          throw new Error('Fuel API auth not ready (missing x-user-id / session). Refresh after login.');
+        }
+        if (authRes.status === 503 && apiMsg?.toLowerCase?.().includes('token')) {
+          throw new Error('ERB is not configured. Set ERB_API_TOKEN in backend/.env, restart docker compose, then refresh.');
+        }
         if (apiMsg) {
           throw new Error(apiMsg);
         }

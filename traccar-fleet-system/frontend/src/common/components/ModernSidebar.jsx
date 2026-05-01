@@ -11,29 +11,25 @@ import {
   Tooltip,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
+import { useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import MapIcon from '@mui/icons-material/Map';
-import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import BuildIcon from '@mui/icons-material/Build';
-import PeopleIcon from '@mui/icons-material/People';
-import PlaceIcon from '@mui/icons-material/Place';
-import SettingsIcon from '@mui/icons-material/Settings';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import PersonIcon from '@mui/icons-material/Person';
-import FolderIcon from '@mui/icons-material/Folder';
-import TodayIcon from '@mui/icons-material/Today';
-import CalculateIcon from '@mui/icons-material/Calculate';
-import SendIcon from '@mui/icons-material/Send';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import TuneIcon from '@mui/icons-material/Tune';
-import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import DirectionsCarOutlinedIcon from '@mui/icons-material/DirectionsCarOutlined';
+import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
+import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
+import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
+import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
+import ChevronLeftOutlinedIcon from '@mui/icons-material/ChevronLeftOutlined';
+import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
 import usePersistedState from '../util/usePersistedState';
 import { useAdministrator, useManager, useRestriction } from '../util/permissions';
 import useFeatures from '../util/useFeatures';
+import LogoImage from '../../login/LogoImage';
+import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -41,15 +37,14 @@ const useStyles = makeStyles()((theme) => ({
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: theme.palette.background.paper,
-    // Subtle gradient for depth
-    backgroundImage: 'linear-gradient(to bottom, rgba(6, 182, 212, 0.01) 0%, transparent 100%)',
+    overflowX: 'hidden',
+    minWidth: 0,
   },
   menuList: {
     flex: 1,
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: theme.spacing(1.5, 1.25),
-    // Custom scrollbar
+    padding: theme.spacing(1.25, 1),
     '&::-webkit-scrollbar': {
       width: '6px',
     },
@@ -65,7 +60,7 @@ const useStyles = makeStyles()((theme) => ({
     },
   },
   sectionHeader: {
-    padding: theme.spacing(1.75, 2, 0.75, 2),
+    padding: theme.spacing(1.5, 1.5, 0.75, 1.5),
     marginTop: theme.spacing(1.5),
     '&:first-of-type': {
       marginTop: 0,
@@ -80,33 +75,23 @@ const useStyles = makeStyles()((theme) => ({
     opacity: 0.7,
   },
   menuItem: {
-    borderRadius: theme.spacing(1),
-    marginBottom: theme.spacing(0.5),
-    padding: theme.spacing(1, 1.5),
-    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+    borderRadius: theme.spacing(1.25),
+    marginBottom: theme.spacing(0.25),
+    padding: theme.spacing(1, 1.25),
+    transition: 'background-color 0.15s ease, color 0.15s ease',
     position: 'relative',
-    border: '1px solid transparent',
     '&:hover': {
-      backgroundColor: 'rgba(6, 182, 212, 0.08)',
-      borderColor: 'rgba(6, 182, 212, 0.15)',
-      transform: 'translateX(3px)',
-    },
-    '&:active': {
-      transform: 'scale(0.98) translateX(2px)',
+      backgroundColor: theme.palette.action.hover,
     },
   },
   menuItemActive: {
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.primary.contrastText,
-    borderColor: theme.palette.primary.main,
-    boxShadow: '0 2px 12px rgba(6, 182, 212, 0.3)',
+    backgroundColor: theme.palette.action.selected,
+    color: theme.palette.text.primary,
     '&:hover': {
-      backgroundColor: theme.palette.primary.dark,
-      borderColor: theme.palette.primary.dark,
-      transform: 'translateX(3px)',
+      backgroundColor: theme.palette.action.selected,
     },
     '& .MuiListItemIcon-root': {
-      color: theme.palette.primary.contrastText,
+      color: theme.palette.primary.main,
     },
     '& .MuiListItemText-primary': {
       fontWeight: 700,
@@ -118,20 +103,19 @@ const useStyles = makeStyles()((theme) => ({
       top: '20%',
       bottom: '20%',
       width: '3px',
-      backgroundColor: theme.palette.primary.contrastText,
+      backgroundColor: theme.palette.primary.main,
       borderRadius: '0 3px 3px 0',
     },
   },
   menuItemIcon: {
     minWidth: 38,
-    color: theme.palette.primary.main,
+    color: theme.palette.text.secondary,
     '& .MuiSvgIcon-root': {
       fontSize: '1.3rem',
-      transition: 'transform 0.15s',
     },
-    '&:hover .MuiSvgIcon-root': {
-      transform: 'scale(1.1)',
-    },
+  },
+  menuItemIconActive: {
+    color: theme.palette.primary.main,
   },
   menuItemText: {
     '& .MuiListItemText-primary': {
@@ -147,7 +131,7 @@ const useStyles = makeStyles()((theme) => ({
     marginBottom: theme.spacing(0.25),
     '&:hover': {
       paddingLeft: theme.spacing(5.75),
-      backgroundColor: 'rgba(6, 182, 212, 0.06)',
+      backgroundColor: theme.palette.action.hover,
     },
     '&::before': {
       content: '""',
@@ -161,17 +145,6 @@ const useStyles = makeStyles()((theme) => ({
       opacity: 0.4,
       transform: 'translateY(-50%)',
     },
-  },
-  expandIcon: {
-    color: theme.palette.text.secondary,
-    opacity: 0.7,
-    fontSize: '1.125rem',
-    transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-  },
-  expandIconOpen: {
-    transform: 'rotate(90deg)',
-    color: theme.palette.primary.main,
-    opacity: 1,
   },
   divider: {
     margin: theme.spacing(2.5, 2),
@@ -191,7 +164,16 @@ const useStyles = makeStyles()((theme) => ({
   },
 }));
 
-const ModernSidebar = () => {
+const SIDEBAR_WIDTH_EXPANDED = 168;
+const SIDEBAR_WIDTH_COLLAPSED = 68;
+
+const ModernSidebar = ({
+  collapsed: collapsedProp,
+  setCollapsed: setCollapsedProp,
+  forceExpanded = false,
+  showHeaderLogo = false,
+  onNavigate,
+} = {}) => {
   const { classes } = useStyles();
   const location = useLocation();
   const navigate = useNavigate();
@@ -201,7 +183,6 @@ const ModernSidebar = () => {
   const admin = useAdministrator();
   const manager = useManager();
   const features = useFeatures();
-  const userId = useSelector((state) => state.session.user?.id);
   
   // Get pending counts for badges
   const fuelRequests = useSelector((state) => state.fuelRequests?.items || {});
@@ -210,247 +191,293 @@ const ModernSidebar = () => {
     return status === 'pending' || status === 'submitted' || status === 'awaiting_approval';
   }).length;
   
-  // Collapsible sections state (persisted)
-  const [reportsOpen, setReportsOpen] = usePersistedState('sidebarReportsOpen', false);
-  const [fuelOpen, setFuelOpen] = usePersistedState('sidebarFuelOpen', false);
-  const [settingsOpen, setSettingsOpen] = usePersistedState('sidebarSettingsOpen', false);
+  const liveAlertBufferCount = useSelector((state) => state.events?.items?.length ?? 0);
+  const alertsBadgeCount =
+    liveAlertBufferCount > 0 ? Math.min(liveAlertBufferCount, 99) : undefined;
 
-  const isActive = (path, exact = false) => {
+  const [collapsedState, setCollapsedState] = usePersistedState('sidebarCollapsed', false);
+  const collapsed = forceExpanded ? false : (collapsedProp ?? collapsedState);
+  const setCollapsed = setCollapsedProp ?? setCollapsedState;
+
+  const [openState, setOpenState] = usePersistedState('sidebarNavOpen', {
+    fleet: true,
+    fuel: true,
+  });
+
+  const pathActive = useCallback((path, exact = false) => {
+    if (!path) return false;
     if (exact) return location.pathname === path;
-    return location.pathname === path || location.pathname.startsWith(path + '/');
-  };
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  }, [location.pathname]);
 
-  // Main navigation sections
-  const mainNavItems = [
-    {
-      title: 'Dashboard',
-      icon: <DashboardIcon />,
-      path: '/',
-      exact: true,
-      tooltip: 'Fleet Overview Dashboard',
-    },
-    {
-      title: 'Live Map',
-      icon: <MapIcon />,
-      path: '/map',
-      tooltip: 'Real-time Vehicle Tracking',
-    },
-  ];
+  const isAnyChildActive = useCallback((children) => {
+    if (!Array.isArray(children) || !children.length) return false;
+    return children.some((c) => pathActive(c.path));
+  }, [pathActive]);
 
-  const fleetNavItems = [
+  const navGroups = useMemo(() => ([
     {
-      title: 'Fleet',
-      icon: <DirectionsCarIcon />,
-      path: '/settings/devices',
-      show: !readonly,
-      tooltip: 'Manage Vehicles',
-    },
-    {
-      title: 'Operations',
-      icon: <LocalGasStationIcon />,
-      hasSubmenu: true,
-      open: fuelOpen,
-      onToggle: () => setFuelOpen(!fuelOpen),
-      show: !readonly,
-      badge: pendingFuelCount,
-      submenu: [
-        { title: 'Operations hub', path: '/fleet/operation-sessions' },
-        { title: 'Fuel requests', path: '/fuel-requests', badge: pendingFuelCount },
-        { title: 'Vehicles', path: '/fleet/vehicles' },
-        { title: 'Tank & fuel specs', path: '/settings/vehicle-specs' },
+      key: 'primary',
+      items: [
+        { title: 'Dashboard', path: '/', icon: DashboardOutlinedIcon },
       ],
     },
     {
-      title: 'Geofences',
-      icon: <PlaceIcon />,
-      path: '/geofences',
-      show: !readonly,
-      tooltip: 'Virtual Boundaries',
+      key: 'operations',
+      label: 'OPERATIONS',
+      items: [
+        {
+          key: 'fleet',
+          title: 'Fleet',
+          icon: DirectionsCarOutlinedIcon,
+          show: !readonly,
+          children: [
+            { title: 'Vehicles', path: '/fleet/vehicles', show: manager },
+            { title: 'Devices', path: '/settings/devices' },
+            { title: 'Drivers', path: '/settings/drivers', show: !features.disableDrivers },
+          ].filter((c) => c.show !== false),
+        },
+        {
+          key: 'fuel',
+          title: 'Fuel',
+          icon: LocalGasStationOutlinedIcon,
+          show: !readonly,
+          badge: pendingFuelCount > 0 ? pendingFuelCount : undefined,
+          children: [
+            { title: 'Overview', path: '/fuel-requests' },
+            { title: 'Requests', path: '/fuel-requests' },
+            { title: 'Sessions', path: '/fleet/operation-sessions' },
+          ],
+        },
+      ].filter((i) => i.show !== false),
     },
     {
-      title: 'Drivers',
-      icon: <PeopleIcon />,
-      path: '/settings/drivers',
-      show: !readonly && !features.disableDrivers,
-      tooltip: 'Driver Management',
-    },
-    {
-      title: 'Maintenance',
-      icon: <BuildIcon />,
-      path: '/settings/maintenances',
-      show: !readonly && !features.disableMaintenance,
-      tooltip: 'Service Schedules',
-    },
-  ].filter(item => item.show !== false);
-
-  const analyticsNavItems = [
-    {
-      title: 'Reports',
-      icon: <AssessmentIcon />,
-      hasSubmenu: true,
-      open: reportsOpen,
-      onToggle: () => setReportsOpen(!reportsOpen),
-      submenu: [
-        { title: 'Summary', path: '/reports/summary' },
-        { title: 'Trips', path: '/reports/trips' },
-        { title: 'Stops', path: '/reports/stops' },
-        { title: 'Events', path: '/reports/events' },
-        { title: 'Statistics', path: '/reports/statistics' },
+      key: 'intelligence',
+      label: 'INTELLIGENCE',
+      items: [
+        { title: 'Analytics', path: '/reports/statistics', icon: InsightsOutlinedIcon },
+        { title: 'Reports', path: '/reports/summary', icon: BarChartOutlinedIcon },
       ],
     },
-  ];
-
-  const settingsNavItems = [
     {
-      title: 'Settings',
-      icon: <SettingsIcon />,
-      hasSubmenu: true,
-      open: settingsOpen,
-      onToggle: () => setSettingsOpen(!settingsOpen),
-      show: !readonly,
-      submenu: [
-        { title: 'Preferences', path: '/settings/preferences', icon: <TuneIcon /> },
-        { title: 'Notifications', path: '/settings/notifications', icon: <NotificationsIcon /> },
-        { title: 'My Profile', path: `/settings/user/${userId}`, icon: <PersonIcon /> },
-        { title: 'Groups', path: '/settings/groups', icon: <FolderIcon />, show: !features.disableGroups },
-        { title: 'Calendars', path: '/settings/calendars', icon: <TodayIcon />, show: !features.disableCalendars },
-        { title: 'Attributes', path: '/settings/attributes', icon: <CalculateIcon />, show: !features.disableComputedAttributes },
-        { title: 'Commands', path: '/settings/commands', icon: <SendIcon />, show: !features.disableSavedCommands },
-      ].filter(item => item.show !== false),
+      key: 'system',
+      label: 'SYSTEM',
+      items: [
+        { title: 'Settings', path: '/settings/preferences', icon: SettingsOutlinedIcon, show: !readonly },
+        {
+          title: 'Admin',
+          path: admin ? '/settings/server' : '/settings/users',
+          icon: AdminPanelSettingsOutlinedIcon,
+          show: admin,
+        },
+      ].filter((i) => i.show !== false),
     },
-  ].filter(item => item.show !== false);
+  ]), [admin, features.disableDrivers, manager, pendingFuelCount, readonly]);
 
-  const adminNavItems = manager ? [
-    {
-      title: 'Server Settings',
-      icon: <SettingsIcon />,
-      path: '/settings/server',
-      show: admin,
-      tooltip: 'Server Configuration',
-    },
-    {
-      title: 'User Management',
-      icon: <SupervisorAccountIcon />,
-      path: '/settings/users',
-      tooltip: 'Manage System Users',
-    },
-  ].filter(item => item.show !== false) : [];
-
-  const handleNavigation = (path) => {
+  const handleGo = useCallback((path) => {
+    if (!path) return;
     navigate(path);
-  };
+    onNavigate?.();
+  }, [navigate, onNavigate]);
 
-  const renderMenuItem = (item, isSubmenu = false) => {
-    const active = isActive(item.path, item.exact);
-    const hasActiveSubmenu = item.hasSubmenu && item.submenu?.some(sub => isActive(sub.path));
-    
+  const toggleOpen = useCallback((key) => {
+    setOpenState((prev) => ({ ...(prev || {}), [key]: !prev?.[key] }));
+  }, [setOpenState]);
+
+  const buildTooltip = useCallback((item) => {
+    if (!collapsed) return '';
+    if (Array.isArray(item.children) && item.children.length) {
+      const hint = item.children.slice(0, 3).map((c) => c.title).join(', ');
+      return hint ? `${item.title} — ${hint}` : item.title;
+    }
+    return item.title;
+  }, [collapsed]);
+
+  const renderLeaf = useCallback((item, opts = {}) => {
+    const { dense = false, keyPrefix = '' } = opts;
+    const active = pathActive(item.path);
+    const tooltip = buildTooltip(item);
+
+    const button = (
+      <ListItemButton
+        key={`${keyPrefix}${item.title}`}
+        className={`${classes.menuItem} ${dense ? classes.subMenuItem : ''} ${active ? classes.menuItemActive : ''}`}
+        onClick={() => handleGo(item.path)}
+        sx={{
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          px: collapsed ? 1 : undefined,
+          minHeight: dense ? 40 : 44,
+        }}
+      >
+        {item.icon && (
+          <ListItemIcon
+            className={`${classes.menuItemIcon} ${active ? classes.menuItemIconActive : ''}`}
+            sx={{ minWidth: collapsed ? 'auto' : 38 }}
+          >
+            <item.icon />
+          </ListItemIcon>
+        )}
+        {!collapsed && (
+          <ListItemText primary={item.title} className={classes.menuItemText} />
+        )}
+      </ListItemButton>
+    );
+
     return (
-      <Tooltip 
-        key={item.title} 
-        title={item.tooltip || ''} 
+      <Tooltip
+        key={`${keyPrefix}${item.title}-tt`}
+        title={tooltip}
         placement="right"
-        disableHoverListener={!item.tooltip}
+        disableHoverListener={!collapsed}
       >
         <Box>
-          <ListItemButton
-            className={`${classes.menuItem} ${isSubmenu ? classes.subMenuItem : ''} ${active ? classes.menuItemActive : ''}`}
-            onClick={item.hasSubmenu ? item.onToggle : () => handleNavigation(item.path)}
-          >
-            {item.icon && (
-              <ListItemIcon className={classes.menuItemIcon}>
-                {item.badge ? (
-                  <Badge badgeContent={item.badge} className={classes.badge}>
-                    {item.icon}
-                  </Badge>
-                ) : (
-                  item.icon
-                )}
-              </ListItemIcon>
-            )}
-            
-            <ListItemText 
-              primary={item.title}
-              className={classes.menuItemText}
-            />
-            
-            {item.badge && !item.icon && (
-              <Badge badgeContent={item.badge} className={classes.badge} />
-            )}
-            
-            {item.hasSubmenu && (
-              <ChevronRightIcon 
-                className={`${classes.expandIcon} ${item.open ? classes.expandIconOpen : ''}`}
-              />
-            )}
-          </ListItemButton>
-
-          {item.hasSubmenu && (
-            <Collapse in={item.open} timeout={200} unmountOnExit>
-              <List component="div" disablePadding>
-                {item.submenu.map((subItem) => renderMenuItem(subItem, true))}
-              </List>
-            </Collapse>
-          )}
+          {button}
         </Box>
       </Tooltip>
     );
-  };
+  }, [buildTooltip, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, classes.subMenuItem, collapsed, handleGo, pathActive]);
+
+  const renderParent = useCallback((item) => {
+    const open = Boolean(openState?.[item.key]);
+    const active = isAnyChildActive(item.children);
+    const tooltip = buildTooltip(item);
+    const Icon = item.icon;
+    const badge = item.badge;
+
+    const onClick = () => {
+      if (collapsed) {
+        handleGo(item.children?.[0]?.path);
+        return;
+      }
+      toggleOpen(item.key);
+    };
+
+    const parentButton = (
+      <ListItemButton
+        key={item.title}
+        className={`${classes.menuItem} ${active ? classes.menuItemActive : ''}`}
+        onClick={onClick}
+        sx={{
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          px: collapsed ? 1 : undefined,
+          minHeight: 44,
+        }}
+      >
+        <ListItemIcon className={classes.menuItemIcon} sx={{ minWidth: collapsed ? 'auto' : 38 }}>
+          {badge ? (
+            <Badge badgeContent={badge} className={classes.badge}>
+              <Icon />
+            </Badge>
+          ) : (
+            <Icon />
+          )}
+        </ListItemIcon>
+        {!collapsed && (
+          <>
+            <ListItemText primary={item.title} className={classes.menuItemText} />
+            {open ? <ExpandLessOutlinedIcon fontSize="small" /> : <ExpandMoreOutlinedIcon fontSize="small" />}
+          </>
+        )}
+      </ListItemButton>
+    );
+
+    return (
+      <Box key={item.key || item.title}>
+        <Tooltip title={tooltip} placement="right" disableHoverListener={!collapsed}>
+          <Box>{parentButton}</Box>
+        </Tooltip>
+        {!collapsed && (
+          <Collapse in={open} timeout={150} unmountOnExit>
+            <List component="div" disablePadding>
+              {item.children
+                .filter((c) => c.show !== false)
+                .map((c) => renderLeaf(c, { dense: true, keyPrefix: `${item.key}-` }))}
+            </List>
+          </Collapse>
+        )}
+      </Box>
+    );
+  }, [buildTooltip, classes.badge, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, collapsed, handleGo, isAnyChildActive, openState, renderLeaf, toggleOpen]);
 
   return (
-    <Box className={classes.root}>
+    <Box
+      className={classes.root}
+      sx={{
+        width: forceExpanded ? '100%' : (collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED),
+      }}
+    >
+      {showHeaderLogo && !forceExpanded && (
+        <Box
+          sx={{
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            px: collapsed ? 0.5 : 1.5,
+            pt: 'env(safe-area-inset-top, 0px)',
+            minHeight: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
+            borderBottom: 1,
+            borderColor: 'divider',
+            boxSizing: 'border-box',
+          }}
+        >
+          <LogoImage
+            color="#06b6d4"
+            style={{
+              width: collapsed ? 36 : 44,
+              height: collapsed ? 36 : 44,
+              objectFit: 'contain',
+            }}
+          />
+        </Box>
+      )}
+
       <List className={classes.menuList}>
-        {/* Main Section */}
-        {mainNavItems.map((item) => renderMenuItem(item))}
-        
-        {/* Fleet Management Section */}
-        {fleetNavItems.length > 0 && (
-          <>
-            <Box className={classes.sectionHeader}>
-              <Typography className={classes.sectionTitle}>
-                Fleet Operations
+        {!showHeaderLogo && (
+          <Box sx={{ px: collapsed ? 1.25 : 1.5, py: 1.5 }}>
+            {!collapsed && (
+              <Typography variant="subtitle2" fontWeight={800} letterSpacing="0.14em" color="primary.main">
+                NUMZFLEET
               </Typography>
-            </Box>
-            {fleetNavItems.map((item) => renderMenuItem(item))}
-          </>
+            )}
+          </Box>
         )}
 
-        {/* Analytics Section */}
-        {analyticsNavItems.length > 0 && (
-          <>
-            <Box className={classes.sectionHeader}>
-              <Typography className={classes.sectionTitle}>
-                Analytics
-              </Typography>
-            </Box>
-            {analyticsNavItems.map((item) => renderMenuItem(item))}
-          </>
-        )}
-
-        {/* Settings Section */}
-        {settingsNavItems.length > 0 && (
-          <>
-            <Box className={classes.sectionHeader}>
-              <Typography className={classes.sectionTitle}>
-                Configuration
-              </Typography>
-            </Box>
-            {settingsNavItems.map((item) => renderMenuItem(item))}
-          </>
-        )}
-
-        {/* Admin Section */}
-        {adminNavItems.length > 0 && (
-          <>
-            <Divider className={classes.divider} />
-            <Box className={classes.sectionHeader}>
-              <Typography className={classes.sectionTitle}>
-                Administration
-              </Typography>
-            </Box>
-            {adminNavItems.map((item) => renderMenuItem(item))}
-          </>
-        )}
+        {navGroups.map((group) => (
+          <Box key={group.key}>
+            {group.label && !collapsed && (
+              <Box className={classes.sectionHeader}>
+                <Typography className={classes.sectionTitle}>{group.label}</Typography>
+              </Box>
+            )}
+            {group.items.map((item) => {
+              if (item.show === false) return null;
+              if (item.children) return renderParent(item);
+              return renderLeaf(item);
+            })}
+          </Box>
+        ))}
       </List>
+
+      {!forceExpanded && (
+        <Box sx={{ px: collapsed ? 1 : 1.25, pb: 1.25 }}>
+          <Divider sx={{ opacity: 0.35, mb: 1 }} />
+          <Tooltip title={collapsed ? 'Expand' : 'Collapse'} placement="right" disableHoverListener={!collapsed}>
+            <Box>
+              <ListItemButton
+                className={classes.menuItem}
+                onClick={() => setCollapsed(!collapsed)}
+                sx={{ justifyContent: collapsed ? 'center' : 'flex-start', minHeight: 44 }}
+              >
+                <ListItemIcon className={classes.menuItemIcon} sx={{ minWidth: collapsed ? 'auto' : 38 }}>
+                  {collapsed ? <ChevronRightOutlinedIcon /> : <ChevronLeftOutlinedIcon />}
+                </ListItemIcon>
+                {!collapsed && <ListItemText primary="Collapse" className={classes.menuItemText} />}
+              </ListItemButton>
+            </Box>
+          </Tooltip>
+        </Box>
+      )}
     </Box>
   );
 };

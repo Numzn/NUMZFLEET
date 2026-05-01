@@ -1,79 +1,64 @@
 import { Box, Drawer, IconButton } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
 import GlobalSearch from './GlobalSearch';
 import NotificationsDropdown from './NotificationsDropdown';
 import UserMenuDropdown from './UserMenuDropdown';
-import LogoImage from '../../login/LogoImage';
 import ModernSidebar from './ModernSidebar';
-import { 
-  UnifiedTopbar, 
-  TopbarLeftSection, 
-  TopbarCenterSection, 
+import usePersistedState from '../util/usePersistedState';
+import {
+  UnifiedTopbar,
+  TopbarLeftSection,
+  TopbarCenterSection,
   TopbarRightSection,
-  TopbarDivider 
+  TopbarDivider,
 } from './topbar';
 
-const DRAWER_WIDTH = 280;
-const TOP_OFFSET_DESKTOP = 'calc(env(safe-area-inset-top, 0px) + 56px)';
-const TOP_OFFSET_TABLET = 'calc(env(safe-area-inset-top, 0px) + 56px)';
-const TOP_OFFSET_MOBILE = 'calc(env(safe-area-inset-top, 0px) + 50px)';
+const DRAWER_WIDTH_EXPANDED = 168;
+const DRAWER_WIDTH_COLLAPSED = 68;
 
 const useStyles = makeStyles()((theme) => ({
   root: {
     display: 'flex',
-    // Use svh for stable mobile viewport height (avoids jitter when browser bars show/hide)
+    flexDirection: 'row',
+    alignItems: 'stretch',
     minHeight: '100svh',
     height: '100svh',
     overflow: 'hidden',
   },
   drawer: {
-    width: DRAWER_WIDTH,
     flexShrink: 0,
     '& .MuiDrawer-paper': {
-      width: DRAWER_WIDTH,
       boxSizing: 'border-box',
-      top: TOP_OFFSET_DESKTOP,
-      height: `calc(100svh - ${TOP_OFFSET_DESKTOP})`,
+      position: 'relative',
+      top: 0,
+      height: '100%',
+      maxHeight: '100svh',
       borderRight: `1px solid ${theme.palette.divider}`,
       borderRadius: 0,
       backgroundColor: theme.palette.background.paper,
-      zIndex: theme.zIndex.drawer,
-      // Subtle gradient for depth
       backgroundImage: 'linear-gradient(to bottom, rgba(6, 182, 212, 0.01) 0%, transparent 100%)',
-      [theme.breakpoints.between('md', 'lg')]: {
-        top: TOP_OFFSET_TABLET,
-        height: `calc(100svh - ${TOP_OFFSET_TABLET})`,
-      },
-      [theme.breakpoints.down('md')]: {
-        top: TOP_OFFSET_MOBILE,
-        height: `calc(100svh - ${TOP_OFFSET_MOBILE})`,
-      },
+      overflowX: 'hidden',
     },
   },
-  mobileMenuButton: {
-    marginRight: theme.spacing(2),
+  mainColumn: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
   },
-  content: {
-    position: 'absolute',
-    top: TOP_OFFSET_DESKTOP,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  main: {
+    flex: 1,
+    minHeight: 0,
     overflow: 'auto',
     WebkitOverflowScrolling: 'touch',
     boxSizing: 'border-box',
-    backgroundColor: 'transparent',
-    [theme.breakpoints.between('md', 'lg')]: {
-      top: TOP_OFFSET_TABLET,
-    },
     [theme.breakpoints.down('md')]: {
-      left: 0,  // Full width on mobile when sidebar is hidden
-      top: TOP_OFFSET_MOBILE,
-      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)',
+      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
     },
   },
 }));
@@ -83,85 +68,96 @@ const AppLayout = ({ children, showSidebar = true }) => {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const [sidebarOpen, setSidebarOpen] = useState(desktop);
+  const [collapsed, setCollapsed] = usePersistedState('sidebarCollapsed', false);
+
+  const handleSidebarNavigate = useCallback(() => {
+    if (!desktop) {
+      setSidebarOpen(false);
+    }
+  }, [desktop]);
+
+  const drawerWidth = desktop
+    ? (collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED)
+    : { xs: '80vw', sm: 360 };
+
+  const embeddedTopbarSx = {
+    width: '100%',
+    flexShrink: 0,
+    left: 'auto',
+    right: 'auto',
+    top: 'auto',
+    borderRadius: 0,
+    boxShadow: 'none',
+    border: 'none',
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    zIndex: theme.zIndex.appBar,
+  };
 
   return (
     <Box className={classes.root}>
-      {/* Use unified topbar */}
-      <UnifiedTopbar variant="appbar" position="fixed">
-        <TopbarLeftSection>
-          {desktop && (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <LogoImage
-                color="#06b6d4"
-                style={{ width: '48px', height: '48px', objectFit: 'contain' }}
-              />
-            </Box>
-          )}
-
-          {!desktop && (
-            <IconButton
-              onClick={() => setSidebarOpen(true)}
-              edge="start"
-              size="small"
-              sx={{ 
-                padding: '6px',
-                '&:hover': {
-                  backgroundColor: 'rgba(6, 182, 212, 0.08)',
-                },
-              }}
-            >
-              <MenuIcon sx={{ fontSize: '1.1rem' }} />
-            </IconButton>
-          )}
-        </TopbarLeftSection>
-
-        <TopbarCenterSection>
-          <GlobalSearch />
-        </TopbarCenterSection>
-
-        <TopbarDivider />
-
-        <TopbarRightSection>
-          <NotificationsDropdown />
-          <UserMenuDropdown />
-        </TopbarRightSection>
-      </UnifiedTopbar>
-
-      {/* Left Sidebar - Below TopBar */}
       {showSidebar && (
         <Drawer
           variant={desktop ? 'permanent' : 'temporary'}
           open={desktop || sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           className={classes.drawer}
+          ModalProps={{ keepMounted: true }}
+          sx={{
+            width: desktop ? drawerWidth : 0,
+            '& .MuiDrawer-paper': {
+              width: drawerWidth,
+              maxWidth: desktop ? undefined : 420,
+            },
+          }}
         >
-          {/* Navigation Menu */}
-          <ModernSidebar />
+          <ModernSidebar
+            collapsed={collapsed}
+            setCollapsed={setCollapsed}
+            forceExpanded={!desktop}
+            showHeaderLogo={desktop}
+            onNavigate={handleSidebarNavigate}
+          />
         </Drawer>
       )}
 
-      {/* Right Side Container */}
-      <Box sx={{ 
-        flexGrow: 1, 
-        display: 'flex', 
-        flexDirection: 'column',
-        position: 'relative',  // Add: Establishes positioning context
-      }}>
+      <Box className={classes.mainColumn}>
+        <UnifiedTopbar variant="appbar" position="static" sx={embeddedTopbarSx}>
+          <TopbarLeftSection>
+            {!desktop && (
+              <IconButton
+                onClick={() => setSidebarOpen(true)}
+                edge="start"
+                size="small"
+                sx={{
+                  padding: '6px',
+                  '&:hover': {
+                    backgroundColor: 'rgba(6, 182, 212, 0.08)',
+                  },
+                }}
+              >
+                <MenuIcon sx={{ fontSize: '1.1rem' }} />
+              </IconButton>
+            )}
+          </TopbarLeftSection>
 
-        {/* Main Content */}
-        <Box component="main" className={classes.content}>
+          <TopbarCenterSection>
+            <GlobalSearch />
+          </TopbarCenterSection>
+
+          <TopbarDivider />
+
+          <TopbarRightSection>
+            <NotificationsDropdown />
+            <UserMenuDropdown />
+          </TopbarRightSection>
+        </UnifiedTopbar>
+
+        <Box component="main" className={classes.main}>
           {children}
         </Box>
-
-
       </Box>
     </Box>
   );
 };
 
 export default AppLayout;
-
-
-
-
-
