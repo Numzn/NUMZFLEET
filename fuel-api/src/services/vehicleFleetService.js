@@ -5,9 +5,17 @@ import {
   getTraccarDevice,
   getTraccarDevicesByIds,
   getTraccarLatestPositionsByDeviceIds,
+  upsertTraccarDeviceAttribute,
 } from '../config/traccar.js';
 import { emitDomainEvent } from '../events/eventBus.js';
 import { EVENT_NAMES } from '../events/eventNames.js';
+import { normalizePositionTelemetry } from '../utils/normalizeTelemetry.js';
+import {
+  parseTraccarAttributesRaw,
+  parseDeviceFleetConfig,
+  mergeFleetConfigFromBody,
+} from '../utils/fleetConfigUtils.js';
+import { updateVehicleSpec } from './vehicleSpecService.js';
 
 /**
  * v1 merged vehicle DTO — single shape for list and get-by-id.
@@ -27,6 +35,7 @@ function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
       device: null,
       position: null,
       vehicleSpec: null,
+      fleetConfig: null,
     };
   }
 
@@ -45,16 +54,22 @@ function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
         id: tr.id,
         name: tr.name,
         status: tr.status,
+        uniqueId: tr.uniqueid ?? tr.uniqueId ?? null,
+        lastUpdate: tr.lastupdate ? new Date(tr.lastupdate).toISOString() : null,
       }
     : null;
 
   let positionDto = null;
   if (pos && pos.latitude != null && pos.longitude != null) {
+    const attrs = pos.attributes && typeof pos.attributes === 'object' ? pos.attributes : {};
     positionDto = {
       latitude: Number(pos.latitude),
       longitude: Number(pos.longitude),
       speed: pos.speed != null ? Number(pos.speed) : null,
+      course: pos.course != null ? Number(pos.course) : null,
+      altitude: pos.altitude != null ? Number(pos.altitude) : null,
       fixTime: pos.fixtime ? new Date(pos.fixtime).toISOString() : null,
+      telemetry: normalizePositionTelemetry(attrs),
     };
   }
 
@@ -66,12 +81,16 @@ function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
       }
     : null;
 
+  const devAttrs = tr ? parseTraccarAttributesRaw(tr.attributes) : {};
+  const fleetConfig = tr ? parseDeviceFleetConfig(devAttrs) : null;
+
   return {
     ...base,
     assignment: assignmentDto,
     device: deviceDto,
     position: positionDto,
     vehicleSpec: vehicleSpecDto,
+    fleetConfig,
   };
 }
 
@@ -253,6 +272,84 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
   });
 
   return getVehicleMerged(vid);
+}
+
+/**
+ * Unified config: vehicle row, vehicle_specs, and Traccar `numzFleetConfig` on device attributes.
+ * @param {string} vehicleId — UUID
+ * @param {object} body — partial updates (name, plateNumber, tankCapacity, fuelType, fuelEfficiency,
+ *   fuelConsumptionLPer100km, vehicleType, lowFuelThresholdPct, updateIntervalSec, geofenceEnabled,
+ *   geofenceRadiusM, alerts)
+ */
+export async function updateVehicleMergedConfig(vehicleId, body = {}) {
+  const vehicle = await Vehicle.findByPk(vehicleId);
+  if (!vehicle) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const assignment = await DeviceAssignment.findOne({
+    where: { vehicleId, isActive: true },
+  });
+
+  const wantsVehicleFields = body.name !== undefined || body.plateNumber !== undefined;
+  const specKeysTouched = ['tankCapacity', 'fuelEfficiency', 'fuelType', 'fuelConsumptionLPer100km'].some(
+    (k) => Object.prototype.hasOwnProperty.call(body, k),
+  );
+  const wantsSpec = specKeysTouched;
+  const fleetPatchKeys = [
+    'vehicleType',
+    'lowFuelThresholdPct',
+    'updateIntervalSec',
+    'geofenceEnabled',
+    'geofenceRadiusM',
+    'alerts',
+  ];
+  const wantsFleetPatch = fleetPatchKeys.some((k) => Object.prototype.hasOwnProperty.call(body, k));
+
+  if ((wantsSpec || wantsFleetPatch) && !assignment) {
+    const err = new Error('Assign a Traccar device before saving fuel or tracking settings');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (wantsVehicleFields) {
+    await updateVehicle(vehicleId, {
+      name: body.name !== undefined ? body.name : vehicle.name,
+      plateNumber: body.plateNumber !== undefined ? body.plateNumber : vehicle.plateNumber,
+    });
+  }
+
+  if (wantsSpec && assignment) {
+    const deviceId = Number(assignment.deviceId);
+    const existing = await VehicleSpec.findOne({ where: { deviceId } });
+    let fuelEff =
+      body.fuelEfficiency != null ? Number(body.fuelEfficiency) : existing?.fuelEfficiency ?? 10;
+    if (body.fuelConsumptionLPer100km != null) {
+      const l100 = Number(body.fuelConsumptionLPer100km);
+      if (l100 > 0) fuelEff = 100 / l100;
+    }
+    await updateVehicleSpec(deviceId, {
+      tankCapacity:
+        body.tankCapacity != null ? Number(body.tankCapacity) : existing?.tankCapacity ?? 60,
+      fuelEfficiency: fuelEff,
+      fuelType:
+        body.fuelType != null ? body.fuelType : existing?.fuelType ?? 'Petrol',
+    });
+  }
+
+  if (wantsFleetPatch && assignment) {
+    const deviceId = Number(assignment.deviceId);
+    const devices = await getTraccarDevicesByIds([deviceId]);
+    const tr = devices[0];
+    const devAttrs = parseTraccarAttributesRaw(tr?.attributes);
+    const current = parseDeviceFleetConfig(devAttrs);
+    const next = mergeFleetConfigFromBody(current, body);
+    await upsertTraccarDeviceAttribute(deviceId, 'numzFleetConfig', next);
+  }
+
+  return getVehicleMerged(vehicleId);
 }
 
 /**

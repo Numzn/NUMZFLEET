@@ -285,6 +285,17 @@ const parsePositionAttributes = (position) => {
  * @param {number[]} ids
  * @returns {Promise<object[]>}
  */
+const parseDeviceRowAttributes = (row) => {
+  if (!row?.attributes) return;
+  if (typeof row.attributes === 'string') {
+    try {
+      row.attributes = JSON.parse(row.attributes);
+    } catch {
+      /* keep string */
+    }
+  }
+};
+
 export const getTraccarDevicesByIds = async (ids) => {
   if (!ids?.length) return [];
   const unique = [...new Set(ids.filter((id) => id != null && Number.isFinite(Number(id))).map(Number))];
@@ -292,9 +303,10 @@ export const getTraccarDevicesByIds = async (ids) => {
   const pool = getTraccarPool();
   const placeholders = unique.map(() => '?').join(',');
   const [rows] = await pool.execute(
-    `SELECT id, name, uniqueid, status, lastupdate, positionid FROM tc_devices WHERE id IN (${placeholders})`,
+    `SELECT id, name, uniqueid, status, lastupdate, positionid, attributes FROM tc_devices WHERE id IN (${placeholders})`,
     unique,
   );
+  rows.forEach((row) => parseDeviceRowAttributes(row));
   return rows;
 };
 

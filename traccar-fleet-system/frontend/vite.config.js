@@ -1,16 +1,21 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import svgr from 'vite-plugin-svgr';
 import { VitePWA } from 'vite-plugin-pwa';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
+/** Always treat this frontend folder as the Vite root (fixes @mui resolve when `vite` runs from repo root). */
+const frontendRoot = path.dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
-  const env = loadEnv(mode, process.cwd(), '');
+  // Load env from this package directory (same as `root`), not process.cwd().
+  const env = loadEnv(mode, frontendRoot, '');
   
   // Dev server port (`vite --port` still overrides this at runtime).
-  const devServerPort = parseInt(env.VITE_DEV_SERVER_PORT || '3002', 10);
+  // Default dev port avoids clashing with Dockerized static frontend (host :3002).
+  const devServerPort = parseInt(env.VITE_DEV_SERVER_PORT || '5174', 10);
   // Mobile / LAN: set VITE_HMR_EXTERNAL to this machine’s IP so phones can reach the HMR WebSocket.
   // Otherwise use `hmr: true` so the WebSocket uses the same port as the page (fixes e.g. page on :3003 but ws on :3002).
   const hmrExternal = String(env.VITE_HMR_EXTERNAL || '').trim();
@@ -28,10 +33,10 @@ export default defineConfig(({ mode }) => {
   let traccarUrl, fuelApiUrl;
   
   if (isProd) {
-    // Production (Netlify) - use environment variables
+    // Production build: API base from VITE_API_BASE_URL (same-origin nginx, Netlify, etc.)
     traccarUrl = `${apiBaseUrl}/api/traccar`;
     fuelApiUrl = `${apiBaseUrl}/api/fuel`;
-    console.log('🌐 [Vite] Running in PRODUCTION mode (Netlify)');
+    console.log('🌐 [Vite] Running in PRODUCTION mode (env / same-origin API base)');
     console.log(`   API Base: ${apiBaseUrl}`);
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
@@ -73,6 +78,19 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+    root: frontendRoot,
+    resolve: {
+      dedupe: ['react', 'react-dom'],
+    },
+    optimizeDeps: {
+      include: [
+        '@mui/material',
+        '@mui/system',
+        '@mui/utils',
+        '@emotion/react',
+        '@emotion/styled',
+      ],
+    },
     server: {
       port: devServerPort,
       host: '0.0.0.0',

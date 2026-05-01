@@ -46,7 +46,6 @@ import PreferencesPage from './settings/PreferencesPage';
 import AccumulatorsPage from './settings/AccumulatorsPage';
 import CommandDevicePage from './settings/CommandDevicePage';
 import CommandGroupPage from './settings/CommandGroupPage';
-import VehicleSpecsPage from './settings/VehicleSpecsPage';
 import App from './App';
 import ChangeServerPage from './login/ChangeServerPage';
 import DevicesPage from './settings/DevicesPage';
@@ -67,6 +66,7 @@ import AuditPage from './reports/AuditPage';
 import ToastNotificationTest from './test/ToastNotificationTest';
 import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
 import VehiclesPage from './fleet/VehiclesPage';
+import VehicleDetailPage from './fleet/vehicleDetail/VehicleDetailPage';
 import OperationSessionsPage from './operationSessions/OperationSessionsPage';
 import PlanningPage from './operationSessions/PlanningPage';
 import OperationRunPage from './operationSessions/OperationRunPage';
@@ -130,6 +130,7 @@ const Navigation = () => {
         <Route index element={<DashboardPage />} />
         <Route path="map" element={<MainPage />} />
         <Route path="fuel-requests" element={<FuelRequestsPage />} />
+        <Route path="fleet/vehicles/:vehicleId" element={<VehicleDetailPage />} />
         <Route path="fleet/vehicles" element={<VehiclesPage />} />
         <Route path="fleet/operation-sessions" element={<OperationSessionsPage />} />
         <Route path="fleet/operation-sessions/plan" element={<PlanningPage />} />
@@ -184,7 +185,6 @@ const Navigation = () => {
           <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
           <Route path="user" element={<UserPage />} />
-          <Route path="vehicle-specs" element={<VehicleSpecsPage />} />
         </Route>
 
         <Route path="reports">

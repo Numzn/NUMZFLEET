@@ -34,7 +34,7 @@ dotenv.config();
 
 // Get database URLs from environment (matching docker-compose)
 const DATABASE_URL = process.env.DATABASE_URL || 
-  `postgresql://numztrak:${process.env.POSTGRES_PASSWORD || 'NumzFuel2025'}@numztrak-postgres:5432/numztrak_fuel`;
+  `postgresql://numztrak:${process.env.POSTGRES_PASSWORD || 'NumzFuel2025'}@db:5432/numztrak_fuel`;
 
 const TRACCAR_MYSQL_CONFIG = {
   host: process.env.TRACCAR_MYSQL_HOST || 'numztrak-mysql',
@@ -52,7 +52,7 @@ process.env.TRACCAR_MYSQL_DATABASE = TRACCAR_MYSQL_CONFIG.database;
 process.env.TRACCAR_MYSQL_USER = TRACCAR_MYSQL_CONFIG.user;
 process.env.TRACCAR_MYSQL_PASSWORD = TRACCAR_MYSQL_CONFIG.password;
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 const isDev = process.env.NODE_ENV === 'development';
 const app = express();
 const httpServer = createServer(app);
@@ -61,13 +61,15 @@ const httpServer = createServer(app);
 const LOCAL_VITE_ORIGINS = [
   'http://localhost:3002',
   'http://127.0.0.1:3002',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ];
 
 // CORS configuration - support multiple origins for mobile apps
 const getCorsOrigin = () => {
-  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3002';
+  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5174';
   let origins = corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
   // Union local SPA dev origins so Socket.IO + REST from Vite are not rejected when CORS_ORIGIN is prod-only.
   if (process.env.CORS_STRICT !== 'true') {
@@ -538,7 +540,7 @@ const startServer = async () => {
       console.log('\n✅ NumzTrak Fuel API is running!');
       console.log(`📡 HTTP Server: http://localhost:${PORT}`);
       console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
-      console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:3002'}`);
+      console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:5174'}`);
       console.log(`🗄️ PostgreSQL: Connected`);
       console.log(`🗄️ Traccar MySQL: Connected (read-only)`);
       console.log('\n🎯 Ready to accept fuel requests!\n');

@@ -106,8 +106,8 @@ cd ..\traccar-fleet-system\frontend
 - Fuel API: http://localhost:3001
 
 **Frontend:**
-- Local Dev: http://localhost:3002 (HMR enabled)
-- Docker: http://localhost:3002
+- Local Dev (Vite): http://localhost:5174 (HMR enabled; default avoids clashing with Docker on **3002**)
+- Docker Compose static UI: http://localhost:3002
 
 ## 🛠️ How It Works
 
@@ -128,10 +128,13 @@ The `vite.config.js` automatically detects the mode:
 
 ## 🐛 Troubleshooting
 
-### Port 3002 already in use
+### Port 5174 already in use (Vite dev)
+Set `VITE_DEV_SERVER_PORT` in `traccar-fleet-system/frontend/.env` to another free port, or stop the process using that port.
+
+### Port 3002 already in use (Docker static frontend)
 ```powershell
-# Stop Docker frontend
-docker stop numztrak-frontend
+# Stop root Compose frontend (example project name)
+docker stop numzfleet-frontend-1
 ```
 
 ### Backend not accessible

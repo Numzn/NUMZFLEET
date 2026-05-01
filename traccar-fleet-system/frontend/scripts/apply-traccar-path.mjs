@@ -47,14 +47,6 @@ function addImport(s, absPath) {
   return `${line}${s}`;
 }
 
-function replaceQuotes(s, quote) {
-  const re = new RegExp(`${quote}(\\/api\\/[^${quote === "'" ? "'" : '"'}]+)${quote}`, 'g');
-  return s.replace(re, (full, inner) => {
-    if (isFuelPath(inner)) return full;
-    return `${quote}\${traccarPath('${inner}')}${quote}`;
-  });
-}
-
 // Fix broken output: we want traccarPath('...') not '${traccarPath...}' inside quotes
 function replaceQuotesFixed(s, quote) {
   const q = quote;

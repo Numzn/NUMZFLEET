@@ -102,13 +102,13 @@ const RefuelTable = ({
     setError(null);
 
     if (!sessionId) {
-      setError('Select or create a session before submitting records.');
+      setError('Select a session before submitting.');
       return;
     }
 
     const payload = buildPayload();
     if (!payload.length) {
-      setError('Enter valid Fuel Cost and Fuel Amount for at least one vehicle.');
+      setError('Enter valid cost and amount for at least one vehicle.');
       return;
     }
 
@@ -130,10 +130,10 @@ const RefuelTable = ({
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h6">Refuel Entries</Typography>
+      <Typography variant="h6">Refuel log</Typography>
 
       {!sessionId && (
-        <Alert severity="info">Select or create a session to begin logging refuels.</Alert>
+        <Alert severity="info">Select a session to start logging refuels.</Alert>
       )}
       {isSessionClosed && (
         <Alert severity="warning">This session is closed. No more refuels can be added.</Alert>
@@ -145,9 +145,9 @@ const RefuelTable = ({
           <TableHead>
             <TableRow>
               <TableCell>Vehicle</TableCell>
-              <TableCell>Fuel Cost</TableCell>
-              <TableCell>Fuel Amount (L)</TableCell>
-              <TableCell>Current Mileage</TableCell>
+              <TableCell>Cost (K)</TableCell>
+              <TableCell>Amount (L)</TableCell>
+              <TableCell>Mileage</TableCell>
               <TableCell>Attendant</TableCell>
               <TableCell>Pump #</TableCell>
             </TableRow>
@@ -213,7 +213,7 @@ const RefuelTable = ({
 
       <Box display="flex" justifyContent="flex-end">
         <Button variant="contained" disabled={isDisabled || !selectedVehicles.length} onClick={handleSubmitAll}>
-          {submitting ? 'Submitting...' : 'Submit All'}
+          {submitting ? 'Submitting...' : 'Submit entries'}
         </Button>
       </Box>
     </Stack>

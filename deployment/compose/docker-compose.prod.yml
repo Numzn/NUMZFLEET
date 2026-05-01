@@ -1,0 +1,19 @@
+services:
+  numztrak-frontend:
+    image: ${REGISTRY_PREFIX}/numztrak-frontend:${IMAGE_TAG}
+    container_name: numztrak-frontend
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+
+  numztrak-backend:
+    image: ${REGISTRY_PREFIX}/numztrak-backend:${IMAGE_TAG}
+    container_name: numztrak-fuel-api
+    restart: unless-stopped
+    env_file:
+      - ../../backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Alert,
@@ -27,19 +27,19 @@ import {
   IconButton,
   Tooltip,
   LinearProgress,
+  Link,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
 import LinkIcon from '@mui/icons-material/Link';
-import EditIcon from '@mui/icons-material/Edit';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
-import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import AppLayout from '../common/components/AppLayout';
 import Breadcrumbs from '../common/components/Breadcrumbs';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import { useManager } from '../common/util/permissions';
-import { fetchVehicles, createVehicle, assignVehicleDevice, updateVehicle, deleteVehicle } from './vehiclesApi';
+import { fetchVehicles, createVehicle, assignVehicleDevice, deleteVehicle } from './vehiclesApi';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -89,11 +89,6 @@ const VehiclesPage = () => {
   const [assignVehicleId, setAssignVehicleId] = useState(null);
   const [assignDeviceId, setAssignDeviceId] = useState('');
 
-  const [editOpen, setEditOpen] = useState(false);
-  const [editVehicle, setEditVehicle] = useState(null);
-  const [editName, setEditName] = useState('');
-  const [editPlate, setEditPlate] = useState('');
-
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteVehicleRow, setDeleteVehicleRow] = useState(null);
 
@@ -125,25 +120,6 @@ const VehiclesPage = () => {
       await load();
     } catch (e) {
       setError(e.message || 'Create failed');
-    }
-  };
-
-  const openEdit = (row) => {
-    setEditVehicle(row);
-    setEditName(row.name);
-    setEditPlate(row.plateNumber || '');
-    setEditOpen(true);
-  };
-
-  const handleEdit = async () => {
-    if (!editVehicle) return;
-    try {
-      await updateVehicle(user, editVehicle.id, { name: editName, plateNumber: editPlate });
-      setEditOpen(false);
-      setEditVehicle(null);
-      await load();
-    } catch (e) {
-      setError(e.message || 'Update failed');
     }
   };
 
@@ -212,13 +188,6 @@ const VehiclesPage = () => {
                 </IconButton>
               </span>
             </Tooltip>
-            <Button
-              variant="outlined"
-              startIcon={<LocalGasStationIcon />}
-              onClick={() => navigate('/settings/vehicle-specs')}
-            >
-              Tank &amp; fuel specs
-            </Button>
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
               Add vehicle
             </Button>
@@ -226,13 +195,8 @@ const VehiclesPage = () => {
         </Box>
 
         <Typography variant="body2" className={classes.muted} paragraph>
-          Business vehicles in NumzTrak. Device and GPS data come from Traccar; tank capacity and fuel type for operations
-          are stored in{' '}
-          <Button variant="text" size="small" sx={{ p: 0, minWidth: 0, verticalAlign: 'baseline' }} onClick={() => navigate('/settings/vehicle-specs')}>
-            vehicle specs
-          </Button>
-          {' '}
-          (per Traccar device). Use the fuel icon on a row after a device is assigned to edit that device&apos;s specs.
+          <strong>Open a vehicle</strong> (name or plate, or <strong>Dashboard</strong>) for the unified view: live telemetry,
+          fuel planning, ERB reference, alerts, quick actions, and setup workflow in one screen.
         </Typography>
 
         {error && (
@@ -269,8 +233,27 @@ const VehiclesPage = () => {
               ) : (
                 rows.map((row) => (
                   <TableRow key={row.id} hover>
-                    <TableCell>{row.name}</TableCell>
-                    <TableCell>{row.plateNumber || '—'}</TableCell>
+                    <TableCell>
+                      <Link
+                        component={RouterLink}
+                        to={`/fleet/vehicles/${encodeURIComponent(row.id)}`}
+                        fontWeight={600}
+                        underline="hover"
+                        color="primary"
+                      >
+                        {row.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        component={RouterLink}
+                        to={`/fleet/vehicles/${encodeURIComponent(row.id)}`}
+                        underline="hover"
+                        color="inherit"
+                      >
+                        {row.plateNumber || '—'}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       {row.device?.name || (row.assignment ? `ID ${row.assignment.deviceId}` : '—')}
                     </TableCell>
@@ -294,34 +277,15 @@ const VehiclesPage = () => {
                       {row.vehicleSpec?.tankCapacity != null ? row.vehicleSpec.tankCapacity : '—'}
                     </TableCell>
                     <TableCell align="right">
-                      <Box display="flex" justifyContent="flex-end" gap={0.5}>
-                        <Tooltip title={row.assignment?.deviceId ? 'Tank & fuel specs (this device)' : 'Assign a device first to edit specs'}>
-                          <span>
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                const did = row.assignment?.deviceId;
-                                if (did != null) {
-                                  navigate(`/settings/vehicle-specs?deviceId=${encodeURIComponent(did)}`);
-                                }
-                              }}
-                              disabled={row.assignment?.deviceId == null}
-                              aria-label="Tank and fuel specs"
-                            >
-                              <LocalGasStationIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Edit vehicle">
-                          <IconButton size="small" onClick={() => openEdit(row)} aria-label="Edit vehicle">
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete vehicle">
-                          <IconButton size="small" color="error" onClick={() => openDeleteConfirm(row)} aria-label="Delete vehicle">
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                      <Box display="flex" justifyContent="flex-end" alignItems="center" gap={0.5} flexWrap="wrap">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<DashboardOutlinedIcon />}
+                          onClick={() => navigate(`/fleet/vehicles/${encodeURIComponent(row.id)}`)}
+                        >
+                          Dashboard
+                        </Button>
                         <Button
                           size="small"
                           startIcon={<LinkIcon />}
@@ -329,6 +293,11 @@ const VehiclesPage = () => {
                         >
                           {row.assignment ? 'Change device' : 'Assign device'}
                         </Button>
+                        <Tooltip title="Delete vehicle">
+                          <IconButton size="small" color="error" onClick={() => openDeleteConfirm(row)} aria-label="Delete vehicle">
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -392,33 +361,6 @@ const VehiclesPage = () => {
             <Button onClick={() => setAssignOpen(false)}>Cancel</Button>
             <Button variant="contained" onClick={handleAssign} disabled={!assignDeviceId}>
               Assign
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Edit dialog */}
-        <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle>Edit vehicle</DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-            <TextField
-              label="Name"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              required
-              fullWidth
-              autoFocus
-            />
-            <TextField
-              label="Plate number"
-              value={editPlate}
-              onChange={(e) => setEditPlate(e.target.value)}
-              fullWidth
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button variant="contained" onClick={handleEdit} disabled={!editName.trim()}>
-              Save
             </Button>
           </DialogActions>
         </Dialog>

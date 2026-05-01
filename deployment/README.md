@@ -1,77 +1,25 @@
-# Deployment Scripts
+# Deployment
 
-Scripts and guides for deploying NumzTrak to Oracle Cloud Infrastructure (OCI).
+**Start here:** [DEPLOYMENT_FLOW.md](./DEPLOYMENT_FLOW.md) — authoritative runbook (full-stack vs registry, rollback, hybrid checklist).
 
-## Essential Files
+## Entry points (summary)
 
-- **`oci-server-setup.sh`** - Initial server setup (Docker, Node.js, firewall, etc.)
-- **`oci-deploy.sh`** - Deploy backend services to OCI
-- **`deploy-backend-only-final.sh`** - Complete backend-only deployment (recommended)
-- **`DEPLOYMENT_GUIDE.md`** - Complete deployment documentation
-- **`BACKEND_ONLY_DEPLOYMENT.md`** - Backend-only deployment guide
-- **`FRONTEND_DEPLOYMENT.md`** - Frontend deployment options
+| What | Command / path |
+|------|------------------|
+| **Production full stack (default)** | `.\release-prod.ps1` from repo root (Windows) |
+| **Production fast path (pulled images)** | `.\release-prod.ps1 -UseRegistryAppImages -RegistryImagePrefix "user-or-ghcr-path" -SkipLocalChecks` after `.\deploy-registry.ps1 -Action BuildPush` |
+| **Registry images — build/push (Windows)** | `.\deploy-registry.ps1` — `-Action Build`, `Push`, `BuildPush`, or `Validate` |
+| **Registry — shell scripts** | `deployment/build/`, `deployment/push/`, `deployment/deploy/` (use **Git Bash**, not Store `bash`) |
+| **Frontend-only rsync-style** | `./deploy-frontend-docker.sh` (Git Bash from repo root) |
+| **OCI machine bootstrap** | `deployment/oci-server-setup.sh` |
 
-## Quick Start
+## Legacy (do not use for current prod)
 
-### Quick Deployment (Recommended)
+- `deployment/oci-deploy.sh`, `backend/deploy.sh`, `deploy.sh` (removed)
+- `deployment/deploy-backend-only-final.sh` (removed)
 
-```bash
-# From project root using Git Bash
-bash deployment/deploy-backend-only-final.sh
-```
+## More docs
 
-Or with custom parameters:
-```bash
-bash deployment/deploy-backend-only-final.sh 129.151.163.95 ~/.ssh/oci_instance_key ubuntu
-```
-
-### Manual Deployment
-
-1. **Connect to server:**
-   ```bash
-   ssh -i ~/.ssh/oci_instance_key ubuntu@129.151.163.95
-   ```
-
-2. **Run initial setup:**
-   ```bash
-   bash deployment/oci-server-setup.sh
-   ```
-
-3. **Clone repository:**
-   ```bash
-   cd ~
-   git clone https://github.com/Numzn/NUMZGPS.git
-   cd NUMZGPS
-   ```
-
-4. **Configure environment:**
-   ```bash
-   cd backend
-   cp env.template .env
-   nano .env  # Edit with your production values
-   ```
-
-5. **Deploy:**
-   ```bash
-   cd ~/NUMZGPS
-   bash deployment/oci-deploy.sh
-   ```
-
-## Documentation
-
-- See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed deployment instructions
-- See [FRONTEND_DEPLOYMENT.md](./FRONTEND_DEPLOYMENT.md) for frontend deployment options
-
-## Requirements
-
-- OCI Ubuntu instance (20.04 or 22.04)
-- SSH access with key file
-- Git repository access
-
-## Support
-
-For issues, check:
-1. Deployment logs: `docker-compose logs`
-2. Service status: `docker-compose ps`
-3. Documentation in project root
-
+- Root `README.md` — project overview; Docker section links to `DEPLOYMENT_FLOW.md`
+- `ROUTING.md` — same-origin routing
+- `fuel-api/docs/DATABASE_MIGRATIONS.md` — database migrations

@@ -3,6 +3,9 @@
 # dependencies
 node_modules
 
+# Vite
+.vite
+
 # testing
 /coverage
 

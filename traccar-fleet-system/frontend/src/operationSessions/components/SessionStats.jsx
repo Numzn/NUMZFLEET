@@ -16,10 +16,10 @@ const SessionStats = ({ sessions = [], fleetEfficiency = { efficiency: null, typ
 
   const cards = [
     { label: 'Total Budget', value: formatCurrency(totals.totalBudget) },
-    { label: 'Total Spent', value: formatCurrency(totals.totalSpent) },
-    { label: 'Difference', value: formatCurrency(difference) },
+    { label: 'Spent', value: formatCurrency(totals.totalSpent) },
+    { label: 'Balance', value: formatCurrency(difference) },
     {
-      label: 'Fleet Efficiency',
+      label: 'Efficiency',
       value: fleetEfficiency.efficiency != null
         ? `${fleetEfficiency.efficiency.toFixed(1)} ${fleetEfficiency.type || ''}`
         : '--',

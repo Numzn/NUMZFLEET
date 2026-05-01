@@ -358,7 +358,7 @@ const FuelSocketController = () => {
         console.error('🐳 [FuelSocket] Docker Network Issue Detected:');
         console.error('   - Check if fuel-api container is running: docker ps | grep fuel-api');
         console.error('   - Check Docker network: docker network inspect numztrak-network');
-        console.error('   - If accessing directly (port 3002), try accessing via nginx: http://localhost');
+        console.error('   - If the SPA is on a different port than fuel-api, confirm CORS + Vite proxy (see LOCAL_DEVELOPMENT_GUIDE.md)');
         console.error('   - Check Vite proxy logs in frontend container');
       }
       

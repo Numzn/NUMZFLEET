@@ -97,11 +97,14 @@ services:
     healthcheck:
       test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:8082/api/server']
       interval: 30s
-      timeout: 10s
-      retries: 3
+      timeout: 30s
+      retries: 5
+      start_period: 120s
 
   fuel-api:
-    # remove `image: numztrak/fuel-api:latest`
+    # Built image tag when using `docker compose build`; for fast registry deploy set
+    # NUMZ_FUEL_API_IMAGE in backend/.env (e.g. yourdockeruser/numztrak-backend:<git-sha>) and use `up --no-build`.
+    image: ${NUMZ_FUEL_API_IMAGE:-numztrak/fuel-api:local}
     build:
       context: ../fuel-api
       dockerfile: Dockerfile

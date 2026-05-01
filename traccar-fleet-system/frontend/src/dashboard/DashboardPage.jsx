@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import DirectionsCarFilledOutlinedIcon from '@mui/icons-material/DirectionsCarFilledOutlined';
@@ -25,6 +25,7 @@ import usePersistedState from '../common/util/usePersistedState';
 
 const DashboardPage = () => {
   const theme = useTheme();
+  const location = useLocation();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
   const positions = useSelector((state) => state.session.positions);
@@ -42,6 +43,17 @@ const DashboardPage = () => {
   const [filterMap] = usePersistedState('filterMap', false);
 
   useFilter(keyword, filter, filterSort, filterMap, positions, setFilteredDevices, setFilteredPositions);
+
+  useEffect(() => {
+    const h = (location.hash || '').replace(/^#/, '');
+    if (h !== 'dashboard-erb') return;
+    const el = document.getElementById('dashboard-erb');
+    if (el) {
+      window.requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, [location.hash]);
 
   const dashboardSummary = useMemo(() => {
     const onlineCount = filteredDevices.filter((device) => (
@@ -392,7 +404,7 @@ const DashboardPage = () => {
         </Box>
 
         {/* ERB Fuel Prices */}
-        <Box sx={{ mb: 4 }}>
+        <Box id="dashboard-erb" sx={{ mb: 4, scrollMarginTop: 96 }}>
           <ErbPricesCard />
         </Box>
 

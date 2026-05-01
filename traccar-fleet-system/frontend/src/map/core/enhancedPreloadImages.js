@@ -68,7 +68,6 @@ export const mapImages = {};
 
 const theme = createTheme({
   palette: {
-    neutral: { main: grey[500] },
     // Enhanced color palette for better status indication
     success: { main: '#4caf50' }, // Green for online
     error: { main: '#f44336' },    // Red for offline

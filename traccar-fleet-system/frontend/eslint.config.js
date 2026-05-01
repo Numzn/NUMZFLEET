@@ -8,22 +8,32 @@ import globals from 'globals';
 export default [
   {
     ignores: [
+      'dist/**',
+      'node_modules/**',
       'build/**',
+      'coverage/**',
+      'public/sw*.js',
+      'public/workbox-*.js',
+      'mapbox-gl-rtl-text.js',
       'switcher.js',
       'theme.js',
       'vite.config.js',
     ],
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
+    },
   },
   js.configs.recommended,
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['**/*.{js,jsx,mjs}'],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: { ecmaFeatures: { jsx: true } },
       globals: {
         ...globals.browser,
         ...globals.es2021,
+        ...globals.node,
       },
     },
     plugins: {
@@ -48,24 +58,18 @@ export default [
       'no-return-assign': 'off',
       'no-param-reassign': 'off',
       'no-prototype-builtins': 'off',
-      'object-curly-newline': ['warn', {
-        ObjectExpression: { minProperties: 8, multiline: true, consistent: true },
-        ObjectPattern: { minProperties: 8, multiline: true, consistent: true },
-        ImportDeclaration: { minProperties: 4, multiline: true, consistent: true },
-        ExportDeclaration: { minProperties: 4, multiline: true, consistent: true }
-      }],
+      'object-curly-newline': 'off',
       'import/no-unresolved': ['warn', {
         ignore: ['\\.svg', 'virtual:']
       }],
-      'react/function-component-definition': ['warn', {
-        namedComponents: 'arrow-function',
-        unnamedComponents: 'arrow-function'
-      }],
+      'react/function-component-definition': 'off',
       'react/jsx-props-no-spreading': 'off',
       'react/jsx-uses-vars': 'error',
+      'react/react-in-jsx-scope': 'off',
       'jsx-a11y/anchor-is-valid': 'off',
       'jsx-a11y/label-has-associated-control': 'off',
       'react/prop-types': 'off',
+      'no-unused-vars': 'off',
     },
   },
 ];

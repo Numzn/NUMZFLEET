@@ -1,0 +1,6 @@
+# Local operator secrets (copy from .env.example)
+.env
+
+# Registry deploy scripts state (server or laptop)
+deploy/.last_deploy
+deploy/.deploy_history

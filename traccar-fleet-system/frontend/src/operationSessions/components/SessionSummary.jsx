@@ -73,7 +73,7 @@ const SessionSummary = ({ sessions = [], selectedSessionId, onSelectSession, onS
         <List dense disablePadding>
           {sessions.length === 0 && (
             <ListItemButton disabled>
-              <ListItemText primary="No sessions found" secondary="Use Hub → Start operation or Plan operation." />
+              <ListItemText primary="No sessions yet" secondary="Use Start operation or Plan operation." />
             </ListItemButton>
           )}
           {sessions.map((session) => (

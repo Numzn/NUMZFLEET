@@ -12,6 +12,7 @@ import {
   listVehicles,
   getVehicle,
   assignDevice,
+  updateVehicleConfig,
   updateVehicle,
   deleteVehicle,
 } from '../controllers/vehicleFleetController.js';
@@ -30,6 +31,7 @@ router.get('/', requireAuth, requireManager, listVehicles);
 // assign-device before :id so "assign-device" is never captured as id
 router.post('/:vehicleId/assign-device', requireAuth, requireManager, assignDevice);
 router.get('/:id', requireAuth, requireManager, getVehicle);
+router.put('/:id/config', requireAuth, requireManager, updateVehicleConfig);
 router.put('/:id', requireAuth, requireManager, updateVehicle);
 router.delete('/:id', requireAuth, requireManager, deleteVehicle);
 

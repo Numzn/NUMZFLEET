@@ -163,7 +163,7 @@ const OperationSessionsPage = () => {
             <Box>
               <Typography variant="h4">Operations</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                Control center — quick start, planned runs, or resume the active session.
+                Start, plan, or resume operations.
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -221,19 +221,17 @@ const OperationSessionsPage = () => {
             <>
               {!sessions.length && (
                 <Alert severity="info">
-                  No sessions yet. Use Start operation for a quick run with loaded devices, or Plan operation to
-                  choose vehicles with intelligence.
+                  No sessions yet. Start an operation or create a plan.
                 </Alert>
               )}
               {!quickStartIds.length && (
                 <Alert severity="info">
-                  No Traccar devices in memory — open Live Map or refresh devices, then quick start or plan.
+                  No devices loaded. Open Live Map or refresh devices, then try again.
                 </Alert>
               )}
               {resumeSessionId && (
                 <Alert severity="info" sx={{ py: 0.75 }}>
-                  Active session #{resumeSessionId} — resume to continue refueling, or close it from the run screen
-                  before starting another.
+                  Session #{resumeSessionId} is active. Resume it or close it before starting a new one.
                 </Alert>
               )}
               <SessionStats sessions={summarizedSessions} fleetEfficiency={fleetEfficiency} />

@@ -88,7 +88,8 @@ sudo chown $USER:$USER ~/NUMZGPS/backend/cert.pem ~/NUMZGPS/backend/key.pem
 
 ```bash
 cd ~/NUMZGPS
-bash deployment/oci-deploy.sh
+# Legacy script removed. Use the canonical Windows entrypoint from repo root:
+#   .\release-prod.ps1
 ```
 
 ### 6. Verify Deployment

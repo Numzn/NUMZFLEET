@@ -4,6 +4,7 @@ import {
   getVehicleMerged,
   assignDevice as assignDeviceService,
   updateVehicle as updateVehicleService,
+  updateVehicleMergedConfig,
   deleteVehicle as deleteVehicleService,
 } from '../services/vehicleFleetService.js';
 
@@ -71,6 +72,20 @@ export const assignDevice = async (req, res) => {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Assign device error:', error);
     return res.status(status).json({ error: error.message || 'Failed to assign device' });
+  }
+};
+
+/**
+ * PUT /api/vehicles/:id/config — unified vehicle + spec + Traccar fleetConfig
+ */
+export const updateVehicleConfig = async (req, res) => {
+  try {
+    const merged = await updateVehicleMergedConfig(req.params.id, req.body || {});
+    return res.json(merged);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Update vehicle config error:', error);
+    return res.status(status).json({ error: error.message || 'Failed to update vehicle configuration' });
   }
 };
 

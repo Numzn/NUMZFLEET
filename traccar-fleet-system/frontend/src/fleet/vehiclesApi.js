@@ -47,3 +47,22 @@ export async function deleteVehicle(user, vehicleId) {
     headers: fuelApiAuthHeaders(user),
   });
 }
+
+export async function fetchVehicle(user, vehicleId) {
+  const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
+    headers: fuelApiAuthHeaders(user),
+  });
+  return res.json();
+}
+
+export async function updateVehicleConfig(user, vehicleId, body) {
+  const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}/config`, {
+    method: 'PUT',
+    headers: {
+      ...fuelApiAuthHeaders(user),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}

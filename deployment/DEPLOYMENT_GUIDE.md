@@ -22,7 +22,7 @@ ssh -i ~/.ssh/oci_instance_key ubuntu@129.151.163.95
 Run the automated setup script:
 
 ```bash
-# Copy the setup script to your server first, then:
+# From this repo checkout (recommended layout: ~/NUMZFLEET on the server):
 bash deployment/oci-server-setup.sh
 ```
 
@@ -37,6 +37,8 @@ cd ~
 git clone https://github.com/Numzn/NUMZGPS.git
 cd NUMZGPS
 ```
+
+Note: legacy `deployment/oci-deploy.sh` has been removed to avoid conflicting deploy paths. Use `.\release-prod.ps1` (Windows) for production releases.
 
 ### 4. Configure Environment
 
@@ -86,8 +88,8 @@ openssl req -x509 -newkey rsa:4096 -nodes \
 ### 6. Deploy Backend Services
 
 ```bash
-cd ~/NUMZGPS
-bash deployment/oci-deploy.sh
+# Legacy script removed. Use the canonical Windows entrypoint from repo root:
+#   .\release-prod.ps1
 ```
 
 Or manually:

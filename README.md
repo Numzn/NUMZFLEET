@@ -42,14 +42,14 @@ The system consists of three main components:
    - PostgreSQL database for fuel data
    - Express.js REST API
    - Socket.io for real-time notifications
-   - Port: 3001
+   - Port: 3000
 
 3. **Frontend**: React-based web application
    - React 19 with Material-UI (MUI)
    - Redux for state management
    - MapLibre GL JS for maps
    - Vite for build tooling
-   - Port: 3002
+   - Dev server default port: **5174** (host **3002** is reserved for the Dockerized static frontend)
 
 ## 📦 Prerequisites
 
@@ -117,8 +117,8 @@ JWT_SECRET=your_jwt_secret
 # Network Settings
 HTTP_PORT=8082
 HTTPS_PORT=8443
-PORT=3001
-CORS_ORIGIN=http://localhost:3002
+PORT=3000
+CORS_ORIGIN=http://localhost:5174,http://localhost:3002
 ```
 
 ### Database Setup
@@ -204,9 +204,10 @@ npm run start:local
 
 ### Access Points
 
-- **Frontend**: http://localhost:3002
+- **Frontend (Vite dev)**: http://localhost:5174
+- **Frontend (Docker static, root compose)**: http://localhost:3002
 - **Traccar API**: http://localhost:8082
-- **Fuel API**: http://localhost:3001
+- **Fuel API**: http://localhost:3000
 - **MySQL**: localhost:3306
 - **PostgreSQL**: localhost:5432
 
@@ -271,7 +272,7 @@ cd fuel-api
 # Start with nodemon (auto-reload)
 npm run dev
 
-# Start production
+# Start production (local)
 npm start
 ```
 
@@ -283,31 +284,40 @@ npm start
 
 ## 🐳 Docker Deployment
 
+**Production and registry runbook:** [deployment/DEPLOYMENT_FLOW.md](deployment/DEPLOYMENT_FLOW.md) (full-stack `release-prod.ps1`, optional Docker Hub/GHCR flow, rollback).
+
+### Minimal Compose (standardized)
+
+From repo root:
+
+```bash
+docker compose up -d --build
+```
+
 ### Services
 
 The Docker Compose setup includes:
 
-1. **numztrak-mysql**: MySQL 8.0 for Traccar
-2. **numztrak-postgres**: PostgreSQL 15 for Fuel API
-3. **numztrak-traccar**: Traccar GPS tracking server
-4. **numztrak-fuel-api**: Fuel management API
-5. **numztrak-frontend**: React frontend (optional)
-6. **numztrak-nginx**: Reverse proxy (optional)
+1. **frontend**: Vite build served by Nginx (port 3002)
+2. **backend**: Node.js API (port 3000)
+3. **db**: PostgreSQL (port 5432)
+4. **traccar**: Traccar server (port 8082)
+5. **traccar-mysql**: MySQL 8 for Traccar’s schema (fuel-api reads this database; not published to the host by default)
 
 ### Docker Commands
 
 ```bash
 # Build and start all services
-docker-compose up -d --build
+docker compose up -d --build
 
 # View logs
-docker-compose logs -f [service-name]
+docker compose logs -f [service-name]
 
 # Stop services
-docker-compose down
+docker compose down
 
 # Stop and remove volumes
-docker-compose down -v
+docker compose down -v
 ```
 
 ## 📡 API Documentation

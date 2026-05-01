@@ -13,6 +13,21 @@
     Only commits already pushed to origin/main can be deployed.
     No local build artifacts are ever shipped to production.
 
+    Registry image flow (Docker Hub / GHCR): see deployment/DEPLOYMENT_FLOW.md
+    and deploy-registry.ps1 (Track B). Full-stack prod default remains this script.
+
+    Fast path (-UseRegistryAppImages): skips server-side npm/Vite for the frontend and
+    skips fuel-api image build by pulling pre-pushed images (same tags as deploy-registry.ps1).
+    Push images first: .\deploy-registry.ps1 -Action BuildPush -Commit <sha>
+
+.PARAMETER UseRegistryAppImages
+    When set, the server pulls numztrak-frontend and numztrak-backend from the registry
+    prefix you supply (full SHA tag). Requires images already pushed for that commit.
+
+.PARAMETER RegistryImagePrefix
+    Docker Hub user (e.g. myuser) or GHCR path without trailing slash (e.g. ghcr.io/myorg).
+    Images must exist as: {prefix}/numztrak-frontend:{Commit} and {prefix}/numztrak-backend:{Commit}
+
 .PARAMETER Server
     Oracle Cloud server IP or hostname.  Default: 129.151.163.95
 
@@ -46,6 +61,10 @@
 .EXAMPLE
     # Emergency deploy without local checks (SHA still validated)
     .\release-prod.ps1 -SkipLocalChecks
+
+.EXAMPLE
+    # Fast path: images already pushed for this commit (see deploy-registry.ps1)
+    .\release-prod.ps1 -UseRegistryAppImages -RegistryImagePrefix "mydockerhubuser" -SkipLocalChecks
 #>
 
 param(
@@ -54,7 +73,9 @@ param(
     [string]$KeyPath   = "$HOME/.ssh/oci_instance_key.pem",
     [string]$Branch    = "main",
     [string]$Commit    = "",
-    [switch]$SkipLocalChecks
+    [switch]$SkipLocalChecks,
+    [switch]$UseRegistryAppImages,
+    [string]$RegistryImagePrefix = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -200,9 +221,16 @@ if ($SkipLocalChecks) {
     if (Get-Command docker -ErrorAction SilentlyContinue) {
         Write-Host "   -> nginx -t on nginx.prod.conf" -ForegroundColor DarkGray
         $nginxConf = (Join-Path $RepoRoot "backend/nginx/nginx.prod.conf").Replace('\', '/')
+        $certPem = (Join-Path $RepoRoot "backend/cert.pem").Replace('\', '/')
+        $keyPem = (Join-Path $RepoRoot "backend/key.pem").Replace('\', '/')
         Run-Or-Throw "nginx config check" {
             docker run --rm `
+                --add-host fuel-api:127.0.0.1 `
+                --add-host traccar-server:127.0.0.1 `
+                --add-host erb-api:127.0.0.1 `
                 -v "${nginxConf}:/etc/nginx/conf.d/default.conf:ro" `
+                -v "${certPem}:/etc/ssl/certs/numz.site.crt:ro" `
+                -v "${keyPem}:/etc/ssl/private/numz.site.key:ro" `
                 nginx:alpine nginx -t
         }
         Write-Ok "Nginx config valid"
@@ -248,16 +276,39 @@ if (-not $contains) {
 }
 Write-Ok "Commit $Commit is in origin/$Branch - safe to deploy"
 
+if ($UseRegistryAppImages) {
+    if ([string]::IsNullOrWhiteSpace($RegistryImagePrefix)) {
+        Write-Fail "-UseRegistryAppImages requires -RegistryImagePrefix (e.g. mydockerhubuser or ghcr.io/myorg)."
+        exit 1
+    }
+    Write-Warn "Registry fast path: push images for this commit first:"
+    Write-Warn "  .\deploy-registry.ps1 -Action BuildPush -Commit $Commit"
+}
+
 # ─────────────────────────────────────────────────────────────
 # PHASE 5 — Server deploy (Git-first, SHA-locked)
 # ─────────────────────────────────────────────────────────────
 
 Write-Step "Phase 5 - Deploy to production  ($User@$Server)"
 Write-Host "   Commit : $Commit" -ForegroundColor Green
+if ($UseRegistryAppImages) {
+    Write-Host "   Mode   : registry app images ($RegistryImagePrefix/numztrak-*:$($Commit.Substring(0, [Math]::Min(12, $Commit.Length))))..." -ForegroundColor Green
+}
+
+function Escape-BashSingleQuoted([string]$s) {
+    if ([string]::IsNullOrWhiteSpace($s)) { return "" }
+    return $s.Replace("'", "'\''")
+}
+
+$useRegFlag = if ($UseRegistryAppImages) { "1" } else { "0" }
+$regPrefixEsc = Escape-BashSingleQuoted $RegistryImagePrefix
 
 # Single-quoted here-string: bash uses $(...) — a double-quoted @"..."@ breaks PowerShell parsing.
 $remoteScript = @'
 set -euo pipefail
+
+NUMZ_DEPLOY_USE_REGISTRY=__NUMZ_DEPLOY_USE_REGISTRY__
+NUMZ_DEPLOY_REG_PREFIX='__NUMZ_DEPLOY_REG_PREFIX_ESC__'
 
 # Prefer Docker Compose v2 (`docker compose`). Legacy python `docker-compose` 1.29.x can throw
 # KeyError: ContainerConfig against newer Docker Engine; v2 avoids that path.
@@ -286,25 +337,46 @@ compose up -d traccar-mysql fuel-postgres
 echo ""
 echo "=== [3/7] Start core backend services ==="
 cd ~/NUMZFLEET/backend
-compose up -d --build traccar-server fuel-api
+if [ "$NUMZ_DEPLOY_USE_REGISTRY" = "1" ]; then
+  echo "Registry mode: pull fuel-api image, skip local Docker build for fuel-api."
+  compose up -d traccar-server
+  BE_IMAGE="${NUMZ_DEPLOY_REG_PREFIX}/numztrak-backend:__DEPLOY_COMMIT__"
+  docker pull "$BE_IMAGE"
+  export NUMZ_FUEL_API_IMAGE="$BE_IMAGE"
+  compose up -d --no-build --force-recreate fuel-api
+else
+  compose up -d --build traccar-server fuel-api
+fi
 
 echo ""
 echo "=== [4/7] Start ERB services ==="
 cd ~/NUMZFLEET/backend
 compose up -d --build erb-worker erb-api
 
-echo ""
-echo "=== [5/7] Build frontend from same commit ==="
-FRONT="$HOME/NUMZFLEET/traccar-fleet-system/frontend"
-cd "$FRONT"
-if command -v npm >/dev/null 2>&1; then
-  npm ci --quiet
-  export VITE_TRACCAR_PREFIX=/traccar
-  npm run build
+if [ "$NUMZ_DEPLOY_USE_REGISTRY" = "1" ]; then
+  echo ""
+  echo "=== [5/7] Pull frontend image + sync dist/ (registry fast path) ==="
+  FE_IMAGE="${NUMZ_DEPLOY_REG_PREFIX}/numztrak-frontend:__DEPLOY_COMMIT__"
+  docker pull "$FE_IMAGE"
+  FRONT_DIST="$HOME/NUMZFLEET/traccar-fleet-system/frontend/dist"
+  mkdir -p "$FRONT_DIST"
+  CID="$(docker create "$FE_IMAGE")"
+  docker cp "$CID:/usr/share/nginx/html/." "$FRONT_DIST/"
+  docker rm "$CID"
 else
-  echo "npm not on PATH; using Node 20 image to write dist/ (matches local dev toolchain)."
-  docker pull node:20-bookworm
-  docker run --rm -v "$FRONT:/app" -w /app node:20-bookworm bash -lc "export VITE_TRACCAR_PREFIX=/traccar && npm ci && npm run build"
+  echo ""
+  echo "=== [5/7] Build frontend from same commit ==="
+  FRONT="$HOME/NUMZFLEET/traccar-fleet-system/frontend"
+  cd "$FRONT"
+  if command -v npm >/dev/null 2>&1; then
+    npm ci --quiet
+    export VITE_TRACCAR_PREFIX=/traccar
+    npm run build
+  else
+    echo "npm not on PATH; using Node 20 image to write dist/ (matches local dev toolchain)."
+    docker pull node:20-bookworm
+    docker run --rm -v "$FRONT:/app" -w /app node:20-bookworm bash -lc "export VITE_TRACCAR_PREFIX=/traccar && npm ci && npm run build"
+  fi
 fi
 
 echo ""
@@ -342,7 +414,7 @@ echo "  Completed at    : $(date -u '+%Y-%m-%d %H:%M UTC')"
 echo "==========================================="
 '@
 
-$remoteScript = $remoteScript.Replace('__DEPLOY_COMMIT__', $Commit).Replace('__DEPLOY_SERVER__', $Server)
+$remoteScript = $remoteScript.Replace('__DEPLOY_COMMIT__', $Commit).Replace('__DEPLOY_SERVER__', $Server).Replace('__NUMZ_DEPLOY_USE_REGISTRY__', $useRegFlag).Replace('__NUMZ_DEPLOY_REG_PREFIX_ESC__', $regPrefixEsc)
 
 Run-Or-Throw "Remote deploy" {
     $remoteScript | & "$SshCommand" -i "$KeyPath" -o "StrictHostKeyChecking=accept-new" "$User@$Server" "bash -s"
