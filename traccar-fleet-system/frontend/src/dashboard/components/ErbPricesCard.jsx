@@ -127,7 +127,9 @@ const ErbPricesCard = () => {
           throw new Error('Fuel API auth not ready (missing x-user-id / session). Refresh after login.');
         }
         if (authRes.status === 503 && apiMsg?.toLowerCase?.().includes('token')) {
-          throw new Error('ERB is not configured. Set ERB_API_TOKEN in backend/.env, restart docker compose, then refresh.');
+          throw new Error(
+            'ERB relay token missing: set ERB_API_TOKEN and API_TOKEN to the same value in backend/.env (fuel-api + erb-api), redeploy, then refresh.',
+          );
         }
         if (apiMsg) {
           throw new Error(apiMsg);

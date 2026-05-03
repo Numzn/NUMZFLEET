@@ -8,12 +8,16 @@ const logErb = (level, msg, extra = {}) => {
   else console.info(line, extra);
 };
 
-const requestErb = async (path) => {
-  const token = process.env.ERB_API_TOKEN;
+/** Shared secret with erb-api: prefer ERB_API_TOKEN, else API_TOKEN (same file often sets both). */
+const getErbRelayToken = () =>
+  String(process.env.ERB_API_TOKEN || process.env.API_TOKEN || '').trim();
 
-  if (!token || !String(token).trim()) {
-    logErb('warn', 'ERB_API_TOKEN missing or empty on fuel-api; cannot call erb-api', {
-      hint: 'Set ERB_API_TOKEN in env (must match erb-api API_TOKEN)',
+const requestErb = async (path) => {
+  const token = getErbRelayToken();
+
+  if (!token) {
+    logErb('warn', 'No ERB relay token on fuel-api; cannot call erb-api', {
+      hint: 'Set ERB_API_TOKEN or API_TOKEN in backend/.env (must match erb-api API_TOKEN)',
     });
     const error = new Error('ERB API token is not configured on server');
     error.statusCode = 503;

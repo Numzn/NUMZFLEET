@@ -22,7 +22,8 @@ from config import Config
 app = FastAPI(title="ERB Fuel Monitor API", version="1.0.0")
 security = HTTPBearer(auto_error=False)
 
-API_TOKEN = os.getenv("API_TOKEN", "").strip()
+# Accept API_TOKEN or ERB_API_TOKEN (compose often loads backend/.env with either or both).
+API_TOKEN = (os.getenv("API_TOKEN") or os.getenv("ERB_API_TOKEN") or "").strip()
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("API_ALLOWED_ORIGINS", "").split(",") if o.strip()]
 
 if ALLOWED_ORIGINS:
