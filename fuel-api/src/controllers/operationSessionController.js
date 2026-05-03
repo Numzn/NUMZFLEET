@@ -6,6 +6,7 @@ import {
   closeOperationSession,
   suggestVehiclesForFueling,
 } from '../services/operationSessionService.js';
+import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
 export const listSessions = async (req, res) => {
   try {
@@ -16,7 +17,7 @@ export const listSessions = async (req, res) => {
     if (status >= 500) {
       console.error('List operation sessions error:', error);
     }
-    return res.status(status).json({ error: error.message || 'Failed to list operation sessions' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to list operation sessions') });
   }
 };
 
@@ -29,7 +30,7 @@ export const createSession = async (req, res) => {
     if (status >= 500) {
       console.error('Create operation session error:', error);
     }
-    return res.status(status).json({ error: error.message || 'Failed to create operation session' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to create operation session') });
   }
 };
 
@@ -42,7 +43,7 @@ export const getSessionDetails = async (req, res) => {
     if (status >= 500) {
       console.error('Get operation session details error:', error);
     }
-    return res.status(status).json({ error: error.message || 'Failed to fetch operation session details' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to fetch operation session details') });
   }
 };
 
@@ -55,7 +56,7 @@ export const closeSession = async (req, res) => {
     if (status >= 500) {
       console.error('Close operation session error:', error);
     }
-    return res.status(status).json({ error: error.message || 'Failed to close operation session' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to close operation session') });
   }
 };
 
@@ -68,7 +69,7 @@ export const addRefuels = async (req, res) => {
     if (status >= 500) {
       console.error('Add operation session refuels error:', error);
     }
-    return res.status(status).json({ error: error.message || 'Failed to add operation session refuels' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to add operation session refuels') });
   }
 };
 
@@ -81,6 +82,6 @@ export const suggestVehicles = async (req, res) => {
     if (status >= 500) {
       console.error('Suggest vehicles for fueling error:', error);
     }
-    return res.status(status).json({ error: error.message || 'Failed to suggest vehicles' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to suggest vehicles') });
   }
 };

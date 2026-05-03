@@ -477,6 +477,20 @@ const startServer = async () => {
     }
   }
 
+  // Create/update Postgres schema whenever PostgreSQL is up — even if Traccar is not.
+  // Otherwise a degraded or partial startup can leave API routes failing with missing relations.
+  if (pgConnected) {
+    try {
+      if (isDev) {
+        console.log('\n📦 Synchronizing database schema (PostgreSQL connected)...');
+      }
+      await syncDatabase();
+    } catch (error) {
+      console.error('❌ Database sync failed:', error.message);
+      console.error('   Postgres-backed APIs may fail until schema is fixed (run SQL migrations or restart after DB is healthy).');
+    }
+  }
+
   if (!pgConnected || !traccarConnected) {
     console.error('\n❌ Database connection failed after all retries.');
     console.error('   Please check:');
@@ -510,18 +524,7 @@ const startServer = async () => {
       stopErbLoginInsightScheduler = startErbLoginInsightScheduler();
     });
     
-    return; // Exit early, don't try to sync database
-  }
-
-  // Sync database schema
-  try {
-    if (isDev) {
-      console.log('\n📦 Synchronizing database schema...');
-    }
-    await syncDatabase();
-  } catch (error) {
-    console.error('❌ Database sync failed:', error.message);
-    console.error('   Server will continue but database operations may fail.');
+    return; // Exit early (sync already attempted if Postgres was reachable)
   }
 
   // Initialize authentication system

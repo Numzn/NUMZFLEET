@@ -7,6 +7,7 @@ import {
   updateVehicleMergedConfig,
   deleteVehicle as deleteVehicleService,
 } from '../services/vehicleFleetService.js';
+import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
 /**
  * POST /api/vehicles — create fleet vehicle; returns merged DTO (no assignment yet).
@@ -20,7 +21,7 @@ export const createVehicle = async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Create vehicle error:', error);
-    return res.status(status).json({ error: error.message || 'Failed to create vehicle' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to create vehicle') });
   }
 };
 
@@ -34,7 +35,7 @@ export const listVehicles = async (req, res) => {
   } catch (error) {
     console.error('List vehicles error:', error);
     return res.status(500).json({
-      error: error.message || 'Failed to list vehicles',
+      error: dbErrorMessage(error, 'Failed to list vehicles'),
     });
   }
 };
@@ -51,7 +52,7 @@ export const getVehicle = async (req, res) => {
     return res.json(merged);
   } catch (error) {
     console.error('Get vehicle error:', error);
-    return res.status(500).json({ error: error.message || 'Failed to fetch vehicle' });
+    return res.status(500).json({ error: dbErrorMessage(error, 'Failed to fetch vehicle') });
   }
 };
 
@@ -73,7 +74,7 @@ export const assignDevice = async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Assign device error:', error);
-    return res.status(status).json({ error: error.message || 'Failed to assign device' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to assign device') });
   }
 };
 
@@ -87,7 +88,7 @@ export const updateVehicleConfig = async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Update vehicle config error:', error);
-    return res.status(status).json({ error: error.message || 'Failed to update vehicle configuration' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to update vehicle configuration') });
   }
 };
 
@@ -102,7 +103,7 @@ export const updateVehicle = async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Update vehicle error:', error);
-    return res.status(status).json({ error: error.message || 'Failed to update vehicle' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to update vehicle') });
   }
 };
 
@@ -116,6 +117,6 @@ export const deleteVehicle = async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Delete vehicle error:', error);
-    return res.status(status).json({ error: error.message || 'Failed to delete vehicle' });
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to delete vehicle') });
   }
 };
