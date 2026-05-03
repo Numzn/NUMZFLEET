@@ -45,7 +45,7 @@ log "Deploy SHA=$SHA — pull only (no build). Registry prefix: $REGISTRY_PREFIX
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
 
 log "Starting services"
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
 
 mkdir -p "$(dirname "$STATE_FILE")" "$(dirname "$HISTORY_FILE")"
 
