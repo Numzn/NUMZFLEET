@@ -46,13 +46,15 @@ const getConfig = () => {
     HYBRID_FALLBACK: process.env.HYBRID_FALLBACK === 'true' || false,
     HYBRID_FALLBACK_TTL: parseInt(process.env.HYBRID_FALLBACK_TTL || '600'), // seconds
     
-    // Traccar connection details
+    // Traccar connection details (keep MYSQL_* fallbacks in sync with src/config/traccar.js)
     TRACCAR: {
       MYSQL_HOST: process.env.TRACCAR_MYSQL_HOST || 'traccar-mysql',
       MYSQL_PORT: parseInt(process.env.TRACCAR_MYSQL_PORT || '3306'),
-      MYSQL_DATABASE: process.env.TRACCAR_MYSQL_DATABASE || 'traccar',
-      MYSQL_USER: process.env.TRACCAR_MYSQL_USER || 'traccar',
-      MYSQL_PASSWORD: process.env.TRACCAR_MYSQL_PASSWORD || 'traccar123',
+      MYSQL_DATABASE:
+        process.env.TRACCAR_MYSQL_DATABASE || process.env.MYSQL_DATABASE || 'traccar',
+      MYSQL_USER: process.env.TRACCAR_MYSQL_USER || process.env.MYSQL_USER || 'traccar',
+      MYSQL_PASSWORD:
+        process.env.TRACCAR_MYSQL_PASSWORD || process.env.MYSQL_PASSWORD || 'traccar123',
       API_URL: process.env.TRACCAR_API_URL || 'http://traccar:8082',
     },
     

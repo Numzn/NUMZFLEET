@@ -95,12 +95,28 @@ function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
 }
 
 async function loadMergeMapsForDeviceIds(deviceIds) {
-  const devices = await getTraccarDevicesByIds(deviceIds);
-  const positions = await getTraccarLatestPositionsByDeviceIds(deviceIds);
-  const deviceMap = new Map(devices.map((d) => [Number(d.id), d]));
-  const positionMap = new Map(
-    positions.filter((p) => p.deviceId != null).map((p) => [Number(p.deviceId), p]),
-  );
+  const deviceMap = new Map();
+  const positionMap = new Map();
+
+  if (deviceIds?.length) {
+    try {
+      const devices = await getTraccarDevicesByIds(deviceIds);
+      for (const d of devices) {
+        deviceMap.set(Number(d.id), d);
+      }
+    } catch (err) {
+      console.error('[vehicleFleet] Traccar device batch load failed (listing still works without device fields):', err?.message || err);
+    }
+    try {
+      const positions = await getTraccarLatestPositionsByDeviceIds(deviceIds);
+      for (const p of positions) {
+        if (p.deviceId != null) positionMap.set(Number(p.deviceId), p);
+      }
+    } catch (err) {
+      console.error('[vehicleFleet] Traccar position batch load failed (listing still works without positions):', err?.message || err);
+    }
+  }
+
   const specs = deviceIds.length
     ? await VehicleSpec.findAll({ where: { deviceId: { [Op.in]: deviceIds } } })
     : [];

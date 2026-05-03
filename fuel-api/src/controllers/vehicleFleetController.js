@@ -33,7 +33,9 @@ export const listVehicles = async (req, res) => {
     return res.json(rows);
   } catch (error) {
     console.error('List vehicles error:', error);
-    return res.status(500).json({ error: 'Failed to list vehicles' });
+    return res.status(500).json({
+      error: error.message || 'Failed to list vehicles',
+    });
   }
 };
 
@@ -49,7 +51,7 @@ export const getVehicle = async (req, res) => {
     return res.json(merged);
   } catch (error) {
     console.error('Get vehicle error:', error);
-    return res.status(500).json({ error: 'Failed to fetch vehicle' });
+    return res.status(500).json({ error: error.message || 'Failed to fetch vehicle' });
   }
 };
 
