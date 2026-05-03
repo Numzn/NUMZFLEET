@@ -1,0 +1,64 @@
+name: Build and push NumzFleet images
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "traccar-fleet-system/frontend/**"
+      - "fuel-api/**"
+      - "erb-fuel-monitor/**"
+      - ".github/workflows/build-push-numzfleet-images.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        run: echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: traccar-fleet-system/frontend
+          file: traccar-fleet-system/frontend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: fuel-api
+          file: fuel-api/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push ERB
+        uses: docker/build-push-action@v6
+        with:
+          context: erb-fuel-monitor
+          file: erb-fuel-monitor/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-erb:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

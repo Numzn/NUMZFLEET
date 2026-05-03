@@ -6,6 +6,7 @@ Thank you for your interest in contributing to NumzTrak! This document provides 
 
 - [Code of Conduct](#code-of-conduct)
 - [Getting Started](#getting-started)
+- [Production releases (registry model)](#production-releases-registry-model)
 - [Development Workflow](#development-workflow)
 - [Coding Standards](#coding-standards)
 - [Commit Guidelines](#commit-guidelines)
@@ -21,11 +22,12 @@ Thank you for your interest in contributing to NumzTrak! This document provides 
 
 ## 🚀 Getting Started
 
-1. **Fork the repository**
+1. **Fork and clone the repository**
    ```bash
-   git clone https://github.com/yourusername/numztrak-fleet-system.git
-   cd numztrak-fleet-system
+   git clone https://github.com/Numzn/NUMZFLEET.git
+   cd NUMZFLEET
    ```
+   Use your fork URL if you forked first; the clone folder name may differ (for example `NUMZFLEET`).
 
 2. **Set up development environment**
    - Follow the installation instructions in [README.md](README.md)
@@ -38,6 +40,12 @@ Thank you for your interest in contributing to NumzTrak! This document provides 
    # or
    git checkout -b fix/your-bug-fix
    ```
+
+## 🚢 Production releases (registry model)
+
+Production deployment is **registry-based only**: images are built in CI (or a release machine), pushed to Docker Hub as `numzfleet-frontend`, `numzfleet-backend`, and `numzfleet-erb` tagged with the **full git SHA**; servers run `deployment/deploy/deploy-from-registry.sh` (pull + up, no build).
+
+Read [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md) and ensure workflow secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are set for [.github/workflows/build-push-numzfleet-images.yml](.github/workflows/build-push-numzfleet-images.yml).
 
 ## 💻 Development Workflow
 
@@ -231,7 +239,7 @@ Use the GitHub issue template and include:
 
 - Open a discussion on GitHub
 - Check existing issues and PRs
-- Review documentation in `/docs`
+- Review documentation in `fuel-api/docs/` and repo markdown guides (`README.md`, `LOCAL_DEVELOPMENT_GUIDE.md`)
 
 Thank you for contributing! 🎉
 

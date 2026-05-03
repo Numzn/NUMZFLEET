@@ -4,7 +4,6 @@ import { traccarPath, traccarFetch } from './config/traccarApi.js';
 import { useDispatch, useSelector } from 'react-redux';
 import { useMediaQuery, useTheme } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import BottomMenu from './common/components/BottomMenu';
 import SocketController from './SocketController';
 import FuelSocketController from './fuelRequests/socket/FuelSocketController';
 import CachingController from './CachingController';
@@ -21,12 +20,6 @@ const useStyles = makeStyles()(() => ({
     flexGrow: 1,
     overflow: 'auto',
   },
-  menu: {
-    zIndex: 4,
-    '@media print': {
-      display: 'none',
-    },
-  },
 }));
 
 const App = () => {
@@ -35,8 +28,6 @@ const App = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-
-  const desktop = useMediaQuery(theme.breakpoints.up('md'));
 
   const newServer = useSelector((state) => state.session.server.newServer);
   const termsUrl = useSelector((state) => state.session.server.attributes.termsUrl);
@@ -86,11 +77,6 @@ const App = () => {
       <div className={classes.page}>
         <Outlet />
       </div>
-      {!desktop && (
-        <div className={classes.menu}>
-          <BottomMenu />
-        </div>
-      )}
     </>
   );
 };

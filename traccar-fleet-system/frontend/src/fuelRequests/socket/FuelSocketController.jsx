@@ -355,11 +355,10 @@ const FuelSocketController = () => {
       
       // Common Docker-related error patterns
       if (error.message.includes('ECONNREFUSED') || error.message.includes('Failed to fetch')) {
-        console.error('🐳 [FuelSocket] Docker Network Issue Detected:');
-        console.error('   - Check if fuel-api container is running: docker ps | grep fuel-api');
-        console.error('   - Check Docker network: docker network inspect numztrak-network');
-        console.error('   - If the SPA is on a different port than fuel-api, confirm CORS + Vite proxy (see LOCAL_DEVELOPMENT_GUIDE.md)');
-        console.error('   - Check Vite proxy logs in frontend container');
+        console.error('🐳 [FuelSocket] Docker / connectivity issue (hints):');
+        console.error('   - From repo root: docker compose ps (service name is usually backend for fuel-api)');
+        console.error('   - docker network ls (Compose uses a <project>_default network, not numztrak-network)');
+        console.error('   - If Vite dev port differs from fuel-api, confirm CORS + proxy (LOCAL_DEVELOPMENT_GUIDE.md)');
       }
       
       if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {

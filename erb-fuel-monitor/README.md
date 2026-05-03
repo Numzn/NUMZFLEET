@@ -6,7 +6,9 @@
 
 An automated fuel price monitoring system for the Energy Regulation Board (ERB) of Zambia. It uses a **lean monitor** (Lusaka window, soft day-of-month guard) to detect price changes, notify promptly, and **publish** to the API file at midnight.
 
-**Production source of truth (OCI and GitHub):** this app lives inside the **NUMZGPS** monorepo at [`erb-fuel-monitor`](https://github.com/Numzn/NUMZGPS/tree/main/erb-fuel-monitor). Deploy servers should pull that path on `main`; ship updates by committing under `erb-fuel-monitor/` in **Numzn/NUMZGPS**, not only in a separate standalone repo.
+**NUMZFLEET clone:** you are already in `erb-fuel-monitor/` at the repo root. Use root **`docker-compose.erb.yml`** with **`rebuild-stack.ps1`** for the full stack that includes this worker.
+
+**Production source of truth (OCI and GitHub):** deploy servers often pull the same tree from the **NUMZFLEET** monorepo at [`erb-fuel-monitor`](https://github.com/Numzn/NUMZFLEET/tree/main/erb-fuel-monitor) on `main`; ship updates by committing under `erb-fuel-monitor/` in **Numzn/NUMZFLEET** when that remote is canonical for production.
 
 ## ✨ Features
 
@@ -24,8 +26,8 @@ An automated fuel price monitoring system for the Energy Regulation Board (ERB) 
 
 1. **Clone the monorepo and enter this app**
    ```powershell
-   git clone https://github.com/Numzn/NUMZGPS.git
-   cd NUMZGPS\erb-fuel-monitor
+   git clone https://github.com/Numzn/NUMZFLEET.git
+   cd NUMZFLEET\erb-fuel-monitor
    ```
 
 2. **Install dependencies**
@@ -225,9 +227,9 @@ Environment variables to set in Render (Dashboard → Environment):
 - `MONITOR_MIN_DAY` - first calendar day of month to allow the afternoon window (default: `25`)
 
 Deploy steps (from GitHub):
-1. Push your changes under `erb-fuel-monitor/` in repo **`Numzn/NUMZGPS`** (`main`).
+1. Push your changes under `erb-fuel-monitor/` in repo **`Numzn/NUMZFLEET`** (`main`).
 2. In Render, create a new service:
-   - Connect GitHub repo **`Numzn/NUMZGPS`**
+   - Connect GitHub repo **`Numzn/NUMZFLEET`**
    - Set **Root directory** (or equivalent) to **`erb-fuel-monitor`** so build and start commands run from this folder.
    - Choose "Background Worker" (start command above) or "Cron Job" (command above).
    - Set environment variables in the Render Dashboard.
@@ -235,7 +237,7 @@ Deploy steps (from GitHub):
 
 ### OCI (Oracle Cloud) and other VMs
 
-Use the same code path: deploy from **`NUMZGPS`** at `erb-fuel-monitor/` (see [`deploy/systemd/`](deploy/systemd/) for example unit files). After `git pull` on the instance, restart the worker and API services so they pick up changes.
+Use the same code path: deploy from **`NUMZFLEET`** at `erb-fuel-monitor/` (see [`deploy/systemd/`](deploy/systemd/) for example unit files). After `git pull` on the instance, restart the worker and API services so they pick up changes.
 
 Notes:
 - The repository now supports optional S3 persistence via `boto3` (install via `requirements.txt`). If `S3_ENABLED=true`, the app will try to download the latest `fuel_prices.json` at startup and upload it after saves.
@@ -291,18 +293,18 @@ For support, email [your-email@example.com] or create an issue on GitHub.
 
 If you want to host this with minimal fuss, use GitHub + GitHub Actions to run the monitor and optionally build/push a container for AWS ECS.
 
-1) **NUMZGPS monorepo (recommended):** clone **`Numzn/NUMZGPS`**, edit `erb-fuel-monitor/`, commit, and push to `main` (same tree OCI should pull):
+1) **NUMZFLEET monorepo (recommended):** clone **`Numzn/NUMZFLEET`**, edit `erb-fuel-monitor/`, commit, and push to `main` (same tree OCI should pull):
 
 ```bash
-git clone https://github.com/Numzn/NUMZGPS.git
-cd NUMZGPS
+git clone https://github.com/Numzn/NUMZFLEET.git
+cd NUMZFLEET
 # apply your changes under erb-fuel-monitor/
 git add erb-fuel-monitor
 git commit -m "erb-fuel-monitor: describe your update"
 git push origin main
 ```
 
-2) Add Secrets in repository **Numzn/NUMZGPS** (Settings → Secrets and variables → Actions) if workflows under `erb-fuel-monitor/.github` or repo root Actions need them:
+2) Add Secrets in repository **Numzn/NUMZFLEET** (Settings → Secrets and variables → Actions) if workflows under `erb-fuel-monitor/.github` or repo root Actions need them:
 - EMAIL_FROM
 - EMAIL_PASSWORD (Gmail App Password if using Gmail)
 - EMAIL_TO

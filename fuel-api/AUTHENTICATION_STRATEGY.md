@@ -218,7 +218,7 @@ Validates JSESSIONID by calling `/api/session` endpoint with cookie.
 
 ```javascript
 // Call Traccar session endpoint
-GET http://traccar-server:8082/api/session
+GET http://traccar:8082/api/session
   Cookie: JSESSIONID=abc123
   
 Response: { id, name, email, administrator, ... }

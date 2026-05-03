@@ -53,7 +53,7 @@ const getConfig = () => {
       MYSQL_DATABASE: process.env.TRACCAR_MYSQL_DATABASE || 'traccar',
       MYSQL_USER: process.env.TRACCAR_MYSQL_USER || 'traccar',
       MYSQL_PASSWORD: process.env.TRACCAR_MYSQL_PASSWORD || 'traccar123',
-      API_URL: process.env.TRACCAR_API_URL || 'http://traccar-server:8082',
+      API_URL: process.env.TRACCAR_API_URL || 'http://traccar:8082',
     },
     
     // Logging

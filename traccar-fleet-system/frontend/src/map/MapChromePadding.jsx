@@ -2,11 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { map } from './core/MapView';
 
-/** Must match PremiumTopBar inner toolbar (see getToolbarHeight). */
-const TOP_TOOLBAR_DESKTOP = 56;
-const TOP_TOOLBAR_MOBILE = 50;
-/** Reserve space for BottomMenu + labels; aligned with AppLayout mobile content offset. */
-const BOTTOM_NAV_RESERVE = 64;
 /** Space between fixed chrome and map control stacks (px). */
 const CHROME_GAP = 8;
 
@@ -20,6 +15,8 @@ const MapChromePadding = ({ sidebarInset = 0, isDesktop }) => {
   const bottomSafeRef = useRef(null);
   const [safeTop, setSafeTop] = useState(0);
   const [safeBottom, setSafeBottom] = useState(0);
+  const [chromeTop, setChromeTop] = useState(56);
+  const [chromeBottom, setChromeBottom] = useState(0);
 
   const readSafe = () => {
     setSafeTop(topSafeRef.current?.offsetHeight ?? 0);
@@ -28,20 +25,37 @@ const MapChromePadding = ({ sidebarInset = 0, isDesktop }) => {
 
   useLayoutEffect(() => {
     readSafe();
-    window.addEventListener('resize', readSafe);
+    const readChromeVars = () => {
+      try {
+        const styles = getComputedStyle(document.documentElement);
+        const top = parseFloat(styles.getPropertyValue('--app-topbar-height')) || 56;
+        const bottom = parseFloat(styles.getPropertyValue('--app-bottomnav-height')) || 0;
+        setChromeTop(top);
+        setChromeBottom(bottom);
+      } catch {
+        // ignore
+      }
+    };
+
+    const readAll = () => {
+      readSafe();
+      readChromeVars();
+    };
+
+    readAll();
+    window.addEventListener('resize', readAll);
     const vv = window.visualViewport;
-    vv?.addEventListener('resize', readSafe);
+    vv?.addEventListener('resize', readAll);
     return () => {
-      window.removeEventListener('resize', readSafe);
-      vv?.removeEventListener('resize', readSafe);
+      window.removeEventListener('resize', readAll);
+      vv?.removeEventListener('resize', readAll);
     };
   }, []);
 
   useEffect(() => {
     const container = map.getContainer();
-    const toolbar = isDesktop ? TOP_TOOLBAR_DESKTOP : TOP_TOOLBAR_MOBILE;
-    const topPad = safeTop + toolbar;
-    const bottomPad = isDesktop ? 0 : safeBottom + BOTTOM_NAV_RESERVE;
+    const topPad = safeTop + chromeTop;
+    const bottomPad = isDesktop ? 0 : safeBottom + chromeBottom;
     const left = theme.direction === 'rtl' ? 0 : sidebarInset;
     const right = theme.direction === 'rtl' ? sidebarInset : 0;
 
@@ -83,7 +97,7 @@ const MapChromePadding = ({ sidebarInset = 0, isDesktop }) => {
       });
       map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 });
     };
-  }, [isDesktop, sidebarInset, theme.direction, safeTop, safeBottom]);
+  }, [chromeBottom, chromeTop, isDesktop, sidebarInset, theme.direction, safeTop, safeBottom]);
 
   return (
     <>

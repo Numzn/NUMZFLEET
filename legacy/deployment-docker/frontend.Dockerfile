@@ -13,7 +13,8 @@ ENV VITE_TRACCAR_PREFIX=${VITE_TRACCAR_PREFIX}
 RUN npm run build
 
 FROM nginx:1.27-alpine
-COPY deployment/docker/frontend-nginx.conf /etc/nginx/conf.d/default.conf
+# Repo-root build: docker build -f legacy/deployment-docker/frontend.Dockerfile .
+COPY legacy/deployment-docker/frontend-nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

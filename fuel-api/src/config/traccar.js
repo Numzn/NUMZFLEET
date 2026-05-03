@@ -144,7 +144,7 @@ export const getTraccarUserBySessionToken = async (sessionToken) => {
  * Alternative: Get user by validating session with Traccar API
  * This is more reliable as it uses Traccar's own session validation
  */
-export const getTraccarUserBySessionViaAPI = async (sessionToken, traccarBaseUrl = 'http://traccar-server:8082') => {
+export const getTraccarUserBySessionViaAPI = async (sessionToken, traccarBaseUrl = 'http://traccar:8082') => {
   try {
     // Make request to Traccar API to validate session
     const response = await fetch(`${traccarBaseUrl}/api/session`, {

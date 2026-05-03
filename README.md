@@ -65,8 +65,8 @@ The system consists of three main components:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Numzn/NUMZGPS.git
-cd NUMZGPS
+git clone https://github.com/Numzn/NUMZFLEET.git
+cd NUMZFLEET
 ```
 
 ### 2. Environment Setup
@@ -132,60 +132,29 @@ Database initialization scripts are in `backend/scripts/init-database.sql`
 
 ## 🚀 Running the Application
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Docker Compose (recommended)
+
+**Full stack rebuild (Windows, canonical):** from repo root run `.\rebuild-stack.ps1` (see script header for flags). Core + ERB is the default.
 
 ```bash
-# Start all services
-cd backend
-docker-compose up -d
+# Start all services (core only)
+docker compose -f docker-compose.yml up -d --build
+
+# Core + ERB overlay
+docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop services
-docker-compose down
+docker compose down
 ```
-
-### Production (Oracle, Same-Origin) — Git-First Release
-
-All production deployments are commit-locked. Only commits already in `origin/main` can reach the server. Never deploy local build artifacts directly.
-
-**One-command release (Windows PowerShell, from repo root):**
-
-```powershell
-# Deploy latest origin/main to numz.site
-.\release-prod.ps1
-```
-
-**Roll back to a previous known-good commit:**
-
-```powershell
-.\release-prod.ps1 -Commit <prev-sha>
-```
-
-The script enforces this flow automatically:
-1. Frontend lint → build (local gate)
-2. Nginx config syntax check (local gate)
-3. Resolve + verify SHA is in `origin/main`
-4. SSH → checkout exact SHA on server → build + deploy
-5. Live health checks (HTTPS, Traccar API, Fuel API)
-
-**CI gate** — every PR and push to `main` runs [`.github/workflows/release-gate.yml`](.github/workflows/release-gate.yml) which validates frontend and nginx config before merge is allowed.
-
-Production URLs:
-
-- Frontend: https://numz.site
-- Traccar API (cemented): https://numz.site/traccar/api/... (see [ROUTING.md](ROUTING.md))
-- Fuel API (same origin): https://numz.site/api/... (e.g. `/api/fuel-requests`)
 
 ### Option 2: Local Development
 
-#### Start Backend (Traccar)
+#### Start Backend (Traccar + fuel-api + DBs in Docker)
 ```bash
-cd backend
-./start-numztrak.ps1  # Windows PowerShell
-# or
-java -jar traccar.jar
+docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build
 ```
 
 #### Start Fuel API
@@ -197,9 +166,7 @@ npm run dev
 #### Start Frontend
 ```bash
 cd traccar-fleet-system/frontend
-npm start
-# or for local development
-npm run start:local
+npm run dev
 ```
 
 ### Access Points
@@ -214,12 +181,14 @@ npm run start:local
 ## 📁 Project Structure
 
 ```
-numztrak-fleet-system/
-├── backend/                 # Traccar backend (Java)
-│   ├── conf/               # Configuration files
+NUMZFLEET/  (canonical monorepo: [Numzn/NUMZFLEET](https://github.com/Numzn/NUMZFLEET))
+├── docker-compose.yml      # Core stack (authoritative)
+├── docker-compose.erb.yml  # Optional ERB overlay
+├── rebuild-stack.ps1       # Canonical Windows full-stack rebuild
+├── backend/
+│   ├── conf/               # Traccar XML and runtime config
 │   ├── scripts/            # Database and utility scripts
-│   ├── docker-compose.yml  # Docker services definition
-│   └── env.template        # Environment variables template
+│   └── env.template        # Environment template (copy to backend/.env)
 │
 ├── fuel-api/               # Fuel Management API (Node.js)
 │   ├── src/
@@ -241,9 +210,8 @@ numztrak-fleet-system/
 │       │   └── settings/   # Settings pages
 │       └── public/        # Static assets
 │
-└── data/                   # Database data (gitignored)
-    ├── mysql/             # MySQL data
-    └── fuel-postgres/     # PostgreSQL data
+└── data/                   # Optional local paths (gitignored); compose may use named volumes instead
+    └── …                  # See `docker-compose.yml` volume definitions
 ```
 
 ## 💻 Development
@@ -284,19 +252,17 @@ npm start
 
 ## 🐳 Docker Deployment
 
-**Production and registry runbook:** [deployment/DEPLOYMENT_FLOW.md](deployment/DEPLOYMENT_FLOW.md) (full-stack `release-prod.ps1`, optional Docker Hub/GHCR flow, rollback).
+### Local / development (build on machine)
 
-### Minimal Compose (standardized)
-
-From repo root:
+From repo root (full stack including databases and Traccar):
 
 ```bash
 docker compose up -d --build
 ```
 
-### Services
+On Windows, the canonical rebuild/smoke flow is `.\rebuild-stack.ps1` (see [LOCAL_DEVELOPMENT_GUIDE.md](LOCAL_DEVELOPMENT_GUIDE.md)).
 
-The Docker Compose setup includes:
+### Services (local compose)
 
 1. **frontend**: Vite build served by Nginx (port 3002)
 2. **backend**: Node.js API (port 3000)
@@ -304,21 +270,27 @@ The Docker Compose setup includes:
 4. **traccar**: Traccar server (port 8082)
 5. **traccar-mysql**: MySQL 8 for Traccar’s schema (fuel-api reads this database; not published to the host by default)
 
-### Docker Commands
+Optional ERB overlay: `docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build`
+
+### Production (registry-only — single model)
+
+Production servers **do not build images**. They **pull** SHA-tagged images from Docker Hub and run `deployment/compose/docker-compose.prod.yml`.
+
+Operator runbook: [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md)  
+CI build/push: [.github/workflows/build-push-numzfleet-images.yml](.github/workflows/build-push-numzfleet-images.yml)
+
+### Docker commands (local)
 
 ```bash
-# Build and start all services
 docker compose up -d --build
-
-# View logs
 docker compose logs -f [service-name]
-
-# Stop services
 docker compose down
-
-# Stop and remove volumes
 docker compose down -v
 ```
+
+### Production backups
+
+Single-node backup and restore (Postgres, Traccar MySQL, optional ERB volume) are documented in [deployment/backup/README.md](deployment/backup/README.md).
 
 ## 📡 API Documentation
 
@@ -362,7 +334,7 @@ This project is licensed under the ISC License - see the [LICENSE](traccar-fleet
 For issues and questions:
 - Open an issue on GitHub
 - Check existing documentation in `/docs`
-- Review `DOCKER_SETUP_REVIEW.md` for deployment help
+- See [LOCAL_DEVELOPMENT_GUIDE.md](LOCAL_DEVELOPMENT_GUIDE.md) for standardized compose and dev workflows
 
 ## 🔒 Security
 

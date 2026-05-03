@@ -1,4 +1,4 @@
-const TRACCAR_SERVER_URL = process.env.TRACCAR_SERVER_URL || 'http://traccar-server:8082';
+const TRACCAR_SERVER_URL = process.env.TRACCAR_SERVER_URL || 'http://traccar:8082';
 
 const buildHeaders = (req) => {
   const headers = {

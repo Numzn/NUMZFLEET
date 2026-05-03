@@ -176,7 +176,8 @@ export const getTraccarUserBySessionViaAPI = async (
       method: 'GET',
       headers: {
         'Cookie': `JSESSIONID=${sessionToken}`,
-        'Content-Type': 'application/json',
+        // Traccar may reject GETs that specify a request body content-type.
+        Accept: 'application/json',
       },
     });
     

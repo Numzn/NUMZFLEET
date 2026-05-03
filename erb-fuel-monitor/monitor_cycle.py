@@ -216,6 +216,7 @@ class MonitorCycle:
         """
         Returns a small result dict for logging (status, action).
         """
+        force = str(os.getenv("MONITOR_FORCE", "")).strip().lower() in ("1", "true", "yes", "on")
         now = self._now_lusaka()
         today_str = now.date().isoformat()
         state = load_monitor_state(self.cfg)
@@ -238,12 +239,12 @@ class MonitorCycle:
             return {"status": "ok", "action": "midnight_idle"}
 
         # --- Morning / before window ---
-        if not self._in_monitoring_evening(now):
+        if not force and not self._in_monitoring_evening(now):
             save_monitor_state(state, self.cfg)
             return {"status": "ok", "action": "outside_window"}
 
         # --- Soft day-of-month guard ---
-        if now.day < self.cfg.MONITOR_MIN_DAY:
+        if not force and now.day < self.cfg.MONITOR_MIN_DAY:
             save_monitor_state(state, self.cfg)
             return {"status": "ok", "action": "guard_skip"}
 

@@ -6,7 +6,7 @@ import { getLatestErbPrices } from '../reports/adapters/erbAdapter.js';
  * GET /api/public/login-insight (so the login page works without Traccar HTTP creds).
  *
  * Env (all optional — if missing, sync is skipped silently):
- *   TRACCAR_API_BASE_URL — preferred; falls back to TRACCAR_SERVER_URL (e.g. http://traccar-server:8082)
+ *   TRACCAR_API_BASE_URL — preferred; falls back to TRACCAR_SERVER_URL (e.g. http://traccar:8082)
  *   TRACCAR_API_USER     — Traccar admin email for Basic auth
  *   TRACCAR_API_PASSWORD — Traccar admin password
  */

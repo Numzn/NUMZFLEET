@@ -8,7 +8,7 @@
 ```
 NUMZFLEET/
 ├── backend/ (Docker containers)
-│   ├── docker-compose.yml (4 services: mysql, traccar-server, traccar-admin, nginx)
+│   ├── (obsolete layout) old backend/docker-compose.yml listed mysql, traccar, nginx, etc.
 │   ├── conf/traccar.xml (GPS protocols on ports 5000-5250)
 │   └── nginx.conf (HTTPS proxy to Traccar)
 │
@@ -135,9 +135,9 @@ module.exports = (sequelize, DataTypes) => {
 
 **1.4 Update docker-compose.yml**
 
-File: `backend/docker-compose.yml`
+File: root `docker-compose.yml` (stack is defined at repo root; `backend/docker-compose.yml` is obsolete).
 
-Insert after line 65 (after traccar-admin):
+Historical note — this plan referenced inserting after `traccar-admin`; reconcile with current root compose if applying:
 
 ```yaml
   fuel-postgres:

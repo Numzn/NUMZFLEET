@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Tag and push release images to Docker Hub or GHCR.
+# Prereq: local images named numzfleet-frontend:SHA, numzfleet-backend:SHA, numzfleet-erb:SHA
+# (build in CI, or run: bash deployment/push/build-release-images.sh <sha> from repo root).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,23 +25,37 @@ export IMAGE_TAG="$SHA"
 
 case "${REGISTRY_PROVIDER:-}" in
   dockerhub)
-    FRONTEND_REMOTE="${DOCKERHUB_USERNAME}/numztrak-frontend:$SHA"
-    BACKEND_REMOTE="${DOCKERHUB_USERNAME}/numztrak-backend:$SHA"
+    NS="${REGISTRY_PREFIX:-${DOCKERHUB_USERNAME}}"
+    FRONTEND_REMOTE="${NS}/numzfleet-frontend:$SHA"
+    BACKEND_REMOTE="${NS}/numzfleet-backend:$SHA"
+    ERB_REMOTE="${NS}/numzfleet-erb:$SHA"
     ;;
   ghcr)
-    FRONTEND_REMOTE="ghcr.io/${GHCR_OWNER}/numztrak-frontend:$SHA"
-    BACKEND_REMOTE="ghcr.io/${GHCR_OWNER}/numztrak-backend:$SHA"
+    NS="${REGISTRY_PREFIX:-ghcr.io/${GHCR_OWNER}}"
+    FRONTEND_REMOTE="${NS}/numzfleet-frontend:$SHA"
+    BACKEND_REMOTE="${NS}/numzfleet-backend:$SHA"
+    ERB_REMOTE="${NS}/numzfleet-erb:$SHA"
     ;;
   *)
     fail "REGISTRY_PROVIDER must be dockerhub or ghcr"
     ;;
 esac
 
+for local_name in "numzfleet-frontend:$SHA" "numzfleet-backend:$SHA" "numzfleet-erb:$SHA"; do
+  if ! docker image inspect "$local_name" >/dev/null 2>&1; then
+    fail "Missing local image $local_name — build first (see deployment/push/build-release-images.sh or CI workflow)."
+  fi
+done
+
 log "Tagging and pushing images for SHA=$SHA"
-docker tag "numztrak-frontend:$SHA" "$FRONTEND_REMOTE"
-docker tag "numztrak-backend:$SHA" "$BACKEND_REMOTE"
+docker tag "numzfleet-frontend:$SHA" "$FRONTEND_REMOTE"
+docker tag "numzfleet-backend:$SHA" "$BACKEND_REMOTE"
+docker tag "numzfleet-erb:$SHA" "$ERB_REMOTE"
+
 docker push "$FRONTEND_REMOTE"
 docker push "$BACKEND_REMOTE"
+docker push "$ERB_REMOTE"
 
 log "Pushed: $FRONTEND_REMOTE"
 log "Pushed: $BACKEND_REMOTE"
+log "Pushed: $ERB_REMOTE"

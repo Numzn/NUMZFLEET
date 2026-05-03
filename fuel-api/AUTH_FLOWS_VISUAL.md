@@ -444,7 +444,7 @@ fuel-api/src/
 ```javascript
 // vite.config.js
 '/api/operation-sessions': {
-  target: 'http://fuel-api:3001',
+  target: 'http://backend:3000',
   configure: (proxy) => {
     proxy.on('proxyReq', (proxyReq, req) => {
       // Forward credentials ✅

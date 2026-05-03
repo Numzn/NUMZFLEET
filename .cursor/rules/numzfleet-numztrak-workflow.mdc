@@ -5,27 +5,36 @@ alwaysApply: true
 
 # NUMZFLEET (NumzTrak) — repo workflow
 
-**Repo root:** monorepo with `backend/` (Docker + nginx), `fuel-api/`, `traccar-fleet-system/frontend/`.
+**Repo root:** monorepo with `backend/` (Traccar runtime assets), `fuel-api/`, `traccar-fleet-system/frontend/`.
 
-## Production deploy (default)
+## Runtime contract (authoritative)
 
-- **Canonical operator flow:** from repo root on Windows, after changes are **pushed and on `origin/main`**, run **`.\release-prod.ps1`** (optional **`-Commit <sha>`** for rollback). **Do not** deploy a SHA that is not on `origin/main`.
-- The script runs a **local alignment gate** (frontend `npm ci` / `lint` / `build`, nginx `nginx -t` if Docker exists) unless **`-SkipLocalChecks`**.
-- **Remote:** server uses **`~/NUMZFLEET`**, **`git checkout`** the deploy SHA, **`docker compose -f docker-compose.prod.yml up -d --build`** for the stack slice it manages, **builds frontend on the server** from that commit, restarts **`numztrak-nginx`**, then health-checks **https://numz.site** and APIs.
-- **Do not** present **`scp` / copying `dist/`** from a laptop to production as the normal path. For **emergency** hotfixes only, state that explicitly; still prefer **commit + `.\release-prod.ps1`** or fixing CI.
+### Rebuild (do not drift)
+
+When the user says **rebuild**, when either of you suggests **“try rebuilding”** / **“have you tried rebuilding?”**, or when you need a **full stack rebuild** to validate runtime wiring, **always** use the repo script from the repo root — **do not** invent alternate `docker compose` command sequences; that is how behavior drifts from what is known to work.
+
+- **Canonical rebuild:** `.\rebuild-stack.ps1` (same directory as `docker-compose.yml`)
+- Default: core + ERB overlay, `ensure-erb-token.ps1`, `compose build` then `up -d --build`, then HTTP smoke checks.
+- **Only** use raw compose for a **targeted** follow-up after the script failed (e.g. `docker compose … logs` on one service), or if the user explicitly asks for a one-off compose line.
+
+### First run / docs-style “bring stack up”
+
+- **Core:** `docker compose -f docker-compose.yml up -d --build`
+- **Core + ERB:** `docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build`
 
 ## CI (GitHub)
 
-- **`release-gate.yml`:** required checks on PR/push to **`main`** (frontend lint+build, nginx validate, file sanity). Align guidance with **merge only when green**.
-- **`deploy-frontend.yml`:** on push to **`main`** with **frontend path** changes, CI builds and **rsyncs `dist/`** to the server — valid **frontend-only** automation; needs repo **secrets** (`OCI_*`). Do not equate this with ad-hoc laptop uploads.
+- CI should validate the standardized stack inputs (frontend lint/build, basic file sanity).
 
 ## Legacy scripts
 
-- **`deployment/deploy-backend-only-final.sh`** and some **`deployment/*.md`** may reference **`~/NUMZGPS`**. Unless the user confirms that layout, prefer **`~/NUMZFLEET`** + **`.\release-prod.ps1`** and **`backend/docker-compose.prod.yml`**.
+- Legacy deployment scripts and runbooks have been retired in favor of the standardized root compose.
 
 ## Coding assistant habits (this project + user prefs)
 
-- **Windows-first** when suggesting shell steps (`.\release-prod.ps1`, PowerShell idioms).
+- **Windows-first** when suggesting shell steps (PowerShell idioms).
 - **Ask before editing files** unless the user already asked for implementation or a concrete change.
 - **Do not run** `npm run build` / full production builds unless the user asked for a build, deploy, or CI-related verification.
-- When asked **how to deploy**, answer in order: **push to `main` → green `release-gate` → `.\release-prod.ps1`**; mention **frontend-only CI** only if the change is frontend-only and they rely on that workflow.
+- When asked **how to rebuild**, answer with **`.\rebuild-stack.ps1`** and its switches (`-CoreOnly`, `-SkipVerify`, `-NoCache`, `-ForceRecreate`, etc.).
+- For **integration / Docker / “something is off in the running stack”** issues, treat **rebuild** as the first concrete step unless logs clearly show a non-runtime cause; use **`.\rebuild-stack.ps1`**, not ad-hoc compose.
+- When asked **how to run** (first-time / docs tone), answer: root compose as above, optionally the ERB overlay file list.

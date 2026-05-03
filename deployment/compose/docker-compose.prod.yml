@@ -1,19 +1,180 @@
-services:
-  numztrak-frontend:
-    image: ${REGISTRY_PREFIX}/numztrak-frontend:${IMAGE_TAG}
-    container_name: numztrak-frontend
-    restart: unless-stopped
-    ports:
-      - "3002:80"
+# Production stack — registry-only (image:, no build).
+# Servers: docker compose pull && docker compose up -d (see deployment/deploy/deploy-from-registry.sh).
+# App images: ${REGISTRY_PREFIX}/numzfleet-{frontend,backend,erb}:${IMAGE_TAG} (SHA-pinned).
+# Infra images: pinned public images (postgres, mysql, traccar).
 
-  numztrak-backend:
-    image: ${REGISTRY_PREFIX}/numztrak-backend:${IMAGE_TAG}
-    container_name: numztrak-fuel-api
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: numzfleet-prod-db
+    restart: unless-stopped
+    env_file:
+      - ../../backend/.env
+    environment:
+      POSTGRES_DB: numztrak_fuel
+      POSTGRES_USER: numztrak
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numztrak -d numztrak_fuel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  traccar-mysql:
+    image: mysql:8.0
+    container_name: numzfleet-prod-traccar-mysql
+    restart: unless-stopped
+    env_file:
+      - ../../backend/.env
+    volumes:
+      - traccar_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+
+  traccar:
+    image: traccar/traccar:latest
+    container_name: numzfleet-prod-traccar
+    restart: unless-stopped
+    depends_on:
+      traccar-mysql:
+        condition: service_healthy
+    environment:
+      TRACCAR_DATABASE_URL: jdbc:mysql://traccar-mysql:3306/traccar?useSSL=false&allowPublicKeyRetrieval=true
+      TRACCAR_DATABASE_USER: traccar
+    volumes:
+      - ../../backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "if command -v wget >/dev/null 2>&1; then wget -qO- http://localhost:8082/ >/dev/null; elif command -v nc >/dev/null 2>&1; then nc -z localhost 8082; else exit 1; fi",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  erb-worker:
+    image: ${REGISTRY_PREFIX}/numzfleet-erb:${IMAGE_TAG}
+    container_name: numzfleet-prod-erb-worker
+    restart: unless-stopped
+    command: ["python", "erb_scraper_final.py", "--mode", "schedule"]
+    env_file:
+      - ../../backend/.env
+    environment:
+      EMAIL_ENABLED: ${ERB_EMAIL_ENABLED:-false}
+      EMAIL_FROM: ${ERB_EMAIL_FROM:-}
+      EMAIL_PASSWORD: ${ERB_EMAIL_PASSWORD:-}
+      EMAIL_TO: ${ERB_EMAIL_TO:-}
+      SMTP_SERVER: ${ERB_SMTP_SERVER:-smtp.gmail.com}
+      SMTP_PORT: ${ERB_SMTP_PORT:-587}
+      SSL_VERIFY: ${ERB_SSL_VERIFY:-true}
+      SSL_ALLOW_INSECURE_FALLBACK: ${ERB_SSL_ALLOW_INSECURE_FALLBACK:-true}
+      S3_ENABLED: ${ERB_S3_ENABLED:-false}
+      S3_BUCKET: ${ERB_S3_BUCKET:-}
+      S3_KEY: ${ERB_S3_KEY:-fuel_prices.json}
+    volumes:
+      - erb_data:/app/data
+
+  erb-api:
+    image: ${REGISTRY_PREFIX}/numzfleet-erb:${IMAGE_TAG}
+    container_name: numzfleet-prod-erb-api
+    restart: unless-stopped
+    command: ["python", "-m", "uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file:
+      - ../../backend/.env
+    environment:
+      PORT: 8000
+      API_ALLOWED_ORIGINS: ${ERB_API_ALLOWED_ORIGINS:-http://localhost:3002}
+      S3_ENABLED: ${ERB_S3_ENABLED:-false}
+      S3_BUCKET: ${ERB_S3_BUCKET:-}
+      S3_KEY: ${ERB_S3_KEY:-fuel_prices.json}
+    depends_on:
+      erb-worker:
+        condition: service_started
+    volumes:
+      - erb_data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  backend:
+    image: ${REGISTRY_PREFIX}/numzfleet-backend:${IMAGE_TAG}
+    container_name: numzfleet-prod-fuel-api
     restart: unless-stopped
     env_file:
       - ../../backend/.env
     environment:
       NODE_ENV: production
       PORT: 3000
+      # DATABASE_URL, TRACCAR_MYSQL_PASSWORD, SESSION_SECRET, etc.: set in ../../backend/.env (host @db, @traccar-mysql).
+      TRACCAR_MYSQL_HOST: traccar-mysql
+      TRACCAR_MYSQL_PORT: 3306
+      TRACCAR_MYSQL_DATABASE: traccar
+      TRACCAR_MYSQL_USER: traccar
+      TRACCAR_SERVER_URL: http://traccar:8082
+      TRACCAR_API_URL: http://traccar:8082
+      ERB_API_BASE_URL: http://erb-api:8000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3002}
+      AUTH_STRATEGY: ${AUTH_STRATEGY:-strict}
+      TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
+      DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
+      HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
     ports:
       - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      traccar-mysql:
+        condition: service_healthy
+      traccar:
+        condition: service_healthy
+      erb-api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  frontend:
+    image: ${REGISTRY_PREFIX}/numzfleet-frontend:${IMAGE_TAG}
+    container_name: numzfleet-prod-frontend
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+      traccar:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    name: numzfleet_prod_postgres_data
+  traccar_mysql_data:
+    name: numzfleet_prod_traccar_mysql_data
+  erb_data:
+    name: numzfleet_prod_erb_data

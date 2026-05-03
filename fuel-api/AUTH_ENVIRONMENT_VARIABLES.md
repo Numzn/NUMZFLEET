@@ -62,7 +62,7 @@ TRACCAR_API_URL=https://traccar.example.com
 | `TRACCAR_MYSQL_DATABASE` | `traccar` | `traccar` | Database name |
 | `TRACCAR_MYSQL_USER` | `traccar` | `fleet_user` | Database user |
 | `TRACCAR_MYSQL_PASSWORD` | `traccar123` | (secret) | Database password |
-| `TRACCAR_API_URL` | `http://traccar-server:8082` | `https://traccar.example.com` | Traccar API endpoint |
+| `TRACCAR_API_URL` | `http://traccar:8082` | `https://traccar.example.com` | Traccar API endpoint (Compose service `traccar`) |
 
 ### Development Mode
 
@@ -193,7 +193,7 @@ DEV_AUTH_BYPASS=true
 TRACCAR_ENABLED=false
 
 # Request
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 # Returns: 200 (synthetic user created)
 ```
 
@@ -211,11 +211,11 @@ TRACCAR_MYSQL_USER=traccar
 TRACCAR_MYSQL_PASSWORD=traccar123
 
 # Request with Traccar session
-curl -H "Cookie: JSESSIONID=abc123" http://localhost:3001/api/operation-sessions
+curl -H "Cookie: JSESSIONID=abc123" http://localhost:3000/api/operation-sessions
 # Returns: 200 (real user from Traccar)
 
 # Request with header fallback
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 # Returns: 200 (synthetic user if Traccar lookup fails)
 ```
 
@@ -316,7 +316,7 @@ TRACCAR_MYSQL_HOST=${PROD_DB_HOST}
 **Fix**:
 ```bash
 # Add header to request
-curl -H "x-user-id: 5" http://localhost:3001/api/...
+curl -H "x-user-id: 5" http://localhost:3000/api/...
 
 # Or enable bypass
 DEV_AUTH_BYPASS=true npm run dev
@@ -328,7 +328,7 @@ DEV_AUTH_BYPASS=true npm run dev
 **Fix**:
 ```bash
 # Option 1: Start Traccar
-docker-compose up -d traccar-mysql traccar-server
+docker compose -f docker-compose.yml up -d traccar-mysql traccar
 
 # Option 2: Disable Traccar (dev only)
 TRACCAR_ENABLED=false npm run dev

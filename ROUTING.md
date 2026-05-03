@@ -6,13 +6,13 @@ On **https://numz.site** the edge routes are:
 |-------------|------------|--------|
 | `/api/*` | **fuel-api** (and explicit `/api/erb/` → erb-api) | First-match locations for fuel paths; remaining `/api/*` is proxied to fuel-api (404 if unknown). **Traccar is not served under `/api`.** |
 | `/socket.io/*` | **fuel-api** | Socket.IO |
-| `/traccar/*` | **traccar-server** | Prefix stripped; includes map WebSocket `GET/WS /traccar/api/socket` → Traccar `/api/socket`. |
+| `/traccar/*` | **Traccar (Java)** | Prefix stripped; includes map WebSocket `GET/WS /traccar/api/socket` → Traccar `/api/socket`. |
 
 **api.numz.site** is unchanged (separate server block; may still proxy to Traccar on `/` per that host’s config).
 
 ## Frontend
 
-Production builds set `VITE_TRACCAR_PREFIX=/traccar` via [traccar-fleet-system/frontend/.env.production](traccar-fleet-system/frontend/.env.production) and [release-prod.ps1](release-prod.ps1). Traccar HTTP and the map socket use `traccarPath('/api/...')` from [traccar-fleet-system/frontend/src/config/traccarApi.js](traccar-fleet-system/frontend/src/config/traccarApi.js).
+Production builds set `VITE_TRACCAR_PREFIX=/traccar` via [traccar-fleet-system/frontend/.env.production](traccar-fleet-system/frontend/.env.production). Traccar HTTP and the map socket use `traccarPath('/api/...')` from [traccar-fleet-system/frontend/src/config/traccarApi.js](traccar-fleet-system/frontend/src/config/traccarApi.js).
 
 Fuel-only paths stay literal `/api/...` (see `FUEL_API_PREFIXES` in `traccarApi.js`).
 
@@ -40,10 +40,12 @@ Fuel-only paths stay literal `/api/...` (see `FUEL_API_PREFIXES` in `traccarApi.
 
 ## Nginx reload (server)
 
+**This repo (root Compose):** static UI is the `frontend` service (nginx inside the container):
+
 ```bash
-docker exec numztrak-nginx nginx -s reload
+docker compose exec frontend nginx -s reload
 ```
 
-(Adjust container name if your compose uses a different service name.)
+**Other deployments:** use your edge/gateway container name (legacy examples used `numztrak-nginx`).
 
-**Note:** `nginx -t` in a bare `nginx:alpine` container mounting only `nginx.prod.conf` may fail with `host not found in upstream` because Docker DNS does not resolve `fuel-api` / `traccar-server` outside the compose network. Use the same check as [release-prod.ps1](release-prod.ps1) Phase 2, or validate on the server after `docker compose up`.
+**Note:** `nginx -t` in a bare `nginx:alpine` container mounting only a config may fail with `host not found in upstream` because Docker DNS does not resolve upstreams outside the compose network. Prefer validating on the running compose network after `docker compose up`.

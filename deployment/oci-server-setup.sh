@@ -2,6 +2,9 @@
 # OCI Server Initial Setup Script
 # Run this script on your OCI Ubuntu instance to prepare it for deployment
 # Usage: bash oci-server-setup.sh
+#
+# Paths default to ~/NUMZFLEET (clone of https://github.com/Numzn/NUMZFLEET.git).
+# Adjust directory names if you clone into a different folder.
 
 set -e  # Exit on error
 
@@ -92,8 +95,8 @@ sudo systemctl enable fail2ban
 sudo systemctl start fail2ban
 
 echo -e "${GREEN}Step 9: Creating deployment directory...${NC}"
-mkdir -p ~/NUMZGPS
-cd ~/NUMZGPS
+mkdir -p ~/NUMZFLEET
+cd ~/NUMZFLEET
 
 echo ""
 echo -e "${GREEN}=========================================="
@@ -102,12 +105,15 @@ echo "==========================================${NC}"
 echo ""
 echo "Next steps:"
 echo "1. Log out and back in (or run: newgrp docker) for Docker group to take effect"
-echo "2. Clone your repository:"
-echo "   cd ~/NUMZGPS"
-echo "   git clone https://github.com/Numzn/NUMZGPS.git ."
-echo "3. Run the deployment script:"
-echo "   cd ~/NUMZGPS"
-echo "   bash deployment/oci-deploy.sh"
+echo "2. Clone your repository (adjust URL/path to your fork):"
+echo "   cd ~/NUMZFLEET"
+echo "   git clone https://github.com/Numzn/NUMZFLEET.git ."
+echo "3. Configure backend/.env and deployment/.env (see deployment/REGISTRY_DEPLOY.md)"
+echo "4. Deploy a SHA (pull + up only — no build on server):"
+echo "   cd ~/NUMZFLEET"
+echo "   bash deployment/deploy/deploy-from-registry.sh <full-git-sha> deployment/.env"
+echo ""
+echo "Use Docker Compose v2: docker compose version (install Docker plugin if needed)."
 echo ""
 echo -e "${YELLOW}Note: If you just installed Docker, you may need to log out and back in.${NC}"
 echo ""
@@ -115,7 +121,8 @@ echo ""
 # Verify installations
 echo -e "${GREEN}Verification:${NC}"
 echo "Docker: $(docker --version 2>/dev/null || echo 'Not available - log out and back in')"
-echo "Docker Compose: $(docker-compose --version 2>/dev/null || echo 'Not available')"
+echo "Docker Compose v2: $(docker compose version 2>/dev/null || echo 'Not available')"
+echo "Legacy docker-compose: $(docker-compose --version 2>/dev/null || echo 'Not installed')"
 echo "Node.js: $(node --version 2>/dev/null || echo 'Not available')"
 echo "NPM: $(npm --version 2>/dev/null || echo 'Not available')"
 echo ""

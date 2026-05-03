@@ -469,13 +469,13 @@ console.log('⚠️ No authenticated user found', { method, strategy, traccarEna
 
 ```bash
 # Test with header (dev mode)
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 
 # Test with no auth
-curl http://localhost:3001/api/operation-sessions
+curl http://localhost:3000/api/operation-sessions
 
 # Test with invalid session
-curl -H "Cookie: JSESSIONID=invalid" http://localhost:3001/api/operation-sessions
+curl -H "Cookie: JSESSIONID=invalid" http://localhost:3000/api/operation-sessions
 ```
 
 ---
@@ -563,7 +563,7 @@ If you're migrating from old authentication:
 ### "Authentication required" in Dev
 **Solution**:
 ```bash
-curl -H "x-user-id: 5" http://localhost:3001/api/...
+curl -H "x-user-id: 5" http://localhost:3000/api/...
 # OR
 export DEV_AUTH_BYPASS=true
 ```
@@ -572,7 +572,7 @@ export DEV_AUTH_BYPASS=true
 **Solution**:
 ```bash
 # Option 1: Ensure Traccar is running
-docker-compose up -d traccar-mysql traccar-server
+docker compose -f docker-compose.yml up -d traccar-mysql traccar
 
 # Option 2: Disable Traccar (dev only)
 TRACCAR_ENABLED=false npm run dev
@@ -598,7 +598,7 @@ curl http://$TRACCAR_MYSQL_HOST:3306
 **Solution in vite.config.js**:
 ```javascript
 '/api/operation-sessions': {
-  target: 'http://fuel-api:3001',
+  target: 'http://backend:3000',
   configure: (proxy) => {
     proxy.on('proxyReq', (proxyReq, req) => {
       // Ensure headers are forwarded

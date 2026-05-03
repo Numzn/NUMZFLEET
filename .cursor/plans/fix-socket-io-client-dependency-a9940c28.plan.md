@@ -6,7 +6,7 @@ todos:
     content: Add socket.io-client to package.json dependencies
     status: pending
   - id: b9b8262f-8e30-4713-a448-56bdeecb0578
-    content: Restart the numztrak-frontend container to apply changes
+    content: Restart the frontend service (e.g. docker compose restart frontend from repo root)
     status: pending
 ---
 
@@ -20,7 +20,7 @@ Integrate driver app with existing Fuel API (Node.js/PostgreSQL) for production-
 
 **Existing Fuel API (Already Running):**
 
-- Node.js/Express server on port 3001
+- Node.js/Express server on port 3000 (root compose service `backend`)
 - PostgreSQL database with fuel_requests table
 - REST endpoints: POST, GET, DELETE, PUT
 - Authentication middleware (session + header-based)
@@ -160,7 +160,7 @@ Ensure correct routing:
 
 ```nginx
 location /api/fuel-requests {
-    proxy_pass http://fuel-api:3001/api/fuel-requests;
+    proxy_pass http://backend:3000/api/fuel-requests;
     # ... proxy settings
 }
 ```

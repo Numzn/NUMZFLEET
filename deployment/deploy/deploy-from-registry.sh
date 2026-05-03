@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Production deploy: pull prebuilt images only (no build on server).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,17 +29,19 @@ export IMAGE_TAG="$SHA"
 
 case "${REGISTRY_PROVIDER:-}" in
   dockerhub)
-    export REGISTRY_PREFIX="${DOCKERHUB_USERNAME}"
+    export REGISTRY_PREFIX="${REGISTRY_PREFIX:-${DOCKERHUB_USERNAME}}"
     ;;
   ghcr)
-    export REGISTRY_PREFIX="ghcr.io/${GHCR_OWNER}"
+    export REGISTRY_PREFIX="${REGISTRY_PREFIX:-ghcr.io/${GHCR_OWNER}}"
     ;;
   *)
     fail "REGISTRY_PROVIDER must be dockerhub or ghcr"
     ;;
 esac
 
-log "Pulling images for SHA=$SHA from $REGISTRY_PREFIX"
+: "${REGISTRY_PREFIX:?REGISTRY_PREFIX could not be resolved (set REGISTRY_PREFIX or DOCKERHUB_USERNAME/GHCR_OWNER)}"
+
+log "Deploy SHA=$SHA — pull only (no build). Registry prefix: $REGISTRY_PREFIX"
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
 
 log "Starting services"
@@ -49,7 +52,6 @@ mkdir -p "$(dirname "$STATE_FILE")" "$(dirname "$HISTORY_FILE")"
 if [[ -f "$STATE_FILE" ]]; then
   PREV_SHA="$(cat "$STATE_FILE" || true)"
   if [[ -n "$PREV_SHA" && "$PREV_SHA" != "$SHA" ]]; then
-    # Do not duplicate PREV if it is already the last history line (normal upgrade path)
     if [[ ! -f "$HISTORY_FILE" ]] || [[ "$(tail -n1 "$HISTORY_FILE" 2>/dev/null || true)" != "$PREV_SHA" ]]; then
       printf '%s\n' "$PREV_SHA" >> "$HISTORY_FILE"
     fi

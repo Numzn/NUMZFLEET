@@ -1,34 +1,48 @@
-# Local Frontend Development Guide
+# Local Development Guide (standardized)
 
-> **Production UI (`dist/`):** primary path is [`deploy-frontend-docker.sh`](deploy-frontend-docker.sh) — **API health** (`GET` `…/health` on `api.numz.site`, overridable with `API_HEALTH_URL`; skip with `SKIP_API_HEALTH_CHECK=1`), then **Node 20 Docker** build (`npm ci` + `npm run build`), **deploy lock** on the server (`LOCK_REMOTE`, default `/tmp/frontend-deploy.lock`), **backup of current `dist/`** before overwrite (`REMOTE_BACKUP`, default `~/NUMZFLEET/backups/dist`; skip with `SKIP_DIST_BACKUP=1`), upload, `nginx -s reload` on `numztrak-nginx`. **Clean Git tree required** unless `DEPLOY_ALLOW_DIRTY=1`; `DEPLOY_REQUIRE_MAIN=1` restricts to `main`. Writes **`frontend-deploy-version.txt`** (override `REMOTE_VERSION_FILE`) including rollback path. **Push to GitHub yourself**; this script does not commit or push.
->
-> **Full stack / SHA-locked deploy** (backend + on-server frontend build when Node is available): [`release-prod.ps1`](release-prod.ps1) and [`.github/workflows/release-gate.yml`](.github/workflows/release-gate.yml). Optional automated UI upload: [`.github/workflows/deploy-frontend.yml`](.github/workflows/deploy-frontend.yml) when GitHub Actions are available. Legacy all-in-one script: [`deploy.sh`](deploy.sh).
+This repo uses the **root Docker Compose** as the single contract:
+
+- **Full stack rebuild (canonical, Windows):** `.\rebuild-stack.ps1` from repo root (see script for flags).
+- Core stack: `docker compose -f docker-compose.yml up -d --build`
+- Core + ERB: `docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build`
+- Vite dev server: `npm run dev` in `traccar-fleet-system/frontend` (default `http://localhost:5174`)
 
 ## 🚀 Quick Start
 
-### Option 1: Using Helper Scripts (Recommended)
+### Option 1: Docker-only (production-like)
 
-**Start Backend + Frontend Locally:**
 ```powershell
-# Terminal 1: Start backend services only
-cd backend
-.\scripts\start-backend-only.ps1
-
-# Terminal 2: Start frontend locally with HMR
-cd traccar-fleet-system\frontend
-.\start-local.ps1
+cd C:\Users\NUMERI\NUMZFLEET
+docker compose -f docker-compose.yml up -d --build
 ```
 
-### Option 2: Manual Commands
+### Option 1b: Docker + ERB (auto-generate token if missing)
 
-**Start Backend in Docker:**
 ```powershell
-cd backend
-docker compose -f docker-compose.dev.yml up -d traccar-mysql fuel-postgres traccar-server fuel-api numztrak-nginx
-docker stop numztrak-frontend  # Stop Docker frontend to avoid port conflict
+cd C:\Users\NUMERI\NUMZFLEET
+.\ensure-erb-token.ps1
+docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build
+```
+
+### Option 1c: Full rebuild script (build + up + smoke checks)
+
+```powershell
+cd C:\Users\NUMERI\NUMZFLEET
+.\rebuild-stack.ps1
+```
+
+### Option 2: Vite dev + Docker APIs
+
+```powershell
+cd C:\Users\NUMERI\NUMZFLEET
+docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build
+
+cd traccar-fleet-system\frontend
+npm run dev
 ```
 
 **Start Frontend Locally:**
+
 ```powershell
 cd traccar-fleet-system\frontend
 npm run start:local
@@ -42,111 +56,74 @@ $env:LOCAL_DEV = "true"; npm start
 
 **When to use:** Daily coding, styling, UI changes
 
-1. Start backend in Docker:
-   ```powershell
-   cd backend
-   .\scripts\start-backend-only.ps1
-   ```
+Start the APIs in Docker, then run Vite locally:
 
-2. Start frontend locally:
-   ```powershell
-   cd traccar-fleet-system\frontend
-   .\start-local.ps1
-   ```
+```powershell
+cd C:\Users\NUMERI\NUMZFLEET
+docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build
 
-3. Make changes - **see them instantly!** ✨
+cd traccar-fleet-system\frontend
+npm run dev
+```
 
 **Benefits:**
+
 - ✅ Instant hot module replacement (HMR)
 - ✅ No Docker rebuild needed
 - ✅ Fast feedback loop
 - ✅ See logs in terminal
 
-### 🐳 Full Docker Stack
+### URLs
 
-**When to use:** Testing, production-like environment
-
-```powershell
-cd backend
-docker compose -f docker-compose.dev.yml up -d  # Start everything including frontend
-```
-
-**Benefits:**
-- ✅ Production-like environment
-- ✅ All services in containers
-- ✅ Easy to test complete stack
-
-## 🔄 Switching Between Modes
-
-### Switch from Docker to Local Dev
-
-```powershell
-# Stop Docker frontend
-cd backend
-.\scripts\stop-frontend-docker.ps1
-
-# Start local frontend
-cd ..\traccar-fleet-system\frontend
-.\start-local.ps1
-```
-
-### Switch from Local Dev to Docker
-
-1. Stop local dev server (Ctrl+C)
-2. Start Docker frontend:
-   ```powershell
-   cd backend
-   .\scripts\start-frontend-docker.ps1
-   ```
+- Docker static UI: `http://localhost:3002`
+- Vite dev UI: `http://localhost:5174`
+- Fuel API: `http://localhost:3000`
+- Traccar: `http://localhost:8082`
 
 ## 📍 URLs
 
 **Backend Services (Docker):**
-- Traccar Server: http://localhost:8082
-- Fuel API: http://localhost:3001
+
+- Traccar Server: `http://localhost:8082`
+- Fuel API: `http://localhost:3000`
 
 **Frontend:**
-- Local Dev (Vite): http://localhost:5174 (HMR enabled; default avoids clashing with Docker on **3002**)
-- Docker Compose static UI: http://localhost:3002
+
+- Local Dev (Vite): `http://localhost:5174` (HMR enabled; default avoids clashing with Docker on **3002**)
+- Docker Compose static UI: `http://localhost:3002`
 
 ## 🛠️ How It Works
 
 The `vite.config.js` automatically detects the mode:
 
-- **Docker Mode** (default): Uses service names (`traccar-server:8082`, `fuel-api:3001`)
-- **Local Dev Mode** (`LOCAL_DEV=true`): Uses `localhost:8082` and `localhost:3001`
-
-## 📝 Helper Scripts
-
-### Frontend Scripts
-- `start-local.ps1` - Start frontend in local dev mode
-
-### Backend Scripts
-- `start-backend-only.ps1` - Start only backend services (no frontend)
-- `start-frontend-docker.ps1` - Start Docker frontend container
-- `stop-frontend-docker.ps1` - Stop Docker frontend container
+- **Docker Mode** (default): Uses service names (`traccar:8082`, `backend:3000`) inside the compose network.
+- **Local Dev Mode** (`LOCAL_DEV=true`): Uses `localhost:8082` and `localhost:3000`.
 
 ## 🐛 Troubleshooting
 
 ### Port 5174 already in use (Vite dev)
+
 Set `VITE_DEV_SERVER_PORT` in `traccar-fleet-system/frontend/.env` to another free port, or stop the process using that port.
 
 ### Port 3002 already in use (Docker static frontend)
+
 ```powershell
 # Stop root Compose frontend (example project name)
 docker stop numzfleet-frontend-1
 ```
 
 ### Backend not accessible
+
 ```powershell
 # Verify backend services are running
-docker compose -f docker-compose.dev.yml ps
+docker compose ps
 # Check ports
-netstat -ano | findstr "3001 8082"
+netstat -ano | findstr "3000 8082"
 ```
 
 ### Changes not reflecting
-- Make sure you're using `npm run start:local` or `start-local.ps1`
+
+- Make sure you're using `npm run dev`
 - Check browser console for errors
 - Try hard refresh (Ctrl+Shift+R)
 
@@ -159,6 +136,13 @@ netstat -ano | findstr "3001 8082"
 
 ## Canonical Compose Files
 
-- Development: `backend/docker-compose.dev.yml`
-- Production: `backend/docker-compose.prod.yml`
+- Core: `docker-compose.yml`
+- Optional ERB overlay: `docker-compose.erb.yml`
 
+The above is for **local development** (build on your machine).
+
+## Production (registry-only)
+
+Production uses **prebuilt Docker Hub images** and **no** `docker compose build` on the server. See [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md).
+
+Production backup/restore scripts and checklist: [deployment/backup/README.md](deployment/backup/README.md).

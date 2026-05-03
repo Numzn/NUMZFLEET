@@ -1,82 +1,26 @@
-# NumzTrak System - Quick Status Chart
+# NumzTrak — quick reference (root Compose)
 
-## 🎯 Current Status: ALL OPERATIONAL ✅
+This file is a **compact status map** for the standardized stack. Authoritative run/rebuild: repo root **`docker-compose.yml`** (+ optional **`docker-compose.erb.yml`**) and **`rebuild-stack.ps1`**.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     NUMZTRAK SYSTEM STATUS                      │
-│                      Last Updated: Now                          │
-└─────────────────────────────────────────────────────────────────┘
+## Ports (host)
 
-┌─────────────────────────────────────────────────────────────────┐
-│                        DATABASES                                │
-├─────────────────────────────────────────────────────────────────┤
-│  ✅ PostgreSQL (Fuel)    │ Port 5432 │ User: numztrak           │
-│  ✅ MySQL (Traccar)      │ Port 3306 │ User: traccar            │
-└─────────────────────────────────────────────────────────────────┘
+| Service        | Port | Notes                                      |
+|----------------|------|--------------------------------------------|
+| Fuel API       | 3000 | Compose service `backend`                  |
+| Static UI      | 3002 | Compose service `frontend` (nginx)        |
+| Traccar        | 8082 | Compose service `traccar`                  |
+| PostgreSQL     | 5432 | Compose service `db`                       |
+| Traccar MySQL  | —    | `traccar-mysql`; not published by default |
 
-┌─────────────────────────────────────────────────────────────────┐
-│                      CORE SERVICES                              │
-├─────────────────────────────────────────────────────────────────┤
-│  ✅ Fuel API            │ Port 3001 │ Connected to both DBs     │
-│  ✅ Traccar Server      │ Port 8082 │ GPS tracking active       │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                     FRONTEND SERVICES                           │
-├─────────────────────────────────────────────────────────────────┤
-│  ✅ Frontend            │ Port 3002 │ Web dashboard             │
-│  ✅ Nginx Proxy         │ Port 80   │ Routes to services        │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                      PASSWORD SUMMARY                           │
-├─────────────────────────────────────────────────────────────────┤
-│  PostgreSQL:  numztrak / NumzFuel2025                          │
-│  MySQL Root:  root / NumzTrak2025Root                          │
-│  MySQL App:   traccar / traccar123                             │
-│  Traccar:     admin / admin123                                 │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                      ACCESS POINTS                              │
-├─────────────────────────────────────────────────────────────────┤
-│  🌐 Frontend:    http://localhost:3002                         │
-│  🔌 Fuel API:    http://localhost:3001                         │
-│  📡 Traccar:     http://localhost:8082                         │
-│  🌍 Nginx:       http://localhost                              │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                    OPERATIONAL FLOW                             │
-├─────────────────────────────────────────────────────────────────┤
-│  1. Databases (PostgreSQL, MySQL) → Healthy                    │
-│  2. Core Services (Fuel API, Traccar) → Running                │
-│  3. Frontend Services → Active                                 │
-│  4. All Connections → Verified ✅                              │
-└─────────────────────────────────────────────────────────────────┘
-
-📋 All Issues Resolved:
-  ✅ Traccar port conflicts fixed
-  ✅ Database ENUM errors handled
-  ✅ Service dependencies optimized
-  ✅ Passwords documented and working
-
-```
-
-## Quick Commands
+## Commands (from repo root)
 
 ```powershell
-# View all services
-docker-compose ps
-
-# Test database connections
-.\scripts\test-database-connections.ps1
-
-# View logs
-docker-compose logs -f [service-name]
-
-# Restart services
-docker-compose restart [service-name]
+docker compose -f docker-compose.yml -f docker-compose.erb.yml ps
+docker compose -f docker-compose.yml -f docker-compose.erb.yml logs -f backend
 ```
 
+Full rebuild (Windows): `.\rebuild-stack.ps1`
+
+## Secrets
+
+Use **`backend/.env`** (from **`backend/env.template`**). Do not rely on any sample passwords in old docs; they may not match your machine.

@@ -1,6 +1,6 @@
 import { Box, Drawer, IconButton } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -8,6 +8,7 @@ import GlobalSearch from './GlobalSearch';
 import NotificationsDropdown from './NotificationsDropdown';
 import UserMenuDropdown from './UserMenuDropdown';
 import ModernSidebar from './ModernSidebar';
+import BottomMenu from './BottomMenu';
 import usePersistedState from '../util/usePersistedState';
 import {
   UnifiedTopbar,
@@ -19,6 +20,7 @@ import {
 
 const DRAWER_WIDTH_EXPANDED = 168;
 const DRAWER_WIDTH_COLLAPSED = 68;
+const CHROME_GAP = 8;
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -57,9 +59,6 @@ const useStyles = makeStyles()((theme) => ({
     overflow: 'auto',
     WebkitOverflowScrolling: 'touch',
     boxSizing: 'border-box',
-    [theme.breakpoints.down('md')]: {
-      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
-    },
   },
 }));
 
@@ -69,6 +68,10 @@ const AppLayout = ({ children, showSidebar = true }) => {
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const [sidebarOpen, setSidebarOpen] = useState(desktop);
   const [collapsed, setCollapsed] = usePersistedState('sidebarCollapsed', false);
+  const topbarRef = useRef(null);
+  const bottomNavRef = useRef(null);
+  const [topbarHeight, setTopbarHeight] = useState(56);
+  const [bottomNavHeight, setBottomNavHeight] = useState(0);
 
   const handleSidebarNavigate = useCallback(() => {
     if (!desktop) {
@@ -79,6 +82,34 @@ const AppLayout = ({ children, showSidebar = true }) => {
   const drawerWidth = desktop
     ? (collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED)
     : { xs: '80vw', sm: 360 };
+
+  const mainPaddingBottom = useMemo(() => {
+    if (desktop) return CHROME_GAP;
+    const safeBottom = 'env(safe-area-inset-bottom, 0px)';
+    return `calc(${safeBottom} + ${bottomNavHeight}px + ${CHROME_GAP}px)`;
+  }, [bottomNavHeight, desktop]);
+
+  useLayoutEffect(() => {
+    const read = () => {
+      const tb = topbarRef.current?.getBoundingClientRect?.().height;
+      const bn = bottomNavRef.current?.getBoundingClientRect?.().height;
+      if (tb && Math.abs(tb - topbarHeight) > 0.5) setTopbarHeight(tb);
+      if (bn != null && Math.abs(bn - bottomNavHeight) > 0.5) setBottomNavHeight(bn);
+      // Expose for MapChromePadding + any full-bleed surfaces.
+      if (typeof document !== 'undefined') {
+        document.documentElement.style.setProperty('--app-topbar-height', `${tb || topbarHeight}px`);
+        document.documentElement.style.setProperty('--app-bottomnav-height', `${bn || 0}px`);
+      }
+    };
+    read();
+    window.addEventListener('resize', read);
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', read);
+    return () => {
+      window.removeEventListener('resize', read);
+      vv?.removeEventListener('resize', read);
+    };
+  }, [bottomNavHeight, topbarHeight]);
 
   const embeddedTopbarSx = {
     width: '100%',
@@ -121,7 +152,7 @@ const AppLayout = ({ children, showSidebar = true }) => {
       )}
 
       <Box className={classes.mainColumn}>
-        <UnifiedTopbar variant="appbar" position="static" sx={embeddedTopbarSx}>
+        <UnifiedTopbar ref={topbarRef} variant="appbar" position="static" sx={embeddedTopbarSx}>
           <TopbarLeftSection>
             {!desktop && (
               <IconButton
@@ -152,9 +183,20 @@ const AppLayout = ({ children, showSidebar = true }) => {
           </TopbarRightSection>
         </UnifiedTopbar>
 
-        <Box component="main" className={classes.main}>
+        <Box component="main" className={classes.main} sx={{ pb: mainPaddingBottom }}>
           {children}
         </Box>
+
+        {!desktop && (
+          <Box
+            ref={bottomNavRef}
+            sx={{
+              '@media print': { display: 'none' },
+            }}
+          >
+            <BottomMenu />
+          </Box>
+        )}
       </Box>
     </Box>
   );

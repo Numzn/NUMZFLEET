@@ -1,5 +1,7 @@
 # Procedure to Reset Database Passwords
 
+> **Stack drift:** commands below use legacy container names (`numztrak-postgres`, `numztrak-fuel-api`, `numztrak-network`). On **repo root** compose, use **`db`** for Postgres, **`backend`** for fuel-api, and inspect `docker compose ps` for exact container names.
+
 This guide explains how to reset database passwords when you have forgotten them, but have access to Docker containers.
 
 ## Prerequisites

@@ -15,6 +15,7 @@ Purpose: Automated fuel price monitoring and notification system
 import requests
 from bs4 import BeautifulSoup
 import re
+import os
 from datetime import datetime
 import urllib3
 import logging
@@ -227,8 +228,18 @@ if __name__ == "__main__":
     
     if args.mode == 'once':
         print("Running single lean-monitor tick...")
+        # One-off runs should be able to scrape immediately (bypass Lusaka window guard).
+        os.environ["MONITOR_FORCE"] = "true"
         result = monitor.tick()
         print(f"Tick result: {result}")
+        # One-off runs should publish immediately if a pending file exists (don't wait for midnight).
+        try:
+            from monitor_cycle import promote_pending_to_published
+            promoted = promote_pending_to_published(monitor.price_comparator)
+            if promoted:
+                print("✅ Published prices immediately (promoted pending → published).")
+        except Exception as e:
+            print(f"⚠️ Could not promote pending prices: {e}")
         if result.get('status') == 'error':
             print(f"\n❌ Error: {result.get('message', result)}")
     

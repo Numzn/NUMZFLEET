@@ -51,7 +51,7 @@ import { requireAuth, requireAdmin } from '../middleware/authGates.js';  // Auth
 
 ```bash
 # Local dev: just send header
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 
 # Production: must have valid JSESSIONID
 curl -H "Cookie: JSESSIONID=validtoken" https://api.prod.com/api/operation-sessions
@@ -130,7 +130,7 @@ TRACCAR_ENABLED=false \
 npm run dev
 ```
 
-Test: `curl -H "x-user-id: 5" http://localhost:3001/api/...`
+Test: `curl -H "x-user-id: 5" http://localhost:3000/api/...`
 
 ### Development (Docker Compose)
 ```bash
@@ -142,7 +142,7 @@ TRACCAR_ENABLED=true
 TRACCAR_MYSQL_HOST=traccar-mysql
 ```
 
-Test: `curl -H "x-user-id: 5" http://localhost:3001/api/...`
+Test: `curl -H "x-user-id: 5" http://localhost:3000/api/...`
 
 ### Production
 ```bash
@@ -242,10 +242,10 @@ router.get('/', requireAuth, (req, res) => {
 NODE_ENV=development AUTH_STRATEGY=permissive DEV_AUTH_BYPASS=true npm run dev
 
 # Terminal 2
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 # Expected: 200 OK (synthetic user created)
 
-curl http://localhost:3001/api/operation-sessions
+curl http://localhost:3000/api/operation-sessions
 # Expected: 401 Unauthorized (no auth data)
 ```
 
@@ -255,7 +255,7 @@ curl http://localhost:3001/api/operation-sessions
 NODE_ENV=production AUTH_STRATEGY=strict npm run dev
 
 # Terminal 2
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 # Expected: 401 Unauthorized (header fallback ignored)
 
 # Note: Would need valid JSESSIONID to get 200 OK
@@ -270,11 +270,11 @@ docker-compose up -d
 sleep 5
 
 # Test with header (fallback)
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 # Expected: 200 OK (synthetic user)
 
 # Test with Traccar session (if you logged in via web UI)
-curl -H "Cookie: JSESSIONID=..." http://localhost:3001/api/operation-sessions
+curl -H "Cookie: JSESSIONID=..." http://localhost:3000/api/operation-sessions
 # Expected: 200 OK (real user)
 ```
 

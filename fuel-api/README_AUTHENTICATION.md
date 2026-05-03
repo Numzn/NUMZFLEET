@@ -292,7 +292,7 @@ export TRACCAR_ENABLED=false
 npm run dev
 
 # Test in another terminal
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 # Result: 200 OK (synthetic user created)
 ```
 
@@ -302,7 +302,7 @@ curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
 docker-compose up -d
 
 # Test
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 # Result: 200 OK (synthetic or real user from Traccar)
 ```
 
@@ -331,15 +331,15 @@ curl -H "Cookie: JSESSIONID=<valid-token>" https://api.prod.com/api/operation-se
 ### Manual Testing
 ```bash
 # Dev mode: test header fallback
-curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
 # Expected: 200 OK
 
 # Test without auth
-curl http://localhost:3001/api/operation-sessions
+curl http://localhost:3000/api/operation-sessions
 # Expected: 401 Unauthorized
 
 # Test admin route (fails - not admin)
-curl -X DELETE http://localhost:3001/api/operation-sessions/1
+curl -X DELETE http://localhost:3000/api/operation-sessions/1
 # Expected: 401 or 403
 ```
 
@@ -455,13 +455,13 @@ Check `AUTH_IMPLEMENTATION_GUIDE.md` → **Common Issues & Solutions**
 2. **Test locally**
    ```bash
    NODE_ENV=development npm run dev
-   curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+   curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
    ```
 
 3. **Test with Docker Compose**
    ```bash
    docker-compose up -d
-   curl -H "x-user-id: 5" http://localhost:3001/api/operation-sessions
+   curl -H "x-user-id: 5" http://localhost:3000/api/operation-sessions
    ```
 
 4. **Review environment variables**

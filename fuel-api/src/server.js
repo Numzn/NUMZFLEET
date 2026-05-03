@@ -37,7 +37,7 @@ const DATABASE_URL = process.env.DATABASE_URL ||
   `postgresql://numztrak:${process.env.POSTGRES_PASSWORD || 'NumzFuel2025'}@db:5432/numztrak_fuel`;
 
 const TRACCAR_MYSQL_CONFIG = {
-  host: process.env.TRACCAR_MYSQL_HOST || 'numztrak-mysql',
+  host: process.env.TRACCAR_MYSQL_HOST || 'traccar-mysql',
   port: process.env.TRACCAR_MYSQL_PORT || 3306,
   database: process.env.TRACCAR_MYSQL_DATABASE || process.env.MYSQL_DATABASE || 'traccar',
   user: process.env.TRACCAR_MYSQL_USER || process.env.MYSQL_USER || 'traccar',

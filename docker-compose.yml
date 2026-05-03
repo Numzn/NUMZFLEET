@@ -15,6 +15,10 @@ services:
     build:
       context: ./fuel-api
       dockerfile: Dockerfile
+    env_file:
+      # Compose does NOT automatically read backend/.env.
+      # This keeps secrets/config stable across rebuilds.
+      - ./backend/.env
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -23,13 +27,16 @@ services:
       TRACCAR_MYSQL_PORT: 3306
       TRACCAR_MYSQL_DATABASE: traccar
       TRACCAR_MYSQL_USER: traccar
-      TRACCAR_MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traccar123}
+      # TRACCAR_MYSQL_PASSWORD comes from ./backend/.env (env_file).
       TRACCAR_SERVER_URL: http://traccar:8082
       TRACCAR_API_URL: http://traccar:8082
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
       CORS_ORIGIN: http://localhost:3002
-      ERB_API_BASE_URL: ${ERB_API_BASE_URL:-http://erb-api:8000}
-      ERB_API_TOKEN: ${ERB_API_TOKEN:-change-me-erb-token}
+      # Auth: allow x-user-id header fallback when cookie Path is /traccar
+      AUTH_STRATEGY: ${AUTH_STRATEGY:-hybrid}
+      TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
+      DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
+      HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
     ports:
       - "3000:3000"
     depends_on:
@@ -38,8 +45,6 @@ services:
       traccar-mysql:
         condition: service_healthy
       traccar:
-        condition: service_healthy
-      erb-api:
         condition: service_healthy
     healthcheck:
       test:
@@ -54,54 +59,13 @@ services:
       retries: 5
       start_period: 90s
 
-  erb-worker:
-    build:
-      context: ./erb-fuel-monitor
-      dockerfile: Dockerfile
-    command: ['python', 'erb_scraper_final.py', '--mode', 'schedule']
-    environment:
-      EMAIL_ENABLED: ${ERB_EMAIL_ENABLED:-false}
-      EMAIL_FROM: ${ERB_EMAIL_FROM:-}
-      EMAIL_PASSWORD: ${ERB_EMAIL_PASSWORD:-}
-      EMAIL_TO: ${ERB_EMAIL_TO:-}
-      SMTP_SERVER: ${ERB_SMTP_SERVER:-smtp.gmail.com}
-      SMTP_PORT: ${ERB_SMTP_PORT:-587}
-      SSL_VERIFY: ${ERB_SSL_VERIFY:-true}
-      SSL_ALLOW_INSECURE_FALLBACK: ${ERB_SSL_ALLOW_INSECURE_FALLBACK:-true}
-      S3_ENABLED: ${ERB_S3_ENABLED:-false}
-      S3_BUCKET: ${ERB_S3_BUCKET:-}
-      S3_KEY: ${ERB_S3_KEY:-fuel_prices.json}
-    volumes:
-      - erb_data:/app/data
-
-  erb-api:
-    build:
-      context: ./erb-fuel-monitor
-      dockerfile: Dockerfile
-    command: ['python', '-m', 'uvicorn', 'api_server:app', '--host', '0.0.0.0', '--port', '8000']
-    environment:
-      PORT: 8000
-      API_TOKEN: ${ERB_API_TOKEN:-change-me-erb-token}
-      API_ALLOWED_ORIGINS: ${ERB_API_ALLOWED_ORIGINS:-http://localhost:3002}
-      S3_ENABLED: ${ERB_S3_ENABLED:-false}
-      S3_BUCKET: ${ERB_S3_BUCKET:-}
-      S3_KEY: ${ERB_S3_KEY:-fuel_prices.json}
-    depends_on:
-      - erb-worker
-    volumes:
-      - erb_data:/app/data
-    healthcheck:
-      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/v1/health\")']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   db:
     image: postgres:15-alpine
+    env_file:
+      - ./backend/.env
     environment:
       POSTGRES_DB: numztrak_fuel
       POSTGRES_USER: numztrak
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-NumzFuel2025}
     ports:
       - "5432:5432"
     volumes:
@@ -115,11 +79,8 @@ services:
   # Traccar upstream DB (fuel-api reads this MySQL schema; Traccar server uses it too)
   traccar-mysql:
     image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
-      MYSQL_DATABASE: traccar
-      MYSQL_USER: traccar
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traccar123}
+    env_file:
+      - ./backend/.env
     volumes:
       - traccar_mysql_data:/var/lib/mysql
     healthcheck:
@@ -136,7 +97,10 @@ services:
     environment:
       TRACCAR_DATABASE_URL: jdbc:mysql://traccar-mysql:3306/traccar?useSSL=false&allowPublicKeyRetrieval=true
       TRACCAR_DATABASE_USER: traccar
-      TRACCAR_DATABASE_PASSWORD: ${MYSQL_PASSWORD:-traccar123}
+      # database.password comes from mounted traccar.xml
+    volumes:
+      # Force Traccar to use MySQL (not built-in H2).
+      - ./backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
     ports:
       - "8082:8082"
     healthcheck:
@@ -152,5 +116,6 @@ services:
 
 volumes:
   postgres_data:
+    name: numzfleet_postgres_data
   traccar_mysql_data:
-  erb_data:
+    name: numzfleet_traccar_mysql_data

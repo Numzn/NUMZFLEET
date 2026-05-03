@@ -26,14 +26,14 @@ export default defineConfig(({ mode }) => {
   const isProd = mode === 'production';
   const apiBaseUrl = env.VITE_API_BASE_URL || 'http://localhost';
   const remoteApiBaseUrl = env.REMOTE_API_BASE_URL || env.VITE_REMOTE_API_BASE_URL;
-  /** When using REMOTE_API_BASE_URL for Traccar, point fuel-only routes to a host that serves fuel-api (e.g. http://localhost:3001). */
+  /** When using REMOTE_API_BASE_URL for Traccar, point fuel-only routes to a host that serves fuel-api (e.g. http://localhost:3000). */
   const explicitFuelApiUrl = env.VITE_FUEL_API_URL || env.VITE_FUEL_API_BASE_URL;
 
   // Determine backend URLs based on environment
   let traccarUrl, fuelApiUrl;
   
   if (isProd) {
-    // Production build: API base from VITE_API_BASE_URL (same-origin nginx, Netlify, etc.)
+    // Production build: API base from VITE_API_BASE_URL (same-origin nginx / static host, etc.)
     traccarUrl = `${apiBaseUrl}/api/traccar`;
     fuelApiUrl = `${apiBaseUrl}/api/fuel`;
     console.log('🌐 [Vite] Running in PRODUCTION mode (env / same-origin API base)');
@@ -41,12 +41,12 @@ export default defineConfig(({ mode }) => {
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
   } else if (remoteApiBaseUrl) {
-    // Local frontend + hosted Traccar: fuel-api usually runs on Docker localhost:3001, not on the remote host.
+    // Local frontend + hosted Traccar: fuel-api usually runs on Docker localhost:3000, not on the remote host.
     const fuelUsesRemote = env.VITE_FUEL_PROXY_USE_REMOTE === 'true';
     traccarUrl = remoteApiBaseUrl;
     fuelApiUrl =
       explicitFuelApiUrl ||
-      (fuelUsesRemote ? remoteApiBaseUrl : 'http://localhost:3001');
+      (fuelUsesRemote ? remoteApiBaseUrl : 'http://localhost:3000');
     console.log('☁️ [Vite] Running in REMOTE backend mode');
     console.log(`   Remote Base: ${remoteApiBaseUrl}`);
     console.log(`   Traccar: ${traccarUrl}`);
@@ -56,22 +56,22 @@ export default defineConfig(({ mode }) => {
           ? ' (VITE_FUEL_API_URL)'
           : fuelUsesRemote
             ? ' (VITE_FUEL_PROXY_USE_REMOTE)'
-            : ' (default localhost:3001)'
+            : ' (default localhost:3000)'
       }`
     );
   } else if (isLocalDev) {
     // Local development
     traccarUrl = 'http://localhost:8082';
-    fuelApiUrl = 'http://localhost:3001';
+    fuelApiUrl = 'http://localhost:3000';
     console.log('🔧 [Vite] Running in LOCAL development mode');
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
   } else {
-    // Vite runs on the host; Compose maps traccar:8082 and fuel-api:3001 to localhost.
+    // Vite runs on the host; root Compose maps traccar:8082 and backend (fuel-api):3000 to localhost.
     // Set VITE_PROXY_INTERNAL_DOCKER=true only if the dev server runs inside the Compose network.
     const internalDocker = env.VITE_PROXY_INTERNAL_DOCKER === 'true';
-    traccarUrl = internalDocker ? 'http://traccar-server:8082' : 'http://localhost:8082';
-    fuelApiUrl = internalDocker ? 'http://fuel-api:3001' : 'http://localhost:3001';
+    traccarUrl = internalDocker ? 'http://traccar:8082' : 'http://localhost:8082';
+    fuelApiUrl = internalDocker ? 'http://backend:3000' : 'http://localhost:3000';
     console.log(internalDocker ? '🐳 [Vite] Running in DOCKER (internal) proxy mode' : '🐳 [Vite] Running in DOCKER-style dev (localhost proxy targets)');
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
