@@ -171,27 +171,21 @@ services:
       traccar:
         condition: service_healthy
 
-  # Port 80 → frontend (embedded nginx handles /api, /traccar, SPA). Use this so users need not use :3002.
-  edge:
-    image: nginx:alpine
-    container_name: numzfleet-prod-edge
+  # Public HTTP + HTTPS (Let's Encrypt). Proxies to frontend:80 (nginx inside serves /api, /traccar, SPA).
+  caddy:
+    image: caddy:2-alpine
+    container_name: numzfleet-prod-caddy
     restart: unless-stopped
     depends_on:
       frontend:
         condition: service_started
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ../nginx/edge-proxy.conf:/etc/nginx/conf.d/default.conf:ro
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -qO- http://127.0.0.1/edge-health >/dev/null || exit 1",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   postgres_data:
@@ -200,3 +194,7 @@ volumes:
     name: numzfleet_prod_traccar_mysql_data
   erb_data:
     name: numzfleet_prod_erb_data
+  caddy_data:
+    name: numzfleet_prod_caddy_data
+  caddy_config:
+    name: numzfleet_prod_caddy_config

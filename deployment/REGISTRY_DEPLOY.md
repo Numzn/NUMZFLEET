@@ -14,7 +14,7 @@ Default namespace in this repo’s examples: **`numz14`** (set `DOCKERHUB_USERNA
 
 ## Compose file
 
-- [compose/docker-compose.prod.yml](compose/docker-compose.prod.yml) — all required services (`frontend`, `backend`, `erb-api`, `erb-worker`, `db`, `traccar-mysql`, `traccar`), **`image:` only**, plus **`edge`** (`nginx:alpine`) on **host port 80** proxying to `frontend:80` (same-origin routing as [ROUTING.md](../ROUTING.md)). If **port 80 is already in use** (host `nginx`, etc.), stop that service or adjust the `edge` port mapping.
+- [compose/docker-compose.prod.yml](compose/docker-compose.prod.yml) — all required services (`frontend`, `backend`, `erb-api`, `erb-worker`, `db`, `traccar-mysql`, `traccar`), **`image:` only**, plus **`caddy`** on **host ports 80 and 443** reverse-proxying to `frontend:80` (TLS via Let’s Encrypt; same-origin routing as [ROUTING.md](../ROUTING.md)). Config: [caddy/Caddyfile](caddy/Caddyfile). **Oracle VCN / security lists** must allow **ingress TCP 80 and 443** to the instance (host `ufw` alone is not enough). If **port 80 is already in use**, stop the conflicting service before `compose up`.
 
 ## Server layout
 

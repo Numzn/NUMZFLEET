@@ -1,0 +1,11 @@
+# Automatic HTTPS (Let's Encrypt) for numz.site → frontend:80 (embedded nginx: /api, /traccar, SPA).
+# Requires public DNS A record to this host and OCI / firewall allow ingress TCP 80 + 443.
+
+{
+	# Optional: ACME account email (recommended for expiry notices)
+	# email admin@example.com
+}
+
+numz.site, www.numz.site {
+	reverse_proxy frontend:80
+}
