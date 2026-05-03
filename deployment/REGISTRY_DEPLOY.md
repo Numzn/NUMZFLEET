@@ -14,7 +14,7 @@ Default namespace in this repo’s examples: **`numz14`** (set `DOCKERHUB_USERNA
 
 ## Compose file
 
-- [compose/docker-compose.prod.yml](compose/docker-compose.prod.yml) — all required services (`frontend`, `backend`, `erb-api`, `erb-worker`, `db`, `traccar-mysql`, `traccar`), **`image:` only**.
+- [compose/docker-compose.prod.yml](compose/docker-compose.prod.yml) — all required services (`frontend`, `backend`, `erb-api`, `erb-worker`, `db`, `traccar-mysql`, `traccar`), **`image:` only**, plus **`edge`** (`nginx:alpine`) on **host port 80** proxying to `frontend:80` (same-origin routing as [ROUTING.md](../ROUTING.md)). If **port 80 is already in use** (host `nginx`, etc.), stop that service or adjust the `edge` port mapping.
 
 ## Server layout
 
@@ -22,7 +22,7 @@ SSH from Windows (key ACLs, interactive vs one-liner checks): [OCI_SSH.md](OCI_S
 
 1. Clone repo (for `deployment/compose`, `deployment/deploy`, `backend/.env`, `backend/conf/traccar.xml`).
 2. Copy [deployment/.env.example](.env.example) → `deployment/.env` and set `IMAGE_TAG` to the **full git SHA** you are deploying.
-3. Configure [../backend/.env](../backend/.env) (secrets, `DATABASE_URL` with host `db`, `TRACCAR_MYSQL_PASSWORD`, `ERB_API_TOKEN`, production `CORS_ORIGIN` / auth, etc.).
+3. Configure [../backend/.env](../backend/.env) (secrets, `POSTGRES_PASSWORD` or `DATABASE_URL` with host `db`, `TRACCAR_MYSQL_PASSWORD`, `ERB_API_TOKEN`, production `CORS_ORIGIN` / auth, etc.).
 
 ## Deploy commands
 
