@@ -50,6 +50,10 @@ class Config:
     S3_ENABLED = os.getenv('S3_ENABLED', 'false').lower() in ('1', 'true', 'yes')
     S3_BUCKET = os.getenv('S3_BUCKET', '')
     S3_KEY = os.getenv('S3_KEY', 'fuel_prices.json')
+
+    # When true (default), `--mode schedule` scrapes once at worker startup and refreshes
+    # data/fuel_prices.json so erb-api serves current ERB prices after every container rebuild.
+    ERB_STARTUP_REFRESH = os.getenv('ERB_STARTUP_REFRESH', 'true').lower() in ('1', 'true', 'yes')
     
     # Fuel Types to Monitor
     FUEL_TYPES = ["Petrol", "Diesel", "Kerosene", "Jet A-1"]

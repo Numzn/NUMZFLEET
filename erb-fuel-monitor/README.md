@@ -53,6 +53,8 @@ python erb_scraper_final.py --mode once
 #### Start scheduled worker
 Runs a 1-minute scheduler loop; each tick applies window logic so the ERB site is only scraped during the monitoring window.
 
+On worker start (including every Docker rebuild), by default **`ERB_STARTUP_REFRESH=true`** runs one immediate scrape and updates **`data/fuel_prices.json`** so **erb-api** serves fresh prices without waiting for the Lusaka window. Set `ERB_STARTUP_REFRESH=false` to disable.
+
 ```powershell
 python erb_scraper_final.py --mode schedule
 ```

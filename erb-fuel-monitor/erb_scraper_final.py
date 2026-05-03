@@ -160,6 +160,28 @@ class ERBFuelPriceMonitor:
         """Single lean-monitor step (Lusaka window, detect vs publish)."""
         return run_monitor_tick(self)
 
+    def refresh_published_cache_from_erb(self) -> dict:
+        """
+        Scrape ERB once and write published fuel_prices.json (erb-api reads this file).
+        Bypasses the Lusaka monitoring window. Does not send email — for deploy/restart refresh.
+        """
+        self.logger.info("Refreshing published price cache from ERB (startup refresh)...")
+        result = self.scrape_erb_prices()
+        if result.get("status") != "success":
+            msg = result.get("message", "scrape failed")
+            self.logger.warning("Startup cache refresh: scrape did not succeed: %s", msg)
+            return result
+        cur = result.get("data") or {}
+        if not cur:
+            self.logger.warning("Startup cache refresh: scrape returned no price data")
+            return {"status": "error", "message": "no price data in scrape result"}
+        # save_current_prices accepts stringy or numeric values
+        as_strings = {k: str(v) for k, v in cur.items()}
+        if not self.price_comparator.save_current_prices(as_strings):
+            return {"status": "error", "message": "save_current_prices failed"}
+        self.logger.info("Startup cache refresh: fuel_prices.json updated for API")
+        return {"status": "success", "message": "cache_refreshed", "data": cur}
+
     def monitor_prices(self):
         """Fetch current ERB prices, save to published file, and email (legacy one-shot)."""
         try:
@@ -192,6 +214,11 @@ class ERBFuelPriceMonitor:
     def start_scheduled_monitoring(self):
         """Start the scheduled monitoring system."""
         try:
+            if self.config.ERB_STARTUP_REFRESH:
+                self.refresh_published_cache_from_erb()
+            else:
+                self.logger.info("ERB_STARTUP_REFRESH disabled; skipping startup cache scrape")
+
             scheduler = ERBScheduler(self.tick)
             scheduler.start_scheduler()
 

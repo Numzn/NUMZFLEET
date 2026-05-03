@@ -14,6 +14,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      ERB_STARTUP_REFRESH: ${ERB_STARTUP_REFRESH:-true}
       EMAIL_ENABLED: ${ERB_EMAIL_ENABLED:-false}
       EMAIL_FROM: ${ERB_EMAIL_FROM:-}
       EMAIL_PASSWORD: ${ERB_EMAIL_PASSWORD:-}
