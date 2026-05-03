@@ -3,8 +3,30 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+function buildDatabaseUrl() {
+  const explicit = process.env.DATABASE_URL?.trim();
+  if (explicit) return explicit;
+  const password = process.env.POSTGRES_PASSWORD;
+  if (!password) {
+    return '';
+  }
+  const user = process.env.POSTGRES_USER || 'numztrak';
+  const host = process.env.POSTGRES_HOST || 'db';
+  const port = process.env.POSTGRES_PORT || '5432';
+  const database = process.env.POSTGRES_DB || 'numztrak_fuel';
+  const enc = encodeURIComponent(password);
+  return `postgresql://${user}:${enc}@${host}:${port}/${database}`;
+}
+
+const databaseUrl = buildDatabaseUrl();
+if (!databaseUrl) {
+  throw new Error(
+    'Missing PostgreSQL config: set DATABASE_URL or POSTGRES_PASSWORD (with optional POSTGRES_USER, POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB)'
+  );
+}
+
 // PostgreSQL connection for fuel management data
-const sequelize = new Sequelize(process.env.DATABASE_URL || '', {
+const sequelize = new Sequelize(databaseUrl, {
   dialect: 'postgres',
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
   pool: {

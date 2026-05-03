@@ -1,0 +1,13 @@
+# Merge after docker-compose.yml to mirror production fuel-api env:
+# deployment/compose/docker-compose.prod.yml does not set DATABASE_URL; the
+# backend image derives it from POSTGRES_PASSWORD (see fuel-api database config).
+#
+# Usage (from repo root):
+#   docker compose -f docker-compose.yml -f docker-compose.server-parity.yml up -d --build
+# Or: .\verify-server-env-parity.ps1
+
+services:
+  backend:
+    environment:
+      # Force app to build URL from POSTGRES_PASSWORD (same as registry prod on server).
+      DATABASE_URL: ""
