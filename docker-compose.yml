@@ -31,7 +31,7 @@ services:
       TRACCAR_SERVER_URL: http://traccar:8082
       TRACCAR_API_URL: http://traccar:8082
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
-      CORS_ORIGIN: http://localhost:3002
+      CORS_ORIGIN: https://numz.site,http://localhost:3002
       # Auth: allow x-user-id header fallback when cookie Path is /traccar
       AUTH_STRATEGY: ${AUTH_STRATEGY:-hybrid}
       TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}

@@ -133,7 +133,7 @@ services:
       TRACCAR_SERVER_URL: http://traccar:8082
       TRACCAR_API_URL: http://traccar:8082
       ERB_API_BASE_URL: http://erb-api:8000
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3002}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://numz.site,http://localhost:3002}
       AUTH_STRATEGY: ${AUTH_STRATEGY:-strict}
       TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
       DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
