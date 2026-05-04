@@ -235,10 +235,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoint.
+// Exposed at /health (container-local probes) and at /api/health so it can be
+// verified from the public edge through the frontend nginx /api proxy without
+// a separate edge route.
+const healthHandler = (req, res) => {
   res.status(200).json({ status: 'ok', service: 'numztrak-fuel-api' });
-});
+};
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 /** Unauthenticated: ERB fuel lines for login (same adapter as /api/reports/erb/latest; fills cache on demand). */
 app.get('/api/public/login-insight', async (req, res) => {

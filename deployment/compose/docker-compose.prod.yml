@@ -47,8 +47,10 @@ services:
       TRACCAR_DATABASE_USER: traccar
     volumes:
       - ../../backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    # Bound to loopback so only Caddy (80/443) is the public entry; ops can still
+    # reach Traccar admin via SSH tunnel: ssh -L 8082:127.0.0.1:8082 <host>.
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     healthcheck:
       test:
         [
@@ -136,8 +138,10 @@ services:
       TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
       DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
       HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
+    # Bound to loopback so the backend is only reachable publicly via Caddy → frontend → /api;
+    # ops can still reach it directly via SSH tunnel: ssh -L 3000:127.0.0.1:3000 <host>.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       db:
         condition: service_healthy
@@ -164,8 +168,10 @@ services:
     image: ${REGISTRY_PREFIX}/numzfleet-frontend:${IMAGE_TAG}
     container_name: numzfleet-prod-frontend
     restart: unless-stopped
+    # Bound to loopback so users only reach the SPA via Caddy at https://<domain>;
+    # ops can still hit it directly via SSH tunnel: ssh -L 3002:127.0.0.1:3002 <host>.
     ports:
-      - "3002:80"
+      - "127.0.0.1:3002:80"
     depends_on:
       backend:
         condition: service_healthy

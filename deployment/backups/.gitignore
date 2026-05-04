@@ -1,0 +1,4 @@
+# Baseline + ad-hoc Postgres snapshots from deployment/backup/baseline-backup.sh.
+# Never commit DB dumps to the repo; they belong on the host (and off-site copy if configured).
+*
+!.gitignore
