@@ -21,6 +21,26 @@ Replace host if your instance IP changes.
 ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/oci_instance_key.pem ubuntu@YOUR_OCI_PUBLIC_IP
 ```
 
+## Saved shortcut (recommended)
+
+This repo includes a reusable shortcut script for production login:
+
+```bash
+bash deployment/ssh-prod.sh
+```
+
+Defaults in the script:
+
+- Host: `129.151.163.95`
+- User: `ubuntu`
+- Key: `~/.ssh/oci_instance_key.pem`
+
+Optional overrides:
+
+```bash
+OCI_PROD_HOST=YOUR_OCI_PUBLIC_IP OCI_PROD_USER=ubuntu OCI_PROD_KEY=~/.ssh/oci_instance_key.pem bash deployment/ssh-prod.sh
+```
+
 ## Non-interactive check (PowerShell — confirms SSH + quick server state)
 
 Uses Git for Windows OpenSSH. Fails fast if the key is wrong (`BatchMode=yes`).

@@ -4,7 +4,7 @@ These files were an alternate root-context build path for frontend/backend. **Do
 
 Canonical builds:
 
-- [deployment/push/build-release-images.sh](../deployment/push/build-release-images.sh) (local/CI)
+- [deployment/push/build-release-images.sh](../../../deployment/push/build-release-images.sh) (local/CI)
 - App Dockerfiles: `traccar-fleet-system/frontend/Dockerfile`, `fuel-api/Dockerfile`, `erb-fuel-monitor/Dockerfile`
 
-Registry images: `numzfleet-frontend`, `numzfleet-backend`, `numzfleet-erb` (see [deployment/REGISTRY_DEPLOY.md](../deployment/REGISTRY_DEPLOY.md)).
+Registry images: `numzfleet-frontend`, `numzfleet-backend`, `numzfleet-erb` (see [deployment/REGISTRY_DEPLOY.md](../../../deployment/REGISTRY_DEPLOY.md)).

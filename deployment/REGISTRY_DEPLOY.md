@@ -180,4 +180,4 @@ Use root `docker-compose.yml` (+ optional `docker-compose.erb.yml`) and `rebuild
 
 ## Legacy
 
-Old alternate Dockerfiles live under [legacy/deployment-docker](../legacy/deployment-docker/) for reference only.
+Old alternate Dockerfiles are archived under [legacy/deployment-archived/deployment-docker](../legacy/deployment-archived/deployment-docker/) for reference only.
