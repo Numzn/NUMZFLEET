@@ -47,6 +47,17 @@ const App = () => {
       const response = await traccarFetch('/api/session');
       if (response.ok) {
         dispatch(sessionActions.updateUser(await response.json()));
+
+        try {
+          const fuelProbe = await fetch('/api/fuel-requests', { credentials: 'include' });
+          if (fuelProbe.status === 401) {
+            await traccarFetch('/api/session', { method: 'DELETE' });
+            window.sessionStorage.setItem('postLogin', pathname + search);
+            navigate(newServer ? '/register' : '/login', { replace: true });
+          }
+        } catch {
+          // Ignore probe failures (network, server issues). This check is only to detect stale cookies.
+        }
       } else {
         window.sessionStorage.setItem('postLogin', pathname + search);
         navigate(newServer ? '/register' : '/login', { replace: true });
