@@ -105,7 +105,7 @@ const SettingsMenu = () => {
               title={t('sharedGeofences')}
               link="/geofences"
               icon={<DrawIcon />}
-              selected={location.pathname.startsWith('/settings/geofence')}
+              selected={location.pathname.startsWith('/geofences')}
             />
             {!features.disableGroups && (
               <MenuItem

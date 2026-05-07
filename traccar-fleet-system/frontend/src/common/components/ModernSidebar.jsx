@@ -21,6 +21,7 @@ import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
+import DrawOutlinedIcon from '@mui/icons-material/DrawOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ChevronLeftOutlinedIcon from '@mui/icons-material/ChevronLeftOutlined';
@@ -235,6 +236,7 @@ const ModernSidebar = ({
             { title: 'Vehicles', path: '/fleet/vehicles', show: manager },
             { title: 'Devices', path: '/settings/devices' },
             { title: 'Drivers', path: '/settings/drivers', show: !features.disableDrivers },
+            { title: 'Geofences', path: '/geofences', icon: DrawOutlinedIcon },
           ].filter((c) => c.show !== false),
         },
         {
