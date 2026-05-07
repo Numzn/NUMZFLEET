@@ -9,7 +9,7 @@ const CHROME_GAP = 8;
  * Keeps the map canvas full-bleed under fixed top/bottom chrome while insetting
  * MapLibre's logical viewport (padding + control offsets) so controls and framing stay clear.
  */
-const MapChromePadding = ({ sidebarInset = 0, isDesktop }) => {
+const MapChromePadding = ({ sidebarInset = 0 }) => {
   const theme = useTheme();
   const topSafeRef = useRef(null);
   const bottomSafeRef = useRef(null);
@@ -55,7 +55,8 @@ const MapChromePadding = ({ sidebarInset = 0, isDesktop }) => {
   useEffect(() => {
     const container = map.getContainer();
     const topPad = safeTop + chromeTop;
-    const bottomPad = isDesktop ? 0 : safeBottom + chromeBottom;
+    // Bottom nav can be visible at any viewport width (--app-bottomnav-height from AppLayout or map route).
+    const bottomPad = safeBottom + chromeBottom;
     const left = theme.direction === 'rtl' ? 0 : sidebarInset;
     const right = theme.direction === 'rtl' ? sidebarInset : 0;
 
@@ -71,16 +72,15 @@ const MapChromePadding = ({ sidebarInset = 0, isDesktop }) => {
       }
     }
 
-    // Push bottom stacks above the mobile bottom nav (scale + attribution live in opposite corners).
-    const bottomCorners = !isDesktop
-      ? [
-          container.querySelector('.maplibregl-ctrl-bottom-left'),
-          container.querySelector('.maplibregl-ctrl-bottom-right'),
-        ].filter(Boolean)
-      : [];
+    // Push bottom stacks above the bottom nav (scale + attribution live in opposite corners).
+    const bottomCorners = [
+      container.querySelector('.maplibregl-ctrl-bottom-left'),
+      container.querySelector('.maplibregl-ctrl-bottom-right'),
+    ].filter(Boolean);
 
+    const bottomOffset = bottomPad > 0 ? bottomPad + CHROME_GAP : CHROME_GAP;
     bottomCorners.forEach((el) => {
-      el.style.bottom = `${bottomPad + CHROME_GAP}px`;
+      el.style.bottom = `${bottomOffset}px`;
     });
 
     map.setPadding({ top: topPad, right, bottom: bottomPad, left });
@@ -97,7 +97,7 @@ const MapChromePadding = ({ sidebarInset = 0, isDesktop }) => {
       });
       map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 });
     };
-  }, [chromeBottom, chromeTop, isDesktop, sidebarInset, theme.direction, safeTop, safeBottom]);
+  }, [chromeBottom, chromeTop, sidebarInset, theme.direction, safeTop, safeBottom]);
 
   return (
     <>

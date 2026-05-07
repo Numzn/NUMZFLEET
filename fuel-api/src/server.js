@@ -187,7 +187,8 @@ const standardLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // Public endpoints have their own relaxed limiter.
-  skip: (req) => req.path.startsWith('/public/'),
+  // /health is exempt so connectivity heartbeats don't burn the IP budget.
+  skip: (req) => req.path.startsWith('/public/') || req.path === '/health',
 });
 
 // Sensitive write actions are throttled more aggressively.

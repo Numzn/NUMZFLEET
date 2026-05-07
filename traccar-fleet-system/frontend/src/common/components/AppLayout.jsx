@@ -83,16 +83,19 @@ const AppLayout = ({ children, showSidebar = true }) => {
     ? (collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED)
     : { xs: '80vw', sm: 360 };
 
+  // Bottom nav is shown at all breakpoints; keep scrollable main content above it.
   const mainPaddingBottom = useMemo(() => {
-    if (desktop) return CHROME_GAP;
     const safeBottom = 'env(safe-area-inset-bottom, 0px)';
     return `calc(${safeBottom} + ${bottomNavHeight}px + ${CHROME_GAP}px)`;
-  }, [bottomNavHeight, desktop]);
+  }, [bottomNavHeight]);
 
   useLayoutEffect(() => {
     const read = () => {
       const tb = topbarRef.current?.getBoundingClientRect?.().height;
-      const bn = bottomNavRef.current?.getBoundingClientRect?.().height;
+      const paper = bottomNavRef.current?.querySelector?.('.MuiPaper-root');
+      const bn = paper?.getBoundingClientRect?.().height
+        ?? bottomNavRef.current?.getBoundingClientRect?.().height
+        ?? 0;
       if (tb && Math.abs(tb - topbarHeight) > 0.5) setTopbarHeight(tb);
       if (bn != null && Math.abs(bn - bottomNavHeight) > 0.5) setBottomNavHeight(bn);
       // Expose for MapChromePadding + any full-bleed surfaces.
@@ -187,16 +190,14 @@ const AppLayout = ({ children, showSidebar = true }) => {
           {children}
         </Box>
 
-        {!desktop && (
-          <Box
-            ref={bottomNavRef}
-            sx={{
-              '@media print': { display: 'none' },
-            }}
-          >
-            <BottomMenu />
-          </Box>
-        )}
+        <Box
+          ref={bottomNavRef}
+          sx={{
+            '@media print': { display: 'none' },
+          }}
+        >
+          <BottomMenu />
+        </Box>
       </Box>
     </Box>
   );

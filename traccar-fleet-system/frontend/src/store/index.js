@@ -1,6 +1,7 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 
 import { errorsReducer as errors } from './errors';
+import { connectivityReducer as connectivity } from './connectivity';
 import { sessionReducer as session } from './session';
 import { devicesReducer as devices } from './devices';
 import { eventsReducer as events } from './events';
@@ -15,6 +16,7 @@ import throttleMiddleware from './throttleMiddleware';
 
 const reducer = combineReducers({
   errors,
+  connectivity,
   session,
   devices,
   events,
@@ -28,6 +30,7 @@ const reducer = combineReducers({
 });
 
 export { errorsActions } from './errors';
+export { connectivityActions } from './connectivity';
 export { sessionActions } from './session';
 export { devicesActions } from './devices';
 export { eventsActions } from './events';

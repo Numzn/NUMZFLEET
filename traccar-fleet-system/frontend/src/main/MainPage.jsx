@@ -1,17 +1,17 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Box } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { devicesActions } from '../store';
 import usePersistedState from '../common/util/usePersistedState';
-import EventsDrawer from './EventsDrawer';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
 import PremiumTopBar from './components/PremiumTopBar';
 import DeviceDropdown from './components/DeviceDropdown';
 import MapDevicePopup from './components/MapDevicePopup';
-import { useAttributePreference } from '../common/util/preferences';
+import BottomMenu from '../common/components/BottomMenu';
 
 const useStyles = makeStyles()(() => ({
   root: {
@@ -36,6 +36,7 @@ const useStyles = makeStyles()(() => ({
 
 const MainPage = () => {
   const { classes } = useStyles();
+  const bottomNavRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
@@ -70,6 +71,29 @@ const MainPage = () => {
   }, [navigate]);
 
   useFilter(keyword, filter, filterSort, filterMap, positions, setFilteredDevices, setFilteredPositions);
+
+  // Map route is outside AppLayout; portaled BottomMenu + --app-bottomnav-height for MapChromePadding.
+  useLayoutEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const read = () => {
+      const paper = bottomNavRef.current?.querySelector?.('.MuiPaper-root');
+      const h = paper?.getBoundingClientRect?.().height
+        ?? bottomNavRef.current?.getBoundingClientRect?.().height
+        ?? 0;
+      document.documentElement.style.setProperty('--app-bottomnav-height', `${Math.round(h)}px`);
+    };
+
+    read();
+    window.addEventListener('resize', read);
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', read);
+    return () => {
+      window.removeEventListener('resize', read);
+      vv?.removeEventListener('resize', read);
+      document.documentElement.style.setProperty('--app-bottomnav-height', '0px');
+    };
+  }, []);
 
   // Auto-open drawer when device is selected
   useEffect(() => {
@@ -181,6 +205,17 @@ const MainPage = () => {
         )}
       </Box>
 
+      {/* Portal keeps the bar above MapLibre/WebGL and out of overflow:hidden ancestors */}
+      {typeof document !== 'undefined'
+        && createPortal(
+          <Box
+            ref={bottomNavRef}
+            sx={{ '@media print': { display: 'none' } }}
+          >
+            <BottomMenu layer="map" />
+          </Box>,
+          document.body,
+        )}
     </Box>
   );
 };

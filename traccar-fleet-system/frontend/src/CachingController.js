@@ -7,6 +7,7 @@ import {
 } from './store';
 import { useEffectAsync } from './reactHelper';
 import fetchOrThrow from './common/util/fetchOrThrow';
+import diag from './common/util/diagLogger';
 
 const FUEL_POLL_INTERVAL_MS = 60000; // 60s fallback poll
 
@@ -64,25 +65,22 @@ const CachingController = () => {
           headers: fuelApiAuthHeaders(user),
         });
         const requests = await response.json();
-        if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Loaded fuel requests:', requests.length, 'requests');
-        }
-        
-        // Log if no requests found but we expect some
+        diag.log('fuel_requests_loaded', { count: requests.length });
+
+        // Empty list is a valid success state (no rows yet, or driver has none).
+        // Log it as a structured diag event in dev only — never as a user-facing error.
         if (requests.length === 0) {
-          console.warn('⚠️ No fuel requests found. This could mean:');
-          console.warn('   1. No requests exist in the database');
-          console.warn('   2. User is a driver and has no requests');
-          console.warn('   3. Authentication issue - check backend logs');
+          diag.log('fuel_requests_empty', {
+            possibleCauses: ['no_rows', 'driver_has_none', 'auth_mismatch'],
+          });
         }
-        
+
         dispatch(fuelRequestsActions.refresh(requests));
       } catch (error) {
-        // Fuel API might not be available in all environments
-        console.error('❌ Fuel requests API error:', error);
-        console.warn('⚠️ Fuel requests API not available:', error.message);
-        // Initialize with empty array to prevent errors
-        dispatch(fuelRequestsActions.refresh([]));
+        // Network / server failure: keep last known good data on screen.
+        // Wiping the slice would create a misleading "no fuel requests" state
+        // during outages, which is exactly what we want to avoid.
+        diag.warn('fuel_requests_load_failed', { error: error && error.message });
       }
     }
   }, [authenticated, user?.id]);

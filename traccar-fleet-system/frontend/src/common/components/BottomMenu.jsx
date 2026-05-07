@@ -20,7 +20,12 @@ import { useTranslation } from './LocalizationProvider';
 import { useRestriction } from '../util/permissions';
 import { nativePostMessage } from './NativeInterface';
 
-const BottomMenu = () => {
+/**
+ * @param {Object} props
+ * @param {'chrome'|'map'} [props.layer='chrome'] — `map` uses a higher z-index so the bar stays
+ *   above full-bleed MapLibre / WebGL stacking; use when rendering over the live map surface.
+ */
+const BottomMenu = ({ layer = 'chrome' } = {}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
@@ -112,6 +117,8 @@ const BottomMenu = () => {
     }
   };
 
+  const navZ = (theme) => (layer === 'map' ? theme.zIndex.modal + 600 : theme.zIndex.modal + 1);
+
   return (
     <Paper
       elevation={8}
@@ -120,7 +127,7 @@ const BottomMenu = () => {
         left: 0,
         right: 0,
         bottom: 'env(safe-area-inset-bottom, 0px)',
-        zIndex: theme.zIndex.modal + 1,
+        zIndex: navZ(theme),
         borderRadius: '14px 14px 0 0',
         overflow: 'hidden',
         border: `1px solid ${theme.palette.mode === 'dark' ? alpha('#67e8f9', 0.22) : alpha('#0f172a', 0.09)}`,
@@ -171,7 +178,14 @@ const BottomMenu = () => {
           <BottomNavigationAction label={t('settingsUser')} icon={<PersonIcon />} value="account" />
         )}
       </BottomNavigation>
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+        {...(layer === 'map'
+          ? { slotProps: { paper: { sx: { zIndex: 2000 } } } }
+          : {})}
+      >
         <MenuItem onClick={handleAccount}>
           <Typography color="textPrimary">{t('settingsUser')}</Typography>
         </MenuItem>

@@ -3,36 +3,64 @@ import { useDispatch, useSelector } from 'react-redux';
 import { io } from 'socket.io-client';
 import { fuelRequestsActions } from '../store/fuelRequests';
 import { useToastNotifications } from '../../hooks/useToastNotifications';
+import ConnectivityService from '../../connectivity/ConnectivityService';
+import diag from '../../common/util/diagLogger';
+
+/**
+ * Fuel Socket.IO controller — connectivity-aware lifecycle.
+ *
+ * State machine:
+ *   CONNECTED      socket is healthy
+ *   RECONNECTING   socket is attempting to reconnect
+ *   OFFLINE        browser is offline; reconnection is paused
+ *   FAILED         backend repeatedly unreachable; we keep waiting but stop
+ *                  spamming the console
+ *   PAUSED         no authenticated user; nothing to do
+ *
+ * User-facing messaging is owned by ConnectivityBanner. This controller only
+ * emits structured diag events; it never writes Docker/troubleshooting copy
+ * to the browser console.
+ */
+const SOCKET_STATE = Object.freeze({
+  CONNECTED: 'CONNECTED',
+  RECONNECTING: 'RECONNECTING',
+  OFFLINE: 'OFFLINE',
+  FAILED: 'FAILED',
+  PAUSED: 'PAUSED',
+});
 
 const FuelSocketController = () => {
   const dispatch = useDispatch();
   const authenticated = useSelector((state) => !!state.session.user);
   const user = useSelector((state) => state.session.user);
-  
-  // Enable browser notifications - users can see notifications even when tab is not active
-  // Check if user has enabled browser notifications in preferences
-  const browserNotificationsEnabled = 
-    user?.attributes?.browserNotificationsEnabled !== false; // Default to true if not set
-  
+
+  const browserNotificationsEnabled = user?.attributes?.browserNotificationsEnabled !== false;
+
   const { showToast, ToastNotification, showFuelRequestNotification } = useToastNotifications({
     enableBrowserNotifications: browserNotificationsEnabled,
-    autoRequestPermission: false, // Don't auto-request, let user enable manually
+    autoRequestPermission: false,
   });
-  
-  // Use refs to avoid recreating socket connection
+
   const socketRef = useRef(null);
+  const stateRef = useRef(SOCKET_STATE.PAUSED);
   const showToastRef = useRef(showToast);
   const showFuelRequestNotificationRef = useRef(showFuelRequestNotification);
   const userRef = useRef(user);
   const dispatchRef = useRef(dispatch);
   const browserNotificationsEnabledRef = useRef(browserNotificationsEnabled);
-  
-  // Smart notification tracking - prevent duplicates
-  const shownNotificationsRef = useRef(new Set()); // Track shown notification IDs
-  const notificationTimeoutRef = useRef({}); // Track timeouts for clearing
-  const tabFocusStateRef = useRef(true); // Track tab focus state reliably
 
-  // Update refs when values change
+  const shownNotificationsRef = useRef(new Set());
+  const notificationTimeoutRef = useRef({});
+  const tabFocusStateRef = useRef(true);
+  const failureStreakRef = useRef(0);
+
+  const setState = (next, reason) => {
+    if (stateRef.current === next) return;
+    const prev = stateRef.current;
+    stateRef.current = next;
+    diag.log('fuel_socket_state', { from: prev, to: next, reason });
+  };
+
   useEffect(() => {
     showToastRef.current = showToast;
     showFuelRequestNotificationRef.current = showFuelRequestNotification;
@@ -41,18 +69,14 @@ const FuelSocketController = () => {
     browserNotificationsEnabledRef.current = browserNotificationsEnabled;
   }, [showToast, showFuelRequestNotification, user, dispatch, browserNotificationsEnabled]);
 
-  // Track tab focus state reliably using visibilitychange API
   useEffect(() => {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined') return undefined;
 
     const updateFocusState = () => {
       tabFocusStateRef.current = !document.hidden && document.hasFocus();
     };
 
-    // Set initial state
     updateFocusState();
-
-    // Listen for visibility changes (more reliable than focus/blur)
     document.addEventListener('visibilitychange', updateFocusState);
     window.addEventListener('focus', updateFocusState);
     window.addEventListener('blur', updateFocusState);
@@ -65,47 +89,40 @@ const FuelSocketController = () => {
   }, []);
 
   useEffect(() => {
-    // Guard against SSR/test environments where window is not available
     if (typeof window === 'undefined') {
-      return;
+      return undefined;
     }
 
     if (!authenticated || !user) {
-      return;
+      setState(SOCKET_STATE.PAUSED, 'no_user');
+      return undefined;
     }
 
-    // Determine fuel API WebSocket URL.
-    // With new service-based routing, Socket.IO is at /socket.io on the same origin
+    // Same-origin Socket.IO endpoint.
     const fuelApiUrl = '/';
 
-    // Reuse socket while connected or actively reconnecting.
     let socket = socketRef.current;
 
     if (!socket || (!socket.connected && !socket.active)) {
-      // Disconnect existing socket if any
       if (socket) {
         socket.removeAllListeners();
         socket.disconnect();
       }
 
-      // Connect to fuel API WebSocket via Socket.IO
-      
       socket = io(fuelApiUrl, {
-        transports: ['polling', 'websocket'], // Try polling first, then upgrade to websocket
+        transports: ['polling', 'websocket'],
         timeout: 20000,
-        forceNew: false, // Allow reuse of existing connection
-        path: '/socket.io', // Socket.IO standard path (NO trailing slash - this is critical!)
+        forceNew: false,
+        path: '/socket.io',
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 10000,
         randomizationFactor: 0.5,
-        reconnectionAttempts: Infinity, // Keep trying to reconnect
-        withCredentials: true, // Important: send cookies for authentication
-        upgrade: true, // Allow upgrade from polling to websocket
-        rememberUpgrade: true, // Remember transport preference
-        // Socket.IO v4+ standard options
+        reconnectionAttempts: Infinity,
+        withCredentials: true,
+        upgrade: true,
+        rememberUpgrade: true,
         autoConnect: true,
-        // Socket.IO v4+ standard: auth is an object, not a callback!
         auth: {
           userId: user?.id,
           administrator: user?.administrator,
@@ -113,30 +130,33 @@ const FuelSocketController = () => {
       });
 
       socketRef.current = socket;
+      setState(SOCKET_STATE.RECONNECTING, 'init');
     }
 
-    // Register event listeners FIRST, before connection
-    // This ensures listeners are ready when events arrive
-    
-    // Smart notification function with deduplication
+    // If we already know we are offline, pause the socket immediately.
+    const initialSnap = ConnectivityService.getSnapshot();
+    if (!initialSnap.isBrowserOnline) {
+      try {
+        if (socket.io && socket.io.opts) socket.io.opts.reconnection = false;
+        socket.disconnect();
+      } catch (err) {
+        diag.warn('fuel_socket_pause_failed', { error: String(err && err.message) });
+      }
+      setState(SOCKET_STATE.OFFLINE, 'browser_offline');
+    }
+
     const showSmartNotification = (request, change, eventType) => {
       if (!request || !request.id) return;
-      
-      // Create unique notification ID based on request ID and change type
+
       const notificationId = `${eventType}-${request.id}-${change?.type || 'created'}`;
-      
-      // Check if already shown (within last 5 seconds to prevent duplicates)
+
       if (shownNotificationsRef.current.has(notificationId)) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[Notification] Skipping duplicate: ${notificationId}`);
-        }
+        diag.log('fuel_notification_dedup', { id: notificationId });
         return;
       }
-      
-      // Mark as shown IMMEDIATELY to prevent race conditions
+
       shownNotificationsRef.current.add(notificationId);
-      
-      // Clear from set after 5 seconds to allow re-notification if needed
+
       if (notificationTimeoutRef.current[notificationId]) {
         clearTimeout(notificationTimeoutRef.current[notificationId]);
       }
@@ -144,18 +164,12 @@ const FuelSocketController = () => {
         shownNotificationsRef.current.delete(notificationId);
         delete notificationTimeoutRef.current[notificationId];
       }, 5000);
-      
-      // Use reliable focus state from ref (updated via visibilitychange API)
-      const isTabFocused = tabFocusStateRef.current;
+
       const isManager = userRef.current?.administrator;
       const isMyRequest = request.userId === userRef.current?.id;
-      
-      // For fuel-request-created: Only show to managers
+
       if (eventType === 'fuel-request-created' && isManager) {
-        // Only show push notification (no toast notification for new requests)
-        // Use a small delay to ensure focus state is stable
         setTimeout(() => {
-          // Always show push notification for new fuel requests (no toast)
           if (showFuelRequestNotificationRef.current) {
             try {
               showFuelRequestNotificationRef.current('request-created', {
@@ -165,239 +179,206 @@ const FuelSocketController = () => {
                 vehicleName: request.vehicleName,
                 ...request,
               });
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`[Notification] Showing push for fuel-request-created: ${notificationId}`);
-              }
+              diag.log('fuel_notification_push', { kind: 'request-created', id: notificationId });
             } catch (error) {
-              console.error('❌ [Push] Error showing push notification:', error);
+              diag.error('fuel_notification_push_error', { error: String(error && error.message) });
             }
           }
-        }, 50); // Small delay to ensure focus state is stable
+        }, 50);
       }
-      
-      // For fuel-request-updated: Show to relevant user
+
       if (eventType === 'fuel-request-updated' && change && (isMyRequest || isManager)) {
         const message = change.message || `Fuel request ${change.type}`;
-        
-        // Determine notification type
+
         let notificationType = 'info';
         if (change.type === 'approved') notificationType = 'success';
         else if (change.type === 'rejected') notificationType = 'error';
         else if (change.type === 'cancelled') notificationType = 'warning';
         else if (change.type === 'fulfilled') notificationType = 'success';
-        
-        // Smart notification routing:
-        // - If tab is focused: Show toast only (user is actively using app)
-        // - If tab is NOT focused: Show push notification only (user is away)
-        // Use a small delay to ensure focus state is stable
+
         setTimeout(() => {
-          // Re-check focus state after delay to ensure accuracy
           const currentFocusState = tabFocusStateRef.current;
-          
+
           if (currentFocusState) {
-            // Tab is focused - show toast ONLY (no push)
             if (showToastRef.current) {
               try {
                 showToastRef.current(message, notificationType, undefined, { skipPush: true });
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`[Notification] Showing toast for fuel-request-updated (tab focused): ${notificationId}`);
-                }
+                diag.log('fuel_notification_toast', { id: notificationId, type: notificationType });
               } catch (error) {
-                console.error('❌ [Toast] Error calling showToast:', error);
+                diag.error('fuel_notification_toast_error', { error: String(error && error.message) });
               }
             }
-          } else {
-            // Tab is NOT focused - show push notification ONLY (no toast)
-            if (showFuelRequestNotificationRef.current) {
-              const pushNotificationType = change.type === 'approved' ? 'request-approved' :
-                                         change.type === 'rejected' ? 'request-rejected' :
-                                         change.type === 'fulfilled' ? 'request-fulfilled' :
-                                         change.type === 'cancelled' ? 'request-cancelled' : null;
-              
-              if (pushNotificationType) {
-                try {
-                  showFuelRequestNotificationRef.current(pushNotificationType, {
-                    id: request.id,
-                    fuelAmount: request.approvedAmount || request.requestedAmount,
-                    reason: request.notes || request.rejectionReason,
-                    vehicleName: request.vehicleName,
-                    ...request,
-                  });
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log(`[Notification] Showing push for fuel-request-updated (tab not focused): ${notificationId}`);
-                  }
-                } catch (error) {
-                  console.error('❌ [Push] Error showing push notification:', error);
-                }
+          } else if (showFuelRequestNotificationRef.current) {
+            const pushNotificationType = change.type === 'approved' ? 'request-approved'
+              : change.type === 'rejected' ? 'request-rejected'
+                : change.type === 'fulfilled' ? 'request-fulfilled'
+                  : change.type === 'cancelled' ? 'request-cancelled' : null;
+
+            if (pushNotificationType) {
+              try {
+                showFuelRequestNotificationRef.current(pushNotificationType, {
+                  id: request.id,
+                  fuelAmount: request.approvedAmount || request.requestedAmount,
+                  reason: request.notes || request.rejectionReason,
+                  vehicleName: request.vehicleName,
+                  ...request,
+                });
+                diag.log('fuel_notification_push', { kind: pushNotificationType, id: notificationId });
+              } catch (error) {
+                diag.error('fuel_notification_push_error', { error: String(error && error.message) });
               }
             }
           }
-        }, 50); // Small delay to ensure focus state is stable
+        }, 50);
       }
     };
 
-    // Fuel request events - remove old listeners before adding new ones to prevent duplicates
+    const joinRoom = () => {
+      if (!socket.connected) {
+        diag.log('fuel_socket_join_skipped', { reason: 'not_connected' });
+        return;
+      }
+      const room = userRef.current?.administrator
+        ? 'managers'
+        : `driver-${userRef.current?.id}`;
+      socket.emit('join-room', room, (response) => {
+        diag.log('fuel_socket_room_joined', { room, ack: !!response });
+      });
+    };
+
     socket.off('fuel-request-created');
     socket.off('fuel-request-updated');
 
-    // Fuel request events - REGISTER BEFORE CONNECTION
     socket.on('fuel-request-created', (data) => {
-      // Handle both old format (just request) and new format (with change data)
       const request = data.request || data;
       const change = data.change;
-      
+
       dispatchRef.current(fuelRequestsActions.update([request]));
-      
+
       if (userRef.current?.administrator) {
-        // Use smart notification system to prevent duplicates
         showSmartNotification(request, change, 'fuel-request-created');
       }
     });
 
     socket.on('fuel-request-updated', (data) => {
-      // Handle both old format (just request) and new format (with change data)
       const request = data.request || data;
       const change = data.change;
-      
+
       if (!change) {
-        console.warn('⚠️ No change data in event - using fallback format');
+        diag.log('fuel_event_no_change', { id: request?.id });
       }
-      
+
       dispatchRef.current(fuelRequestsActions.update([request]));
-      
-      // Use smart notification system to prevent duplicates
+
       if (change) {
         showSmartNotification(request, change, 'fuel-request-updated');
-      } else {
-        // Fallback for old format
-        if (!userRef.current?.administrator && request.userId === userRef.current?.id) {
-          if (showToastRef.current) {
-            showToastRef.current('Your fuel request was updated', 'info', undefined, { skipPush: true });
-          }
+      } else if (!userRef.current?.administrator && request.userId === userRef.current?.id) {
+        if (showToastRef.current) {
+          showToastRef.current('Your fuel request was updated', 'info', undefined, { skipPush: true });
         }
       }
     });
 
-    // Listen for room-joined event (fallback for Socket.IO callback issues)
     socket.off('room-joined');
     socket.on('room-joined', (data) => {
-      // Room joined successfully
+      diag.log('fuel_socket_room_joined_event', { room: data && data.room });
     });
 
-    // Connection events - remove old listener first to prevent duplicates
     socket.off('connect');
     socket.on('connect', () => {
-      setTimeout(() => {
-        if (!socket.connected) {
-          console.warn('⚠️ [Room] Socket disconnected, skipping join-room');
-          return;
-        }
-        
-        if (userRef.current?.administrator) {
-          const room = 'managers';
-          socket.emit('join-room', room, (response) => {
-            if (!response) {
-              console.warn('⚠️ [Room] No callback received, using room-joined event');
-            }
-          });
-        } else {
-          const room = `driver-${userRef.current?.id}`;
-          socket.emit('join-room', room, (response) => {
-            if (!response) {
-              console.warn('⚠️ [Room] No callback received, using room-joined event');
-            }
-          });
-        }
-      }, 500);
+      failureStreakRef.current = 0;
+      setState(SOCKET_STATE.CONNECTED, 'connect');
+      setTimeout(joinRoom, 500);
     });
 
-    // If already connected, join rooms immediately
     if (socket.connected) {
-      setTimeout(() => {
-        if (!socket.connected) {
-          console.warn('⚠️ [Room] Socket disconnected, skipping join-room');
-          return;
-        }
-        
-        if (userRef.current?.administrator) {
-          const room = 'managers';
-          socket.emit('join-room', room, (response) => {
-            if (!response) {
-              console.warn('⚠️ [Room] No callback received, using room-joined event');
-            }
-          });
-        } else {
-          const room = `driver-${userRef.current?.id}`;
-          socket.emit('join-room', room, (response) => {
-            if (!response) {
-              console.warn('⚠️ [Room] No callback received, using room-joined event');
-            }
-          });
-        }
-      }, 500);
+      setState(SOCKET_STATE.CONNECTED, 'already_connected');
+      setTimeout(joinRoom, 500);
     }
 
-    // Disconnect and error handlers - remove old listeners first
+    socket.off('reconnect_attempt');
+    socket.on('reconnect_attempt', (attempt) => {
+      if (stateRef.current !== SOCKET_STATE.OFFLINE) {
+        setState(SOCKET_STATE.RECONNECTING, 'reconnect_attempt');
+      }
+      diag.log('fuel_socket_reconnect_attempt', { attempt });
+    });
+
     socket.off('disconnect');
     socket.on('disconnect', (reason) => {
-      // Log Docker-specific disconnect reasons
-      if (reason === 'transport close' || reason === 'transport error') {
-        console.warn('🐳 [FuelSocket] Transport error - possible Docker network issue');
-        console.warn('   - Check if fuel-api container restarted');
-        console.warn('   - Verify nginx proxy is running (if using nginx)');
-        console.warn('   - Check Docker network connectivity');
+      diag.warn('fuel_socket_disconnect', { reason });
+      if (stateRef.current === SOCKET_STATE.CONNECTED) {
+        setState(SOCKET_STATE.RECONNECTING, `disconnect:${reason}`);
       }
     });
 
     socket.off('connect_error');
     socket.on('connect_error', (error) => {
-      console.error('❌ [FuelSocket] Fuel WebSocket connection error:', error);
-      
-      // Common Docker-related error patterns
-      if (error.message.includes('ECONNREFUSED') || error.message.includes('Failed to fetch')) {
-        console.error('🐳 [FuelSocket] Docker / connectivity issue (hints):');
-        console.error('   - From repo root: docker compose ps (service name is usually backend for fuel-api)');
-        console.error('   - docker network ls (Compose uses a <project>_default network, not numztrak-network)');
-        console.error('   - If Vite dev port differs from fuel-api, confirm CORS + proxy (LOCAL_DEVELOPMENT_GUIDE.md)');
-      }
-      
-      if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
-        console.error('🐳 [FuelSocket] Connection Timeout - Possible Docker Issues:');
-        console.error('   - Container may be slow to respond');
-        console.error('   - Network latency between containers');
-        console.error('   - Check container resource usage: docker stats');
-      }
-      
-      // Try to fallback to polling if websocket fails
-      if (error.type === 'TransportError' || error.message.includes('websocket')) {
-        console.warn('⚠️ [FuelSocket] WebSocket failed, will retry with polling...');
-        // Socket.IO will automatically fallback to polling
+      failureStreakRef.current += 1;
+      diag.warn('fuel_socket_connect_error', {
+        message: String(error && error.message),
+        type: error && error.type,
+        attempt: failureStreakRef.current,
+      });
+      ConnectivityService.notifyFailure(error);
+
+      // Stop spamming after several failures; the banner has already informed
+      // the user. Socket.IO keeps retrying internally.
+      if (failureStreakRef.current >= 3 && stateRef.current !== SOCKET_STATE.OFFLINE) {
+        setState(SOCKET_STATE.FAILED, 'too_many_errors');
       }
     });
 
-    // Cleanup on unmount or when dependencies change significantly
+    // Connectivity-aware reconnection: pause Socket.IO retries while offline,
+    // resume immediately when the browser comes back online.
+    const unsubscribeConnectivity = ConnectivityService.subscribe((snap) => {
+      if (!socketRef.current) return;
+      const sock = socketRef.current;
+
+      if (!snap.isBrowserOnline) {
+        if (stateRef.current !== SOCKET_STATE.OFFLINE) {
+          try {
+            if (sock.io && sock.io.opts) sock.io.opts.reconnection = false;
+            sock.disconnect();
+          } catch (err) {
+            diag.warn('fuel_socket_pause_failed', { error: String(err && err.message) });
+          }
+          setState(SOCKET_STATE.OFFLINE, 'connectivity_offline');
+        }
+        return;
+      }
+
+      // Browser is online; if we paused the socket, resume it.
+      if (stateRef.current === SOCKET_STATE.OFFLINE) {
+        try {
+          if (sock.io && sock.io.opts) sock.io.opts.reconnection = true;
+          if (!sock.connected) sock.connect();
+        } catch (err) {
+          diag.warn('fuel_socket_resume_failed', { error: String(err && err.message) });
+        }
+        setState(SOCKET_STATE.RECONNECTING, 'connectivity_online');
+      }
+    });
+
     return () => {
-      // Always clean up socket connection on unmount
+      try { unsubscribeConnectivity(); } catch { /* noop */ }
       if (socketRef.current) {
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
         socketRef.current = null;
       }
-      
-      // Clean up notification timeouts
-      Object.values(notificationTimeoutRef.current).forEach(timeout => {
+      setState(SOCKET_STATE.PAUSED, 'cleanup');
+
+      Object.values(notificationTimeoutRef.current).forEach((timeout) => {
         if (timeout) clearTimeout(timeout);
       });
       notificationTimeoutRef.current = {};
       shownNotificationsRef.current.clear();
+      failureStreakRef.current = 0;
     };
   }, [authenticated, user?.id]);
 
-  // Render toast notifications only (popup notifications handled by FuelRequestsCard)
   return <ToastNotification />;
 };
 
 export default FuelSocketController;
-
-
-

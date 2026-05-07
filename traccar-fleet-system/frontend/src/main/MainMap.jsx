@@ -41,7 +41,7 @@ const MainMap = ({ filteredPositions, selectedPosition, devicesOpen }) => {
   return (
     <MapErrorBoundary>
       <MapView>
-        <MapChromePadding sidebarInset={desktop && devicesOpen ? 320 : 0} isDesktop={desktop} />
+        <MapChromePadding sidebarInset={desktop && devicesOpen ? 320 : 0} />
         <MapOverlay />
         <MapGeofence />
         <MapAccuracy positions={filteredPositions} />
