@@ -168,10 +168,13 @@ def ssh_remote_cmd(user: str, host: str, inner: str) -> list[str]:
     Use bash -c (not -lc): login profiles often break non-interactive SSH (PATH, cd, set -e).
     """
     strict = os.environ.get("NUMZFLEET_SSH_STRICT_HOST_KEY_CHECKING", "accept-new")
+    connect_timeout = str(_env_int("NUMZFLEET_SSH_CONNECT_TIMEOUT_SECONDS", 45))
     argv = [
         ssh_executable(),
         "-o",
         "BatchMode=yes",
+        "-o",
+        f"ConnectTimeout={connect_timeout}",
         "-o",
         f"StrictHostKeyChecking={strict}",
     ]
@@ -252,7 +255,8 @@ _HELP_EPILOG = """
 Env files: deployment/scripts/auto_deploy.defaults.env then auto_deploy.env (optional).
 Override file path: NUMZFLEET_AUTO_DEPLOY_ENV_FILE.
 
-NUMZFLEET_SSH_HOST  NUMZFLEET_SSH_USER  NUMZFLEET_SSH_IDENTITY_FILE  NUMZFLEET_SERVER_REPO_PATH
+NUMZFLEET_SSH_HOST  NUMZFLEET_SSH_USER  NUMZFLEET_SSH_IDENTITY_FILE  NUMZFLEET_SSH_CONNECT_TIMEOUT_SECONDS
+NUMZFLEET_SERVER_REPO_PATH
 NUMZFLEET_BRANCH  NUMZFLEET_DEPLOY_ENV  NUMZFLEET_USE_MIGRATIONS  NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS
 NUMZFLEET_SSH_STRICT_HOST_KEY_CHECKING
 NUMZFLEET_GIT_PULL_STRATEGY   reset (default) or merge for server pull
@@ -433,13 +437,21 @@ def main() -> int:
         if args.dry_run:
             print(f"[dry-run] Would wait {wait_sec}s for GitHub Actions to push images.\n")
         else:
-            print(f"Waiting {wait_sec}s for GitHub Actions to push images…\n")
+            print(f"Waiting {wait_sec}s for GitHub Actions to push images...\n")
             countdown(wait_sec, "Deploy buffer")
     elif flags["image_build_required"] and args.skip_wait:
         print("Image build likely; skipping wait (--skip-wait).\n")
     else:
         print("No image rebuild required from path filters (config-only or unrelated paths).")
         print("Registry deploy still pins images to this commit SHA.\n")
+        if not args.skip_deploy:
+            print(
+                "[auto_deploy] WARN: CI may not have built images for this SHA. "
+                "If docker pull fails with manifest unknown, push a change under "
+                "traccar-fleet-system/frontend/, fuel-api/, or erb-fuel-monitor/, "
+                "or run the GitHub workflow manually, then redeploy.\n",
+                file=sys.stderr,
+            )
 
     sp = shlex.quote(server_path)
     env_q = shlex.quote(deploy_env)
@@ -494,13 +506,13 @@ def main() -> int:
     try:
         run_cmd(ssh_remote_cmd(user, host, git_pull_inner))
 
-        print(f"\nRunning {deploy_label} on server…\n")
+        print(f"\nRunning {deploy_label} on server...\n")
         run_cmd(ssh_remote_cmd(user, host, deploy_inner))
 
         # After a full registry deploy, containers already restart; extra traccar restart
         # only helps config-only pushes when we did NOT pull new images.
         if flags["traccar_conf"] and not flags["image_build_required"]:
-            print("\nRestarting Traccar (config changed, no image rebuild)…\n")
+            print("\nRestarting Traccar (config changed, no image rebuild)...\n")
             run_cmd(ssh_remote_cmd(user, host, compose_restart_inner))
     except subprocess.CalledProcessError as e:
         print("[auto_deploy] Remote step failed (see command output above).", file=sys.stderr)
