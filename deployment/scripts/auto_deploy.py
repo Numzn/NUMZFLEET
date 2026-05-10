@@ -365,13 +365,13 @@ def main() -> int:
             if args.skip_deploy:
                 return 0
             print(
-                "Proceeding to deploy: will `git push` so origin matches HEAD "
-                "(needed for server `git pull`).",
+                "Proceeding to deploy: will `git push origin HEAD:<branch>` so the commit you are on "
+                f"updates remote `{branch}` (not only the local `{branch}` ref if you are on another branch).",
             )
             if args.dry_run:
-                print("[dry-run] would: git push origin", branch)
+                print("[dry-run] would: git push origin", f"HEAD:{branch}")
             else:
-                run_cmd(["git", "push", "origin", branch], cwd=repo)
+                run_cmd(["git", "push", "origin", f"HEAD:{branch}"], cwd=repo)
         else:
             print("Changed files:\n", status, "\n", sep="")
             if args.dry_run:
@@ -399,9 +399,9 @@ def main() -> int:
                 run_cmd(["git", "commit", "-m", msg], cwd=repo)
 
             if args.dry_run:
-                print("[dry-run] would: git push origin", branch)
+                print("[dry-run] would: git push origin", f"HEAD:{branch}")
             else:
-                run_cmd(["git", "push", "origin", branch], cwd=repo)
+                run_cmd(["git", "push", "origin", f"HEAD:{branch}"], cwd=repo)
     else:
         dirty = get_output(["git", "status", "--short"], cwd=repo)
         if dirty:
