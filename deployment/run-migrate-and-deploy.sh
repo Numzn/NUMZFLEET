@@ -8,9 +8,51 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BACKEND_ENV="$ROOT_DIR/backend/.env"
 MIGRATIONS_DIR="$ROOT_DIR/fuel-api/migrations"
 BACKEND_CONTAINER="${BACKEND_CONTAINER:-numzfleet-prod-fuel-api}"
+POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-numzfleet-prod-db}"
 
 log() { printf '[migrate-deploy] %s\n' "$*"; }
 fail() { printf '[migrate-deploy] ERROR: %s\n' "$*" >&2; exit 1; }
+
+# DATABASE_URL normally uses host "db" (Docker DNS). That hostname does not resolve on the
+# bare host, and many servers do not install postgresql-client. Prefer psql inside the
+# running Postgres container when available.
+psql_url_for_inside_db_container() {
+  # postgresql://user:pass@db:5432/dbname -> @127.0.0.1:5432 so psql inside the db container hits local Postgres
+  local u="$DATABASE_URL"
+  u="${u//@db:/@127.0.0.1:}"
+  u="${u//@postgres:/@127.0.0.1:}"
+  printf '%s' "$u"
+}
+
+postgres_container_running() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$POSTGRES_CONTAINER"
+}
+
+run_psql() {
+  if postgres_container_running; then
+    local inner
+    inner="$(psql_url_for_inside_db_container)"
+    docker exec -i "$POSTGRES_CONTAINER" psql "$inner" -v ON_ERROR_STOP=1 "$@"
+  elif command -v psql >/dev/null 2>&1; then
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 "$@"
+  else
+    fail "psql not on PATH and container '$POSTGRES_CONTAINER' is not running. Install postgresql-client, or start the stack so Postgres is up (docker compose up -d db), or set POSTGRES_CONTAINER."
+  fi
+}
+
+run_psql_file() {
+  local f="$1"
+  if postgres_container_running; then
+    local inner
+    inner="$(psql_url_for_inside_db_container)"
+    docker exec -i "$POSTGRES_CONTAINER" psql "$inner" -v ON_ERROR_STOP=1 -f - <"$f"
+  elif command -v psql >/dev/null 2>&1; then
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+  else
+    fail "psql not on PATH and container '$POSTGRES_CONTAINER' is not running. Install postgresql-client, or start the stack so Postgres is up, or set POSTGRES_CONTAINER."
+  fi
+}
 
 # Mask userinfo in DATABASE_URL for logs (postgresql://user:pass@host -> user:***@host)
 mask_database_url() {
@@ -95,7 +137,10 @@ probe_url() {
 verify_db() {
   : "${DATABASE_URL:?DATABASE_URL must be set (typically in backend/.env)}"
   log "DATABASE_URL (masked): $(mask_database_url "$DATABASE_URL")"
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 AS ok;" >/dev/null
+  if postgres_container_running; then
+    log "Using psql inside Docker container: $POSTGRES_CONTAINER"
+  fi
+  run_psql -c "SELECT 1 AS ok;" >/dev/null
   log "Database connectivity OK"
 }
 
@@ -112,7 +157,7 @@ run_migrations() {
   done
   for f in "${files[@]}"; do
     log "Applying migration: $(basename "$f")"
-    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+    run_psql_file "$f"
   done
   log "All migrations applied successfully"
 }
