@@ -21,7 +21,7 @@ set +a
 SHA="${2:-${IMAGE_TAG:-$("$ROOT_DIR/deployment/utils/get-sha.sh")}}"
 export IMAGE_TAG="$SHA"
 
-"$ROOT_DIR/deployment/utils/validate-env.sh" "$ENV_FILE" "$SHA"
+bash "$ROOT_DIR/deployment/utils/validate-env.sh" "$ENV_FILE" "$SHA"
 
 case "${REGISTRY_PROVIDER:-}" in
   dockerhub)

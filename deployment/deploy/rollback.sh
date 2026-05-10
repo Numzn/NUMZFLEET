@@ -16,5 +16,5 @@ PREV_SHA="$(tail -n 2 "$HISTORY_FILE" | head -n 1 || true)"
 [[ -n "$PREV_SHA" ]] || fail "Could not determine previous SHA from $HISTORY_FILE"
 
 log "Rolling back to previous SHA=$PREV_SHA"
-"$ROOT_DIR/deployment/deploy/deploy-from-registry.sh" "$PREV_SHA" "$ENV_FILE"
+bash "$ROOT_DIR/deployment/deploy/deploy-from-registry.sh" "$PREV_SHA" "$ENV_FILE"
 log "Rollback completed"

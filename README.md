@@ -277,7 +277,8 @@ Optional ERB overlay: `docker compose -f docker-compose.yml -f docker-compose.er
 Production servers **do not build images**. They **pull** SHA-tagged images from Docker Hub and run `deployment/compose/docker-compose.prod.yml`.
 
 Operator runbook: [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md)  
-CI build/push: [.github/workflows/build-push-numzfleet-images.yml](.github/workflows/build-push-numzfleet-images.yml)
+CI build/push: [.github/workflows/build-push-numzfleet-images.yml](.github/workflows/build-push-numzfleet-images.yml)  
+Workstation deploy helper: [deployment/scripts/auto_deploy.py](deployment/scripts/auto_deploy.py) — see [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md).
 
 ### Docker commands (local)
 

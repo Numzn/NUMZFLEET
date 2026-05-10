@@ -38,7 +38,7 @@ ssh -L 3000:127.0.0.1:3000 -L 3002:127.0.0.1:3002 -L 8082:127.0.0.1:8082 <user>@
 
 SSH from Windows (key ACLs, interactive vs one-liner checks): [OCI_SSH.md](OCI_SSH.md).
 
-1. Clone repo (for `deployment/compose`, `deployment/deploy`, `backend/.env`, `backend/conf/traccar.xml`).
+1. Clone repo (for `deployment/compose`, `deployment/deploy`, `backend/.env`, `backend/conf/traccar.xml`). OCI default: **`~/NUMZFLEET`** — [oci-server-setup.sh](oci-server-setup.sh) (same path in `deployment/scripts/auto_deploy.defaults.env`).
 2. Copy [deployment/.env.example](.env.example) → `deployment/.env` and set `IMAGE_TAG` to the **full git SHA** you are deploying.
 3. Configure [../backend/.env](../backend/.env) (secrets, `POSTGRES_PASSWORD` or `DATABASE_URL` with host `db`, `TRACCAR_MYSQL_PASSWORD`, `ERB_API_TOKEN`, production `CORS_ORIGIN` / auth, etc.).
 
@@ -88,6 +88,16 @@ Optional second argument: path to the deployment env file (defaults to `deployme
 - Migrations in this repo are intended to be **idempotent** and **additive** (no `DROP` / `TRUNCATE`); the wrapper enforces that guard before running SQL.
 - It does **not** wipe or truncate data; it only runs the vetted SQL files above.
 - **Backward compatibility:** you can still run `deploy-from-registry.sh` alone when no migration is needed.
+
+### Optional: workstation script
+
+Python helper: commit/push (optional), SSH `git pull`, then `deploy-from-registry.sh` or `run-migrate-and-deploy.sh` — same as manual steps above. Loads [scripts/auto_deploy.defaults.env](scripts/auto_deploy.defaults.env) then optional `scripts/auto_deploy.env` (gitignored; copy from [auto_deploy.env.example](scripts/auto_deploy.env.example)). Key and host align with [ssh-prod.sh](../ssh-prod.sh); Git Bash paths use **forward slashes**. SSH / key setup: [OCI_SSH.md](OCI_SSH.md).
+
+```bash
+py deployment/scripts/auto_deploy.py --help
+py deployment/scripts/auto_deploy.py -m "release: …"
+py deployment/scripts/auto_deploy.py --dry-run --skip-git
+```
 
 ## Baseline backup (post-deploy snapshot)
 

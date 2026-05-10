@@ -58,4 +58,4 @@ $ip = "YOUR_OCI_PUBLIC_IP"
 
 ## Forward link (deploy)
 
-Registry production flow (pull/up, env files): [REGISTRY_DEPLOY.md](REGISTRY_DEPLOY.md).
+Registry production flow (pull/up, env files): [REGISTRY_DEPLOY.md](REGISTRY_DEPLOY.md). Optional PC automation: [scripts/auto_deploy.py](scripts/auto_deploy.py) (same doc).

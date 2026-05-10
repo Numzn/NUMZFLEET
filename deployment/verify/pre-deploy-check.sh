@@ -25,7 +25,7 @@ set -a
 source "$ENV_FILE"
 set +a
 
-"$ROOT_DIR/deployment/utils/validate-env.sh" "$ENV_FILE" "$SHA"
+bash "$ROOT_DIR/deployment/utils/validate-env.sh" "$ENV_FILE" "$SHA"
 
 case "${REGISTRY_PROVIDER:-}" in
   dockerhub)
