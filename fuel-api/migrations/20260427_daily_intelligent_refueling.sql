@@ -41,4 +41,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_operation_sessions_one_active_per_user
   ON operation_sessions ("userId")
   WHERE status = 'active';
 
+-- Optional station + planned litres (also in 20260511_operation_session_planned_station.sql; repeated here
+-- so environments that only ever ran the first three migration files still get these columns.)
+ALTER TABLE operation_sessions
+  ADD COLUMN IF NOT EXISTS "fuelStationId" INTEGER,
+  ADD COLUMN IF NOT EXISTS "stationName" VARCHAR(120);
+
+ALTER TABLE operation_session_refuels
+  ADD COLUMN IF NOT EXISTS "plannedFuelLitres" DOUBLE PRECISION;
+
+CREATE INDEX IF NOT EXISTS operation_sessions_fuel_station_id ON operation_sessions ("fuelStationId");
+
 COMMIT;
