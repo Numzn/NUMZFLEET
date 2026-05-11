@@ -76,6 +76,7 @@ Optional second argument: path to the deployment env file (defaults to `deployme
    - `20260503_create_operation_sessions_tables.sql`
    - `20260427_daily_intelligent_refueling.sql`
    - `20260429_refuel_status_incomplete.sql`
+   - `20260511_operation_session_planned_station.sql`
 5. Calls the existing **`deployment/deploy/deploy-from-registry.sh`** (unchanged registry-only deploy).
 6. Verifies **two** public health endpoints, each with retries, and **fails fast** if either is unhealthy:
    - **Edge:** `GET /health` (frontend nginx static `200 ok`) — proves Caddy → frontend reachability. Override with `HEALTHCHECK_URL`.
@@ -110,6 +111,8 @@ python deployment/scripts/auto_deploy.py --dry-run --skip-git
 ```
 
 **Useful flags**: `--skip-git` (deploy only), `--skip-deploy` (push only), `--skip-wait` (skip CI buffer sleep), `--no-migrations` (always registry deploy), `--deploy-image-tag <ref>`, `--prompt-message` / `NUMZFLEET_AUTO_COMMIT_MESSAGE=0` for commit messages.
+
+**If `docker pull` fails with `manifest unknown` after a push:** GitHub Actions may still be building. Confirm the **Build and push NumzFleet images** run for that SHA is green, then run `python deployment/scripts/auto_deploy.py --skip-git` (or raise **`NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS`** / **`NUMZFLEET_IMAGE_BUILD_WAIT_MIN_WITH_MIGRATIONS`** — when both migrations and app images change, `auto_deploy` uses at least **180s** before SSH by default).
 
 Full env list: comments in `auto_deploy.defaults.env` and **`python deployment/scripts/auto_deploy.py --help`** epilog (points here).
 

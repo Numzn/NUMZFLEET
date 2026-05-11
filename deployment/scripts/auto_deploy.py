@@ -468,6 +468,8 @@ def main() -> int:
     deploy_env = os.environ.get("NUMZFLEET_DEPLOY_ENV", "deployment/.env")
     use_migrations = _env_bool("NUMZFLEET_USE_MIGRATIONS", True) and not args.no_migrations
     wait_sec = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS", 90)
+    # Migrations + fresh images: backend build often exceeds a short buffer; floor unless user set higher.
+    wait_min_migrations = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_MIN_WITH_MIGRATIONS", 180)
 
     if not args.skip_deploy and not host:
         hint = ""
@@ -574,13 +576,22 @@ def main() -> int:
         print("==============================\n")
         return 0
 
-    if flags["image_build_required"] and wait_sec > 0 and not args.skip_wait:
+    ci_wait = wait_sec
+    if flags["image_build_required"] and flags["migrations"] and ci_wait > 0 and ci_wait < wait_min_migrations:
+        ci_wait = wait_min_migrations
+        print(
+            f"[auto_deploy] Migrations + app images: using CI buffer {ci_wait}s "
+            f"(NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS={wait_sec}; "
+            f"floor NUMZFLEET_IMAGE_BUILD_WAIT_MIN_WITH_MIGRATIONS={wait_min_migrations}).\n"
+        )
+
+    if flags["image_build_required"] and ci_wait > 0 and not args.skip_wait:
         print("Image build likely triggered (paths match CI workflow filters).")
         if args.dry_run:
-            print(f"[dry-run] Would wait {wait_sec}s for GitHub Actions to push images.\n")
+            print(f"[dry-run] Would wait {ci_wait}s for GitHub Actions to push images.\n")
         else:
-            print(f"Waiting {wait_sec}s for GitHub Actions to push images...\n")
-            countdown(wait_sec, "Deploy buffer")
+            print(f"Waiting {ci_wait}s for GitHub Actions to push images...\n")
+            countdown(ci_wait, "Deploy buffer")
     elif flags["image_build_required"] and args.skip_wait:
         print("Image build likely; skipping wait (--skip-wait).\n")
     else:
