@@ -5,8 +5,7 @@ NUMZFLEET workstation deploy driver — one command from laptop to production.
 Flow (see deployment/REGISTRY_DEPLOY.md, section **auto_deploy.py (workstation → server)**):
   1. Optional: git add / commit (auto message from paths unless -m / --prompt-message)
   2. git push origin HEAD:<branch> (updates remote branch from current commit; not only local <branch>)
-  3. SSH: server repo fetch + reset (or merge) to match remote
-  4. SSH: registry deploy, or migrate+deploy when fuel-api/migrations changed
+  3. SSH: one session runs server git sync then migrate+deploy or registry deploy (optional SSH master during CI wait)
 
 Config: deployment/scripts/auto_deploy.defaults.env, optional auto_deploy.env (gitignored).
 Windows: use deployment/scripts/... paths; see deployment/OCI_SSH.md for keys.
@@ -15,11 +14,13 @@ Windows: use deployment/scripts/... paths; see deployment/OCI_SSH.md for keys.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -198,8 +199,86 @@ def ssh_identity_args() -> list[str]:
     return []
 
 
-def ssh_remote_cmd(user: str, host: str, inner: str) -> list[str]:
-    """Run a bash script on the server (one SSH session).
+def _ssh_server_alive_opts() -> list[str]:
+    """Keep long-running sessions alive (migrate + docker pull). 0 = off."""
+    sec = _env_int("NUMZFLEET_SSH_SERVER_ALIVE_INTERVAL", 30)
+    if sec <= 0:
+        return []
+    return [
+        "-o",
+        f"ServerAliveInterval={sec}",
+        "-o",
+        "ServerAliveCountMax=12",
+    ]
+
+
+def ssh_control_socket_path(user: str, host: str) -> Path:
+    h = hashlib.sha256(f"{user}@{host}".encode()).hexdigest()[:24]
+    return Path(tempfile.gettempdir()) / f"numzfleet-ad-{h}.sock"
+
+
+def ssh_start_control_master(user: str, host: str, sock: Path) -> bool:
+    """Background SSH master so one TCP session stays up during local CI wait (NAT / path warmup)."""
+    try:
+        if sock.exists():
+            sock.unlink()
+    except OSError:
+        pass
+    strict = os.environ.get("NUMZFLEET_SSH_STRICT_HOST_KEY_CHECKING", "accept-new")
+    connect_timeout = str(_env_int("NUMZFLEET_SSH_CONNECT_TIMEOUT_SECONDS", 45))
+    argv = [
+        ssh_executable(),
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        f"ConnectTimeout={connect_timeout}",
+        "-o",
+        f"StrictHostKeyChecking={strict}",
+    ]
+    argv.extend(_ssh_server_alive_opts())
+    argv.extend(ssh_identity_args())
+    argv.extend(
+        [
+            "-o",
+            "ControlMaster=yes",
+            "-o",
+            f"ControlPath={sock}",
+            "-o",
+            "ControlPersist=no",
+            "-fN",
+            f"{user}@{host}",
+        ]
+    )
+    print("\n>>>", " ".join(shlex.quote(a) for a in argv), "\n", flush=True)
+    r = subprocess.run(argv, text=True)
+    if r.returncode != 0:
+        print("[auto_deploy] WARN: SSH multiplex master did not start; continuing without it.\n", file=sys.stderr)
+        return False
+    return True
+
+
+def ssh_stop_control_master(user: str, host: str, sock: Path) -> None:
+    argv = [
+        ssh_executable(),
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        f"ControlPath={sock}",
+        "-O",
+        "exit",
+        f"{user}@{host}",
+    ]
+    subprocess.run(argv, capture_output=True, text=True)
+
+
+def ssh_remote_cmd(
+    user: str,
+    host: str,
+    inner: str,
+    *,
+    mux_path: Path | None = None,
+) -> list[str]:
+    """Run a bash script on the server (one SSH session). Reuse mux_path when a ControlMaster is already running.
 
     Use bash -c (not -lc): login profiles often break non-interactive SSH (PATH, cd, set -e).
     """
@@ -214,6 +293,9 @@ def ssh_remote_cmd(user: str, host: str, inner: str) -> list[str]:
         "-o",
         f"StrictHostKeyChecking={strict}",
     ]
+    argv.extend(_ssh_server_alive_opts())
+    if mux_path is not None:
+        argv.extend(["-o", f"ControlPath={mux_path}", "-o", "ControlMaster=no"])
     argv.extend(ssh_identity_args())
     argv.extend(
         [
@@ -586,12 +668,7 @@ def main() -> int:
         )
 
     if flags["image_build_required"] and ci_wait > 0 and not args.skip_wait:
-        print("Image build likely triggered (paths match CI workflow filters).")
-        if args.dry_run:
-            print(f"[dry-run] Would wait {ci_wait}s for GitHub Actions to push images.\n")
-        else:
-            print(f"Waiting {ci_wait}s for GitHub Actions to push images...\n")
-            countdown(ci_wait, "Deploy buffer")
+        print("Image build likely triggered (paths match CI workflow filters).\n")
     elif flags["image_build_required"] and args.skip_wait:
         print("Image build likely; skipping wait (--skip-wait).\n")
     else:
@@ -620,31 +697,41 @@ def main() -> int:
         # Deploy servers: discard tracked edits so pull never blocks (local compose tweaks, etc.).
         pull_cmd = f"git fetch origin {shlex.quote(branch)} && git reset --hard FETCH_HEAD"
 
-    git_pull_inner = rpx + pull_cmd
-    compose_restart_inner = (
-        rpx
-        + f"docker compose -f deployment/compose/docker-compose.prod.yml "
+    compose_restart_tail = (
+        f"docker compose -f deployment/compose/docker-compose.prod.yml "
         f"--env-file {env_q} restart traccar"
     )
 
     if flags["migrations"] and use_migrations:
-        deploy_inner = (
-            rpx
-            + "chmod +x deployment/run-migrate-and-deploy.sh && "
-            + f"./deployment/run-migrate-and-deploy.sh {sha_q} {env_q}"
+        deploy_body = (
+            "chmod +x deployment/run-migrate-and-deploy.sh && "
+            f"./deployment/run-migrate-and-deploy.sh {sha_q} {env_q}"
         )
         deploy_label = "migrate + deploy"
     else:
-        deploy_inner = rpx + f"bash deployment/deploy/deploy-from-registry.sh {sha_q} {env_q}"
+        deploy_body = f"bash deployment/deploy/deploy-from-registry.sh {sha_q} {env_q}"
         deploy_label = "registry deploy"
+
+    remote_inner = rpx + pull_cmd + " && " + deploy_body
+    if flags["traccar_conf"] and not flags["image_build_required"]:
+        remote_inner += " && " + compose_restart_tail
 
     if args.dry_run:
         print("[dry-run] Remote (same as actual SSH):\n")
+        if flags["image_build_required"] and ci_wait > 0 and not args.skip_wait:
+            mux_on = _env_bool("NUMZFLEET_SSH_MULTIPLEX_DURING_CI_WAIT", True)
+            print(
+                f"  0) Optional: SSH ControlMaster during {ci_wait}s CI wait "
+                f"({'on' if mux_on else 'off'} — NUMZFLEET_SSH_MULTIPLEX_DURING_CI_WAIT)\n"
+            )
+            print(f"  0b) [dry-run] Would wait {ci_wait}s for GitHub Actions to push images\n")
         sync_label = "git pull" if pull_strategy in ("merge", "pull", "rebase") else "git fetch + reset --hard"
-        print(f"  1) {user}@{host}:{server_path} -> {sync_label} ({branch})")
-        print(f"  2) {user}@{host}:{server_path} -> {deploy_label} ({deploy_sha[:12]}...) env={deploy_env}")
+        print(
+            f"  1) {user}@{host}:{server_path} -> single session: {sync_label} ({branch}) "
+            f"then {deploy_label} ({deploy_sha[:12]}...)"
+        )
         if flags["traccar_conf"] and not flags["image_build_required"]:
-            print(f"  3) {user}@{host}:{server_path} -> docker compose restart traccar")
+            print("     then docker compose restart traccar")
         print("\n==============================")
         print("DONE (--dry-run)")
         print("==============================\n")
@@ -659,20 +746,39 @@ def main() -> int:
         )
         return 2
 
+    mux_path: Path | None = None
     try:
-        run_cmd(ssh_remote_cmd(user, host, git_pull_inner))
+        want_mux = (
+            not args.skip_deploy
+            and flags["image_build_required"]
+            and ci_wait > 0
+            and not args.skip_wait
+            and _env_bool("NUMZFLEET_SSH_MULTIPLEX_DURING_CI_WAIT", True)
+        )
+        if want_mux:
+            mux_path = ssh_control_socket_path(user, host)
+            print(
+                "\n[auto_deploy] Starting SSH ControlMaster (keeps connection warm during CI wait); "
+                f"socket: {mux_path}\n",
+                flush=True,
+            )
+            if not ssh_start_control_master(user, host, mux_path):
+                mux_path = None
 
-        print(f"\nRunning {deploy_label} on server...\n")
-        run_cmd(ssh_remote_cmd(user, host, deploy_inner))
+        if flags["image_build_required"] and ci_wait > 0 and not args.skip_wait:
+            if mux_path:
+                print("[auto_deploy] CI wait runs while ControlMaster keeps SSH session open.\n", flush=True)
+            print(f"Waiting {ci_wait}s for GitHub Actions to push images...\n")
+            countdown(ci_wait, "Deploy buffer")
 
-        # After a full registry deploy, containers already restart; extra traccar restart
-        # only helps config-only pushes when we did NOT pull new images.
-        if flags["traccar_conf"] and not flags["image_build_required"]:
-            print("\nRestarting Traccar (config changed, no image rebuild)...\n")
-            run_cmd(ssh_remote_cmd(user, host, compose_restart_inner))
+        print(f"\nRunning {deploy_label} on server (single SSH session)...\n")
+        run_cmd(ssh_remote_cmd(user, host, remote_inner, mux_path=mux_path))
     except subprocess.CalledProcessError as e:
         print("[auto_deploy] Remote step failed (see command output above).", file=sys.stderr)
         return e.returncode if e.returncode else 1
+    finally:
+        if mux_path is not None:
+            ssh_stop_control_master(user, host, mux_path)
 
     print("\n==============================")
     print("DEPLOYMENT COMPLETE")
