@@ -69,8 +69,8 @@ Optional second argument: path to the deployment env file (defaults to `deployme
 
 **What it does**
 
-1. Loads `deployment/.env` then `backend/.env` (requires **`DATABASE_URL`** in `backend/.env` — must be reachable from the host running `psql`, e.g. host/port exposed or tunnel).
-2. Prints a **masked** `DATABASE_URL` and runs `SELECT 1` to verify connectivity.
+1. Loads `deployment/.env` then `backend/.env` (requires **`DATABASE_URL`** in `backend/.env` with host `db` for in-stack Postgres).
+2. Prints a **masked** `DATABASE_URL` and verifies connectivity with **`psql` inside the `numzfleet-prod-db` container** when that container is running (falls back to host `psql` if the container is not up and `psql` is on `PATH`).
 3. Scans each migration file for forbidden **`DROP`** / **`TRUNCATE`** tokens (comment-aware when `perl` is available); aborts if found.
 4. Applies migrations **in order** with `psql -v ON_ERROR_STOP=1`:
    - `20260503_create_operation_sessions_tables.sql`
@@ -89,15 +89,29 @@ Optional second argument: path to the deployment env file (defaults to `deployme
 - It does **not** wipe or truncate data; it only runs the vetted SQL files above.
 - **Backward compatibility:** you can still run `deploy-from-registry.sh` alone when no migration is needed.
 
-### Optional: workstation script
+### `auto_deploy.py` (workstation → server)
 
-Python helper: commit/push (optional), SSH `git pull`, then `deploy-from-registry.sh` or `run-migrate-and-deploy.sh` — same as manual steps above. Loads [scripts/auto_deploy.defaults.env](scripts/auto_deploy.defaults.env) then optional `scripts/auto_deploy.env` (gitignored; copy from [auto_deploy.env.example](scripts/auto_deploy.env.example)). Key and host align with [ssh-prod.sh](../ssh-prod.sh); Git Bash paths use **forward slashes**. SSH / key setup: [OCI_SSH.md](OCI_SSH.md).
+Single entrypoint from your laptop: **optional commit**, **`git push origin HEAD:<branch>`** (so the commit you are on updates remote `main` even when checked out on another branch), **SSH** to the server, **`git fetch` + reset** (or merge — see `NUMZFLEET_GIT_PULL_STRATEGY`), then **`deploy-from-registry.sh`** or **`run-migrate-and-deploy.sh`** when `fuel-api/migrations/` changed.
+
+| Step | What runs |
+|------|-----------|
+| Config | [scripts/auto_deploy.defaults.env](scripts/auto_deploy.defaults.env) then optional [scripts/auto_deploy.env](scripts/auto_deploy.env) (gitignored; copy [auto_deploy.env.example](scripts/auto_deploy.env.example)) |
+| Git | `git add .` → commit (message from `-m`, or auto from staged paths, or prompt) → `git push origin HEAD:<branch>` → `git fetch` + optional upstream tweak (VS Code sync) |
+| Registry tag | Uses **full `HEAD` SHA** for `IMAGE_TAG` by default. If this push **did not** match CI image `paths:` (deployment-only), **defaults to the latest ancestor commit** that touched `frontend/`, `fuel-api/`, `erb-fuel-monitor/`, or the image workflow — so `docker pull` does not hit **manifest unknown**. Override with **`NUMZFLEET_DEPLOY_IMAGE_TAG`** or **`--deploy-image-tag`**, or disable auto pick with **`--no-auto-image-sha`** / **`NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT=0`**. After **workflow_dispatch** for the same SHA, use **`--no-auto-image-sha`** or explicit **`--deploy-image-tag HEAD`** so images match `HEAD`. |
+| SSH / keys | Same expectations as [ssh-prod.sh](../ssh-prod.sh); details [OCI_SSH.md](OCI_SSH.md). Windows: **`deployment/scripts/...`** with forward slashes, or **`deployment\\scripts\\auto_deploy.cmd`**. |
+
+**Common commands** (repo root):
 
 ```bash
-py deployment/scripts/auto_deploy.py --help
-py deployment/scripts/auto_deploy.py -m "release: …"
-py deployment/scripts/auto_deploy.py --dry-run --skip-git
+python deployment/scripts/auto_deploy.py --help
+python deployment/scripts/auto_deploy.py -m "release: your summary"
+python deployment/scripts/auto_deploy.py --skip-git --skip-wait
+python deployment/scripts/auto_deploy.py --dry-run --skip-git
 ```
+
+**Useful flags**: `--skip-git` (deploy only), `--skip-deploy` (push only), `--skip-wait` (skip CI buffer sleep), `--no-migrations` (always registry deploy), `--deploy-image-tag <ref>`, `--prompt-message` / `NUMZFLEET_AUTO_COMMIT_MESSAGE=0` for commit messages.
+
+Full env list: comments in `auto_deploy.defaults.env` and **`python deployment/scripts/auto_deploy.py --help`** epilog (points here).
 
 ## Baseline backup (post-deploy snapshot)
 

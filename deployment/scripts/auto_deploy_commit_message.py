@@ -2,6 +2,7 @@
 Suggest a short conventional commit message from changed paths (NUMZFLEET monorepo).
 
 Used by auto_deploy.py when -m is omitted and NUMZFLEET_AUTO_COMMIT_MESSAGE is enabled.
+Documented under auto_deploy in deployment/REGISTRY_DEPLOY.md.
 """
 
 from __future__ import annotations

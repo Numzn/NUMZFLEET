@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
-NUMZFLEET — commit/push (optional), SSH to server, registry deploy or migrate+deploy.
+NUMZFLEET workstation deploy driver — one command from laptop to production.
+
+Flow (see deployment/REGISTRY_DEPLOY.md, section **auto_deploy.py (workstation → server)**):
+  1. Optional: git add / commit (auto message from paths unless -m / --prompt-message)
+  2. git push origin HEAD:<branch> (updates remote branch from current commit; not only local <branch>)
+  3. SSH: server repo fetch + reset (or merge) to match remote
+  4. SSH: registry deploy, or migrate+deploy when fuel-api/migrations changed
 
 Config: deployment/scripts/auto_deploy.defaults.env, optional auto_deploy.env (gitignored).
-Git Bash on Windows: forward slashes in paths. See --help and deployment/REGISTRY_DEPLOY.md.
+Windows: use deployment/scripts/... paths; see deployment/OCI_SSH.md for keys.
 """
 
 from __future__ import annotations
@@ -149,6 +155,16 @@ def refresh_git_state_after_push(repo: Path, branch: str) -> None:
         pass
 
 
+def push_head_to_remote_branch(repo: Path, branch: str, *, dry_run: bool) -> None:
+    """Push current HEAD to origin/<branch> then refresh local refs (VS Code sync)."""
+    ref = f"HEAD:{branch}"
+    if dry_run:
+        print("[dry-run] would: git push origin", ref)
+        return
+    run_cmd(["git", "push", "origin", ref], cwd=repo)
+    refresh_git_state_after_push(repo, branch)
+
+
 def ssh_executable() -> str:
     """Resolve ssh: PATH (trust shutil.which), then Windows OpenSSH, then Git for Windows."""
     found = shutil.which("ssh")
@@ -285,6 +301,62 @@ def last_commit_touching_ci_image_paths(repo: Path, ref: str = "HEAD") -> str | 
     return out or None
 
 
+def adjust_deploy_sha_for_registry_images(
+    repo: Path,
+    *,
+    head_sha: str,
+    deploy_sha: str,
+    image_tag_source: str,
+    flags: dict[str, bool],
+    skip_deploy: bool,
+    no_auto_image_sha: bool,
+) -> str:
+    """
+    When HEAD did not trigger CI image builds, optionally use the latest ancestor that did,
+    so docker pull does not fail with manifest unknown.
+    """
+    if (
+        skip_deploy
+        or image_tag_source
+        or flags["image_build_required"]
+        or no_auto_image_sha
+        or not _env_bool("NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT", True)
+    ):
+        return deploy_sha
+
+    last_ci = last_commit_touching_ci_image_paths(repo)
+    if last_ci and last_ci != head_sha:
+        print(
+            f"[auto_deploy] Using registry IMAGE_TAG from latest commit that touches CI image paths "
+            f"({last_ci[:12]}...), not HEAD ({head_sha[:12]}...), so docker pull matches existing images. "
+            f"Server repo and scripts still update to HEAD.\n"
+        )
+        return last_ci
+
+    if not last_ci:
+        print(
+            "[auto_deploy] WARN: No commit on this branch touches frontend/fuel-api/erb/CI workflow paths; "
+            "cannot auto-pick an image SHA. Run 'Build and push NumzFleet images' or set "
+            "NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag.\n",
+            file=sys.stderr,
+        )
+        return deploy_sha
+
+    # last_ci == head_sha but path filters said no image build (rare); warn once.
+    if deploy_sha == head_sha:
+        print(
+            "[auto_deploy] WARN: CI may not have built images for this SHA. "
+            "If docker pull fails with manifest unknown: run the GitHub Action "
+            "'Build and push NumzFleet images' (workflow_dispatch), set "
+            "NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag, or rely on auto image SHA "
+            "(on by default; disable with --no-auto-image-sha or "
+            "NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT=0).\n",
+            file=sys.stderr,
+        )
+
+    return deploy_sha
+
+
 def countdown(seconds: int, label: str) -> None:
     for i in range(seconds, 0, -1):
         print(f"\r{label} {i}s  ", end="", flush=True)
@@ -293,18 +365,10 @@ def countdown(seconds: int, label: str) -> None:
 
 
 _HELP_EPILOG = """
-Env files: deployment/scripts/auto_deploy.defaults.env then auto_deploy.env (optional).
-Override file path: NUMZFLEET_AUTO_DEPLOY_ENV_FILE.
+Env: deployment/scripts/auto_deploy.defaults.env then auto_deploy.env (optional).
+Override file: NUMZFLEET_AUTO_DEPLOY_ENV_FILE.
 
-NUMZFLEET_SSH_HOST  NUMZFLEET_SSH_USER  NUMZFLEET_SSH_IDENTITY_FILE  NUMZFLEET_SSH_CONNECT_TIMEOUT_SECONDS
-NUMZFLEET_SERVER_REPO_PATH
-NUMZFLEET_BRANCH  NUMZFLEET_DEPLOY_ENV  NUMZFLEET_DEPLOY_IMAGE_TAG  NUMZFLEET_USE_MIGRATIONS  NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS
-NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT  (default on) for deployment-only HEAD, pull images from latest commit that touched app/CI paths
-NUMZFLEET_AUTO_COMMIT_MESSAGE   (default on) set 0/false to force typing message when -m omitted
-NUMZFLEET_SSH_STRICT_HOST_KEY_CHECKING
-NUMZFLEET_GIT_PULL_STRATEGY   reset (default) or merge for server pull
-
-Git Bash: use deployment/scripts/... (forward slashes). Full runbook: deployment/REGISTRY_DEPLOY.md
+All NUMZFLEET_* variables, flags, and operator flow: deployment/REGISTRY_DEPLOY.md (section auto_deploy).
 """.strip()
 
 
@@ -433,11 +497,7 @@ def main() -> int:
                 "Proceeding to deploy: will `git push origin HEAD:<branch>` so the commit you are on "
                 f"updates remote `{branch}` (not only the local `{branch}` ref if you are on another branch).",
             )
-            if args.dry_run:
-                print("[dry-run] would: git push origin", f"HEAD:{branch}")
-            else:
-                run_cmd(["git", "push", "origin", f"HEAD:{branch}"], cwd=repo)
-                refresh_git_state_after_push(repo, branch)
+            push_head_to_remote_branch(repo, branch, dry_run=args.dry_run)
         else:
             print("Changed files:\n", status, "\n", sep="")
             if args.dry_run:
@@ -470,11 +530,7 @@ def main() -> int:
             else:
                 run_cmd(["git", "commit", "-m", msg], cwd=repo)
 
-            if args.dry_run:
-                print("[dry-run] would: git push origin", f"HEAD:{branch}")
-            else:
-                run_cmd(["git", "push", "origin", f"HEAD:{branch}"], cwd=repo)
-                refresh_git_state_after_push(repo, branch)
+            push_head_to_remote_branch(repo, branch, dry_run=args.dry_run)
     else:
         dirty = get_output(["git", "status", "--short"], cwd=repo)
         if dirty:
@@ -531,47 +587,15 @@ def main() -> int:
         print("No image rebuild required from path filters (config-only or unrelated paths).")
         print("Registry deploy still pins images to this commit SHA.\n")
 
-    image_sha_warned = False
-    if (
-        not args.skip_deploy
-        and not image_tag_source
-        and not flags["image_build_required"]
-        and not args.no_auto_image_sha
-        and _env_bool("NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT", True)
-    ):
-        last_ci = last_commit_touching_ci_image_paths(repo)
-        if last_ci and last_ci != sha:
-            deploy_sha = last_ci
-            print(
-                f"[auto_deploy] Using registry IMAGE_TAG from latest commit that touches CI image paths "
-                f"({deploy_sha[:12]}...), not HEAD ({sha[:12]}...), so docker pull matches existing images. "
-                f"Server repo and scripts still update to HEAD.\n"
-            )
-        elif not last_ci:
-            print(
-                "[auto_deploy] WARN: No commit on this branch touches frontend/fuel-api/erb/CI workflow paths; "
-                "cannot auto-pick an image SHA. Run 'Build and push NumzFleet images' or set "
-                "NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag.\n",
-                file=sys.stderr,
-            )
-            image_sha_warned = True
-
-    if (
-        not args.skip_deploy
-        and not image_tag_source
-        and not flags["image_build_required"]
-        and deploy_sha == sha
-        and not image_sha_warned
-    ):
-        print(
-            "[auto_deploy] WARN: CI may not have built images for this SHA. "
-            "If docker pull fails with manifest unknown: run the GitHub Action "
-            "'Build and push NumzFleet images' (workflow_dispatch), set "
-            "NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag, or rely on auto image SHA "
-            "(on by default; disable with --no-auto-image-sha or "
-            "NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT=0).\n",
-            file=sys.stderr,
-        )
+    deploy_sha = adjust_deploy_sha_for_registry_images(
+        repo,
+        head_sha=sha,
+        deploy_sha=deploy_sha,
+        image_tag_source=image_tag_source,
+        flags=flags,
+        skip_deploy=args.skip_deploy,
+        no_auto_image_sha=args.no_auto_image_sha,
+    )
 
     sp = shlex.quote(server_path)
     env_q = shlex.quote(deploy_env)
@@ -605,7 +629,8 @@ def main() -> int:
 
     if args.dry_run:
         print("[dry-run] Remote (same as actual SSH):\n")
-        print(f"  1) {user}@{host}:{server_path} -> git pull origin {branch}")
+        sync_label = "git pull" if pull_strategy in ("merge", "pull", "rebase") else "git fetch + reset --hard"
+        print(f"  1) {user}@{host}:{server_path} -> {sync_label} ({branch})")
         print(f"  2) {user}@{host}:{server_path} -> {deploy_label} ({deploy_sha[:12]}...) env={deploy_env}")
         if flags["traccar_conf"] and not flags["image_build_required"]:
             print(f"  3) {user}@{host}:{server_path} -> docker compose restart traccar")
