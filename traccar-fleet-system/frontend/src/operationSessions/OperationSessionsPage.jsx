@@ -5,93 +5,90 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  List,
+  ListItemButton,
+  ListItemText,
+  Paper,
   Stack,
-  Tooltip,
+  TextField,
   Typography,
 } from '@mui/material';
 import AppLayout from '../common/components/AppLayout';
-import Breadcrumbs from '../common/components/Breadcrumbs';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
-import SessionSummary from './components/SessionSummary';
-import SessionStats from './components/SessionStats';
-import RefuelTable from './components/RefuelTable';
 import {
-  createOperationSession,
+  closeOperationSession,
   fetchOperationSessionDetails,
   fetchOperationSessions,
 } from './api/operationSessionsApi';
 import { operationSessionsActions } from './store/operationSessions';
-import { buildVehicleBudgetIndex, calculateFleetEfficiency } from './utils/sessionCalculations';
-import { summarizeSessions } from './utils/sessionGrouping';
-import { collectDeviceIdsForQuickStart } from './utils/operationVehicleContext';
+
+function formatK(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  return `K ${v.toFixed(0)}`;
+}
+
+function formatL(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  return `${v.toFixed(1)} L`;
+}
 
 const OperationSessionsPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.session.user);
-  const devicesItems = useSelector((state) => state.devices.items || {});
-  const vehicles = useSelector((state) => Object.values(state.devices.items || {}));
-  const sessionsMap = useSelector((state) => state.operationSessions.items);
-  const detailsMap = useSelector((state) => state.operationSessions.details);
-  const currentSessionId = useSelector((state) => state.operationSessions.currentSessionId);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [quickStarting, setQuickStarting] = useState(false);
-  const [quickStartMessage, setQuickStartMessage] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [activeDetails, setActiveDetails] = useState(null);
+  const [search, setSearch] = useState('');
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState('');
 
-  const sessions = useMemo(() => Object.values(sessionsMap || {}), [sessionsMap]);
   const activeSession = useMemo(
     () => sessions.find((s) => String(s.status).toLowerCase() === 'active'),
     [sessions],
   );
-  const resumeSessionId = activeSession?.id ?? null;
-
-  const currentSession = currentSessionId ? detailsMap[currentSessionId] : null;
-  const currentRefuels = currentSession?.refuels || [];
-
-  const vehiclesByBudget = useMemo(() => buildVehicleBudgetIndex(vehicles), [vehicles]);
-  const summarizedSessions = useMemo(
-    () => summarizeSessions(currentRefuels, vehiclesByBudget),
-    [currentRefuels, vehiclesByBudget],
-  );
-  const fleetEfficiency = useMemo(() => calculateFleetEfficiency(currentRefuels), [currentRefuels]);
-
-  const quickStartIds = useMemo(() => collectDeviceIdsForQuickStart(devicesItems), [devicesItems]);
-
-  const loadSessionDetails = useCallback(async (sessionId) => {
-    if (!user || !sessionId) return;
-    const details = await fetchOperationSessionDetails(user, sessionId);
-    dispatch(operationSessionsActions.upsertDetails({ sessionId, data: details }));
-    dispatch(operationSessionsActions.setCurrentSession(sessionId));
-  }, [dispatch, user]);
 
   const reloadAllSessions = useCallback(async () => {
-    if (!user) return;
+    if (!user) return [];
     const data = await fetchOperationSessions(user);
-    dispatch(operationSessionsActions.refresh(Array.isArray(data) ? data : []));
-    return data;
+    const list = Array.isArray(data) ? data : [];
+    setSessions(list);
+    dispatch(operationSessionsActions.refresh(list));
+    return list;
   }, [dispatch, user]);
 
   useEffect(() => {
-    const loadSessions = async () => {
+    const load = async () => {
       if (!user) {
         setLoading(false);
         return;
       }
-
       setLoading(true);
       setError(null);
-
       try {
-        const data = await reloadAllSessions();
-        const list = Array.isArray(data) ? data : [];
+        const list = await reloadAllSessions();
         const active = list.find((s) => String(s.status).toLowerCase() === 'active');
-        const pickId = active?.id ?? list[0]?.id ?? null;
-        if (pickId) {
-          await loadSessionDetails(pickId);
+        if (active) {
+          const details = await fetchOperationSessionDetails(user, active.id);
+          setActiveDetails(details);
+          dispatch(operationSessionsActions.upsertDetails({ sessionId: active.id, data: details }));
+          dispatch(operationSessionsActions.setCurrentSession(active.id));
+        } else {
+          setActiveDetails(null);
+          dispatch(operationSessionsActions.setCurrentSession(null));
         }
       } catch (requestError) {
         setError(requestError.message || 'Failed to load operation sessions');
@@ -99,160 +96,244 @@ const OperationSessionsPage = () => {
         setLoading(false);
       }
     };
+    load();
+  }, [dispatch, user, reloadAllSessions]);
 
-    loadSessions();
-  }, [dispatch, user, reloadAllSessions, loadSessionDetails]);
+  const refuels = activeDetails?.refuels || [];
+  const vehicleTotal = refuels.length;
+  const completedCount = useMemo(
+    () => refuels.filter((r) => r.actualFuelLitres != null && Number(r.actualFuelLitres) > 0).length,
+    [refuels],
+  );
+  const pendingCount = Math.max(0, vehicleTotal - completedCount);
 
-  const handleQuickStart = async () => {
-    if (!user || resumeSessionId) return;
-    setQuickStartMessage(null);
-    if (!quickStartIds.length) {
-      setQuickStartMessage('No vehicles loaded yet. Open the map or device list so Traccar devices sync, then try again.');
-      return;
-    }
-    setQuickStarting(true);
-    setError(null);
+  const plannedTotalL = useMemo(
+    () => refuels.reduce((acc, r) => {
+      const p = r.plannedFuelLitres != null ? Number(r.plannedFuelLitres) : null;
+      if (p != null && Number.isFinite(p) && p > 0) return acc + p;
+      const e = r.estimatedFuelLitres != null ? Number(r.estimatedFuelLitres) : 0;
+      return acc + (Number.isFinite(e) ? e : 0);
+    }, 0),
+    [refuels],
+  );
+
+  const actualTotalL = Number(activeDetails?.totalActualFuel ?? activeSession?.totalActualFuel ?? 0);
+  const varianceL = actualTotalL - plannedTotalL;
+
+  const recentClosed = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return sessions
+      .filter((s) => String(s.status).toLowerCase() === 'closed')
+      .filter((s) => {
+        if (!q) return true;
+        const idStr = String(s.id);
+        const name = (s.name || '').toLowerCase();
+        const dateStr = s.sessionDate ? new Date(s.sessionDate).toLocaleString().toLowerCase() : '';
+        return idStr.includes(q) || name.includes(q) || dateStr.includes(q);
+      })
+      .slice(0, 50);
+  }, [sessions, search]);
+
+  const confirmClose = async () => {
+    if (!user || !activeSession) return;
+    setClosing(true);
+    setCloseError('');
     try {
-      const created = await createOperationSession(user, {
-        name: `Quick operation ${new Date().toLocaleString()}`,
-        sessionDate: new Date(),
-        notes: '',
-        vehicleIds: quickStartIds,
-      });
+      await closeOperationSession(user, activeSession.id);
+      setCloseOpen(false);
+      setActiveDetails(null);
+      dispatch(operationSessionsActions.setCurrentSession(null));
       await reloadAllSessions();
-      dispatch(operationSessionsActions.setCurrentSession(created.id));
-      navigate(`/fleet/operation-sessions/run/${created.id}`);
     } catch (err) {
-      const msg = err?.message || 'Could not start operation';
-      if (/409|Close the current active session/i.test(msg)) {
-        setQuickStartMessage('You already have an active session — use Resume active session or close it first.');
-      } else {
-        setQuickStartMessage(msg);
-      }
+      setCloseError(err.message || 'Failed to close session');
     } finally {
-      setQuickStarting(false);
+      setClosing(false);
     }
   };
 
-  const handleRefuelSubmitted = useCallback(async () => {
-    if (currentSessionId) {
-      await loadSessionDetails(currentSessionId);
-    }
-  }, [currentSessionId, loadSessionDetails]);
-
-  const handleSessionClosed = useCallback(async (sessionId) => {
-    await reloadAllSessions();
-    await loadSessionDetails(sessionId);
-  }, [reloadAllSessions, loadSessionDetails]);
-
   return (
     <AppLayout showSidebar>
-      <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Breadcrumbs />
+      <Container maxWidth="md" sx={{ py: 2 }}>
         <FleetWorkspaceShell>
-          <Stack spacing={2}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 1,
-            }}
-          >
-            <Box>
-              <Typography variant="h4">Operations</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                Start, plan, or resume operations.
-              </Typography>
-            </Box>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              {resumeSessionId && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() => navigate(`/fleet/operation-sessions/run/${resumeSessionId}`)}
-                >
-                  Resume active session
-                </Button>
-              )}
-              <Tooltip
-                title={
-                  resumeSessionId
-                    ? 'Close or finish the active session before starting another.'
-                    : ''
-                }
-              >
-                <span>
-                  <Button
-                    variant={resumeSessionId ? 'outlined' : 'contained'}
-                    color="secondary"
-                    onClick={handleQuickStart}
-                    disabled={Boolean(resumeSessionId) || quickStarting || !user}
+          <Stack spacing={1.5}>
+
+            {error && <Alert severity="error">{error}</Alert>}
+
+            {loading ? (
+              <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                {activeSession && !activeDetails && !loading && (
+                  <Alert
+                    severity="warning"
+                    action={(
+                      <Button color="inherit" size="small" onClick={() => navigate(`/fleet/operation-sessions/run/${activeSession.id}`)}>
+                        Open run
+                      </Button>
+                    )}
                   >
-                    {quickStarting ? 'Starting…' : 'Start operation'}
-                  </Button>
-                </span>
-              </Tooltip>
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/fleet/operation-sessions/plan')}
-              >
-                Plan operation
-              </Button>
-              <Button variant="outlined" onClick={() => navigate('/fleet/operation-sessions/history')}>
-                History
-              </Button>
-            </Stack>
-          </Box>
+                    Active session loaded from list, but details failed to refresh. You can still resume from the run screen.
+                  </Alert>
+                )}
 
-          {error && <Alert severity="error">{error}</Alert>}
-          {quickStartMessage && (
-            <Alert severity="warning" onClose={() => setQuickStartMessage(null)}>
-              {quickStartMessage}
-            </Alert>
-          )}
+                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                  {activeSession && activeDetails ? (
+                    <Stack spacing={0.75}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography variant="subtitle1" fontWeight={800}>
+                          {activeDetails.name || `Session ${activeSession.id}`}
+                        </Typography>
+                        <Chip label="ACTIVE" color="success" size="small" />
+                      </Box>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        <Chip size="small" label={`✓ ${completedCount}/${vehicleTotal} done`} />
+                        <Chip size="small" variant="outlined" label={`Pending ${pendingCount}`} />
+                        <Chip size="small" variant="outlined" label={`${formatL(activeDetails.totalActualFuel)} dispensed`} />
+                        <Chip size="small" variant="outlined" label={`${formatK(activeDetails.totalActualCost)} cost`} />
+                        {activeDetails.stationName && (
+                          <Chip size="small" variant="outlined" label={activeDetails.stationName} />
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={() => navigate(`/fleet/operation-sessions/run/${activeSession.id}`)}
+                        >
+                          Resume
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="warning"
+                          size="small"
+                          onClick={() => setCloseOpen(true)}
+                        >
+                          Close
+                        </Button>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => navigate('/fleet/operation-sessions/create')}
+                        >
+                          New
+                        </Button>
+                      </Box>
+                    </Stack>
+                  ) : (
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" color="text.secondary" fontWeight={700}>
+                        No active session
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => navigate('/fleet/operation-sessions/create')}
+                      >
+                        Create session
+                      </Button>
+                    </Box>
+                  )}
+                </Paper>
 
-          {loading ? (
-            <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <>
-              {!sessions.length && (
-                <Alert severity="info">
-                  No sessions yet. Start an operation or create a plan.
-                </Alert>
-              )}
-              {!quickStartIds.length && (
-                <Alert severity="info">
-                  No devices loaded. Open Live Map or refresh devices, then try again.
-                </Alert>
-              )}
-              {resumeSessionId && (
-                <Alert severity="info" sx={{ py: 0.75 }}>
-                  Session #{resumeSessionId} is active. Resume it or close it before starting a new one.
-                </Alert>
-              )}
-              <SessionStats sessions={summarizedSessions} fleetEfficiency={fleetEfficiency} />
-              <SessionSummary
-                sessions={sessions}
-                selectedSessionId={currentSessionId}
-                onSelectSession={loadSessionDetails}
-                onSessionClosed={handleSessionClosed}
-              />
-              <RefuelTable
-                sessionId={currentSessionId}
-                sessionStatus={currentSession?.status}
-                vehicles={vehicles}
-                selectedVehicleIds={[]}
-                onSubmitted={handleRefuelSubmitted}
-              />
-            </>
-          )}
-        </Stack>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.75 }}>
+                    Recent sessions
+                  </Typography>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search by name, id, or date…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    sx={{ mb: 0.75 }}
+                  />
+                  <Paper variant="outlined">
+                    <List disablePadding>
+                      {recentClosed.length === 0 && (
+                        <ListItemButton disabled>
+                          <ListItemText primary="No closed sessions match your search." />
+                        </ListItemButton>
+                      )}
+                      {recentClosed.map((s) => (
+                        <ListItemButton
+                          key={s.id}
+                          onClick={() => navigate(`/fleet/operation-sessions/run/${s.id}`)}
+                        >
+                          <ListItemText
+                            primary={s.name || `Session ${s.id}`}
+                            secondary={
+                              <>
+                                {s.sessionDate ? new Date(s.sessionDate).toLocaleString() : ''}
+                                {' · '}
+                                {formatL(s.totalActualFuel)}
+                                {' · '}
+                                {formatK(s.totalActualCost)}
+                              </>
+                            }
+                          />
+                          <Chip label="Closed" size="small" />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  </Paper>
+                </Box>
+              </>
+            )}
+          </Stack>
         </FleetWorkspaceShell>
       </Container>
+
+      <Dialog open={closeOpen} onClose={() => !closing && setCloseOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Close session?</DialogTitle>
+        <DialogContent>
+          {closeError && <Alert severity="error" sx={{ mb: 1 }}>{closeError}</Alert>}
+          <Stack spacing={0.5}>
+            <Typography variant="body2">
+              <strong>Planned total:</strong>
+              {' '}
+              {formatL(plannedTotalL)}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Actual total:</strong>
+              {' '}
+              {formatL(actualTotalL)}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Variance:</strong>
+              {' '}
+              {varianceL >= 0 ? '+' : ''}
+              {varianceL.toFixed(1)}
+              {' '}
+              L
+            </Typography>
+            <Typography variant="body2">
+              <strong>Vehicles fueled:</strong>
+              {' '}
+              {completedCount}
+              {' '}
+              /
+              {' '}
+              {vehicleTotal}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Total cost:</strong>
+              {' '}
+              {formatK(activeDetails?.totalActualCost)}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ pt: 1 }}>
+              Refuel lines will be locked and totals frozen. This cannot be undone from the app.
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCloseOpen(false)} disabled={closing}>Cancel</Button>
+          <Button color="warning" variant="contained" onClick={confirmClose} disabled={closing}>
+            {closing ? 'Closing…' : 'Confirm close'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppLayout>
   );
 };

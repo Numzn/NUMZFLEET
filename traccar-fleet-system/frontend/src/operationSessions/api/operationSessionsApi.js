@@ -24,12 +24,18 @@ export async function createOperationSession(user, payload) {
   return response.json();
 }
 
-export async function createSessionRefuelRecords(user, sessionId, records) {
-  const response = await fetchOrThrow(`/api/operation-sessions/${encodeURIComponent(sessionId)}/refuels`, {
-    method: 'POST',
+export async function fetchFuelStations(user) {
+  // Stations are optional early in setup. Treat 404 as "no stations configured" (silent empty list).
+  const response = await fetch('/api/fuel-stations', {
+    credentials: 'include',
     headers: fuelApiAuthHeaders(user),
-    body: JSON.stringify({ records }),
   });
+  if (response.status === 404) {
+    return [];
+  }
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
   return response.json();
 }
 

@@ -67,7 +67,8 @@ services:
       POSTGRES_DB: numztrak_fuel
       POSTGRES_USER: numztrak
     ports:
-      - "5432:5432"
+      # Host port only; fuel-api still uses db:5432 inside the compose network.
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -68,6 +68,7 @@ import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
 import VehiclesPage from './fleet/VehiclesPage';
 import VehicleDetailPage from './fleet/vehicleDetail/VehicleDetailPage';
 import OperationSessionsPage from './operationSessions/OperationSessionsPage';
+import CreateSessionPage from './operationSessions/CreateSessionPage';
 import PlanningPage from './operationSessions/PlanningPage';
 import OperationRunPage from './operationSessions/OperationRunPage';
 import OperationSessionsHistoryPage from './operationSessions/HistoryPage';
@@ -133,6 +134,7 @@ const Navigation = () => {
         <Route path="fleet/vehicles/:vehicleId" element={<VehicleDetailPage />} />
         <Route path="fleet/vehicles" element={<VehiclesPage />} />
         <Route path="fleet/operation-sessions" element={<OperationSessionsPage />} />
+        <Route path="fleet/operation-sessions/create" element={<CreateSessionPage />} />
         <Route path="fleet/operation-sessions/plan" element={<PlanningPage />} />
         <Route path="fleet/operation-sessions/run/:sessionId" element={<OperationRunPage />} />
         <Route path="fleet/operation-sessions/history" element={<OperationSessionsHistoryPage />} />

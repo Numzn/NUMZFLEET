@@ -1,5 +1,5 @@
 import sequelize from '../config/database.js';
-import { OperationSessionRefuel, VehicleSpec } from '../models/index.js';
+import { FuelStation, OperationSessionRefuel, VehicleSpec } from '../models/index.js';
 import {
   create as createSessionRecord,
   findActiveByUserId,
@@ -17,9 +17,8 @@ import { calculateSessionTotals, buildSessionSummaryWithStatus } from './operati
 import { getLatestErbPrice } from './fuelPriceService.js';
 import { getTelemetryWithFallback, getVehicleTelemetry } from './refuelTelemetryService.js';
 import {
-  parseVehicleIdsInput,
   assertSessionOpenForMutation,
-  assertNotBothRecordsAndUpdates,
+  parseSessionVehiclesInput,
 } from '../intelligence/OperationEngine.js';
 import { buildPrefillRefuelRow, resolveActualFuelLitres, buildRefuelMetricsPatch, estimateFromTankMetadata } from '../intelligence/RefuelEngine.js';
 import { rankVehiclesByRefuelUrgency } from '../intelligence/SuggestionEngine.js';
@@ -45,6 +44,8 @@ const toSessionDto = (session) => ({
   sessionDate: session.sessionDate,
   status: session.status,
   notes: session.notes,
+  fuelStationId: session.fuelStationId != null ? Number(session.fuelStationId) : null,
+  stationName: session.stationName || null,
   totalEstimatedFuel: Number(session.totalEstimatedFuel || 0),
   totalActualFuel: Number(session.totalActualFuel || 0),
   totalEstimatedCost: Number(session.totalEstimatedCost || 0),
@@ -62,6 +63,7 @@ const toRefuelDto = (record) => ({
   vehicleId: record.vehicleId,
   fuelCost: Number(record.fuelCost),
   fuelAmount: Number(record.fuelAmount),
+  plannedFuelLitres: record.plannedFuelLitres != null ? Number(record.plannedFuelLitres) : null,
   estimatedFuelLitres: record.estimatedFuelLitres != null ? Number(record.estimatedFuelLitres) : null,
   actualFuelLitres: record.actualFuelLitres != null ? Number(record.actualFuelLitres) : null,
   varianceLitres: record.varianceLitres != null ? Number(record.varianceLitres) : null,
@@ -97,16 +99,6 @@ const assertCanAccessSession = (session, user) => {
   }
 };
 
-const parsePositiveNumber = (value, field) => {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number <= 0) {
-    const error = new Error(`${field} must be a positive number`);
-    error.statusCode = 400;
-    throw error;
-  }
-  return number;
-};
-
 const parseOptionalNumber = (value, field) => {
   if (value == null || value === '') {
     return null;
@@ -119,13 +111,6 @@ const parseOptionalNumber = (value, field) => {
   }
   return number;
 };
-
-function parseVehicleIds(vehicleIds) {
-  if (vehicleIds == null) {
-    return [];
-  }
-  return parseVehicleIdsInput(vehicleIds);
-}
 
 export async function listOperationSessions(user) {
   const rows = await listByUser(user);
@@ -144,12 +129,12 @@ async function refreshSessionTotals(sessionId, transaction) {
   await updateSessionByInstance(session, totals, { transaction });
 }
 
-async function prepareInitialRefuels(user, sessionId, vehicleIds, transaction) {
+async function prepareInitialRefuels(user, sessionId, vehiclePlans, transaction) {
   const getVehicleSpec = await loadGetVehicleSpec();
   const now = new Date();
   const prepared = [];
 
-  for (const vehicleId of vehicleIds) {
+  for (const { vehicleId, plannedLitres } of vehiclePlans) {
     const [vehicleSpec, telemetry] = await Promise.all([
       getVehicleSpec(vehicleId),
       getTelemetryWithFallback(vehicleId),
@@ -167,6 +152,7 @@ async function prepareInitialRefuels(user, sessionId, vehicleIds, transaction) {
         telemetryMileage: telemetry.mileage,
         pricePerLitre: priceInfo.pricePerLitre,
         sessionDate: now,
+        plannedFuelLitres: plannedLitres,
       }),
     );
   }
@@ -177,6 +163,31 @@ async function prepareInitialRefuels(user, sessionId, vehicleIds, transaction) {
   }
 }
 
+async function resolveStationFields(payload) {
+  let fuelStationId = payload.fuelStationId != null && payload.fuelStationId !== ''
+    ? Number(payload.fuelStationId)
+    : null;
+  let stationName = payload.stationName != null ? String(payload.stationName).trim() : null;
+  if (stationName === '') stationName = null;
+
+  if (fuelStationId != null && Number.isFinite(fuelStationId)) {
+    try {
+      const st = await FuelStation.findByPk(fuelStationId);
+      if (st) {
+        if (!stationName) stationName = st.name;
+      } else {
+        fuelStationId = null;
+      }
+    } catch {
+      fuelStationId = null;
+    }
+  } else {
+    fuelStationId = null;
+  }
+
+  return { fuelStationId, stationName };
+}
+
 export async function createOperationSession(user, payload = {}) {
   const sessionDate = payload.sessionDate ? new Date(payload.sessionDate) : new Date();
   if (Number.isNaN(sessionDate.getTime())) {
@@ -185,28 +196,45 @@ export async function createOperationSession(user, payload = {}) {
     throw error;
   }
 
-  const requestedVehicleIds = parseVehicleIds(payload.vehicleIds);
+  if (payload.vehicleIds != null) {
+    const error = new Error('vehicleIds is no longer supported; use vehicles: [{ vehicleId, plannedLitres }]');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const isClosedCreate = payload.status === 'closed';
+  let vehiclePlans = [];
+  if (
+    isClosedCreate
+    && (payload.vehicles == null || (Array.isArray(payload.vehicles) && payload.vehicles.length === 0))
+  ) {
+    vehiclePlans = [];
+  } else {
+    vehiclePlans = parseSessionVehiclesInput(payload.vehicles);
+  }
+
+  const { fuelStationId, stationName } = await resolveStationFields(payload || {});
 
   return sequelize.transaction(async (transaction) => {
-    if (requestedVehicleIds.length) {
-      const activeSession = await findActiveByUserId(user.id, { transaction });
-      if (activeSession) {
-        const error = new Error('Close the current active session before creating another');
-        error.statusCode = 409;
-        throw error;
-      }
+    const activeSession = await findActiveByUserId(user.id, { transaction });
+    if (activeSession) {
+      const error = new Error('Close the current active session before creating another');
+      error.statusCode = 409;
+      throw error;
     }
 
     const created = await createSessionRecord({
       userId: user.id,
       name: payload.name ? String(payload.name).trim() : null,
       notes: payload.notes ? String(payload.notes).trim() : null,
-      status: payload.status === 'closed' ? 'closed' : 'active',
+      status: isClosedCreate ? 'closed' : 'active',
       sessionDate,
+      fuelStationId,
+      stationName,
     }, { transaction });
 
-    if (requestedVehicleIds.length) {
-      await prepareInitialRefuels(user, created.id, requestedVehicleIds, transaction);
+    if (vehiclePlans.length) {
+      await prepareInitialRefuels(user, created.id, vehiclePlans, transaction);
     }
 
     return toSessionDto(created);
@@ -246,58 +274,8 @@ export async function closeOperationSession(user, sessionId) {
     await updateManyBySessionId(session.id, { locked: true }, { transaction });
     await updateSessionByInstance(session, { status: 'closed', totalsFrozenAt: new Date() }, { transaction });
   });
-  return toSessionDto(session);
-}
-
-async function createLegacySessionRefuels(user, session, records = [], transaction) {
-  if (!Array.isArray(records) || records.length === 0) {
-    const error = new Error('records must be a non-empty array');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const sanitized = records.map((record) => {
-    const vehicleId = Number(record?.vehicleId);
-    if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
-      const error = new Error('vehicleId must be a positive number');
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const providedDate = record?.sessionDate ? new Date(record.sessionDate) : new Date();
-    if (Number.isNaN(providedDate.getTime())) {
-      const error = new Error('sessionDate must be a valid date');
-      error.statusCode = 400;
-      throw error;
-    }
-
-    return {
-      sessionId: Number(session.id),
-      userId: user.id,
-      vehicleId,
-      fuelCost: parsePositiveNumber(record?.fuelCost, 'fuelCost'),
-      fuelAmount: parsePositiveNumber(record?.fuelAmount, 'fuelAmount'),
-      actualFuelLitres: parsePositiveNumber(record?.fuelAmount, 'fuelAmount'),
-      actualCost: parsePositiveNumber(record?.fuelCost, 'fuelCost'),
-      currentMileage: parseOptionalNumber(record?.currentMileage, 'currentMileage'),
-      attendant: record?.attendant ? String(record.attendant).trim() : null,
-      pumpNumber: record?.pumpNumber ? String(record.pumpNumber).trim() : null,
-      sessionDate: providedDate,
-    };
-  });
-
-  const created = await bulkCreateRefuels(
-    sanitized,
-    { transaction, returning: true },
-  );
-
-  await refreshSessionTotals(session.id, transaction);
-
-  return {
-    sessionId: Number(session.id),
-    createdCount: created.length,
-    records: created.map(toRefuelDto),
-  };
+  const fresh = await findSessionById(sessionId);
+  return toSessionDto(fresh);
 }
 
 async function applySessionRefuelUpdates(user, session, updates = [], transaction) {
@@ -357,12 +335,19 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
       && update?.pumpEnd != null && update?.pumpEnd !== '';
     const hasLitres = update?.actualFuelLitres != null && update?.actualFuelLitres !== '';
 
+    const plannedBaseline = refuel.plannedFuelLitres != null && Number(refuel.plannedFuelLitres) > 0
+      ? Number(refuel.plannedFuelLitres)
+      : null;
+
     if (!hasPump && !hasLitres) {
+      const hasPlanned = plannedBaseline != null;
       await refuel.update({
         tankCapacitySnapshot: metaFromTank.tankCapacitySnapshot,
         tankLevelStart: metaFromTank.tankLevelStart,
-        estimatedFuelLitres: metaFromTank.estimatedFuelLitres,
-        estimatedCost: metaFromTank.estimatedCost,
+        ...(!hasPlanned ? {
+          estimatedFuelLitres: metaFromTank.estimatedFuelLitres,
+          estimatedCost: metaFromTank.estimatedCost,
+        } : {}),
         status: metaFromTank.status,
         currentMileage: mileage,
         erbPricePerLitre: pricePerLitre ?? refuel.erbPricePerLitre,
@@ -384,9 +369,11 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
     }
     const actualFuelLitres = resolved.actualFuelLitres;
 
-    const estimatedFuelLitresForVariance = metaFromTank.estimatedFuelLitres != null
-      ? metaFromTank.estimatedFuelLitres
-      : (refuel.estimatedFuelLitres != null ? Number(refuel.estimatedFuelLitres) : 0);
+    const estimatedFuelLitresForVariance = plannedBaseline != null
+      ? plannedBaseline
+      : (metaFromTank.estimatedFuelLitres != null
+        ? metaFromTank.estimatedFuelLitres
+        : (refuel.estimatedFuelLitres != null ? Number(refuel.estimatedFuelLitres) : 0));
 
     const exceedsCapacity = Number.isFinite(Number(metaFromTank.tankCapacitySnapshot ?? tankCap))
       && actualFuelLitres > Number(metaFromTank.tankCapacitySnapshot ?? tankCap);
@@ -404,10 +391,7 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
       fuelCost: patch.actualCost ?? refuel.fuelCost,
       tankCapacitySnapshot: metaFromTank.tankCapacitySnapshot,
       tankLevelStart: metaFromTank.tankLevelStart,
-      estimatedFuelLitres: metaFromTank.estimatedFuelLitres != null
-        ? metaFromTank.estimatedFuelLitres
-        : refuel.estimatedFuelLitres,
-      estimatedCost: patch.estimatedCost ?? metaFromTank.estimatedCost ?? refuel.estimatedCost,
+      estimatedCost: patch.estimatedCost ?? refuel.estimatedCost,
       currentMileage: mileage,
       erbPricePerLitre: pricePerLitre ?? refuel.erbPricePerLitre,
       sessionDate: new Date(),
@@ -431,16 +415,20 @@ export async function createSessionRefuels(user, sessionId, payload = {}) {
 
   assertSessionOpenForMutation(session);
 
-  const hasRecords = Array.isArray(payload?.records);
-  const hasUpdates = Array.isArray(payload?.updates);
-  assertNotBothRecordsAndUpdates(hasRecords, hasUpdates);
+  if (Array.isArray(payload?.records)) {
+    const error = new Error('Bulk records logging is no longer supported; use updates: [{ refuelId, ... }]');
+    error.statusCode = 400;
+    throw error;
+  }
 
-  return sequelize.transaction(async (transaction) => {
-    if (hasUpdates) {
-      return applySessionRefuelUpdates(user, session, payload.updates, transaction);
-    }
-    return createLegacySessionRefuels(user, session, payload.records, transaction);
-  });
+  const hasUpdates = Array.isArray(payload?.updates) && payload.updates.length > 0;
+  if (!hasUpdates) {
+    const error = new Error('updates must be a non-empty array');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return sequelize.transaction(async (transaction) => applySessionRefuelUpdates(user, session, payload.updates, transaction));
 }
 
 /**

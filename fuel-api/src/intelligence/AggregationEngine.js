@@ -7,9 +7,17 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function plannedOrEstimatedFuel(row) {
+  const planned = row.plannedFuelLitres != null ? Number(row.plannedFuelLitres) : null;
+  if (planned != null && Number.isFinite(planned) && planned > 0) {
+    return planned;
+  }
+  return toNumber(row.estimatedFuelLitres);
+}
+
 export function summarizeTotalsFromRefuels(refuels = []) {
   return refuels.reduce((acc, row) => {
-    acc.totalEstimatedFuel += toNumber(row.estimatedFuelLitres);
+    acc.totalEstimatedFuel += plannedOrEstimatedFuel(row);
     acc.totalActualFuel += toNumber(row.actualFuelLitres ?? row.fuelAmount);
     acc.totalEstimatedCost += toNumber(row.estimatedCost);
     acc.totalActualCost += toNumber(row.actualCost ?? row.fuelCost);

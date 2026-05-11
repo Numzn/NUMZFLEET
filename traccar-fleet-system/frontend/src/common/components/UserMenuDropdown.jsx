@@ -6,7 +6,7 @@ import {
   Avatar,
   Popover,
   List,
-  ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Typography,
@@ -193,8 +193,7 @@ const UserMenuDropdown = () => {
           <Divider sx={{ my: 1 }} />
 
           <List dense>
-            <ListItem
-              button
+            <ListItemButton
               onClick={handleProfile}
               sx={{
                 borderRadius: 1,
@@ -207,10 +206,9 @@ const UserMenuDropdown = () => {
                 <PersonIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText primary="My Profile" />
-            </ListItem>
+            </ListItemButton>
 
-            <ListItem
-              button
+            <ListItemButton
               onClick={handleSettings}
               sx={{
                 borderRadius: 1,
@@ -223,10 +221,9 @@ const UserMenuDropdown = () => {
                 <SettingsIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText primary="Settings" />
-            </ListItem>
+            </ListItemButton>
 
-            <ListItem
-              button
+            <ListItemButton
               onClick={() => window.open('https://numztrak.com/help', '_blank')}
               sx={{
                 borderRadius: 1,
@@ -239,13 +236,12 @@ const UserMenuDropdown = () => {
                 <HelpIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText primary="Help & Support" />
-            </ListItem>
+            </ListItemButton>
           </List>
 
           <Divider sx={{ my: 1 }} />
 
-          <ListItem
-            button
+          <ListItemButton
             onClick={handleLogout}
             sx={{
               borderRadius: 1,
@@ -259,7 +255,7 @@ const UserMenuDropdown = () => {
               <LogoutIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText primary="Logout" />
-          </ListItem>
+          </ListItemButton>
         </Box>
       </Popover>
     </>

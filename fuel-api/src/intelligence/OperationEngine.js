@@ -28,10 +28,48 @@ export function assertSessionOpenForMutation(session) {
   }
 }
 
-export function assertNotBothRecordsAndUpdates(hasRecords, hasUpdates) {
-  if (hasRecords && hasUpdates) {
-    const error = new Error('Use either records or updates, not both');
+/**
+ * Parsed vehicle plan lines for POST /operation-sessions (required for new sessions).
+ * @returns {{ vehicleId: number, plannedLitres: number }[]}
+ */
+export function parseSessionVehiclesInput(vehicles) {
+  if (vehicles == null) {
+    const error = new Error('vehicles is required: [{ vehicleId, plannedLitres }, ...]');
     error.statusCode = 400;
     throw error;
   }
+  if (!Array.isArray(vehicles)) {
+    const error = new Error('vehicles must be an array');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (vehicles.length === 0) {
+    const error = new Error('vehicles must include at least one entry');
+    error.statusCode = 400;
+    throw error;
+  }
+  const seen = new Set();
+  const out = [];
+  for (const v of vehicles) {
+    const vehicleId = Number(v?.vehicleId);
+    if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
+      const error = new Error('Each vehicle must have a positive vehicleId');
+      error.statusCode = 400;
+      throw error;
+    }
+    const plannedLitres = Number(v?.plannedLitres);
+    if (!Number.isFinite(plannedLitres) || plannedLitres <= 0) {
+      const error = new Error('Each vehicle must have plannedLitres greater than 0');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (seen.has(vehicleId)) {
+      const error = new Error(`Duplicate vehicleId ${vehicleId} in vehicles`);
+      error.statusCode = 400;
+      throw error;
+    }
+    seen.add(vehicleId);
+    out.push({ vehicleId, plannedLitres });
+  }
+  return out;
 }

@@ -4,7 +4,7 @@ import {
   Badge,
   Popover,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   ListItemIcon,
   Typography,
@@ -105,9 +105,8 @@ const NotificationsDropdown = () => {
           ) : (
             <List dense>
               {pendingRequests.map((request) => (
-                <ListItem
+                <ListItemButton
                   key={request.id}
-                  button
                   onClick={handleFuelRequestClick}
                   sx={{
                     borderRadius: 1,
@@ -126,13 +125,12 @@ const NotificationsDropdown = () => {
                     secondary={`Device ${request.deviceId} - ${request.requestedAmount}L`}
                     primaryTypographyProps={{ fontWeight: 600 }}
                   />
-                </ListItem>
+                </ListItemButton>
               ))}
 
               {recentEvents.map((event) => (
-                <ListItem
+                <ListItemButton
                   key={event.id}
-                  button
                   sx={{
                     borderRadius: 1,
                     mb: 1,
@@ -145,7 +143,7 @@ const NotificationsDropdown = () => {
                     primary={event.type || 'Alert'}
                     secondary={event.deviceId ? `Device ${event.deviceId}` : 'System'}
                   />
-                </ListItem>
+                </ListItemButton>
               ))}
             </List>
           )}

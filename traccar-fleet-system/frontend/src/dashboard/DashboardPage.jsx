@@ -103,14 +103,14 @@ const DashboardPage = () => {
     <AppLayout showSidebar={true}>
       <Box sx={{
         px: { xs: 1.5, sm: 2.5, md: 3.5, lg: 4 },
-        py: { xs: 1.5, sm: 2.5, md: 3 },
+        py: { xs: 1.25, sm: 2, md: 2.5 },
+        pb: 'calc(var(--app-bottomnav-height, 0px) + env(safe-area-inset-bottom, 0px) + 28px)',
         background: theme.palette.mode === 'dark'
           ? 'radial-gradient(circle at top, rgba(8, 145, 178, 0.1), transparent 28%), linear-gradient(180deg, rgba(2, 6, 23, 0.96) 0%, rgba(6, 23, 42, 0.9) 100%)'
           : 'radial-gradient(circle at top, rgba(6, 182, 212, 0.1), transparent 24%), linear-gradient(180deg, #f7fbff 0%, #eef5fb 100%)',
         minHeight: '100%',
         width: '100%',
         maxWidth: '100%',
-        height: '100%',
         boxSizing: 'border-box',
       }}>
         <Box
@@ -119,7 +119,7 @@ const DashboardPage = () => {
             overflow: 'hidden',
             mb: { xs: 3, md: 4 },
             p: { xs: 2, sm: 2.5, md: 2.75 },
-            borderRadius: { xs: '22px', md: '24px' },
+            borderRadius: { xs: '16px', md: '16px' },
             border: `1px solid ${alpha('#9be7f5', theme.palette.mode === 'dark' ? 0.18 : 0.28)}`,
             background: theme.palette.mode === 'dark'
               ? 'linear-gradient(135deg, rgba(4, 15, 28, 0.94) 0%, rgba(8, 34, 56, 0.92) 55%, rgba(10, 79, 98, 0.9) 100%)'
@@ -303,7 +303,7 @@ const DashboardPage = () => {
                     justifyContent: 'space-between',
                     px: { xs: 1, sm: 1.35 },
                     py: { xs: 0.8, sm: 1 },
-                    borderRadius: { xs: '14px', sm: '16px' },
+                    borderRadius: { xs: '12px', sm: '12px' },
                     fontWeight: 700,
                     fontSize: { xs: '0.85rem', sm: '0.95rem' },
                     color: '#02131e',
@@ -331,7 +331,7 @@ const DashboardPage = () => {
                     justifyContent: 'flex-start',
                     px: { xs: 1, sm: 1.35 },
                     py: { xs: 0.8, sm: 1 },
-                    borderRadius: { xs: '14px', sm: '16px' },
+                    borderRadius: { xs: '12px', sm: '12px' },
                     fontWeight: 700,
                     fontSize: { xs: '0.85rem', sm: '0.95rem' },
                     color: '#f8fdff',
@@ -357,7 +357,7 @@ const DashboardPage = () => {
                     px: { xs: 0.9, sm: 1.25 },
                     py: { xs: 0.75, sm: 0.9 },
                     minWidth: 0,
-                    borderRadius: { xs: '12px', sm: '14px' },
+                    borderRadius: { xs: '12px', sm: '12px' },
                     fontSize: { xs: '0.8rem', sm: '0.85rem' },
                     fontWeight: 600,
                     color: 'rgba(234, 245, 250, 0.92)',
@@ -380,7 +380,7 @@ const DashboardPage = () => {
                     px: { xs: 0.9, sm: 1.25 },
                     py: { xs: 0.75, sm: 0.9 },
                     minWidth: 0,
-                    borderRadius: { xs: '12px', sm: '14px' },
+                    borderRadius: { xs: '12px', sm: '12px' },
                     fontSize: { xs: '0.8rem', sm: '0.85rem' },
                     fontWeight: 600,
                     color: 'rgba(234, 245, 250, 0.92)',

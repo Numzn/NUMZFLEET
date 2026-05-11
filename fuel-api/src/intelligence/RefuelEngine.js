@@ -111,6 +111,7 @@ export function buildPrefillRefuelRow({
   telemetryMileage,
   pricePerLitre,
   sessionDate,
+  plannedFuelLitres = null,
 }) {
   const {
     hasValidCapacity,
@@ -127,11 +128,19 @@ export function buildPrefillRefuelRow({
     });
   }
 
-  const estimatedCost = pricePerLitre != null && estimatedFuelLitres != null
+  const plannedNum = plannedFuelLitres != null ? Number(plannedFuelLitres) : null;
+  const hasPlanned = Number.isFinite(plannedNum) && plannedNum > 0;
+
+  const telemetryEstimatedCost = pricePerLitre != null && estimatedFuelLitres != null
     ? Number((estimatedFuelLitres * pricePerLitre).toFixed(2))
     : null;
+  const plannedEstimatedCost = hasPlanned && pricePerLitre != null
+    ? Number((plannedNum * pricePerLitre).toFixed(2))
+    : null;
+  const estimatedCost = plannedEstimatedCost ?? telemetryEstimatedCost;
 
   const cap = Number(tankCapacity);
+  const status = hasPlanned ? 'normal' : (incomplete ? 'incomplete' : 'normal');
 
   return {
     sessionId,
@@ -139,11 +148,12 @@ export function buildPrefillRefuelRow({
     vehicleId,
     fuelCost: 0,
     fuelAmount: 0,
+    plannedFuelLitres: hasPlanned ? plannedNum : null,
     estimatedFuelLitres,
     actualFuelLitres: null,
     varianceLitres: null,
     variancePercent: null,
-    status: incomplete ? 'incomplete' : 'normal',
+    status,
     erbPricePerLitre: pricePerLitre,
     estimatedCost,
     actualCost: null,

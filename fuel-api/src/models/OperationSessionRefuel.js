@@ -30,6 +30,11 @@ export default (sequelize) => {
       type: DataTypes.DOUBLE,
       allowNull: false,
     },
+    plannedFuelLitres: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'Operator-planned litres (variance baseline)',
+    },
     estimatedFuelLitres: {
       type: DataTypes.DOUBLE,
       allowNull: true,

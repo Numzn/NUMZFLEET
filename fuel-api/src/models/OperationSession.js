@@ -59,6 +59,16 @@ export default (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true,
     },
+    fuelStationId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'Optional fuel_stations.id',
+    },
+    stationName: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+      comment: 'Denormalized station label for display',
+    },
   }, {
     tableName: 'operation_sessions',
     timestamps: true,

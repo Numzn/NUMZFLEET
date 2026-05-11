@@ -10,6 +10,12 @@ export const useServiceWorker = () => {
   const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
+    // In Vite dev (HMR), we intentionally do not register a service worker.
+    // Otherwise `/sw.js` is served as `index.html` and triggers MIME type errors.
+    if (import.meta?.env?.DEV) {
+      return;
+    }
+
     if ('serviceWorker' in navigator) {
       setIsSupported(true);
 
@@ -23,9 +29,7 @@ export const useServiceWorker = () => {
           console.error('❌ [ServiceWorker] Service Worker ready check failed:', error);
         });
 
-      // Register service worker (VitePWA generates this)
-      // In development, VitePWA serves it via dev server with devOptions.enabled
-      // In production, it's in the build output
+      // Register service worker (VitePWA generates this) in production builds.
       navigator.serviceWorker
         .register('/sw.js', {
           scope: '/',
@@ -44,14 +48,7 @@ export const useServiceWorker = () => {
           });
         })
         .catch((error) => {
-          // In development, service worker might not be available if devOptions is not properly configured
-          // This is a warning, not an error, as the app will still work without service worker
-          if (error.message && error.message.includes('MIME type')) {
-            console.warn('⚠️ [ServiceWorker] Service worker not available in development. This is normal if VitePWA dev mode needs configuration.');
-            console.warn('💡 [ServiceWorker] Service worker will work in production build.');
-          } else {
-            console.error('❌ [ServiceWorker] Service Worker registration failed:', error);
-          }
+          console.error('❌ [ServiceWorker] Service Worker registration failed:', error);
         });
 
       // Listen for service worker controller changes

@@ -26,6 +26,8 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ChevronLeftOutlinedIcon from '@mui/icons-material/ChevronLeftOutlined';
 import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
+import NotificationsDropdown from './NotificationsDropdown';
+import UserMenuDropdown from './UserMenuDropdown';
 import usePersistedState from '../util/usePersistedState';
 import { useAdministrator, useManager, useRestriction } from '../util/permissions';
 import useFeatures from '../util/useFeatures';
@@ -163,6 +165,17 @@ const useStyles = makeStyles()((theme) => ({
       padding: '0 4px',
     },
   },
+  footer: {
+    padding: theme.spacing(1, 1.25, 1.25, 1.25),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+  },
+  footerRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing(1),
+  },
 }));
 
 const SIDEBAR_WIDTH_EXPANDED = 168;
@@ -236,7 +249,7 @@ const ModernSidebar = ({
             { title: 'Vehicles', path: '/fleet/vehicles', show: manager },
             { title: 'Devices', path: '/settings/devices' },
             { title: 'Drivers', path: '/settings/drivers', show: !features.disableDrivers },
-            { title: 'Geofences', path: '/geofences', icon: DrawOutlinedIcon },
+            { title: 'Geofences', path: '/geofences' },
           ].filter((c) => c.show !== false),
         },
         {
@@ -249,6 +262,7 @@ const ModernSidebar = ({
             { title: 'Overview', path: '/fuel-requests' },
             { title: 'Requests', path: '/fuel-requests' },
             { title: 'Sessions', path: '/fleet/operation-sessions' },
+            { title: 'New session', path: '/fleet/operation-sessions/create' },
           ],
         },
       ].filter((i) => i.show !== false),
@@ -462,7 +476,11 @@ const ModernSidebar = ({
       </List>
 
       {!forceExpanded && (
-        <Box sx={{ px: collapsed ? 1 : 1.25, pb: 1.25 }}>
+        <Box className={classes.footer}>
+          <Box className={classes.footerRow} sx={{ mb: 0.75 }}>
+            <NotificationsDropdown />
+            <UserMenuDropdown />
+          </Box>
           <Divider sx={{ opacity: 0.35, mb: 1 }} />
           <Tooltip title={collapsed ? 'Expand' : 'Collapse'} placement="right" disableHoverListener={!collapsed}>
             <Box>

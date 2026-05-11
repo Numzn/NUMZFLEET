@@ -4,10 +4,18 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import HomeIcon from '@mui/icons-material/Home';
+import { useContextStripState } from './contextStripState';
 
 const StyledBreadcrumbs = styled(MuiBreadcrumbs)(({ theme }) => ({
+  marginBottom: theme.spacing(1),
+  '& .MuiBreadcrumbs-ol': {
+    flexWrap: 'wrap',
+    rowGap: theme.spacing(0.25),
+  },
   '& .MuiBreadcrumbs-separator': {
     color: theme.palette.text.secondary,
+    marginLeft: theme.spacing(0.5),
+    marginRight: theme.spacing(0.5),
   },
   '& .MuiBreadcrumbs-li': {
     display: 'flex',
@@ -19,34 +27,67 @@ const BreadcrumbLink = styled(Link)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   textDecoration: 'none',
-  color: theme.palette.primary.main,
-  fontSize: '0.875rem',
-  fontWeight: 500,
+  color: theme.palette.text.secondary,
+  fontSize: '0.8125rem',
+  fontWeight: 600,
+  lineHeight: 1.2,
   transition: 'color 0.2s ease',
   '&:hover': {
-    color: theme.palette.primary.dark,
-    textDecoration: 'underline',
+    color: theme.palette.primary.main,
+    textDecoration: 'none',
   },
 }));
 
 const BreadcrumbText = styled(Typography)(({ theme }) => ({
-  fontSize: '0.875rem',
-  color: theme.palette.text.secondary,
-  fontWeight: 500,
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(0.5),
+  fontSize: '0.8125rem',
+  color: theme.palette.text.primary,
+  fontWeight: 700,
+  lineHeight: 1.2,
 }));
 
 const BreadcrumbIcon = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
-  marginRight: theme.spacing(0.5),
+  marginRight: 0,
   '& svg': {
-    fontSize: '1rem',
+    fontSize: '1.05rem',
   },
 }));
 
-const Breadcrumbs = ({ items = [], showHome = true }) => {
+const Breadcrumbs = ({ items = [], showHome = true, hideWhenContextStrip = true }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { enabled } = useContextStripState();
+
+  if (hideWhenContextStrip && enabled) {
+    return null;
+  }
+
+  const formatSegmentLabel = (seg) => {
+    const raw = String(seg || '');
+    if (!raw) return '';
+
+    // Friendly labels for known route segments
+    const known = {
+      fleet: 'Fleet',
+      'operation-sessions': 'Operation sessions',
+      run: 'Run',
+      plan: 'Plan',
+      create: 'Create',
+      history: 'History',
+      vehicles: 'Vehicles',
+      'fuel-requests': 'Fuel requests',
+    };
+    if (known[raw]) return known[raw];
+
+    // IDs look ugly as bare numbers in breadcrumbs
+    if (/^\d+$/.test(raw)) return `#${raw}`;
+
+    return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/-/g, ' ');
+  };
 
   // Generate breadcrumbs from current path if no items provided
   const generateBreadcrumbs = () => {
@@ -65,7 +106,7 @@ const Breadcrumbs = ({ items = [], showHome = true }) => {
     
     pathnames.forEach((name, index) => {
       const href = `/${pathnames.slice(0, index + 1).join('/')}`;
-      const label = name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, ' ');
+      const label = formatSegmentLabel(name);
       
       breadcrumbs.push({
         label,

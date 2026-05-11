@@ -121,26 +121,39 @@ const BottomMenu = ({ layer = 'chrome' } = {}) => {
 
   return (
     <Paper
-      elevation={8}
+      elevation={1}
       sx={(theme) => ({
         position: 'fixed',
         left: 0,
         right: 0,
         bottom: 'env(safe-area-inset-bottom, 0px)',
         zIndex: navZ(theme),
-        borderRadius: '14px 14px 0 0',
+        borderRadius: '10px 10px 0 0',
         overflow: 'hidden',
-        border: `1px solid ${theme.palette.mode === 'dark' ? alpha('#67e8f9', 0.22) : alpha('#0f172a', 0.09)}`,
+        border: `1px solid ${theme.palette.divider}`,
         boxShadow: theme.palette.mode === 'dark'
-          ? '0 14px 34px rgba(0, 0, 0, 0.45)'
-          : '0 14px 30px rgba(7, 89, 133, 0.18)',
-        backdropFilter: 'blur(14px)',
-        background: theme.palette.mode === 'dark'
-          ? 'linear-gradient(165deg, rgba(7, 15, 27, 0.94) 0%, rgba(11, 24, 43, 0.92) 100%)'
-          : 'linear-gradient(165deg, rgba(255, 255, 255, 0.95) 0%, rgba(242, 248, 252, 0.95) 100%)',
+          ? '0 8px 18px rgba(0, 0, 0, 0.38)'
+          : '0 8px 18px rgba(15, 23, 42, 0.12)',
+        backdropFilter: 'blur(6px)',
+        background: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.92 : 0.96),
       })}
     >
-      <BottomNavigation value={currentSelection()} onChange={handleSelection} showLabels>
+      <BottomNavigation
+        value={currentSelection()}
+        onChange={handleSelection}
+        showLabels
+        sx={{
+          minHeight: 52,
+          '& .MuiBottomNavigationAction-root': {
+            minWidth: 62,
+            py: 0.5,
+          },
+          '& .MuiBottomNavigationAction-label': {
+            fontSize: '0.7rem',
+            fontWeight: 600,
+          },
+        }}
+      >
         <BottomNavigationAction
           label="Dashboard"
           icon={<DashboardIcon />}

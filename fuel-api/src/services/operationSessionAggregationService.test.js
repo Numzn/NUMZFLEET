@@ -23,3 +23,26 @@ test('summarizeTotalsFromRefuels computes estimated and actual totals', () => {
   assert.equal(totals.totalEstimatedCost, 1500);
   assert.equal(totals.totalActualCost, 1410);
 });
+
+test('summarizeTotalsFromRefuels prefers plannedFuelLitres for planned rollup', () => {
+  const totals = summarizeTotalsFromRefuels([
+    {
+      plannedFuelLitres: 50,
+      estimatedFuelLitres: 45,
+      estimatedCost: 1500,
+      actualFuelLitres: 48,
+      actualCost: 1440,
+    },
+    {
+      plannedFuelLitres: 70,
+      estimatedFuelLitres: 60,
+      estimatedCost: 2100,
+      actualFuelLitres: null,
+      actualCost: null,
+    },
+  ]);
+
+  assert.equal(totals.totalEstimatedFuel, 120);
+  assert.equal(totals.totalActualFuel, 48);
+  assert.equal(totals.totalEstimatedCost, 3600);
+});

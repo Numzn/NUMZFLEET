@@ -25,15 +25,6 @@ const { reducer, actions } = createSlice({
       state.currentSessionId = action.payload;
       state.lastUpdated = Date.now();
     },
-    appendRefuels(state, action) {
-      const { sessionId, records } = action.payload;
-      if (!state.details[sessionId]) {
-        state.details[sessionId] = { id: sessionId, refuels: [] };
-      }
-      const existing = state.details[sessionId].refuels || [];
-      state.details[sessionId].refuels = [...existing, ...records];
-      state.lastUpdated = Date.now();
-    },
   },
 });
 

@@ -5,7 +5,7 @@ import {
   IconButton,
   Popover,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   ListItemIcon,
   Typography,
@@ -207,9 +207,8 @@ const GlobalSearch = () => {
           <Divider sx={{ my: 1, opacity: 0.6 }} />
           <List dense>
             {results.map((result, index) => (
-              <ListItem
+              <ListItemButton
                 key={index}
-                button
                 onClick={() => handleResultClick(result)}
                 sx={{
                   borderRadius: 1.5,
@@ -230,7 +229,7 @@ const GlobalSearch = () => {
                   primaryTypographyProps={{ fontWeight: 600, fontSize: '0.9rem' }}
                   secondaryTypographyProps={{ fontSize: '0.75rem' }}
                 />
-              </ListItem>
+              </ListItemButton>
             ))}
           </List>
         </Box>

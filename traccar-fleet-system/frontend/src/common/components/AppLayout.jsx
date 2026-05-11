@@ -1,22 +1,13 @@
-import { Box, Drawer, IconButton } from '@mui/material';
+import { Box, Drawer } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import MenuIcon from '@mui/icons-material/Menu';
-import GlobalSearch from './GlobalSearch';
-import NotificationsDropdown from './NotificationsDropdown';
-import UserMenuDropdown from './UserMenuDropdown';
 import ModernSidebar from './ModernSidebar';
 import BottomMenu from './BottomMenu';
+import ContextStrip from './ContextStrip';
+import { ContextStripStateProvider } from './contextStripState';
 import usePersistedState from '../util/usePersistedState';
-import {
-  UnifiedTopbar,
-  TopbarLeftSection,
-  TopbarCenterSection,
-  TopbarRightSection,
-  TopbarDivider,
-} from './topbar';
 
 const DRAWER_WIDTH_EXPANDED = 168;
 const DRAWER_WIDTH_COLLAPSED = 68;
@@ -100,7 +91,7 @@ const AppLayout = ({ children, showSidebar = true }) => {
       if (bn != null && Math.abs(bn - bottomNavHeight) > 0.5) setBottomNavHeight(bn);
       // Expose for MapChromePadding + any full-bleed surfaces.
       if (typeof document !== 'undefined') {
-        document.documentElement.style.setProperty('--app-topbar-height', `${tb || topbarHeight}px`);
+        document.documentElement.style.setProperty('--app-topbar-height', `${tb ?? 0}px`);
         document.documentElement.style.setProperty('--app-bottomnav-height', `${bn || 0}px`);
       }
     };
@@ -113,19 +104,6 @@ const AppLayout = ({ children, showSidebar = true }) => {
       vv?.removeEventListener('resize', read);
     };
   }, [bottomNavHeight, topbarHeight]);
-
-  const embeddedTopbarSx = {
-    width: '100%',
-    flexShrink: 0,
-    left: 'auto',
-    right: 'auto',
-    top: 'auto',
-    borderRadius: 0,
-    boxShadow: 'none',
-    border: 'none',
-    borderBottom: `1px solid ${theme.palette.divider}`,
-    zIndex: theme.zIndex.appBar,
-  };
 
   return (
     <Box className={classes.root}>
@@ -155,40 +133,18 @@ const AppLayout = ({ children, showSidebar = true }) => {
       )}
 
       <Box className={classes.mainColumn}>
-        <UnifiedTopbar ref={topbarRef} variant="appbar" position="static" sx={embeddedTopbarSx}>
-          <TopbarLeftSection>
-            {!desktop && (
-              <IconButton
-                onClick={() => setSidebarOpen(true)}
-                edge="start"
-                size="small"
-                sx={{
-                  padding: '6px',
-                  '&:hover': {
-                    backgroundColor: 'rgba(6, 182, 212, 0.08)',
-                  },
-                }}
-              >
-                <MenuIcon sx={{ fontSize: '1.1rem' }} />
-              </IconButton>
-            )}
-          </TopbarLeftSection>
+        <ContextStripStateProvider value={{ enabled: true }}>
+          <Box ref={topbarRef}>
+            <ContextStrip
+              showMenuButton={showSidebar && !desktop}
+              onMenuClick={() => setSidebarOpen(true)}
+            />
+          </Box>
 
-          <TopbarCenterSection>
-            <GlobalSearch />
-          </TopbarCenterSection>
-
-          <TopbarDivider />
-
-          <TopbarRightSection>
-            <NotificationsDropdown />
-            <UserMenuDropdown />
-          </TopbarRightSection>
-        </UnifiedTopbar>
-
-        <Box component="main" className={classes.main} sx={{ pb: mainPaddingBottom }}>
-          {children}
-        </Box>
+          <Box component="main" className={classes.main} sx={{ pb: mainPaddingBottom }}>
+            {children}
+          </Box>
+        </ContextStripStateProvider>
 
         <Box
           ref={bottomNavRef}

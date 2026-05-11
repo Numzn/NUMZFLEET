@@ -185,7 +185,7 @@ const ErbPricesCard = () => {
         position: 'relative',
         overflow: 'hidden',
         p: { xs: 2, sm: 2.5 },
-        borderRadius: { xs: '20px', md: '22px' },
+        borderRadius: { xs: '16px', md: '16px' },
         border: `1px solid ${alpha('#9be7f5', dark ? 0.18 : 0.28)}`,
         background: cardBg,
         boxShadow: dark
@@ -260,7 +260,7 @@ const ErbPricesCard = () => {
             sx={{
               px: { xs: 1.25, sm: 1.5 },
               py: { xs: 1, sm: 1.25 },
-              borderRadius: '14px',
+              borderRadius: '12px',
               backgroundColor: alpha(color, 0.08),
               border: `1px solid ${alpha(color, 0.18)}`,
             }}
