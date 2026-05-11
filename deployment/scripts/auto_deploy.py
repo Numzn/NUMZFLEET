@@ -17,6 +17,11 @@ import sys
 import time
 from pathlib import Path
 
+try:
+    from auto_deploy_commit_message import suggest_commit_message as _suggest_commit_message
+except ImportError:
+    _suggest_commit_message = None
+
 
 def _env_bool(name: str, default: bool = True) -> bool:
     v = os.environ.get(name)
@@ -257,7 +262,8 @@ Override file path: NUMZFLEET_AUTO_DEPLOY_ENV_FILE.
 
 NUMZFLEET_SSH_HOST  NUMZFLEET_SSH_USER  NUMZFLEET_SSH_IDENTITY_FILE  NUMZFLEET_SSH_CONNECT_TIMEOUT_SECONDS
 NUMZFLEET_SERVER_REPO_PATH
-NUMZFLEET_BRANCH  NUMZFLEET_DEPLOY_ENV  NUMZFLEET_USE_MIGRATIONS  NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS
+NUMZFLEET_BRANCH  NUMZFLEET_DEPLOY_ENV  NUMZFLEET_DEPLOY_IMAGE_TAG  NUMZFLEET_USE_MIGRATIONS  NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS
+NUMZFLEET_AUTO_COMMIT_MESSAGE   (default on) set 0/false to force typing message when -m omitted
 NUMZFLEET_SSH_STRICT_HOST_KEY_CHECKING
 NUMZFLEET_GIT_PULL_STRATEGY   reset (default) or merge for server pull
 
@@ -295,7 +301,13 @@ def main() -> int:
         "-m",
         "--message",
         default=None,
-        help="Commit message (non-interactive). If omitted, you are prompted unless --skip-git.",
+        help="Commit message (non-interactive). If omitted, a message is auto-generated from staged paths unless "
+        "NUMZFLEET_AUTO_COMMIT_MESSAGE=0 or --prompt-message.",
+    )
+    parser.add_argument(
+        "--prompt-message",
+        action="store_true",
+        help="When committing without -m, prompt for the message instead of auto-generating.",
     )
     parser.add_argument(
         "--skip-wait",
@@ -319,6 +331,13 @@ def main() -> int:
         metavar="PATH",
         default=None,
         help="SSH private key (overrides NUMZFLEET_SSH_IDENTITY_FILE; e.g. ~/.ssh/oci_instance_key.pem).",
+    )
+    parser.add_argument(
+        "--deploy-image-tag",
+        metavar="GIT_REF_OR_SHA",
+        default=None,
+        help="Registry IMAGE_TAG (full SHA recommended). Use when HEAD did not run CI (e.g. deployment-only). "
+        "Resolves via git rev-parse. Overrides NUMZFLEET_DEPLOY_IMAGE_TAG.",
     )
     args = parser.parse_args()
 
@@ -386,8 +405,14 @@ def main() -> int:
             msg = (args.message or "").strip()
             if not msg:
                 if args.dry_run:
-                    print("[dry-run] would prompt for commit message (use -m to avoid)")
+                    print("[dry-run] would auto-generate commit message from staged files (or use -m)")
                     msg = "[dry-run placeholder]"
+                elif args.prompt_message or not _env_bool("NUMZFLEET_AUTO_COMMIT_MESSAGE", True):
+                    msg = input("\nEnter commit message: ").strip()
+                elif _suggest_commit_message is not None:
+                    staged = get_output(["git", "diff", "--cached", "--name-only"], cwd=repo).splitlines()
+                    msg = _suggest_commit_message(staged)
+                    print(f"\n[auto_deploy] Generated commit message: {msg}\n")
                 else:
                     msg = input("\nEnter commit message: ").strip()
             if not msg or msg == "[dry-run placeholder]":
@@ -418,6 +443,23 @@ def main() -> int:
     sha = get_output(["git", "rev-parse", "HEAD"], cwd=repo)
     print(f"\nCommit SHA: {sha}\n")
 
+    image_tag_source = (args.deploy_image_tag or os.environ.get("NUMZFLEET_DEPLOY_IMAGE_TAG") or "").strip()
+    deploy_sha = sha
+    if image_tag_source:
+        try:
+            deploy_sha = get_output(["git", "rev-parse", image_tag_source], cwd=repo)
+        except subprocess.CalledProcessError:
+            print(
+                f"[auto_deploy] Could not resolve NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag: {image_tag_source!r}",
+                file=sys.stderr,
+            )
+            return 2
+        if deploy_sha != sha:
+            print(
+                f"[auto_deploy] Registry deploy will pull IMAGE_TAG={deploy_sha} "
+                f"(HEAD={sha}; override from ref {image_tag_source!r}).\n"
+            )
+
     changed = files_in_commit(repo, sha)
     flags = classify_changes(changed)
 
@@ -444,18 +486,19 @@ def main() -> int:
     else:
         print("No image rebuild required from path filters (config-only or unrelated paths).")
         print("Registry deploy still pins images to this commit SHA.\n")
-        if not args.skip_deploy:
+        if not args.skip_deploy and not image_tag_source:
             print(
                 "[auto_deploy] WARN: CI may not have built images for this SHA. "
-                "If docker pull fails with manifest unknown, push a change under "
-                "traccar-fleet-system/frontend/, fuel-api/, or erb-fuel-monitor/, "
-                "or run the GitHub workflow manually, then redeploy.\n",
+                "If docker pull fails with manifest unknown: run the GitHub Action "
+                "'Build and push NumzFleet images' (workflow_dispatch), or set "
+                "NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag to a full SHA that "
+                "already has images, then redeploy.\n",
                 file=sys.stderr,
             )
 
     sp = shlex.quote(server_path)
     env_q = shlex.quote(deploy_env)
-    sha_q = shlex.quote(sha)
+    sha_q = shlex.quote(deploy_sha)
     rpx = remote_repo_prefix(sp)
 
     pull_strategy = os.environ.get("NUMZFLEET_GIT_PULL_STRATEGY", "reset").strip().lower()
@@ -486,7 +529,7 @@ def main() -> int:
     if args.dry_run:
         print("[dry-run] Remote (same as actual SSH):\n")
         print(f"  1) {user}@{host}:{server_path} -> git pull origin {branch}")
-        print(f"  2) {user}@{host}:{server_path} -> {deploy_label} ({sha[:12]}...) env={deploy_env}")
+        print(f"  2) {user}@{host}:{server_path} -> {deploy_label} ({deploy_sha[:12]}...) env={deploy_env}")
         if flags["traccar_conf"] and not flags["image_build_required"]:
             print(f"  3) {user}@{host}:{server_path} -> docker compose restart traccar")
         print("\n==============================")
