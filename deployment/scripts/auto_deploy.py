@@ -249,6 +249,27 @@ def classify_changes(files: list[str]) -> dict[str, bool]:
     }
 
 
+# Path prefixes must stay aligned with .github/workflows/build-push-numzfleet-images.yml `paths:`.
+CI_IMAGE_PATH_LOG_ARGS = (
+    "traccar-fleet-system/frontend",
+    "fuel-api",
+    "erb-fuel-monitor",
+    CI_IMAGE_WORKFLOW,
+)
+
+
+def last_commit_touching_ci_image_paths(repo: Path, ref: str = "HEAD") -> str | None:
+    """Latest commit on `ref` ancestry that touches any path that triggers the image build workflow."""
+    try:
+        out = get_output(
+            ["git", "log", ref, "-1", "--format=%H", "--", *CI_IMAGE_PATH_LOG_ARGS],
+            cwd=repo,
+        ).strip()
+    except subprocess.CalledProcessError:
+        return None
+    return out or None
+
+
 def countdown(seconds: int, label: str) -> None:
     for i in range(seconds, 0, -1):
         print(f"\r{label} {i}s  ", end="", flush=True)
@@ -263,6 +284,7 @@ Override file path: NUMZFLEET_AUTO_DEPLOY_ENV_FILE.
 NUMZFLEET_SSH_HOST  NUMZFLEET_SSH_USER  NUMZFLEET_SSH_IDENTITY_FILE  NUMZFLEET_SSH_CONNECT_TIMEOUT_SECONDS
 NUMZFLEET_SERVER_REPO_PATH
 NUMZFLEET_BRANCH  NUMZFLEET_DEPLOY_ENV  NUMZFLEET_DEPLOY_IMAGE_TAG  NUMZFLEET_USE_MIGRATIONS  NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS
+NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT  (default on) for deployment-only HEAD, pull images from latest commit that touched app/CI paths
 NUMZFLEET_AUTO_COMMIT_MESSAGE   (default on) set 0/false to force typing message when -m omitted
 NUMZFLEET_SSH_STRICT_HOST_KEY_CHECKING
 NUMZFLEET_GIT_PULL_STRATEGY   reset (default) or merge for server pull
@@ -338,6 +360,11 @@ def main() -> int:
         default=None,
         help="Registry IMAGE_TAG (full SHA recommended). Use when HEAD did not run CI (e.g. deployment-only). "
         "Resolves via git rev-parse. Overrides NUMZFLEET_DEPLOY_IMAGE_TAG.",
+    )
+    parser.add_argument(
+        "--no-auto-image-sha",
+        action="store_true",
+        help="Do not auto-pick IMAGE_TAG from the latest commit touching CI image paths when HEAD is deployment-only.",
     )
     args = parser.parse_args()
 
@@ -486,15 +513,48 @@ def main() -> int:
     else:
         print("No image rebuild required from path filters (config-only or unrelated paths).")
         print("Registry deploy still pins images to this commit SHA.\n")
-        if not args.skip_deploy and not image_tag_source:
+
+    image_sha_warned = False
+    if (
+        not args.skip_deploy
+        and not image_tag_source
+        and not flags["image_build_required"]
+        and not args.no_auto_image_sha
+        and _env_bool("NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT", True)
+    ):
+        last_ci = last_commit_touching_ci_image_paths(repo)
+        if last_ci and last_ci != sha:
+            deploy_sha = last_ci
             print(
-                "[auto_deploy] WARN: CI may not have built images for this SHA. "
-                "If docker pull fails with manifest unknown: run the GitHub Action "
-                "'Build and push NumzFleet images' (workflow_dispatch), or set "
-                "NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag to a full SHA that "
-                "already has images, then redeploy.\n",
+                f"[auto_deploy] Using registry IMAGE_TAG from latest commit that touches CI image paths "
+                f"({deploy_sha[:12]}...), not HEAD ({sha[:12]}...), so docker pull matches existing images. "
+                f"Server repo and scripts still update to HEAD.\n"
+            )
+        elif not last_ci:
+            print(
+                "[auto_deploy] WARN: No commit on this branch touches frontend/fuel-api/erb/CI workflow paths; "
+                "cannot auto-pick an image SHA. Run 'Build and push NumzFleet images' or set "
+                "NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag.\n",
                 file=sys.stderr,
             )
+            image_sha_warned = True
+
+    if (
+        not args.skip_deploy
+        and not image_tag_source
+        and not flags["image_build_required"]
+        and deploy_sha == sha
+        and not image_sha_warned
+    ):
+        print(
+            "[auto_deploy] WARN: CI may not have built images for this SHA. "
+            "If docker pull fails with manifest unknown: run the GitHub Action "
+            "'Build and push NumzFleet images' (workflow_dispatch), set "
+            "NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag, or rely on auto image SHA "
+            "(on by default; disable with --no-auto-image-sha or "
+            "NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT=0).\n",
+            file=sys.stderr,
+        )
 
     sp = shlex.quote(server_path)
     env_q = shlex.quote(deploy_env)
