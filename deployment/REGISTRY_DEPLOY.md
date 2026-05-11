@@ -114,6 +114,8 @@ python deployment/scripts/auto_deploy.py --dry-run --skip-git
 
 **If `docker pull` fails with `manifest unknown` after a push:** GitHub Actions may still be building. Confirm the **Build and push NumzFleet images** run for that SHA is green, then run `python deployment/scripts/auto_deploy.py --skip-git` (or raise **`NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS`** / **`NUMZFLEET_IMAGE_BUILD_WAIT_MIN_WITH_MIGRATIONS`** — when both migrations and app images change, `auto_deploy` uses at least **180s** before SSH by default).
 
+**Post-deploy verification (workstation):** After a successful SSH deploy, `auto_deploy` waits **`NUMZFLEET_POST_VERIFY_WAIT_SECONDS`** (default **60**), then **GET**s **`{origin}/health`** and **`{origin}/api/health`** from your machine with **no-cache** headers and a **cache-busting query** (force refresh through browsers/CDNs). Origin comes from **`NUMZFLEET_POST_VERIFY_ORIGIN`** or the first value in **`CORS_ORIGIN`** in `backend/.env` / `deployment/.env`. Override URLs with **`NUMZFLEET_POST_VERIFY_HEALTH_URL`** / **`NUMZFLEET_POST_VERIFY_API_HEALTH_URL`**. Disable with **`NUMZFLEET_POST_VERIFY=0`** or **`--skip-post-verify`**. Set **`NUMZFLEET_POST_VERIFY_STRICT=1`** to exit non-zero if probes fail after retries.
+
 Full env list: comments in `auto_deploy.defaults.env` and **`python deployment/scripts/auto_deploy.py --help`** epilog (points here).
 
 ## Baseline backup (post-deploy snapshot)

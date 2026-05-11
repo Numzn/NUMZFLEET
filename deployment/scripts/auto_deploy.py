@@ -6,6 +6,7 @@ Flow (see deployment/REGISTRY_DEPLOY.md, section **auto_deploy.py (workstation â
   1. Optional: git add / commit (auto message from paths unless -m / --prompt-message)
   2. git push origin HEAD:<branch> (updates remote branch from current commit; not only local <branch>)
   3. SSH: one session runs server git sync then migrate+deploy or registry deploy (optional SSH master during CI wait)
+  4. Optional: wait then HTTP GET /health and /api/health from this machine (cache-bypass) â€” post-deploy verification
 
 Config: deployment/scripts/auto_deploy.defaults.env, optional auto_deploy.env (gitignored).
 Windows: use deployment/scripts/... paths; see deployment/OCI_SSH.md for keys.
@@ -18,10 +19,13 @@ import hashlib
 import os
 import shlex
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 try:
@@ -439,6 +443,135 @@ def adjust_deploy_sha_for_registry_images(
     return deploy_sha
 
 
+def read_env_file_key(path: Path, key: str) -> str | None:
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return None
+    prefix = key + "="
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith(prefix):
+            val = line[len(prefix) :].strip()
+            if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+                val = val[1:-1]
+            return val.strip() or None
+    return None
+
+
+def first_origin_from_cors(val: str | None) -> str | None:
+    if not val:
+        return None
+    first = val.split(",")[0].strip()
+    return first.rstrip("/") or None
+
+
+def resolve_post_verify_origin(repo: Path) -> str | None:
+    o = os.environ.get("NUMZFLEET_POST_VERIFY_ORIGIN", "").strip()
+    if o:
+        return o.rstrip("/")
+    for p in (repo / "backend" / ".env", repo / "deployment" / ".env"):
+        c = read_env_file_key(p, "CORS_ORIGIN")
+        hit = first_origin_from_cors(c)
+        if hit:
+            return hit.rstrip("/")
+    return None
+
+
+def _http_get_ok(url: str, *, timeout: int = 30) -> tuple[bool, str]:
+    """GET with cache-bypass headers + query buster (force refresh through caches)."""
+    bust = f"_numzfleet_pv={int(time.time() * 1000)}"
+    full = url + ("&" if "?" in url else "?") + bust
+    req = urllib.request.Request(
+        full,
+        method="GET",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Accept": "*/*",
+        },
+    )
+    ctx = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            code = resp.getcode()
+            if 200 <= code < 300:
+                return True, str(code)
+            return False, f"HTTP {code}"
+    except urllib.error.HTTPError as e:
+        return False, f"HTTPError {e.code}"
+    except urllib.error.URLError as e:
+        return False, f"URLError {e.reason!r}"
+    except Exception as e:
+        return False, repr(e)
+
+
+def post_deploy_verify_external(repo: Path, *, skip: bool) -> int:
+    """
+    After deployment, wait then probe public edge + API from the workstation (not the server).
+    Returns 0 on success or non-strict failure; 1 if strict and a probe failed.
+    """
+    if skip or not _env_bool("NUMZFLEET_POST_VERIFY", True):
+        return 0
+
+    origin = resolve_post_verify_origin(repo)
+    if not origin:
+        print(
+            "[auto_deploy] Post-verify skipped (no NUMZFLEET_POST_VERIFY_ORIGIN and no CORS_ORIGIN in backend/.env).\n",
+            flush=True,
+        )
+        return 0
+
+    wait_sec = _env_int("NUMZFLEET_POST_VERIFY_WAIT_SECONDS", 60)
+    retries = _env_int("NUMZFLEET_POST_VERIFY_RETRIES", 6)
+    gap = _env_int("NUMZFLEET_POST_VERIFY_RETRY_GAP_SECONDS", 10)
+    strict = _env_bool("NUMZFLEET_POST_VERIFY_STRICT", False)
+
+    edge = os.environ.get("NUMZFLEET_POST_VERIFY_HEALTH_URL", "").strip() or f"{origin}/health"
+    api = os.environ.get("NUMZFLEET_POST_VERIFY_API_HEALTH_URL", "").strip() or f"{origin}/api/health"
+
+    print(
+        f"\n[auto_deploy] Post-verify: waiting {wait_sec}s, then GET (cache-bypass) up to {retries}x per URL...\n",
+        flush=True,
+    )
+    if wait_sec > 0:
+        countdown(wait_sec, "Post-deploy wait")
+
+    def probe_chain(label: str, url: str) -> bool:
+        for attempt in range(1, retries + 1):
+            ok, detail = _http_get_ok(url)
+            if ok:
+                print(f"[auto_deploy] Post-verify {label}: OK ({detail})", flush=True)
+                return True
+            print(
+                f"[auto_deploy] Post-verify {label}: attempt {attempt}/{retries} failed ({detail})",
+                file=sys.stderr,
+                flush=True,
+            )
+            if attempt < retries:
+                time.sleep(gap)
+        return False
+
+    ok_edge = probe_chain("edge /health", edge)
+    ok_api = probe_chain("API /api/health", api)
+
+    if ok_edge and ok_api:
+        print("\n[auto_deploy] Post-verify complete.\n", flush=True)
+        return 0
+
+    msg = "[auto_deploy] Post-verify FAILED (edge or API not healthy from this machine).\n"
+    if strict:
+        print(msg, file=sys.stderr, flush=True)
+        return 1
+    print(msg + "[auto_deploy] Non-strict mode (NUMZFLEET_POST_VERIFY_STRICT=0): exiting success anyway.\n", file=sys.stderr, flush=True)
+    return 0
+
+
 def countdown(seconds: int, label: str) -> None:
     for i in range(seconds, 0, -1):
         print(f"\r{label} {i}s  ", end="", flush=True)
@@ -526,6 +659,11 @@ def main() -> int:
         "--no-auto-image-sha",
         action="store_true",
         help="Do not auto-pick IMAGE_TAG from the latest commit touching CI image paths when HEAD is deployment-only.",
+    )
+    parser.add_argument(
+        "--skip-post-verify",
+        action="store_true",
+        help="After deploy, skip wait + external HTTP health probes (NUMZFLEET_POST_VERIFY).",
     )
     args = parser.parse_args()
 
@@ -732,6 +870,12 @@ def main() -> int:
         )
         if flags["traccar_conf"] and not flags["image_build_required"]:
             print("     then docker compose restart traccar")
+        if not args.skip_deploy and not args.skip_post_verify and _env_bool("NUMZFLEET_POST_VERIFY", True):
+            w = _env_int("NUMZFLEET_POST_VERIFY_WAIT_SECONDS", 60)
+            print(
+                f"  2) [dry-run] After success: wait {w}s then GET /health and /api/health "
+                f"(cache-bypass; NUMZFLEET_POST_VERIFY_*)\n"
+            )
         print("\n==============================")
         print("DONE (--dry-run)")
         print("==============================\n")
@@ -783,6 +927,10 @@ def main() -> int:
     print("\n==============================")
     print("DEPLOYMENT COMPLETE")
     print("==============================\n")
+
+    v = post_deploy_verify_external(repo, skip=args.skip_post_verify)
+    if v != 0:
+        return v
     return 0
 
 
