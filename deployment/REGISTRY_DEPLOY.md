@@ -96,6 +96,8 @@ That error means **Postgres was never migrated** with the station columns while 
 
 **If `auto_deploy` fails during SSH before migrate finishes:** fix OCI security lists / instance / key / network, then rerun **`python deployment/scripts/auto_deploy.py --skip-git`** or run the command above on the server.
 
+**If SSH shows `Connection … port 22 timed out`:** the laptop never completed TCP to `sshd` (not a Git/Docker bug). Check VCN **ingress TCP 22** to the instance public IP, instance **running**, correct **IP**, corporate VPN, and **`NUMZFLEET_SSH_DEPLOY_RETRIES`** / **`NUMZFLEET_SSH_DEPLOY_RETRY_GAP_SECONDS`** (defaults: 3 attempts, 15s gap) for brief outages only.
+
 **Emergency fix (SQL only, idempotent):** same DDL as in `20260511_operation_session_planned_station.sql` / `20260427_…` (use **`INTEGER`** for **`fuelStationId`**, not UUID — match the repo migrations). Example:
 
 ```bash

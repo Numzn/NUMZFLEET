@@ -141,6 +141,34 @@ def run_cmd(
     )
 
 
+def run_cmd_with_retries(
+    argv: list[str],
+    *,
+    cwd: Path | None = None,
+    attempts: int,
+    gap_sec: int,
+    label: str,
+) -> subprocess.CompletedProcess[str]:
+    """Same as run_cmd but retry on failure (e.g. transient SSH port 22 timeouts)."""
+    attempts = max(1, attempts)
+    last_err: subprocess.CalledProcessError | None = None
+    for i in range(1, attempts + 1):
+        try:
+            return run_cmd(argv, cwd=cwd, check=True)
+        except subprocess.CalledProcessError as e:
+            last_err = e
+            if i < attempts:
+                print(
+                    f"\n[auto_deploy] {label}: attempt {i}/{attempts} failed (exit {e.returncode}); "
+                    f"retrying in {gap_sec}s...\n",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                time.sleep(gap_sec)
+    assert last_err is not None
+    raise last_err
+
+
 def get_output(argv: list[str], *, cwd: Path | None = None) -> str:
     return subprocess.check_output(argv, cwd=str(cwd) if cwd else None, text=True).strip()
 
@@ -912,6 +940,9 @@ def main() -> int:
         )
         return 2
 
+    ssh_deploy_attempts = max(1, _env_int("NUMZFLEET_SSH_DEPLOY_RETRIES", 3))
+    ssh_deploy_gap = max(0, _env_int("NUMZFLEET_SSH_DEPLOY_RETRY_GAP_SECONDS", 15))
+
     mux_path: Path | None = None
     try:
         want_mux = (
@@ -938,9 +969,21 @@ def main() -> int:
             countdown(ci_wait, "Deploy buffer")
 
         print(f"\nRunning {deploy_label} on server (single SSH session)...\n")
-        run_cmd(ssh_remote_cmd(user, host, remote_inner, mux_path=mux_path))
+        run_cmd_with_retries(
+            ssh_remote_cmd(user, host, remote_inner, mux_path=mux_path),
+            attempts=ssh_deploy_attempts,
+            gap_sec=ssh_deploy_gap,
+            label="SSH deploy",
+        )
     except subprocess.CalledProcessError as e:
         print("[auto_deploy] Remote step failed (see command output above).", file=sys.stderr)
+        print(
+            "[auto_deploy] If you saw 'port 22 timed out' or 'banner exchange': fix reachability first — "
+            "OCI security list ingress TCP 22, instance running, correct public IP, VPN/firewall, fail2ban. "
+            "Tune NUMZFLEET_SSH_DEPLOY_RETRIES / NUMZFLEET_SSH_DEPLOY_RETRY_GAP_SECONDS for flaky links.\n",
+            file=sys.stderr,
+            flush=True,
+        )
         return e.returncode if e.returncode else 1
     finally:
         if mux_path is not None:
