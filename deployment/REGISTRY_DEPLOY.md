@@ -74,9 +74,8 @@ Optional second argument: path to the deployment env file (defaults to `deployme
 3. Scans each migration file for forbidden **`DROP`** / **`TRUNCATE`** tokens (comment-aware when `perl` is available); aborts if found.
 4. Applies migrations **in order** with `psql -v ON_ERROR_STOP=1`:
    - `20260503_create_operation_sessions_tables.sql`
-   - `20260427_daily_intelligent_refueling.sql` (also adds optional **`fuelStationId`** / **`stationName`** / **`plannedFuelLitres`** — idempotent `IF NOT EXISTS`)
+   - `20260427_daily_intelligent_refueling.sql` (session totals + refuel intelligence columns, including **`plannedFuelLitres`** — idempotent `IF NOT EXISTS`)
    - `20260429_refuel_status_incomplete.sql`
-   - `20260511_operation_session_planned_station.sql`
 5. Calls the existing **`deployment/deploy/deploy-from-registry.sh`** (unchanged registry-only deploy) — **migrations always run before image pull / container recreate** for this wrapper.
 6. Verifies **two** public health endpoints, each with retries, and **fails fast** if either is unhealthy:
    - **Edge:** `GET /health` (frontend nginx static `200 ok`) — proves Caddy → frontend reachability. Override with `HEALTHCHECK_URL`.
@@ -84,42 +83,7 @@ Optional second argument: path to the deployment env file (defaults to `deployme
    Both URLs default to the first `CORS_ORIGIN` value (default `https://numz.site`).
 7. Writes a timestamped log under **`deployment/logs/`**.
 
-### Production only: `column "fuelStationId" does not exist` (schema drift)
-
-That error means **Postgres was never migrated** with the station columns while **fuel-api** already expects them. Typical causes: **`run-migrate-and-deploy.sh` did not finish** (e.g. **`Connection timed out during banner exchange`** on SSH so the script never reached `psql`), or someone ran **`deploy-from-registry.sh` alone** after a migration-only push without applying SQL.
-
-**Preferred fix (when SSH works):** on the instance under `~/NUMZFLEET`, with `main` at a commit that includes the migration files:
-
-```bash
-./deployment/run-migrate-and-deploy.sh <full-git-sha> deployment/.env
-```
-
-**If `auto_deploy` fails during SSH before migrate finishes:** fix OCI security lists / instance / key / network, then rerun **`python deployment/scripts/auto_deploy.py --skip-git`** or run the command above on the server.
-
-**If SSH shows `Connection … port 22 timed out`:** the laptop never completed TCP to `sshd` (not a Git/Docker bug). Check VCN **ingress TCP 22** to the instance public IP, instance **running**, correct **IP**, corporate VPN, and **`NUMZFLEET_SSH_DEPLOY_RETRIES`** / **`NUMZFLEET_SSH_DEPLOY_RETRY_GAP_SECONDS`** (defaults: 3 attempts, 15s gap) for brief outages only.
-
-**Emergency fix (SQL only, idempotent):** same DDL as in `20260511_operation_session_planned_station.sql` / `20260427_…` (use **`INTEGER`** for **`fuelStationId`**, not UUID — match the repo migrations). Example:
-
-```bash
-docker exec -i numzfleet-prod-db psql "postgresql://USER:PASS@127.0.0.1:5432/numztrak_fuel" -v ON_ERROR_STOP=1 <<'SQL'
-BEGIN;
-ALTER TABLE operation_sessions
-  ADD COLUMN IF NOT EXISTS "fuelStationId" INTEGER,
-  ADD COLUMN IF NOT EXISTS "stationName" VARCHAR(120);
-ALTER TABLE operation_session_refuels
-  ADD COLUMN IF NOT EXISTS "plannedFuelLitres" DOUBLE PRECISION;
-CREATE INDEX IF NOT EXISTS operation_sessions_fuel_station_id ON operation_sessions ("fuelStationId");
-COMMIT;
-SQL
-```
-
-Use the same `USER` / `PASS` / database name as in `backend/.env` `DATABASE_URL`. Then **`docker compose -f deployment/compose/docker-compose.prod.yml --env-file deployment/.env restart backend`** (or `up -d backend`) so pools pick up the schema.
-
-**Safety**
-
-- Migrations in this repo are intended to be **idempotent** and **additive** (no `DROP` / `TRUNCATE`); the wrapper enforces that guard before running SQL.
-- It does **not** wipe or truncate data; it only runs the vetted SQL files above.
-- **Backward compatibility:** you can still run `deploy-from-registry.sh` alone when no migration is needed.
+**Safety:** migrations are **idempotent** and **additive** (no `DROP` / `TRUNCATE`); the wrapper enforces that before running SQL. You can still run **`deploy-from-registry.sh` alone** when no migration file changed.
 
 ### `auto_deploy.py` (workstation → server)
 

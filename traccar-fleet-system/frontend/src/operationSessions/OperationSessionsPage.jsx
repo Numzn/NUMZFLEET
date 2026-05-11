@@ -192,9 +192,6 @@ const OperationSessionsPage = () => {
                         <Chip size="small" variant="outlined" label={`Pending ${pendingCount}`} />
                         <Chip size="small" variant="outlined" label={`${formatL(activeDetails.totalActualFuel)} dispensed`} />
                         <Chip size="small" variant="outlined" label={`${formatK(activeDetails.totalActualCost)} cost`} />
-                        {activeDetails.stationName && (
-                          <Chip size="small" variant="outlined" label={activeDetails.stationName} />
-                        )}
                       </Box>
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Button

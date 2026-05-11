@@ -1,5 +1,5 @@
 import sequelize from '../config/database.js';
-import { FuelStation, OperationSessionRefuel, VehicleSpec } from '../models/index.js';
+import { OperationSessionRefuel, VehicleSpec } from '../models/index.js';
 import {
   create as createSessionRecord,
   findActiveByUserId,
@@ -44,8 +44,6 @@ const toSessionDto = (session) => ({
   sessionDate: session.sessionDate,
   status: session.status,
   notes: session.notes,
-  fuelStationId: session.fuelStationId != null ? Number(session.fuelStationId) : null,
-  stationName: session.stationName || null,
   totalEstimatedFuel: Number(session.totalEstimatedFuel || 0),
   totalActualFuel: Number(session.totalActualFuel || 0),
   totalEstimatedCost: Number(session.totalEstimatedCost || 0),
@@ -163,29 +161,12 @@ async function prepareInitialRefuels(user, sessionId, vehiclePlans, transaction)
   }
 }
 
-async function resolveStationFields(payload) {
-  let fuelStationId = payload.fuelStationId != null && payload.fuelStationId !== ''
-    ? Number(payload.fuelStationId)
-    : null;
-  let stationName = payload.stationName != null ? String(payload.stationName).trim() : null;
-  if (stationName === '') stationName = null;
-
-  if (fuelStationId != null && Number.isFinite(fuelStationId)) {
-    try {
-      const st = await FuelStation.findByPk(fuelStationId);
-      if (st) {
-        if (!stationName) stationName = st.name;
-      } else {
-        fuelStationId = null;
-      }
-    } catch {
-      fuelStationId = null;
-    }
-  } else {
-    fuelStationId = null;
+function defaultSessionName(sessionDate) {
+  const d = sessionDate instanceof Date ? sessionDate : new Date(sessionDate);
+  if (Number.isNaN(d.getTime())) {
+    return 'Fuel session';
   }
-
-  return { fuelStationId, stationName };
+  return `Fuel session — ${d.toISOString().slice(0, 10)}`;
 }
 
 export async function createOperationSession(user, payload = {}) {
@@ -213,8 +194,6 @@ export async function createOperationSession(user, payload = {}) {
     vehiclePlans = parseSessionVehiclesInput(payload.vehicles);
   }
 
-  const { fuelStationId, stationName } = await resolveStationFields(payload || {});
-
   return sequelize.transaction(async (transaction) => {
     const activeSession = await findActiveByUserId(user.id, { transaction });
     if (activeSession) {
@@ -225,12 +204,10 @@ export async function createOperationSession(user, payload = {}) {
 
     const created = await createSessionRecord({
       userId: user.id,
-      name: payload.name ? String(payload.name).trim() : null,
+      name: defaultSessionName(sessionDate),
       notes: payload.notes ? String(payload.notes).trim() : null,
       status: isClosedCreate ? 'closed' : 'active',
       sessionDate,
-      fuelStationId,
-      stationName,
     }, { transaction });
 
     if (vehiclePlans.length) {

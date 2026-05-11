@@ -269,9 +269,6 @@ const OperationRunPage = () => {
               <Typography variant="subtitle2" fontWeight={800}>
                 {session?.name || `Session ${sessionId}`}
               </Typography>
-              {session?.stationName && (
-                <Typography variant="caption" color="text.secondary">{session.stationName}</Typography>
-              )}
               <Stack direction="row" flexWrap="wrap" gap={1}>
                 <Chip size="small" label={`${completedCount}/${vehicleTotal} done`} />
                 <Chip size="small" variant="outlined" label={`Pending ${pendingCount}`} />

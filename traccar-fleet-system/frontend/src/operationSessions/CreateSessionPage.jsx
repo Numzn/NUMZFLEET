@@ -10,11 +10,7 @@ import {
   Checkbox,
   Chip,
   Container,
-  FormControl,
-  InputLabel,
   LinearProgress,
-  MenuItem,
-  Select,
   Stack,
   TextField,
   Typography,
@@ -23,7 +19,6 @@ import AppLayout from '../common/components/AppLayout';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import {
   createOperationSession,
-  fetchFuelStations,
   fetchVehicleRefuelSuggestions,
 } from './api/operationSessionsApi';
 
@@ -33,10 +28,7 @@ const CreateSessionPage = () => {
   const vehicles = useMemo(() => Object.values(devicesItems), [devicesItems]);
   const navigate = useNavigate();
 
-  const [sessionName, setSessionName] = useState('');
   const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().slice(0, 16));
-  const [fuelStationId, setFuelStationId] = useState('');
-  const [stations, setStations] = useState([]);
 
   const [selected, setSelected] = useState(new Set());
   const [plannedById, setPlannedById] = useState({});
@@ -53,16 +45,6 @@ const CreateSessionPage = () => {
     }
     return map;
   }, [intelSuggestions]);
-
-  const loadStations = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const data = await fetchFuelStations(user);
-      setStations(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setStations([]);
-    }
-  }, [user]);
 
   const loadIntelligence = useCallback(async () => {
     if (!user?.id) return;
@@ -82,10 +64,6 @@ const CreateSessionPage = () => {
   useEffect(() => {
     loadIntelligence();
   }, [loadIntelligence]);
-
-  useEffect(() => {
-    loadStations();
-  }, [loadStations]);
 
   const rankedVehicles = useMemo(() => [...vehicles].sort((a, b) => {
     const fuelA = Number(a?.attributes?.fuelLevel ?? a?.attributes?.fuel ?? 100);
@@ -162,12 +140,9 @@ const CreateSessionPage = () => {
     setError('');
     setCreating(true);
     try {
-      const name = sessionName.trim() || `Fuel session ${new Date().toLocaleDateString()}`;
       const created = await createOperationSession(user, {
-        name,
         sessionDate: sessionDate ? new Date(sessionDate).toISOString() : new Date().toISOString(),
         notes: '',
-        fuelStationId: fuelStationId === '' ? null : Number(fuelStationId),
         vehicles: vehiclesPayload,
       });
       navigate(`/fleet/operation-sessions/run/${created.id}`);
@@ -192,48 +167,16 @@ const CreateSessionPage = () => {
               </Button>
             </Box>
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
-              <TextField
-                label="Session name"
-                value={sessionName}
-                onChange={(e) => setSessionName(e.target.value)}
-                fullWidth
-                placeholder="e.g. Lusaka Depot — 11 May 2026"
-                size="small"
-              />
-              <TextField
-                label="Session date"
-                type="datetime-local"
-                value={sessionDate}
-                onChange={(e) => setSessionDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-                size="small"
-              />
-            </Stack>
-
-            <FormControl fullWidth size="small">
-              <InputLabel id="station-label">Station (optional)</InputLabel>
-              <Select
-                labelId="station-label"
-                label="Station (optional)"
-                value={fuelStationId}
-                onChange={(e) => setFuelStationId(e.target.value)}
-                displayEmpty
-                renderValue={(value) => {
-                  if (value === '') return 'Engen';
-                  const selectedStation = stations.find((s) => String(s.id) === String(value));
-                  return selectedStation?.name || 'Engen';
-                }}
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {stations.map((s) => (
-                  <MenuItem key={s.id} value={String(s.id)}>{s.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <TextField
+              label="Session date"
+              type="datetime-local"
+              value={sessionDate}
+              onChange={(e) => setSessionDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              size="small"
+              helperText="Session title is set automatically from this date."
+            />
 
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
               <Button variant="text" size="small" onClick={loadIntelligence} disabled={intelLoading}>

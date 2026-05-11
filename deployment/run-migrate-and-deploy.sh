@@ -149,7 +149,6 @@ run_migrations() {
     "$MIGRATIONS_DIR/20260503_create_operation_sessions_tables.sql"
     "$MIGRATIONS_DIR/20260427_daily_intelligent_refueling.sql"
     "$MIGRATIONS_DIR/20260429_refuel_status_incomplete.sql"
-    "$MIGRATIONS_DIR/20260511_operation_session_planned_station.sql"
   )
   local f
   for f in "${files[@]}"; do

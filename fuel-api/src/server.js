@@ -17,7 +17,6 @@ import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
 import vehicleSpecsRouter from './routes/vehicleSpecs.js';
 import vehiclesRouter from './routes/vehicles.js';
 import operationSessionsRouter from './routes/operationSessions.js';
-import fuelStationsRouter from './routes/fuelStations.js';
 import reportsRouter from './reports/routes/reports.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
@@ -386,7 +385,6 @@ app.use('/api/vehicles', vehiclesRouter);
 // Nested path registered on app first so it is never missed if an older router snapshot omits it.
 app.get('/api/operation-sessions/suggestions/vehicles', authenticate, requireAuth, suggestVehicles);
 app.use('/api/operation-sessions', operationSessionsRouter);
-app.use('/api/fuel-stations', fuelStationsRouter);
 app.use('/api/reports', reportsRouter);
 
 // Root endpoint

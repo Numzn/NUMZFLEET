@@ -12,7 +12,6 @@
  */
 export const FUEL_API_PREFIXES = [
   '/api/fuel-requests',
-  '/api/fuel-stations',
   '/api/vehicle-specs',
   '/api/vehicles',
   '/api/operation-sessions',

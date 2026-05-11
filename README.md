@@ -306,7 +306,6 @@ Traccar provides a RESTful API. Documentation: https://www.traccar.org/api/
 - `PUT /api/fuel-requests/:id` - Update fuel request
 - `POST /api/fuel-requests/:id/approve` - Approve request
 - `POST /api/fuel-requests/:id/reject` - Reject request
-- `GET /api/fuel-stations` - List fuel stations
 - `GET /api/vehicle-specs` - Get vehicle specifications
 
 ## 🤝 Contributing
