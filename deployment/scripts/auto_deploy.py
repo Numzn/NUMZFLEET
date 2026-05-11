@@ -134,6 +134,21 @@ def get_output(argv: list[str], *, cwd: Path | None = None) -> str:
     return subprocess.check_output(argv, cwd=str(cwd) if cwd else None, text=True).strip()
 
 
+def refresh_git_state_after_push(repo: Path, branch: str) -> None:
+    """Fetch and align upstream so editors (e.g. VS Code) refresh sync state after `git push origin HEAD:<branch>`."""
+    try:
+        run_cmd(["git", "fetch", "origin"], cwd=repo, check=False)
+        current_branch = get_output(["git", "branch", "--show-current"], cwd=repo).strip()
+        if current_branch and current_branch != branch:
+            run_cmd(
+                ["git", "branch", "--set-upstream-to", f"origin/{branch}", current_branch],
+                cwd=repo,
+                check=False,
+            )
+    except Exception:
+        pass
+
+
 def ssh_executable() -> str:
     """Resolve ssh: PATH (trust shutil.which), then Windows OpenSSH, then Git for Windows."""
     found = shutil.which("ssh")
@@ -422,6 +437,7 @@ def main() -> int:
                 print("[dry-run] would: git push origin", f"HEAD:{branch}")
             else:
                 run_cmd(["git", "push", "origin", f"HEAD:{branch}"], cwd=repo)
+                refresh_git_state_after_push(repo, branch)
         else:
             print("Changed files:\n", status, "\n", sep="")
             if args.dry_run:
@@ -458,6 +474,7 @@ def main() -> int:
                 print("[dry-run] would: git push origin", f"HEAD:{branch}")
             else:
                 run_cmd(["git", "push", "origin", f"HEAD:{branch}"], cwd=repo)
+                refresh_git_state_after_push(repo, branch)
     else:
         dirty = get_output(["git", "status", "--short"], cwd=repo)
         if dirty:
