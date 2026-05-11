@@ -463,11 +463,24 @@ def read_env_file_key(path: Path, key: str) -> str | None:
     return None
 
 
-def first_origin_from_cors(val: str | None) -> str | None:
+def _is_loopback_origin(url: str) -> bool:
+    u = url.strip().lower()
+    if "localhost" in u:
+        return True
+    if "127.0.0.1" in u or "[::1]" in u:
+        return True
+    return False
+
+
+def public_origin_from_cors(val: str | None) -> str | None:
+    """First CORS origin that is not loopback (workstation post-verify must hit the public site)."""
     if not val:
         return None
-    first = val.split(",")[0].strip()
-    return first.rstrip("/") or None
+    for part in val.split(","):
+        o = part.strip().rstrip("/")
+        if o and not _is_loopback_origin(o):
+            return o
+    return None
 
 
 def resolve_post_verify_origin(repo: Path) -> str | None:
@@ -476,7 +489,7 @@ def resolve_post_verify_origin(repo: Path) -> str | None:
         return o.rstrip("/")
     for p in (repo / "backend" / ".env", repo / "deployment" / ".env"):
         c = read_env_file_key(p, "CORS_ORIGIN")
-        hit = first_origin_from_cors(c)
+        hit = public_origin_from_cors(c)
         if hit:
             return hit.rstrip("/")
     return None
@@ -522,7 +535,16 @@ def post_deploy_verify_external(repo: Path, *, skip: bool) -> int:
     origin = resolve_post_verify_origin(repo)
     if not origin:
         print(
-            "[auto_deploy] Post-verify skipped (no NUMZFLEET_POST_VERIFY_ORIGIN and no CORS_ORIGIN in backend/.env).\n",
+            "[auto_deploy] Post-verify skipped: set NUMZFLEET_POST_VERIFY_ORIGIN (e.g. https://numz.site), "
+            "or add a non-loopback URL in CORS_ORIGIN (first value only was localhost).\n",
+            flush=True,
+        )
+        return 0
+
+    if _is_loopback_origin(origin):
+        print(
+            f"[auto_deploy] Post-verify skipped: origin {origin!r} is loopback — "
+            "use NUMZFLEET_POST_VERIFY_ORIGIN=https://<public-host> for probes from this PC.\n",
             flush=True,
         )
         return 0

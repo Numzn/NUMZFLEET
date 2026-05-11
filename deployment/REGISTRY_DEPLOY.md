@@ -74,15 +74,44 @@ Optional second argument: path to the deployment env file (defaults to `deployme
 3. Scans each migration file for forbidden **`DROP`** / **`TRUNCATE`** tokens (comment-aware when `perl` is available); aborts if found.
 4. Applies migrations **in order** with `psql -v ON_ERROR_STOP=1`:
    - `20260503_create_operation_sessions_tables.sql`
-   - `20260427_daily_intelligent_refueling.sql`
+   - `20260427_daily_intelligent_refueling.sql` (also adds optional **`fuelStationId`** / **`stationName`** / **`plannedFuelLitres`** — idempotent `IF NOT EXISTS`)
    - `20260429_refuel_status_incomplete.sql`
    - `20260511_operation_session_planned_station.sql`
-5. Calls the existing **`deployment/deploy/deploy-from-registry.sh`** (unchanged registry-only deploy).
+5. Calls the existing **`deployment/deploy/deploy-from-registry.sh`** (unchanged registry-only deploy) — **migrations always run before image pull / container recreate** for this wrapper.
 6. Verifies **two** public health endpoints, each with retries, and **fails fast** if either is unhealthy:
    - **Edge:** `GET /health` (frontend nginx static `200 ok`) — proves Caddy → frontend reachability. Override with `HEALTHCHECK_URL`.
    - **Backend (through edge):** `GET /api/health` (fuel-api) — proves Node API and `/api` proxy. Override with `API_HEALTHCHECK_URL`. Use `SKIP_API_HEALTH=1` only when intentionally rolling back to an image that pre-dates this endpoint.
    Both URLs default to the first `CORS_ORIGIN` value (default `https://numz.site`).
 7. Writes a timestamped log under **`deployment/logs/`**.
+
+### Production only: `column "fuelStationId" does not exist` (schema drift)
+
+That error means **Postgres was never migrated** with the station columns while **fuel-api** already expects them. Typical causes: **`run-migrate-and-deploy.sh` did not finish** (e.g. **`Connection timed out during banner exchange`** on SSH so the script never reached `psql`), or someone ran **`deploy-from-registry.sh` alone** after a migration-only push without applying SQL.
+
+**Preferred fix (when SSH works):** on the instance under `~/NUMZFLEET`, with `main` at a commit that includes the migration files:
+
+```bash
+./deployment/run-migrate-and-deploy.sh <full-git-sha> deployment/.env
+```
+
+**If `auto_deploy` fails during SSH before migrate finishes:** fix OCI security lists / instance / key / network, then rerun **`python deployment/scripts/auto_deploy.py --skip-git`** or run the command above on the server.
+
+**Emergency fix (SQL only, idempotent):** same DDL as in `20260511_operation_session_planned_station.sql` / `20260427_…` (use **`INTEGER`** for **`fuelStationId`**, not UUID — match the repo migrations). Example:
+
+```bash
+docker exec -i numzfleet-prod-db psql "postgresql://USER:PASS@127.0.0.1:5432/numztrak_fuel" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+ALTER TABLE operation_sessions
+  ADD COLUMN IF NOT EXISTS "fuelStationId" INTEGER,
+  ADD COLUMN IF NOT EXISTS "stationName" VARCHAR(120);
+ALTER TABLE operation_session_refuels
+  ADD COLUMN IF NOT EXISTS "plannedFuelLitres" DOUBLE PRECISION;
+CREATE INDEX IF NOT EXISTS operation_sessions_fuel_station_id ON operation_sessions ("fuelStationId");
+COMMIT;
+SQL
+```
+
+Use the same `USER` / `PASS` / database name as in `backend/.env` `DATABASE_URL`. Then **`docker compose -f deployment/compose/docker-compose.prod.yml --env-file deployment/.env restart backend`** (or `up -d backend`) so pools pick up the schema.
 
 **Safety**
 
@@ -114,7 +143,7 @@ python deployment/scripts/auto_deploy.py --dry-run --skip-git
 
 **If `docker pull` fails with `manifest unknown` after a push:** GitHub Actions may still be building. Confirm the **Build and push NumzFleet images** run for that SHA is green, then run `python deployment/scripts/auto_deploy.py --skip-git` (or raise **`NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS`** / **`NUMZFLEET_IMAGE_BUILD_WAIT_MIN_WITH_MIGRATIONS`** — when both migrations and app images change, `auto_deploy` uses at least **180s** before SSH by default).
 
-**Post-deploy verification (workstation):** After a successful SSH deploy, `auto_deploy` waits **`NUMZFLEET_POST_VERIFY_WAIT_SECONDS`** (default **60**), then **GET**s **`{origin}/health`** and **`{origin}/api/health`** from your machine with **no-cache** headers and a **cache-busting query** (force refresh through browsers/CDNs). Origin comes from **`NUMZFLEET_POST_VERIFY_ORIGIN`** or the first value in **`CORS_ORIGIN`** in `backend/.env` / `deployment/.env`. Override URLs with **`NUMZFLEET_POST_VERIFY_HEALTH_URL`** / **`NUMZFLEET_POST_VERIFY_API_HEALTH_URL`**. Disable with **`NUMZFLEET_POST_VERIFY=0`** or **`--skip-post-verify`**. Set **`NUMZFLEET_POST_VERIFY_STRICT=1`** to exit non-zero if probes fail after retries.
+**Post-deploy verification (workstation):** After a successful SSH deploy, `auto_deploy` waits **`NUMZFLEET_POST_VERIFY_WAIT_SECONDS`** (default **60**), then **GET**s **`{origin}/health`** and **`{origin}/api/health`** from your machine with **no-cache** headers and a **cache-busting query** (force refresh through browsers/CDNs). Origin: **`NUMZFLEET_POST_VERIFY_ORIGIN`** if set; otherwise the **first non-loopback** entry in **`CORS_ORIGIN`** (comma-separated lists often put `https://numz.site` before `http://localhost:3002` — localhost alone would be skipped; set **`NUMZFLEET_POST_VERIFY_ORIGIN`** explicitly if needed). Override URLs with **`NUMZFLEET_POST_VERIFY_HEALTH_URL`** / **`NUMZFLEET_POST_VERIFY_API_HEALTH_URL`**. Disable with **`NUMZFLEET_POST_VERIFY=0`** or **`--skip-post-verify`**. Set **`NUMZFLEET_POST_VERIFY_STRICT=1`** to exit non-zero if probes fail after retries.
 
 Full env list: comments in `auto_deploy.defaults.env` and **`python deployment/scripts/auto_deploy.py --help`** epilog (points here).
 
