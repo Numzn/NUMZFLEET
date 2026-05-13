@@ -399,9 +399,15 @@ export default defineConfig(({ mode }) => {
       // Register service worker automatically
       registerType: 'autoUpdate',
       workbox: {
+        // Ship new SW immediately; take control so precache updates apply without a second reload.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         navigateFallbackDenylist: [/^\/api/, /^\/traccar/],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        globPatterns: ['**/*.{js,css,html,woff,woff2,mp3,png,svg,ico}'],
+        // Do NOT precache index.html — it pins an old SPA shell + old hashed chunk names after deploy.
+        // Navigation still works: Workbox serves navigateFallback from the network when uncached.
+        globPatterns: ['**/*.{js,css,woff,woff2,mp3,png,svg,ico}'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

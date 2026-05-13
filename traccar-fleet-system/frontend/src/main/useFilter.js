@@ -6,8 +6,11 @@ export default (keyword, filter, filterSort, filterMap, positions, setFilteredDe
   const groups = useSelector((state) => state.groups.items);
   const devices = useSelector((state) => state.devices.items);
 
+  const safeKeyword = String(keyword ?? '').toLowerCase();
+  const safePositions = positions ?? {};
+
   // Memoize position array conversion for better performance
-  const positionArray = useMemo(() => Object.values(positions), [positions]);
+  const positionArray = useMemo(() => Object.values(safePositions), [safePositions]);
 
   useEffect(() => {
     const deviceGroups = (device) => {
@@ -30,7 +33,7 @@ export default (keyword, filter, filterSort, filterMap, positions, setFilteredDe
           case 'offline':
             return device.status === 'offline';
           case 'moving': {
-            const p = positions[device.id];
+            const p = safePositions[device.id];
             return Boolean(p && Number(p.speed) > 0);
           }
           default:
@@ -38,8 +41,10 @@ export default (keyword, filter, filterSort, filterMap, positions, setFilteredDe
         }
       })
       .filter((device) => {
-        const lowerCaseKeyword = keyword.toLowerCase();
-        return [device.name, device.uniqueId, device.phone, device.model, device.contact].some((s) => s && s.toLowerCase().includes(lowerCaseKeyword));
+        if (!safeKeyword) return true;
+        return [device.name, device.uniqueId, device.phone, device.model, device.contact].some(
+          (s) => s && String(s).toLowerCase().includes(safeKeyword),
+        );
       });
     switch (filterSort) {
       case 'name':
@@ -57,7 +62,7 @@ export default (keyword, filter, filterSort, filterMap, positions, setFilteredDe
     }
     setFilteredDevices(filtered);
     setFilteredPositions(filterMap
-      ? filtered.map((device) => positions[device.id]).filter(Boolean)
+      ? filtered.map((device) => safePositions[device.id]).filter(Boolean)
       : positionArray); // Use memoized array
-  }, [keyword, filter, filterSort, filterMap, fleetTab, groups, devices, positions, positionArray, setFilteredDevices, setFilteredPositions]);
+  }, [safeKeyword, filter, filterSort, filterMap, fleetTab, groups, devices, safePositions, positionArray, setFilteredDevices, setFilteredPositions]);
 };
