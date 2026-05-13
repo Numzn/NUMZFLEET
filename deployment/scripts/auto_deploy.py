@@ -737,7 +737,8 @@ def main() -> int:
     server_path = os.environ.get("NUMZFLEET_SERVER_REPO_PATH", REMOTE_REPO_DEFAULT).rstrip("/")
     deploy_env = os.environ.get("NUMZFLEET_DEPLOY_ENV", "deployment/.env")
     use_migrations = _env_bool("NUMZFLEET_USE_MIGRATIONS", True) and not args.no_migrations
-    wait_sec = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS", 90)
+    # Three registry images (frontend, backend, ERB) often need >90s on GitHub-hosted runners.
+    wait_sec = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS", 210)
     # Migrations + fresh images: backend build often exceeds a short buffer; floor unless user set higher.
     wait_min_migrations = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_MIN_WITH_MIGRATIONS", 180)
 
