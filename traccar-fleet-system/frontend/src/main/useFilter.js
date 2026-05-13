@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import dayjs from 'dayjs';
 
-export default (keyword, filter, filterSort, filterMap, positions, setFilteredDevices, setFilteredPositions) => {
+export default (keyword, filter, filterSort, filterMap, positions, setFilteredDevices, setFilteredPositions, fleetTab = 'all') => {
   const groups = useSelector((state) => state.groups.items);
   const devices = useSelector((state) => state.devices.items);
 
@@ -23,6 +23,20 @@ export default (keyword, filter, filterSort, filterMap, positions, setFilteredDe
     const filtered = Object.values(devices)
       .filter((device) => !filter.statuses.length || filter.statuses.includes(device.status))
       .filter((device) => !filter.groups.length || deviceGroups(device).some((id) => filter.groups.includes(id)))
+      .filter((device) => {
+        switch (fleetTab) {
+          case 'online':
+            return device.status === 'online';
+          case 'offline':
+            return device.status === 'offline';
+          case 'moving': {
+            const p = positions[device.id];
+            return Boolean(p && Number(p.speed) > 0);
+          }
+          default:
+            return true;
+        }
+      })
       .filter((device) => {
         const lowerCaseKeyword = keyword.toLowerCase();
         return [device.name, device.uniqueId, device.phone, device.model, device.contact].some((s) => s && s.toLowerCase().includes(lowerCaseKeyword));
@@ -45,5 +59,5 @@ export default (keyword, filter, filterSort, filterMap, positions, setFilteredDe
     setFilteredPositions(filterMap
       ? filtered.map((device) => positions[device.id]).filter(Boolean)
       : positionArray); // Use memoized array
-  }, [keyword, filter, filterSort, filterMap, groups, devices, positions, positionArray, setFilteredDevices, setFilteredPositions]);
+  }, [keyword, filter, filterSort, filterMap, fleetTab, groups, devices, positions, positionArray, setFilteredDevices, setFilteredPositions]);
 };

@@ -24,6 +24,10 @@ import {
 import AppLayout from '../common/components/AppLayout';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import {
+  RUNTIME_CONTAINER_PY,
+  RUNTIME_STACK_GAP,
+} from '../common/styles/runtimeDensity';
+import {
   closeOperationSession,
   fetchOperationSessionDetails,
   fetchOperationSessions,
@@ -153,9 +157,9 @@ const OperationSessionsPage = () => {
 
   return (
     <AppLayout showSidebar>
-      <Container maxWidth="md" sx={{ py: 2 }}>
+      <Container maxWidth="md" sx={{ py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
-          <Stack spacing={1.5}>
+          <Stack spacing={RUNTIME_STACK_GAP}>
 
             {error && <Alert severity="error">{error}</Alert>}
 
@@ -178,7 +182,7 @@ const OperationSessionsPage = () => {
                   </Alert>
                 )}
 
-                <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Paper variant="outlined" sx={{ p: 1.25 }}>
                   {activeSession && activeDetails ? (
                     <Stack spacing={0.75}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
@@ -235,7 +239,7 @@ const OperationSessionsPage = () => {
                 </Paper>
 
                 <Box>
-                  <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.75 }}>
+                  <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.5 }}>
                     Recent sessions
                   </Typography>
                   <TextField
@@ -244,7 +248,7 @@ const OperationSessionsPage = () => {
                     placeholder="Search by name, id, or date…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    sx={{ mb: 0.75 }}
+                    sx={{ mb: 0.5 }}
                   />
                   <Paper variant="outlined">
                     <List disablePadding>

@@ -1,17 +1,20 @@
-import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
+import {
+  useCallback, useMemo, useState,
+} from 'react';
 import { Box } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { devicesActions } from '../store';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+import { devicesActions, fleetInteractionActions } from '../store';
 import usePersistedState from '../common/util/usePersistedState';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
 import PremiumTopBar from './components/PremiumTopBar';
-import DeviceDropdown from './components/DeviceDropdown';
 import MapDevicePopup from './components/MapDevicePopup';
-import BottomMenu from '../common/components/BottomMenu';
+import FleetLayout from './fleet/FleetLayout';
+import FleetSidebar from './fleet/FleetSidebar';
 
 const useStyles = makeStyles()(() => ({
   root: {
@@ -21,33 +24,34 @@ const useStyles = makeStyles()(() => ({
     flexDirection: 'column',
     position: 'relative',
     overflow: 'hidden',
-    // PremiumTopBar + BottomMenu are fixed and draw on top of the map; no layout padding here
-    // (avoids empty strips between chrome and tiles — MapChromePadding handles map insets).
   },
-  mapContainer: {
+  mainRow: {
     flex: 1,
-    position: 'relative',
-    overflow: 'hidden',
-    width: '100%',
-    height: '100%',
     minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
   },
 }));
 
 const MainPage = () => {
   const { classes } = useStyles();
-  const bottomNavRef = useRef(null);
+  const theme = useTheme();
+  const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
   const positions = useSelector((state) => state.session.positions);
   const devices = useSelector((state) => state.devices.items);
   const groups = useSelector((state) => state.groups.items || {});
+  const fleetTab = useSelector((state) => state.fleetInteraction.fleetTab);
+  const fleetWorkspaceMode = useSelector((state) => state.fleetInteraction.fleetWorkspaceMode);
+  const searchQuery = useSelector((state) => state.fleetInteraction.searchQuery);
+
   const [filteredPositions, setFilteredPositions] = useState([]);
+  const [filteredDevices, setFilteredDevices] = useState([]);
   const selectedPosition = filteredPositions.find((position) => selectedDeviceId && position.deviceId === selectedDeviceId);
 
-  const [filteredDevices, setFilteredDevices] = useState([]);
-  const [keyword, setKeyword] = useState('');
   const [filter, setFilter] = usePersistedState('filter', {
     statuses: [],
     groups: [],
@@ -55,84 +59,31 @@ const MainPage = () => {
   const [filterSort, setFilterSort] = usePersistedState('filterSort', '');
   const [filterMap, setFilterMap] = usePersistedState('filterMap', false);
 
-  // New state for topbar components
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerPinned, setDrawerPinned] = useState(false);
-  const [eventsOpen, setEventsOpen] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
-  
-  const devicesButtonRef = useRef(null);
+  const effectiveFleetTab = fleetWorkspaceMode === 'live' ? fleetTab : 'all';
 
-  const onEventsClick = useCallback(() => setEventsOpen(true), [setEventsOpen]);
+  useFilter(
+    searchQuery,
+    filter,
+    filterSort,
+    filterMap,
+    positions,
+    setFilteredDevices,
+    setFilteredPositions,
+    effectiveFleetTab,
+  );
 
-  const handleDashboardClick = useCallback(() => {
-    navigate('/');
-  }, [navigate]);
-
-  useFilter(keyword, filter, filterSort, filterMap, positions, setFilteredDevices, setFilteredPositions);
-
-  // Map route is outside AppLayout; portaled BottomMenu + --app-bottomnav-height for MapChromePadding.
-  useLayoutEffect(() => {
-    if (typeof document === 'undefined') return undefined;
-
-    const read = () => {
-      const paper = bottomNavRef.current?.querySelector?.('.MuiPaper-root');
-      const h = paper?.getBoundingClientRect?.().height
-        ?? bottomNavRef.current?.getBoundingClientRect?.().height
-        ?? 0;
-      document.documentElement.style.setProperty('--app-bottomnav-height', `${Math.round(h)}px`);
-    };
-
-    read();
-    window.addEventListener('resize', read);
-    const vv = window.visualViewport;
-    vv?.addEventListener('resize', read);
-    return () => {
-      window.removeEventListener('resize', read);
-      vv?.removeEventListener('resize', read);
-      document.documentElement.style.setProperty('--app-bottomnav-height', '0px');
-    };
-  }, []);
-
-  // Auto-open drawer when device is selected
-  useEffect(() => {
-    if (selectedDeviceId) {
-      setDrawerOpen(true);
-    }
-  }, [selectedDeviceId]);
-
-  // Calculate device statistics
-  const deviceStats = React.useMemo(() => {
+  const deviceStats = useMemo(() => {
     const total = Object.values(devices).length;
-    const online = Object.values(devices).filter(d => d.status === 'online').length;
-    const moving = Object.values(positions).filter(p => p.speed > 0).length;
+    const online = Object.values(devices).filter((d) => d.status === 'online').length;
+    const moving = Object.values(positions).filter((p) => p.speed > 0).length;
     const idling = online - moving;
-    const offline = Object.values(devices).filter(d => d.status === 'offline').length;
+    const offline = Object.values(devices).filter((d) => d.status === 'offline').length;
 
     return { total, online, moving, idling, offline };
   }, [devices, positions]);
 
-  // Event handlers
-  const handleDeviceSelect = useCallback((device) => {
-    dispatch(devicesActions.selectId(device.id));
-  }, [dispatch]);
-
-  const handleDevicesClick = useCallback(() => {
-    setDropdownOpen(!dropdownOpen);
-  }, [dropdownOpen]);
-
-  const handleDrawerToggle = useCallback(() => {
-    setDrawerOpen(!drawerOpen);
-  }, [drawerOpen]);
-
-  const handleViewAllDevices = useCallback(() => {
-    setDropdownOpen(false);
-    setDrawerOpen(true);
-  }, []);
-
-  const handleAddDevice = useCallback(() => {
-    navigate('/settings/device');
+  const handleDashboardClick = useCallback(() => {
+    navigate('/');
   }, [navigate]);
 
   const handleClosePopup = useCallback(() => {
@@ -155,15 +106,12 @@ const MainPage = () => {
 
   return (
     <Box className={classes.root}>
-      {/* Topbar */}
       <PremiumTopBar
         flatBottomOnMobile
         devices={Object.values(devices)}
         stats={deviceStats}
-        onSearch={setKeyword}
         onFilterChange={handlePremiumFilterChange}
         onNavigateToDashboard={handleDashboardClick}
-        onShowAllDevices={handleViewAllDevices}
         groups={Object.values(groups)}
         filters={{
           statuses: filter.statuses,
@@ -171,51 +119,55 @@ const MainPage = () => {
           sortBy: filterSort,
           mapOnly: filterMap,
         }}
+        hideCenterSearch
+        mapRouteOperationalChrome
+        showMobileFleetDrawerButton={!desktop}
+        onOpenMobileFleetDrawer={() => dispatch(fleetInteractionActions.setMobileDrawerOpen(true))}
       />
 
-      {/* Device Dropdown */}
-      <DeviceDropdown
-        open={dropdownOpen}
-        anchorEl={devicesButtonRef.current}
-        onClose={() => setDropdownOpen(false)}
-        onViewAll={handleViewAllDevices}
-        devices={filteredDevices}
-        onDeviceSelect={handleDeviceSelect}
-        keyword={keyword}
-      />
-
-      {/* Map Container */}
-      <Box className={classes.mapContainer}>
-        <MainMap
-          filteredPositions={filteredPositions}
-          selectedPosition={selectedPosition}
-          onEventsClick={() => setEventsOpen(true)}
-          devicesOpen={drawerOpen}
-          sidebarCollapsed={!drawerPinned}
+      <Box
+        className={classes.mainRow}
+        sx={{
+          mt: {
+            xs: 'calc(env(safe-area-inset-top, 0px) + 50px)',
+            md: 'calc(env(safe-area-inset-top, 0px) + 56px)',
+          },
+        }}
+      >
+        <FleetLayout
+          sidebar={(opts) => (
+            <FleetSidebar
+              {...opts}
+              filteredDevices={filteredDevices}
+              positions={positions}
+              groups={Object.values(groups)}
+              filters={{
+                statuses: filter.statuses,
+                groups: filter.groups,
+                sortBy: filterSort,
+                mapOnly: filterMap,
+              }}
+              deviceStats={deviceStats}
+              onFilterChange={handlePremiumFilterChange}
+            />
+          )}
+          map={(
+            <Box sx={{ position: 'relative', flex: 1, minHeight: 0, width: '100%' }}>
+              <MainMap
+                filteredPositions={filteredPositions}
+                selectedPosition={selectedPosition}
+              />
+              {selectedDeviceId && selectedPosition && devices[selectedDeviceId] && (
+                <MapDevicePopup
+                  device={devices[selectedDeviceId]}
+                  position={selectedPosition}
+                  onClose={handleClosePopup}
+                />
+              )}
+            </Box>
+          )}
         />
-        
-        {/* Device Popup */}
-        {selectedDeviceId && selectedPosition && devices[selectedDeviceId] && (
-          <MapDevicePopup
-            device={devices[selectedDeviceId]}
-            position={selectedPosition}
-            onClose={handleClosePopup}
-            initialPosition={{ x: 100, y: 100 }}
-          />
-        )}
       </Box>
-
-      {/* Portal keeps the bar above MapLibre/WebGL and out of overflow:hidden ancestors */}
-      {typeof document !== 'undefined'
-        && createPortal(
-          <Box
-            ref={bottomNavRef}
-            sx={{ '@media print': { display: 'none' } }}
-          >
-            <BottomMenu layer="map" />
-          </Box>,
-          document.body,
-        )}
     </Box>
   );
 };

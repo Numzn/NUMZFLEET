@@ -65,23 +65,30 @@ const MapLiveRoutes = () => {
         .filter((id) => (type === 'selected' ? id === selectedDeviceId : true))
         .filter((id) => history.hasOwnProperty(id));
 
+      const dimOthers = Boolean(selectedDeviceId) && type === 'all';
+
       map.getSource(id)?.setData({
         type: 'FeatureCollection',
-        features: deviceIds.map((deviceId) => ({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: history[deviceId],
-          },
-          properties: {
-            color: devices[deviceId].attributes['web.reportColor'] || theme.palette.geometry.main,
-            width: mapLineWidth,
-            opacity: mapLineOpacity,
-          },
-        })),
+        features: deviceIds.map((deviceId) => {
+          const isSel = deviceId === selectedDeviceId;
+          return {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: history[deviceId],
+            },
+            properties: {
+              color: devices[deviceId].attributes['web.reportColor'] || theme.palette.geometry.main,
+              width: isSel ? mapLineWidth + 1.35 : mapLineWidth,
+              opacity: dimOthers && !isSel
+                ? mapLineOpacity * 0.38
+                : (isSel ? Math.min(1, mapLineOpacity + 0.12) : mapLineOpacity),
+            },
+          };
+        }),
       });
     }
-  }, [theme, type, devices, selectedDeviceId, history]);
+  }, [theme, type, devices, selectedDeviceId, history, mapLineWidth, mapLineOpacity]);
 
   return null;
 };

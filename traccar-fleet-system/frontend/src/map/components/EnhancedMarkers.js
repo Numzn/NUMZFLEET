@@ -14,13 +14,16 @@ const LERP_DURATION = 1200;
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 
-const EnhancedMarkers = ({ 
-  positions, 
-  onMapClick, 
-  onMarkerClick, 
-  showStatus, 
-  selectedPosition, 
-  titleField 
+const EnhancedMarkers = ({
+  positions,
+  onMapClick,
+  onMarkerClick,
+  showStatus,
+  selectedPosition,
+  titleField,
+  labelsMode = 'all',
+  externalHoveredDeviceId = null,
+  onHoverDeviceChange,
 }) => {
   const id = useId();
   const clusters = `${id}-clusters`;
@@ -85,19 +88,23 @@ const EnhancedMarkers = ({
   // Enhanced mouse interactions
   const onMouseEnter = useCallback((event) => {
     map.getCanvas().style.cursor = 'pointer';
-    
-    // Add hover effect
+
     const features = event.features;
     if (features.length > 0) {
       const feature = features[0];
-      map.setFilter(hovered, ['==', 'deviceId', feature.properties.deviceId]);
+      const deviceId = feature.properties.deviceId;
+      if (deviceId != null && onHoverDeviceChange) {
+        onHoverDeviceChange(deviceId);
+      }
     }
-  }, [hovered]);
+  }, [onHoverDeviceChange]);
 
   const onMouseLeave = useCallback(() => {
     map.getCanvas().style.cursor = '';
-    map.setFilter(hovered, ['==', 'deviceId', '']);
-  }, [hovered]);
+    if (onHoverDeviceChange) {
+      onHoverDeviceChange(null);
+    }
+  }, [onHoverDeviceChange]);
 
   const onMapClickCallback = useCallback((event) => {
     if (!event.defaultPrevented && onMapClick) {
@@ -377,6 +384,114 @@ const EnhancedMarkers = ({
       }
     };
   }, [mapCluster, clusters, onMarkerClickCallback, onClusterClick, onMouseEnter, onMouseLeave]);
+
+  useEffect(() => {
+    const src = map.getSource(hovered);
+    if (!src || typeof src.setData !== 'function') return;
+
+    if (externalHoveredDeviceId == null) {
+      src.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+
+    const pos = safePositions.find((p) => p.deviceId === externalHoveredDeviceId);
+    if (!pos) {
+      src.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+
+    src.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [pos.longitude, pos.latitude],
+        },
+        properties: { deviceId: externalHoveredDeviceId },
+      }],
+    });
+  }, [externalHoveredDeviceId, safePositions, hovered]);
+
+  useEffect(() => {
+    if (!map.getLayer(id)) return;
+
+    const nameKey = titleField || 'name';
+    let textExpr;
+    if (labelsMode !== 'selected_or_hover') {
+      textExpr = ['get', nameKey];
+    } else {
+      const conds = [];
+      if (selectedDeviceId != null) {
+        conds.push(['==', ['to-string', ['get', 'deviceId']], String(selectedDeviceId)]);
+      }
+      if (externalHoveredDeviceId != null) {
+        conds.push(['==', ['to-string', ['get', 'deviceId']], String(externalHoveredDeviceId)]);
+      }
+      const nameField = ['get', nameKey];
+      if (!conds.length) {
+        textExpr = '';
+      } else if (conds.length === 1) {
+        textExpr = ['case', conds[0], nameField, ''];
+      } else {
+        textExpr = ['case', ['any', ...conds], nameField, ''];
+      }
+    }
+
+    [id, selected].forEach((layerId) => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'text-field', textExpr);
+      }
+    });
+  }, [labelsMode, selectedDeviceId, externalHoveredDeviceId, id, selected, titleField]);
+
+  /** Dim non-selected markers when one device is selected; emphasize selected marker icon size. */
+  useEffect(() => {
+    if (!map.getLayer(id)) return;
+
+    const dimMain = selectedDeviceId != null;
+    const mainOpacity = dimMain ? 0.88 : 1;
+    const clusterOpacity = dimMain ? 0.92 : 1;
+
+    const applyPaint = (layerId, paint) => {
+      if (!map.getLayer(layerId)) return;
+      Object.entries(paint).forEach(([prop, val]) => {
+        map.setPaintProperty(layerId, prop, val);
+      });
+    };
+
+    applyPaint(id, {
+      'icon-opacity': mainOpacity,
+      'text-opacity': dimMain ? 0.86 : 1,
+    });
+    applyPaint(`status-${id}`, { 'circle-opacity': dimMain ? 0.68 : 0.9 });
+    applyPaint(`direction-${id}`, { 'icon-opacity': dimMain ? 0.85 : 1 });
+    applyPaint(`speed-${id}`, { 'icon-opacity': dimMain ? 0.85 : 1 });
+    applyPaint(clusters, {
+      'icon-opacity': clusterOpacity,
+      'text-opacity': dimMain ? 0.9 : 1,
+    });
+
+    const bump = dimMain ? 1.12 : 1;
+    const sizeExpr = [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      0, iconScale * 0.6 * bump,
+      10, iconScale * 0.8 * bump,
+      15, iconScale * 1.0 * bump,
+      20, iconScale * 1.2 * bump,
+    ];
+    if (map.getLayer(selected)) {
+      map.setLayoutProperty(selected, 'icon-size', sizeExpr);
+    }
+    if (map.getLayer(`direction-${selected}`)) {
+      map.setLayoutProperty(`direction-${selected}`, 'icon-size', iconScale * 0.8 * bump);
+    }
+    if (map.getLayer(`speed-${selected}`)) {
+      map.setLayoutProperty(`speed-${selected}`, 'icon-size', iconScale * 0.4 * bump);
+    }
+  }, [selectedDeviceId, id, selected, clusters, iconScale]);
 
   const prevCoordsRef = useRef({});
   const animFrameRef = useRef(null);

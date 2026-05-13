@@ -21,6 +21,10 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AppLayout from '../common/components/AppLayout';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
+import {
+  RUNTIME_CONTAINER_PY,
+  RUNTIME_STACK_GAP_TIGHT,
+} from '../common/styles/runtimeDensity';
 import DriverValue from '../common/components/DriverValue';
 import {
   closeOperationSession,
@@ -102,11 +106,11 @@ const PendingRefuelCard = ({
         border: 1,
         borderColor: 'divider',
         borderRadius: 2,
-        p: 1.5,
+        p: 1.25,
         bgcolor: 'background.paper',
       }}
     >
-      <Stack spacing={1.1}>
+      <Stack spacing={1}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
           <Box>
             <Typography variant="subtitle1" fontWeight={800} component="div">
@@ -250,7 +254,7 @@ const OperationRunPage = () => {
 
   return (
     <AppLayout showSidebar>
-      <Container maxWidth="sm" disableGutters sx={{ px: { xs: 1.25, sm: 2 }, py: 1.5 }}>
+      <Container maxWidth="sm" disableGutters sx={{ px: { xs: 1.25, sm: 2 }, py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
           <Box
             sx={{
@@ -306,12 +310,12 @@ const OperationRunPage = () => {
           )}
 
           {session && (
-            <Stack spacing={1.25}>
+            <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
               <Typography variant="subtitle2" fontWeight={800}>Pending refuel</Typography>
               {pending.length === 0 && (
                 <Alert severity="success">All vehicles in this session are completed.</Alert>
               )}
-              <Stack spacing={1.25}>
+              <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
                 {pending.map((refuel) => (
                   <PendingRefuelCard
                     key={refuel.id}

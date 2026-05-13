@@ -13,6 +13,7 @@ import { calendarsReducer as calendars } from './calendars';
 import { fuelRequestsReducer as fuelRequests } from '../fuelRequests/store/fuelRequests';
 import { operationSessionsReducer as operationSessions } from '../operationSessions/store/operationSessions';
 import { notificationsReducer as notifications } from './notifications/notificationsSlice.js';
+import { fleetInteractionReducer as fleetInteraction } from './fleetInteraction.js';
 import throttleMiddleware from './throttleMiddleware';
 
 const reducer = combineReducers({
@@ -29,6 +30,7 @@ const reducer = combineReducers({
   fuelRequests,
   operationSessions,
   notifications,
+  fleetInteraction,
 });
 
 export { errorsActions } from './errors';
@@ -43,6 +45,7 @@ export { maintenancesActions } from './maintenances';
 export { calendarsActions } from './calendars';
 export { fuelRequestsActions } from '../fuelRequests/store/fuelRequests';
 export { operationSessionsActions } from '../operationSessions/store/operationSessions';
+export { fleetInteractionActions } from './fleetInteraction.js';
 export { notificationsActions } from './notifications/notificationsSlice.js';
 
 export default configureStore({

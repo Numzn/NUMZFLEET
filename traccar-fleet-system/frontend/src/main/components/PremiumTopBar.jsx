@@ -13,6 +13,7 @@ import {
 import { makeStyles } from 'tss-react/mui';
 import { useSelector } from 'react-redux';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import MenuIcon from '@mui/icons-material/Menu';
 import LogoImage from '../../login/LogoImage';
 import DeviceStatsChips from './DeviceStatsChips';
 import SearchWithDropdown from './SearchWithDropdown';
@@ -131,10 +132,10 @@ const useStyles = makeStyles()((theme) => ({
   },
 }));
 
-const PremiumTopBar = ({ 
-  devices = [], 
-  stats = {}, 
-  onSearch, 
+const PremiumTopBar = ({
+  devices = [],
+  stats = {},
+  onSearch,
   onFilterChange,
   onNavigateToDashboard,
   onShowAllDevices,
@@ -142,6 +143,13 @@ const PremiumTopBar = ({
   filters = { statuses: [], groups: [], sortBy: '', mapOnly: false },
   /** When true (e.g. live map), square off the bottom on small screens so tiles meet the bar with no curved gap. */
   flatBottomOnMobile = false,
+  /** Hide central search dropdown (fleet sidebar owns search). */
+  hideCenterSearch = false,
+  /** Mobile-only control to open fleet drawer */
+  showMobileFleetDrawerButton = false,
+  onOpenMobileFleetDrawer,
+  /** Live map: hide stats + filters from top bar (sidebar owns operations). */
+  mapRouteOperationalChrome = false,
 }) => {
   const { classes } = useStyles();
   const theme = useTheme();
@@ -202,10 +210,22 @@ const PremiumTopBar = ({
         }}
       >
         {/* Left Section - Brand */}
-        <Box 
+        <Box
           className={`${classes.brandSection} ${isMobile ? classes.mobileBrandSection : ''}`}
           sx={isMobile ? { pr: 0 } : undefined}
         >
+          {showMobileFleetDrawerButton && isMobile && (
+            <Tooltip title="Fleet list">
+              <IconButton
+                edge="start"
+                size="small"
+                onClick={() => onOpenMobileFleetDrawer?.()}
+                sx={{ mr: 0.25 }}
+              >
+                <MenuIcon sx={{ fontSize: '1.15rem' }} />
+              </IconButton>
+            </Tooltip>
+          )}
           {/* Match dashboard: hide below md via CSS so SSR/first paint never flashes the logo on phones */}
           <Box
             className={classes.logoContainer}
@@ -223,10 +243,10 @@ const PremiumTopBar = ({
               }} 
             />
           </Box>
-          <Typography 
+          <Typography
             className={classes.brandTitle}
             component="span"
-            sx={{ 
+            sx={{
               fontSize: isMobile ? '0.98rem' : '1.05rem',
               display: 'block',
               whiteSpace: 'nowrap',
@@ -254,10 +274,10 @@ const PremiumTopBar = ({
           }}
         >
           {/* Device stats: omit on mobile so flex gap does not reserve empty space */}
-          {!isMobile && (
+          {!mapRouteOperationalChrome && !isMobile && (
             <Fade in={showStats} timeout={300}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <DeviceStatsChips 
+                <DeviceStatsChips
                   stats={stats}
                   onFilterClick={onFilterChange}
                   compact={isTablet}
@@ -266,14 +286,15 @@ const PremiumTopBar = ({
             </Fade>
           )}
 
-          {/* Search with Dropdown */}
-          <SearchWithDropdown 
-            devices={devices}
-            onSearch={onSearch}
-            onShowAllDevices={onShowAllDevices}
-            compact={isMobile}
-            expanded={!isMobile}
-          />
+          {!hideCenterSearch && (
+            <SearchWithDropdown
+              devices={devices}
+              onSearch={onSearch}
+              onShowAllDevices={onShowAllDevices}
+              compact={isMobile}
+              expanded={!isMobile}
+            />
+          )}
         </Box>
 
         {/* Right Section - Actions */}
@@ -306,6 +327,7 @@ const PremiumTopBar = ({
           />
 
           {/* Filters Flyout */}
+          {!mapRouteOperationalChrome && (
           <FiltersFlyout 
             onFilterChange={onFilterChange}
             compact={isMobile}
@@ -313,6 +335,7 @@ const PremiumTopBar = ({
             filters={filters}
             devices={devices}
           />
+          )}
 
           {/* Notifications */}
           <NotificationCenter />

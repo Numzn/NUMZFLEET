@@ -1,66 +1,82 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Box,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
   Dialog,
+  DialogTitle,
   DialogContent,
-  IconButton,
+  TextField,
   InputAdornment,
+  IconButton,
   List,
   ListItemButton,
-  ListItemIcon,
   ListItemText,
-  TextField,
+  ListItemIcon,
   Typography,
+  Box,
   Divider,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import PersonIcon from '@mui/icons-material/Person';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import CloseIcon from '@mui/icons-material/Close';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 
+const MAX_RESULTS = 12;
+
+/**
+ * Global command palette (Ctrl/Cmd+K). Same search domains as legacy GlobalSearch.
+ */
 const CommandPalette = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const inputRef = useRef(null);
 
-  const devices = useSelector((state) => state.devices.items || {});
-  const drivers = useSelector((state) => state.drivers.items || {});
-  const groups = useSelector((state) => state.groups.items || {});
+  const devices = useSelector((state) => state.devices.items);
+  const drivers = useSelector((state) => state.drivers.items);
+  const groups = useSelector((state) => state.groups.items);
 
-  const close = useCallback(() => {
-    setOpen(false);
-    setQuery('');
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   useEffect(() => {
-    const onKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k') {
-        e.preventDefault();
-        setOpen(true);
-      }
-      if (e.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+    if (open) {
+      setQuery('');
+      const id = requestAnimationFrame(() => inputRef.current?.focus());
+      return () => cancelAnimationFrame(id);
+    }
+    return undefined;
+  }, [open]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (q.length < 2) return [];
+    if (!q || q.length < 2) return [];
 
     const out = [];
 
     Object.values(devices).forEach((device) => {
-      if (device?.name?.toLowerCase?.().includes(q)) {
+      const name = device.name?.toLowerCase() ?? '';
+      const uid = device.uniqueId?.toLowerCase() ?? '';
+      if (name.includes(q) || uid.includes(q)) {
         out.push({
-          key: `vehicle:${device.id}`,
+          key: `device-${device.id}`,
           icon: <DirectionsCarIcon />,
-          title: device.name,
+          title: device.name || device.uniqueId || `Device ${device.id}`,
           subtitle: device.uniqueId || 'Vehicle',
           action: () => navigate('/map'),
         });
@@ -68,9 +84,9 @@ const CommandPalette = () => {
     });
 
     Object.values(drivers).forEach((driver) => {
-      if (driver?.name?.toLowerCase?.().includes(q)) {
+      if (driver.name?.toLowerCase().includes(q)) {
         out.push({
-          key: `driver:${driver.id}`,
+          key: `driver-${driver.id}`,
           icon: <PersonIcon />,
           title: driver.name,
           subtitle: driver.uniqueId || 'Driver',
@@ -80,98 +96,129 @@ const CommandPalette = () => {
     });
 
     Object.values(groups).forEach((group) => {
-      if (group?.name?.toLowerCase?.().includes(q)) {
+      if (group.name?.toLowerCase().includes(q)) {
         out.push({
-          key: `group:${group.id}`,
+          key: `group-${group.id}`,
           icon: <LocationOnIcon />,
           title: group.name,
-          subtitle: 'Device Group',
+          subtitle: 'Device group',
           action: () => navigate('/settings/groups'),
         });
       }
     });
 
-    return out.slice(0, 10);
+    return out.slice(0, MAX_RESULTS);
   }, [devices, drivers, groups, navigate, query]);
 
-  const handlePick = (item) => {
-    item.action?.();
-    close();
+  const handlePick = useCallback((item) => {
+    item.action();
+    setOpen(false);
+    setQuery('');
+  }, []);
+
+  const handleClose = () => {
+    setOpen(false);
+    setQuery('');
   };
 
   return (
     <Dialog
       open={open}
-      onClose={close}
+      onClose={handleClose}
       fullWidth
       maxWidth="sm"
-      PaperProps={{
-        sx: {
-          mt: { xs: 2, sm: 6 },
-          borderRadius: 2,
+      slotProps={{
+        paper: {
+          sx: { mt: '12vh' },
         },
       }}
     >
-      <DialogContent sx={{ p: 1.5 }}>
+      <DialogTitle sx={{ pb: 1, fontSize: '1rem', fontWeight: 700 }}>
+        Search
+        <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1, fontWeight: 500 }}>
+          Ctrl+K
+        </Typography>
+      </DialogTitle>
+      <DialogContent sx={{ pt: 0 }}>
         <TextField
-          autoFocus
-          fullWidth
+          inputRef={inputRef}
+          id="command-palette-search"
+          placeholder="Devices, drivers, groups…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search vehicles, drivers, groups…"
+          variant="outlined"
           size="small"
+          fullWidth
+          autoComplete="off"
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
                 <SearchIcon sx={{ color: 'text.secondary', fontSize: '1.2rem' }} />
               </InputAdornment>
             ),
-            endAdornment: (
+            endAdornment: query ? (
               <InputAdornment position="end">
-                <IconButton size="small" onClick={close} sx={{ p: 0.5 }}>
+                <IconButton
+                  size="small"
+                  aria-label="Clear"
+                  onClick={() => setQuery('')}
+                  edge="end"
+                >
                   <CloseIcon fontSize="small" />
                 </IconButton>
               </InputAdornment>
-            ),
+            ) : null,
           }}
         />
 
-        <Divider sx={{ my: 1 }} />
-
-        <Box sx={{ maxHeight: 420, overflow: 'auto' }}>
-          {results.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 1.5, px: 0.5 }}>
-              Type at least 2 characters. Press Esc to close.
+        {results.length > 0 && (
+          <>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', mt: 1.5, mb: 0.75, fontWeight: 700, letterSpacing: '0.06em' }}
+            >
+              Results
             </Typography>
-          ) : (
-            <List dense disablePadding>
-              {results.map((r) => (
+            <Divider sx={{ mb: 1 }} />
+            <List dense disablePadding sx={{ maxHeight: 360, overflow: 'auto' }}>
+              {results.map((item) => (
                 <ListItemButton
-                  key={r.key}
-                  onClick={() => handlePick(r)}
-                  sx={{
-                    borderRadius: 1,
-                    mb: 0.25,
-                  }}
+                  key={item.key}
+                  onClick={() => handlePick(item)}
+                  sx={{ borderRadius: 1, mb: 0.25 }}
                 >
                   <ListItemIcon sx={{ minWidth: 40, color: 'primary.main' }}>
-                    {r.icon}
+                    {item.icon}
                   </ListItemIcon>
                   <ListItemText
-                    primary={r.title}
-                    secondary={r.subtitle}
-                    primaryTypographyProps={{ fontWeight: 700, fontSize: '0.9rem' }}
+                    primary={item.title}
+                    secondary={item.subtitle}
+                    primaryTypographyProps={{ fontWeight: 600, fontSize: '0.875rem' }}
                     secondaryTypographyProps={{ fontSize: '0.75rem' }}
                   />
                 </ListItemButton>
               ))}
             </List>
-          )}
-        </Box>
+          </>
+        )}
+
+        {query.trim().length >= 2 && results.length === 0 && (
+          <Box sx={{ py: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              No matches.
+            </Typography>
+          </Box>
+        )}
+
+        {query.trim().length > 0 && query.trim().length < 2 && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            Type at least 2 characters.
+          </Typography>
+        )}
       </DialogContent>
     </Dialog>
   );
 };
 
 export default CommandPalette;
-

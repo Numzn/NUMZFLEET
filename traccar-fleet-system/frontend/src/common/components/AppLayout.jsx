@@ -4,7 +4,6 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import ModernSidebar from './ModernSidebar';
-import BottomMenu from './BottomMenu';
 import ContextStrip from './ContextStrip';
 import { ContextStripStateProvider } from './contextStripState';
 import usePersistedState from '../util/usePersistedState';
@@ -60,9 +59,7 @@ const AppLayout = ({ children, showSidebar = true }) => {
   const [sidebarOpen, setSidebarOpen] = useState(desktop);
   const [collapsed, setCollapsed] = usePersistedState('sidebarCollapsed', false);
   const topbarRef = useRef(null);
-  const bottomNavRef = useRef(null);
   const [topbarHeight, setTopbarHeight] = useState(56);
-  const [bottomNavHeight, setBottomNavHeight] = useState(0);
 
   const handleSidebarNavigate = useCallback(() => {
     if (!desktop) {
@@ -74,25 +71,18 @@ const AppLayout = ({ children, showSidebar = true }) => {
     ? (collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED)
     : { xs: '80vw', sm: 360 };
 
-  // Bottom nav is shown at all breakpoints; keep scrollable main content above it.
   const mainPaddingBottom = useMemo(() => {
     const safeBottom = 'env(safe-area-inset-bottom, 0px)';
-    return `calc(${safeBottom} + ${bottomNavHeight}px + ${CHROME_GAP}px)`;
-  }, [bottomNavHeight]);
+    return `calc(${safeBottom} + ${CHROME_GAP}px)`;
+  }, []);
 
   useLayoutEffect(() => {
     const read = () => {
       const tb = topbarRef.current?.getBoundingClientRect?.().height;
-      const paper = bottomNavRef.current?.querySelector?.('.MuiPaper-root');
-      const bn = paper?.getBoundingClientRect?.().height
-        ?? bottomNavRef.current?.getBoundingClientRect?.().height
-        ?? 0;
       if (tb && Math.abs(tb - topbarHeight) > 0.5) setTopbarHeight(tb);
-      if (bn != null && Math.abs(bn - bottomNavHeight) > 0.5) setBottomNavHeight(bn);
-      // Expose for MapChromePadding + any full-bleed surfaces.
       if (typeof document !== 'undefined') {
         document.documentElement.style.setProperty('--app-topbar-height', `${tb ?? 0}px`);
-        document.documentElement.style.setProperty('--app-bottomnav-height', `${bn || 0}px`);
+        document.documentElement.style.setProperty('--app-bottomnav-height', '0px');
       }
     };
     read();
@@ -103,7 +93,7 @@ const AppLayout = ({ children, showSidebar = true }) => {
       window.removeEventListener('resize', read);
       vv?.removeEventListener('resize', read);
     };
-  }, [bottomNavHeight, topbarHeight]);
+  }, [topbarHeight]);
 
   return (
     <Box className={classes.root}>
@@ -145,15 +135,6 @@ const AppLayout = ({ children, showSidebar = true }) => {
             {children}
           </Box>
         </ContextStripStateProvider>
-
-        <Box
-          ref={bottomNavRef}
-          sx={{
-            '@media print': { display: 'none' },
-          }}
-        >
-          <BottomMenu />
-        </Box>
       </Box>
     </Box>
   );

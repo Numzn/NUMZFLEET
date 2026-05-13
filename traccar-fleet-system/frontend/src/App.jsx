@@ -2,7 +2,6 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { traccarPath, traccarFetch } from './config/traccarApi.js';
 
 import { useDispatch, useSelector } from 'react-redux';
-import { useMediaQuery, useTheme } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import SocketController from './SocketController';
 import FuelSocketController from './fuelRequests/socket/FuelSocketController';
@@ -15,6 +14,7 @@ import TermsDialog from './common/components/TermsDialog';
 import Loader from './common/components/Loader';
 import fetchOrThrow from './common/util/fetchOrThrow';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import CommandPalette from './common/components/CommandPalette';
 
 const useStyles = makeStyles()(() => ({
   page: {
@@ -25,7 +25,6 @@ const useStyles = makeStyles()(() => ({
 
 const App = () => {
   const { classes } = useStyles();
-  const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
@@ -87,6 +86,7 @@ const App = () => {
       <CachingController />
       <UpdateController />
       <PWAInstallPrompt />
+      <CommandPalette />
       <div className={classes.page}>
         <Outlet />
       </div>

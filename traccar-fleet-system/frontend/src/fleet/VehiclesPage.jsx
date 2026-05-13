@@ -36,14 +36,13 @@ import LinkIcon from '@mui/icons-material/Link';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AppLayout from '../common/components/AppLayout';
-import Breadcrumbs from '../common/components/Breadcrumbs';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import { useManager } from '../common/util/permissions';
 import { fetchVehicles, createVehicle, assignVehicleDevice, deleteVehicle } from './vehiclesApi';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
-    padding: theme.spacing(3),
+    padding: theme.spacing(2),
   },
   header: {
     display: 'flex',
@@ -164,7 +163,6 @@ const VehiclesPage = () => {
     return (
       <AppLayout showSidebar>
         <Container maxWidth="md" className={classes.container}>
-          <Breadcrumbs />
           <FleetWorkspaceShell>
             <Alert severity="info">Fleet vehicles are available to managers and administrators only.</Alert>
           </FleetWorkspaceShell>
@@ -176,7 +174,6 @@ const VehiclesPage = () => {
   return (
     <AppLayout showSidebar>
       <Container maxWidth="xl" className={classes.container}>
-        <Breadcrumbs />
         <FleetWorkspaceShell>
         <Box className={classes.header}>
           <Typography variant="h4">Fleet vehicles</Typography>
@@ -194,9 +191,8 @@ const VehiclesPage = () => {
           </Box>
         </Box>
 
-        <Typography variant="body2" className={classes.muted} paragraph>
-          <strong>Open a vehicle</strong> (name or plate, or <strong>Dashboard</strong>) for the unified view: live telemetry,
-          fuel planning, ERB reference, alerts, quick actions, and setup workflow in one screen.
+        <Typography variant="body2" className={classes.muted} paragraph sx={{ mb: 1 }}>
+          Open a vehicle for telemetry, fuel, ERB, alerts, and setup in one screen.
         </Typography>
 
         {error && (

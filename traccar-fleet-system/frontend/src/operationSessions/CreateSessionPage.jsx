@@ -18,6 +18,10 @@ import {
 import AppLayout from '../common/components/AppLayout';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import {
+  RUNTIME_CONTAINER_PY,
+  RUNTIME_STACK_GAP_TIGHT,
+} from '../common/styles/runtimeDensity';
+import {
   createOperationSession,
   fetchVehicleRefuelSuggestions,
 } from './api/operationSessionsApi';
@@ -155,12 +159,12 @@ const CreateSessionPage = () => {
 
   return (
     <AppLayout showSidebar>
-      <Container maxWidth="lg" sx={{ py: 2 }}>
+      <Container maxWidth="lg" sx={{ py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
-          <Stack spacing={1.5}>
+          <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
               <Box>
-                <Typography variant="h5" fontWeight={800}>Create session</Typography>
+                <Typography variant="h6" fontWeight={800}>Create session</Typography>
               </Box>
               <Button variant="text" size="small" onClick={() => navigate('/fleet/operation-sessions')}>
                 Operations hub
@@ -175,7 +179,7 @@ const CreateSessionPage = () => {
               InputLabelProps={{ shrink: true }}
               fullWidth
               size="small"
-              helperText="Session title is set automatically from this date."
+              helperText="Title is derived from this timestamp."
             />
 
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
@@ -195,8 +199,8 @@ const CreateSessionPage = () => {
             {intelError && <Alert severity="warning">{intelError}</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
 
-            <Typography variant="subtitle2" fontWeight={800}>Vehicles</Typography>
-            <Stack spacing={1}>
+            <Typography variant="subtitle2" fontWeight={800} sx={{ mt: 0.25 }}>Vehicles</Typography>
+            <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
               {rankedVehicles.map((vehicle) => {
                 const vehicleId = Number(vehicle.id);
                 const isSelected = selected.has(vehicleId);
@@ -213,8 +217,8 @@ const CreateSessionPage = () => {
                         flexDirection: { xs: 'column', sm: 'row' },
                         justifyContent: 'space-between',
                         alignItems: { xs: 'stretch', sm: 'center' },
-                        gap: 1.25,
-                        py: 1.25,
+                        gap: 1,
+                        py: 1,
                       }}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, flex: 1 }}>

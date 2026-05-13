@@ -1,27 +1,7 @@
 import { Box, Tab, Tabs } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useContextStripState } from './contextStripState';
-
-const FLEET_WORKSPACE_TABS = [
-  {
-    label: 'Operations',
-    path: '/fleet/operation-sessions',
-    match: (pathname) => pathname === '/fleet/operation-sessions'
-      || pathname.startsWith('/fleet/operation-sessions/'),
-  },
-  {
-    label: 'Fuel requests',
-    path: '/fuel-requests',
-    match: (pathname) => pathname === '/fuel-requests'
-      || pathname.startsWith('/fuel-requests/'),
-  },
-  {
-    label: 'Vehicles',
-    path: '/fleet/vehicles',
-    match: (pathname) => pathname === '/fleet/vehicles'
-      || pathname.startsWith('/fleet/vehicles/'),
-  },
-];
+import { FLEET_WORKSPACE_TABS } from '../util/fleetWorkspacePaths';
 
 /**
  * Horizontal workspace tabs shared by Operations, fuel approvals queue, and fleet vehicles.
@@ -47,7 +27,7 @@ const FleetWorkspaceShell = ({ children, tabsOnly = false }) => {
           sx={{
             borderBottom: 1,
             borderColor: 'divider',
-            mb: 2,
+            mb: tabsOnly ? 0 : 2,
             minHeight: 48,
             '& .MuiTab-root': {
               textTransform: 'none',

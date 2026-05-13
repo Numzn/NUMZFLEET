@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom';
 import { Alert, Box, Container, Grid, LinearProgress, Typography } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import AppLayout from '../../common/components/AppLayout';
-import Breadcrumbs from '../../common/components/Breadcrumbs';
 import FleetWorkspaceShell from '../../common/components/FleetWorkspaceShell';
 import { useManager } from '../../common/util/permissions';
 import useVehicleData from './useVehicleData';
@@ -21,7 +20,7 @@ import { vehicleDashboardCardSx } from './dashboardCardSx.js';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
-    padding: theme.spacing(3),
+    padding: theme.spacing(2),
   },
 }));
 
@@ -70,7 +69,6 @@ export default function VehicleDetailPage() {
     return (
       <AppLayout showSidebar>
         <Container maxWidth="md" className={classes.container}>
-          <Breadcrumbs />
           <FleetWorkspaceShell>
             <Alert severity="info">Fleet vehicles are available to managers and administrators only.</Alert>
           </FleetWorkspaceShell>
@@ -82,7 +80,6 @@ export default function VehicleDetailPage() {
   return (
     <AppLayout showSidebar>
       <Container maxWidth={false} className={classes.container} sx={{ maxWidth: 1800, mx: 'auto' }}>
-        <Breadcrumbs />
         <FleetWorkspaceShell>
           {loading && <LinearProgress sx={{ mb: 2 }} />}
           {error && (

@@ -1,3 +1,6 @@
+/**
+ * Legacy inline search UI (popover). Prefer CommandPalette (App.jsx) for Ctrl/Cmd+K.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import {
   TextField,

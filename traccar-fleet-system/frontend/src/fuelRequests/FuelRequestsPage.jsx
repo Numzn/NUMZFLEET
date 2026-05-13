@@ -1,14 +1,13 @@
 import { Box, Container } from '@mui/material';
 import AppLayout from '../common/components/AppLayout';
-import Breadcrumbs from '../common/components/Breadcrumbs';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import FuelRequestsCard from './components/FuelRequestsCard';
+import { RUNTIME_CONTAINER_PY } from '../common/styles/runtimeDensity';
 
 const FuelRequestsPage = () => {
   return (
     <AppLayout showSidebar>
-      <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Breadcrumbs />
+      <Container maxWidth="xl" sx={{ py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
           <Box
             sx={{

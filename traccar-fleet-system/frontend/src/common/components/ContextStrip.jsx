@@ -3,15 +3,8 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { useLocation } from 'react-router-dom';
 import Breadcrumbs from './Breadcrumbs';
 import FleetWorkspaceShell from './FleetWorkspaceShell';
-
-const isFleetWorkspacePath = (pathname) => (
-  pathname === '/fleet/operation-sessions'
-  || pathname.startsWith('/fleet/operation-sessions/')
-  || pathname === '/fuel-requests'
-  || pathname.startsWith('/fuel-requests/')
-  || pathname === '/fleet/vehicles'
-  || pathname.startsWith('/fleet/vehicles/')
-);
+import { isFleetWorkspacePath } from '../util/fleetWorkspacePaths';
+import { RUNTIME_CONTEXT_STRIP_PB } from '../styles/runtimeDensity';
 
 /**
  * Lightweight operational context strip.
@@ -30,7 +23,7 @@ const ContextStrip = ({
         flexShrink: 0,
         pt: 'calc(env(safe-area-inset-top, 0px) + 10px)',
         px: { xs: 1.5, sm: 2 },
-        pb: 1.25,
+        pb: RUNTIME_CONTEXT_STRIP_PB,
         borderBottom: 1,
         borderColor: 'divider',
         backgroundColor: theme.palette.background.default,
