@@ -16,6 +16,29 @@ Default namespace in this repo’s examples: **`numz14`** (set `DOCKERHUB_USERNA
 
 - [compose/docker-compose.prod.yml](compose/docker-compose.prod.yml) — all required services (`frontend`, `backend`, `erb-api`, `erb-worker`, `db`, `traccar-mysql`, `traccar`), **`image:` only**, plus **`caddy`** on **host ports 80 and 443** reverse-proxying to `frontend:80` (TLS via Let’s Encrypt; same-origin routing as [ROUTING.md](../ROUTING.md)). Config: [caddy/Caddyfile](caddy/Caddyfile). **Oracle VCN / security lists** must allow **ingress TCP 80 and 443** to the instance (host `ufw` alone is not enough). If **port 80 is already in use**, stop the conflicting service before `compose up`.
 
+### Traccar raw GPS ports (OCI + compose)
+
+GPS trackers open **plain TCP** to the **host public IP** (or DNS) on the ports Traccar listens on. Those ports are published in `deployment/compose/docker-compose.prod.yml` and must match [`backend/conf/traccar.xml`](../backend/conf/traccar.xml) `*.port` entries. **Do not** open VCN ingress for a port that is not both published and configured, or you will see timeouts/refusals with no benefit.
+
+| TCP (host) | `traccar.xml` key | Notes |
+|------------|-------------------|--------|
+| 5001 | `gps103.port` | |
+| 5002 | `tk103.port` | |
+| 5003 | `gl200.port` | |
+| 5004 | `gl100.port` | |
+| 5005 | `t55.port` | |
+| 5006 | `teltonika.port` | Teltonika devices |
+| 5009 | `meiligao.port` | |
+| 5013 | `h02.port` | e.g. Mictrack MT532 / H02 |
+| 5020 | `gpsgate.port` | |
+| 5055 | `osmand.port` | OsmAnd / HTTP-style reporting |
+
+**Traccar web UI / REST** is **not** meant to be on public **8082** in this stack: compose binds **`127.0.0.1:8082:8082`**. Browsers use **`https://<domain>/traccar/*`** (Caddy → `frontend` nginx → `traccar:8082` on the Docker network). **OCI does not need 8082** unless you intentionally change that binding (not recommended).
+
+**Production tightening:** allow **80, 443** plus **only** the GPS ports you actually deploy (e.g. **5013** for MT532-only fleets). Remove unused ingress rules when you drop compose ports. The repo’s [`oci-server-setup.sh`](oci-server-setup.sh) opens a broad **5001–5020** range for convenience; on OCI prefer explicit rules per port in use.
+
+If you previously opened **5027** in OCI after an old compose line, **remove that ingress rule** after deploy (5027 is not used in `traccar.xml` and is no longer published).
+
 ## Public exposure (single domain, no ports)
 
 Only **Caddy** is published to the public interface (`80/443`). The `frontend` (`3002`), `backend` (`3000`), and `traccar` (`8082`) services are **bound to `127.0.0.1`** on the host so they are reachable only via the in-Docker network and via SSH tunnels, never from the public internet. Users access everything at `https://<domain>/`:

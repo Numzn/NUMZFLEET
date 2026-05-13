@@ -5,6 +5,7 @@ import VehicleModel from './Vehicle.js';
 import DeviceAssignmentModel from './DeviceAssignment.js';
 import OperationSessionModel from './OperationSession.js';
 import OperationSessionRefuelModel from './OperationSessionRefuel.js';
+import UserNotificationModel from './UserNotification.js';
 
 // Initialize models
 const FuelRequest = FuelRequestModel(sequelize);
@@ -13,6 +14,7 @@ const Vehicle = VehicleModel(sequelize);
 const DeviceAssignment = DeviceAssignmentModel(sequelize);
 const OperationSession = OperationSessionModel(sequelize);
 const OperationSessionRefuel = OperationSessionRefuelModel(sequelize);
+const UserNotification = UserNotificationModel(sequelize);
 
 // Define associations
 Vehicle.hasMany(DeviceAssignment, { foreignKey: 'vehicleId' });
@@ -132,6 +134,7 @@ export {
   DeviceAssignment,
   OperationSession,
   OperationSessionRefuel,
+  UserNotification,
 };
 export default sequelize;
 

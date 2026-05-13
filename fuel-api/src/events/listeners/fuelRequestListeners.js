@@ -6,13 +6,15 @@ import {
   emitFuelRequestUpdated,
   emitFuelRequestCancelled,
 } from '../../fuelRequests/handlers/socketEvents.js';
+import { persistFuelSocketEvent } from '../../modules/notifications/notificationService.js';
 
 /**
  * Register all listeners for the fuel request state machine.
  *
- * Each state transition has two listeners:
+ * Each state transition has listeners for:
  *   1. socket-notify  — pushes the change to affected rooms via Socket.IO
  *   2. audit-log      — writes a structured log entry for the transition
+ *   3. persist-notification — stores rows for notification center (PostgreSQL)
  *
  * Listeners are wrapped in withSafeListener so a failure in one (e.g. a broken
  * socket) cannot crash the API response or prevent the audit log from running.
@@ -39,6 +41,23 @@ export const registerFuelRequestListeners = (io) => {
         urgency: request.urgency,
         actorUserId,
         at: new Date().toISOString(),
+      });
+    }),
+  );
+
+  eventBus.on(
+    EVENT_NAMES.FUEL_REQUEST_CREATED,
+    withSafeListener(EVENT_NAMES.FUEL_REQUEST_CREATED, 'persist-notification', async ({ request, actorUserId }) => {
+      const changedAt = new Date().toISOString();
+      await persistFuelSocketEvent({
+        kind: 'created',
+        request,
+        change: {
+          type: 'created',
+          changedAt,
+          message: `New fuel request for ${request.requestedAmount}L from device ${request.deviceId}`,
+        },
+        actorUserId,
       });
     }),
   );
@@ -73,6 +92,25 @@ export const registerFuelRequestListeners = (io) => {
     }),
   );
 
+  eventBus.on(
+    EVENT_NAMES.FUEL_REQUEST_APPROVED,
+    withSafeListener(EVENT_NAMES.FUEL_REQUEST_APPROVED, 'persist-notification', async ({ request, previousStatus, actorUserId, message }) => {
+      await persistFuelSocketEvent({
+        kind: 'updated',
+        request,
+        change: {
+          type: 'approved',
+          previousStatus,
+          newStatus: request.status,
+          changedBy: actorUserId,
+          changedAt: new Date().toISOString(),
+          message,
+        },
+        actorUserId,
+      });
+    }),
+  );
+
   // ─── fuel.request.fulfilled ──────────────────────────────────────────────
 
   eventBus.on(
@@ -103,6 +141,24 @@ export const registerFuelRequestListeners = (io) => {
     }),
   );
 
+  eventBus.on(
+    EVENT_NAMES.FUEL_REQUEST_FULFILLED,
+    withSafeListener(EVENT_NAMES.FUEL_REQUEST_FULFILLED, 'persist-notification', async ({ request, previousStatus, actorUserId }) => {
+      await persistFuelSocketEvent({
+        kind: 'updated',
+        request,
+        change: {
+          type: 'fulfilled',
+          previousStatus,
+          newStatus: request.status,
+          changedBy: actorUserId,
+          changedAt: new Date().toISOString(),
+        },
+        actorUserId,
+      });
+    }),
+  );
+
   // ─── fuel.request.rejected ───────────────────────────────────────────────
 
   eventBus.on(
@@ -126,6 +182,25 @@ export const registerFuelRequestListeners = (io) => {
     }),
   );
 
+  eventBus.on(
+    EVENT_NAMES.FUEL_REQUEST_REJECTED,
+    withSafeListener(EVENT_NAMES.FUEL_REQUEST_REJECTED, 'persist-notification', async ({ request, previousStatus, actorUserId, message }) => {
+      await persistFuelSocketEvent({
+        kind: 'updated',
+        request,
+        change: {
+          type: 'rejected',
+          previousStatus,
+          newStatus: request.status,
+          changedBy: actorUserId,
+          changedAt: new Date().toISOString(),
+          message,
+        },
+        actorUserId,
+      });
+    }),
+  );
+
   // ─── fuel.request.cancelled ──────────────────────────────────────────────
 
   eventBus.on(
@@ -144,6 +219,25 @@ export const registerFuelRequestListeners = (io) => {
         previousStatus,
         actorUserId,
         at: new Date().toISOString(),
+      });
+    }),
+  );
+
+  eventBus.on(
+    EVENT_NAMES.FUEL_REQUEST_CANCELLED,
+    withSafeListener(EVENT_NAMES.FUEL_REQUEST_CANCELLED, 'persist-notification', async ({ request, previousStatus, actorUserId }) => {
+      await persistFuelSocketEvent({
+        kind: 'updated',
+        request,
+        change: {
+          type: 'cancelled',
+          previousStatus,
+          newStatus: request.status,
+          changedBy: actorUserId,
+          changedAt: new Date().toISOString(),
+          message: `Fuel request #${request.id} cancelled`,
+        },
+        actorUserId,
       });
     }),
   );

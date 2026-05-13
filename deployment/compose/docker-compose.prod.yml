@@ -49,10 +49,11 @@ services:
       - ../../backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
     # Bound to loopback so only Caddy (80/443) is the public entry; ops can still
     # reach Traccar admin via SSH tunnel: ssh -L 8082:127.0.0.1:8082 <host>.
+    # Raw GPS TCP ports below must match backend/conf/traccar.xml (*.port). Do not
+    # publish a host port unless Traccar is configured to listen on it in that file.
     ports:
       - "127.0.0.1:8082:8082"
-      - "5055:5055"     # OsmAnd (HTTP tracking)
-      - "5027:5027"     # Teltonika
+      - "5055:5055"     # OsmAnd (matches traccar.xml osmand.port)
       - "5001:5001"
       - "5002:5002"
       - "5003:5003"

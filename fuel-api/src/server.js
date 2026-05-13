@@ -18,6 +18,7 @@ import vehicleSpecsRouter from './routes/vehicleSpecs.js';
 import vehiclesRouter from './routes/vehicles.js';
 import operationSessionsRouter from './routes/operationSessions.js';
 import reportsRouter from './reports/routes/reports.js';
+import notificationsRouter from './modules/notifications/routes.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
 import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.js';
@@ -380,6 +381,7 @@ if (process.env.NODE_ENV === 'development') {
 
 // API Routes
 app.use('/api/fuel-requests', fuelRequestsRouter);
+app.use('/api/notifications', notificationsRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
 app.use('/api/vehicles', vehiclesRouter);
 // Nested path registered on app first so it is never missed if an older router snapshot omits it.

@@ -208,6 +208,36 @@ export const getTraccarUserBySessionViaAPI = async (
   }
 };
 
+let managerIdCache = { at: 0, ids: [] };
+const MANAGER_ID_CACHE_MS = 60000;
+
+/**
+ * Traccar user ids that should receive manager-scoped notifications (administrator or isManager).
+ */
+export const getManagerUserIds = async () => {
+  const now = Date.now();
+  if (now - managerIdCache.at < MANAGER_ID_CACHE_MS && managerIdCache.ids.length) {
+    return managerIdCache.ids;
+  }
+  const pool = getTraccarPool();
+  const [rows] = await pool.execute(
+    'SELECT id, administrator, attributes FROM tc_users WHERE disabled = 0',
+  );
+  const ids = [];
+  for (const row of rows) {
+    const { isManager } = roleFlagsFromTraccar({
+      administrator: row.administrator,
+      attributes: row.attributes,
+      isManager: undefined,
+    });
+    if (isManager) {
+      ids.push(Number(row.id));
+    }
+  }
+  managerIdCache = { at: now, ids };
+  return ids;
+};
+
 /**
  * Get device by ID from Traccar
  */
@@ -235,5 +265,6 @@ export default {
   getTraccarUserBySessionToken,
   getTraccarUserBySessionViaAPI,
   getTraccarDevice,
+  getManagerUserIds,
   testTraccarConnection,
 };

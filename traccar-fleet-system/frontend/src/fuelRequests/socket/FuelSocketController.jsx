@@ -5,22 +5,12 @@ import { fuelRequestsActions } from '../store/fuelRequests';
 import { useToastNotifications } from '../../hooks/useToastNotifications';
 import ConnectivityService from '../../connectivity/ConnectivityService';
 import diag from '../../common/util/diagLogger';
+import { notificationsActions } from '../../store/notifications/notificationsSlice.js';
+import { normalizeFuelRequestEvent } from '../../notifications/adapters/normalizeFuelRequestEvent.js';
+import { normalizeVehicleAssignmentEvent } from '../../notifications/adapters/normalizeVehicleAssignmentEvent.js';
+import { normalizeErbPriceEvent } from '../../notifications/adapters/normalizeErbPriceEvent.js';
+import { isUnifiedNotificationsEnabled } from '../../notifications/notificationFeatureFlags.js';
 
-/**
- * Fuel Socket.IO controller — connectivity-aware lifecycle.
- *
- * State machine:
- *   CONNECTED      socket is healthy
- *   RECONNECTING   socket is attempting to reconnect
- *   OFFLINE        browser is offline; reconnection is paused
- *   FAILED         backend repeatedly unreachable; we keep waiting but stop
- *                  spamming the console
- *   PAUSED         no authenticated user; nothing to do
- *
- * User-facing messaging is owned by ConnectivityBanner. This controller only
- * emits structured diag events; it never writes Docker/troubleshooting copy
- * to the browser console.
- */
 const SOCKET_STATE = Object.freeze({
   CONNECTED: 'CONNECTED',
   RECONNECTING: 'RECONNECTING',
@@ -33,6 +23,7 @@ const FuelSocketController = () => {
   const dispatch = useDispatch();
   const authenticated = useSelector((state) => !!state.session.user);
   const user = useSelector((state) => state.session.user);
+  const unified = useSelector(isUnifiedNotificationsEnabled);
 
   const browserNotificationsEnabled = user?.attributes?.browserNotificationsEnabled !== false;
 
@@ -47,7 +38,6 @@ const FuelSocketController = () => {
   const showFuelRequestNotificationRef = useRef(showFuelRequestNotification);
   const userRef = useRef(user);
   const dispatchRef = useRef(dispatch);
-  const browserNotificationsEnabledRef = useRef(browserNotificationsEnabled);
 
   const shownNotificationsRef = useRef(new Set());
   const notificationTimeoutRef = useRef({});
@@ -66,8 +56,7 @@ const FuelSocketController = () => {
     showFuelRequestNotificationRef.current = showFuelRequestNotification;
     userRef.current = user;
     dispatchRef.current = dispatch;
-    browserNotificationsEnabledRef.current = browserNotificationsEnabled;
-  }, [showToast, showFuelRequestNotification, user, dispatch, browserNotificationsEnabled]);
+  }, [showToast, showFuelRequestNotification, user, dispatch]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -98,7 +87,6 @@ const FuelSocketController = () => {
       return undefined;
     }
 
-    // Same-origin Socket.IO endpoint.
     const fuelApiUrl = '/';
 
     let socket = socketRef.current;
@@ -133,7 +121,6 @@ const FuelSocketController = () => {
       setState(SOCKET_STATE.RECONNECTING, 'init');
     }
 
-    // If we already know we are offline, pause the socket immediately.
     const initialSnap = ConnectivityService.getSnapshot();
     if (!initialSnap.isBrowserOnline) {
       try {
@@ -144,6 +131,13 @@ const FuelSocketController = () => {
       }
       setState(SOCKET_STATE.OFFLINE, 'browser_offline');
     }
+
+    const ingestFuelNotification = (eventName, data) => {
+      const n = normalizeFuelRequestEvent(eventName, data);
+      if (n) {
+        dispatchRef.current(notificationsActions.upsertOneNotification(n));
+      }
+    };
 
     const showSmartNotification = (request, change, eventType) => {
       if (!request || !request.id) return;
@@ -233,19 +227,6 @@ const FuelSocketController = () => {
       }
     };
 
-    const joinRoom = () => {
-      if (!socket.connected) {
-        diag.log('fuel_socket_join_skipped', { reason: 'not_connected' });
-        return;
-      }
-      const room = userRef.current?.administrator
-        ? 'managers'
-        : `driver-${userRef.current?.id}`;
-      socket.emit('join-room', room, (response) => {
-        diag.log('fuel_socket_room_joined', { room, ack: !!response });
-      });
-    };
-
     socket.off('fuel-request-created');
     socket.off('fuel-request-updated');
 
@@ -254,6 +235,11 @@ const FuelSocketController = () => {
       const change = data.change;
 
       dispatchRef.current(fuelRequestsActions.update([request]));
+
+      if (unified) {
+        ingestFuelNotification('fuel-request-created', data);
+        return;
+      }
 
       if (userRef.current?.administrator) {
         showSmartNotification(request, change, 'fuel-request-created');
@@ -270,6 +256,22 @@ const FuelSocketController = () => {
 
       dispatchRef.current(fuelRequestsActions.update([request]));
 
+      if (unified) {
+        ingestFuelNotification('fuel-request-updated', data);
+        if (!change && !userRef.current?.administrator && request.userId === userRef.current?.id) {
+          const n = normalizeFuelRequestEvent('fuel-request-updated', {
+            request,
+            change: {
+              type: 'updated',
+              changedAt: new Date().toISOString(),
+              message: 'Your fuel request was updated',
+            },
+          });
+          if (n) dispatchRef.current(notificationsActions.upsertOneNotification(n));
+        }
+        return;
+      }
+
       if (change) {
         showSmartNotification(request, change, 'fuel-request-updated');
       } else if (!userRef.current?.administrator && request.userId === userRef.current?.id) {
@@ -279,21 +281,30 @@ const FuelSocketController = () => {
       }
     });
 
-    socket.off('room-joined');
-    socket.on('room-joined', (data) => {
-      diag.log('fuel_socket_room_joined_event', { room: data && data.room });
+    socket.off('vehicle-assignment-updated');
+    socket.on('vehicle-assignment-updated', (payload) => {
+      const n = normalizeVehicleAssignmentEvent(payload);
+      if (n && unified) {
+        dispatchRef.current(notificationsActions.upsertOneNotification(n));
+      }
+    });
+
+    socket.off('erbPricesUpdated');
+    socket.on('erbPricesUpdated', (payload) => {
+      const n = normalizeErbPriceEvent(payload);
+      if (n && unified) {
+        dispatchRef.current(notificationsActions.upsertOneNotification(n));
+      }
     });
 
     socket.off('connect');
     socket.on('connect', () => {
       failureStreakRef.current = 0;
       setState(SOCKET_STATE.CONNECTED, 'connect');
-      setTimeout(joinRoom, 500);
     });
 
     if (socket.connected) {
       setState(SOCKET_STATE.CONNECTED, 'already_connected');
-      setTimeout(joinRoom, 500);
     }
 
     socket.off('reconnect_attempt');
@@ -322,15 +333,11 @@ const FuelSocketController = () => {
       });
       ConnectivityService.notifyFailure(error);
 
-      // Stop spamming after several failures; the banner has already informed
-      // the user. Socket.IO keeps retrying internally.
       if (failureStreakRef.current >= 3 && stateRef.current !== SOCKET_STATE.OFFLINE) {
         setState(SOCKET_STATE.FAILED, 'too_many_errors');
       }
     });
 
-    // Connectivity-aware reconnection: pause Socket.IO retries while offline,
-    // resume immediately when the browser comes back online.
     const unsubscribeConnectivity = ConnectivityService.subscribe((snap) => {
       if (!socketRef.current) return;
       const sock = socketRef.current;
@@ -348,7 +355,6 @@ const FuelSocketController = () => {
         return;
       }
 
-      // Browser is online; if we paused the socket, resume it.
       if (stateRef.current === SOCKET_STATE.OFFLINE) {
         try {
           if (sock.io && sock.io.opts) sock.io.opts.reconnection = true;
@@ -376,7 +382,11 @@ const FuelSocketController = () => {
       shownNotificationsRef.current.clear();
       failureStreakRef.current = 0;
     };
-  }, [authenticated, user?.id]);
+  }, [authenticated, user?.id, unified]);
+
+  if (unified) {
+    return null;
+  }
 
   return <ToastNotification />;
 };

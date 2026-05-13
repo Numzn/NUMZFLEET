@@ -26,7 +26,7 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ChevronLeftOutlinedIcon from '@mui/icons-material/ChevronLeftOutlined';
 import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
-import NotificationsDropdown from './NotificationsDropdown';
+import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from './UserMenuDropdown';
 import usePersistedState from '../util/usePersistedState';
 import { useAdministrator, useManager, useRestriction } from '../util/permissions';
@@ -478,7 +478,7 @@ const ModernSidebar = ({
       {!forceExpanded && (
         <Box className={classes.footer}>
           <Box className={classes.footerRow} sx={{ mb: 0.75 }}>
-            <NotificationsDropdown />
+            <NotificationCenter />
             <UserMenuDropdown />
           </Box>
           <Divider sx={{ opacity: 0.35, mb: 1 }} />

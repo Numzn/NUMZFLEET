@@ -104,65 +104,7 @@ export const initializeSocket = (io) => {
         // Don't disconnect - let connection continue without room membership
       }
       // =========================================================
-
-      // Join appropriate rooms based on user role (manual join requests)
-      socket.on('join-room', (roomName, callback) => {
-        try {
-          if (!roomName || typeof roomName !== 'string') {
-            const error = 'Invalid room name';
-            if (isDev) {
-              console.error(`❌ [Room] Invalid room name from ${socket.id}:`, roomName);
-            }
-            if (typeof callback === 'function') {
-              callback({ success: false, error });
-            }
-            return;
-          }
-          
-          socket.join(roomName);
-          
-          // Send acknowledgment if callback provided
-          if (typeof callback === 'function') {
-            try {
-              const adapter = io.sockets.adapter;
-              const room = adapter.rooms?.get(roomName);
-              const roomSize = room ? room.size : 0;
-              const response = { 
-                success: true, 
-                room: roomName, 
-                socketId: socket.id, 
-                roomSize 
-              };
-              callback(response);
-            } catch (callbackError) {
-              console.error(`❌ [Room] Error sending acknowledgment:`, callbackError);
-              callback({ success: false, error: callbackError.message });
-            }
-          }
-          
-          // ALWAYS emit fallback event (Socket.IO v4+ compatibility)
-          try {
-            const adapter = io.sockets.adapter;
-            const room = adapter.rooms?.get(roomName);
-            const roomSize = room ? room.size : 0;
-            socket.emit('room-joined', { 
-              success: true, 
-              room: roomName, 
-              socketId: socket.id, 
-              roomSize,
-              timestamp: new Date().toISOString()
-            });
-          } catch (emitError) {
-            console.error(`❌ [Room] Error emitting room-joined event:`, emitError);
-          }
-        } catch (error) {
-          console.error(`❌ [Room] Error in join-room handler for ${socket.id}:`, error);
-          console.error('Stack:', error.stack);
-          if (typeof callback === 'function') {
-            callback({ success: false, error: error.message });
-          }
-        }
-      });
+      // Room membership is server-owned only (see auto-join above). Client join-room is not supported.
 
       // Error event handler
       socket.on('error', (error) => {

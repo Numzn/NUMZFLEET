@@ -17,7 +17,7 @@ import LogoImage from '../../login/LogoImage';
 import DeviceStatsChips from './DeviceStatsChips';
 import SearchWithDropdown from './SearchWithDropdown';
 import FiltersFlyout from './FiltersFlyout';
-import NotificationsDropdown from '../../common/components/NotificationsDropdown';
+import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from '../../common/components/UserMenuDropdown';
 
 const useStyles = makeStyles()((theme) => ({
@@ -315,7 +315,7 @@ const PremiumTopBar = ({
           />
 
           {/* Notifications */}
-          <NotificationsDropdown />
+          <NotificationCenter />
 
           {/* User Menu */}
           <UserMenuDropdown />
