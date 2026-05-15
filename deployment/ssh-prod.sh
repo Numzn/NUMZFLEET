@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+          #!/usr/bin/env bash
 # Persistent shortcut for production SSH login.
 # Default IP is also in deployment/scripts/auto_deploy.defaults.env — update both if the instance changes.
 set -euo pipefail

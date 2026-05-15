@@ -44,8 +44,26 @@ esac
 log "Deploy SHA=$SHA — pull only (no build). Registry prefix: $REGISTRY_PREFIX"
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
 
-log "Starting services"
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
+log "Starting services (wait until healthchecks pass)"
+# --wait avoids returning while nginx/Node are still warming; recycle Caddy afterwards so
+# HTTP/2 upstream pools don’t stick to an old recreated frontend endpoint.
+if docker compose up --help 2>/dev/null | grep -qE '[[:space:]]--wait([[:space:]]|$)'; then
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans --wait
+else
+  log "Docker Compose has no --wait flag; upgrade to plugin v2.29+. Running up without wait."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
+  log "Polling frontend container health (max ~120s)"
+  for _ in $(seq 1 40); do
+    st="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' numzfleet-prod-frontend 2>/dev/null || echo missing)"
+    if [[ "$st" == "healthy" ]]; then
+      break
+    fi
+    sleep 3
+  done
+fi
+
+log "Recycling Caddy to flush upstream after roll"
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart --no-deps caddy
 
 mkdir -p "$(dirname "$STATE_FILE")" "$(dirname "$HISTORY_FILE")"
 

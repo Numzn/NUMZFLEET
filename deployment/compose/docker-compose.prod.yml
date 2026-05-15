@@ -189,6 +189,18 @@ services:
         condition: service_healthy
       traccar:
         condition: service_healthy
+    # Without this, Caddy can start (or keep proxying) while nginx inside the new container
+    # is not listening yet → 502 / “site won’t load” right after each deploy.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1/health || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
   # Public HTTP + HTTPS (Let's Encrypt). Proxies to frontend:80 (nginx inside serves /api, /traccar, SPA).
   caddy:
@@ -197,7 +209,7 @@ services:
     restart: unless-stopped
     depends_on:
       frontend:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"

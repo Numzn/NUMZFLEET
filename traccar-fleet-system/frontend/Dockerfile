@@ -15,6 +15,7 @@ ENV VITE_TRACCAR_PREFIX=$VITE_TRACCAR_PREFIX
 RUN echo "build:${BUILD_REF}" && npm run build
 
 FROM nginx:alpine
+RUN apk add --no-cache wget
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
