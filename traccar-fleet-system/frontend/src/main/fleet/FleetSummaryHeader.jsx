@@ -6,7 +6,7 @@ import { selectUnreadCount } from '../../store/notifications/notificationSelecto
 /**
  * Dense fleet metric strip — operational pills (not dashboard widgets).
  */
-const FleetSummaryHeader = ({ deviceStats = {} }) => {
+const FleetSummaryHeader = ({ deviceStats = {}, compact = false }) => {
   const theme = useTheme();
   const unread = useSelector(selectUnreadCount);
 
@@ -34,8 +34,8 @@ const FleetSummaryHeader = ({ deviceStats = {} }) => {
   return (
     <Box
       sx={{
-        px: 1.25,
-        py: 0.5,
+        px: compact ? 1 : 1.25,
+        py: compact ? 0.35 : 0.5,
         borderBottom: '1px solid',
         borderColor: 'divider',
         bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.18)' : 'action.hover',
@@ -44,8 +44,8 @@ const FleetSummaryHeader = ({ deviceStats = {} }) => {
       <Stack
         direction="row"
         flexWrap="wrap"
-        useFlexGap
-        sx={{ columnGap: 0.45, rowGap: 0.35, alignItems: 'center' }}
+        spacing={0.45}
+        sx={{ rowGap: 0.3, alignItems: 'center' }}
       >
         <Chip size="small" variant="outlined" color="info" label={`Moving ${moving}`} sx={chipSx} />
         <Chip size="small" variant="outlined" label={`Idle ${idling}`} sx={chipSx} />

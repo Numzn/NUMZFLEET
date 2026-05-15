@@ -3,9 +3,11 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useDispatch, useSelector } from 'react-redux';
 import { fleetInteractionActions } from '../../store';
 
-const FleetSearch = ({ sx: sxProp = {} }) => {
+const FleetSearch = ({ sx: sxProp = {}, compact = false }) => {
   const dispatch = useDispatch();
   const q = useSelector((s) => s.fleetInteraction.searchQuery);
+
+  const inputMinH = compact ? 36 : 30;
 
   return (
     <TextField
@@ -25,12 +27,12 @@ const FleetSearch = ({ sx: sxProp = {} }) => {
         flex: 1,
         minWidth: 0,
         '& .MuiInputBase-root': {
-          minHeight: 30,
+          minHeight: inputMinH,
           fontSize: '0.75rem',
           borderRadius: 1,
         },
         '& .MuiInputBase-input': {
-          py: 0.5,
+          py: compact ? 0.65 : 0.5,
         },
         ...sxProp,
       }}

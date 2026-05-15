@@ -16,22 +16,22 @@ const FILTER_TABS = [
   { id: 'offline', label: 'Offline' },
 ];
 
-/** Compact tactical tabs — full width uses sidebar space without oversized chrome */
+/** Compact tactical tabs */
 const tacticalTabsSx = {
-  minHeight: 30,
+  minHeight: 28,
   '& .MuiTabs-flexContainer': { gap: 0 },
   '& .MuiTabs-indicator': {
     height: 2,
     borderRadius: '2px 2px 0 0',
   },
   '& .MuiTab-root': {
-    minHeight: 30,
+    minHeight: 28,
     minWidth: 0,
     py: 0,
-    px: 1,
+    px: 0.85,
     textTransform: 'none',
     fontWeight: 600,
-    fontSize: '0.72rem',
+    fontSize: '0.7rem',
     letterSpacing: '0.02em',
     color: 'text.secondary',
     '&.Mui-selected': {
@@ -41,10 +41,23 @@ const tacticalTabsSx = {
   },
 };
 
-const FleetTabs = () => {
+const FleetTabs = ({ compact = false }) => {
   const dispatch = useDispatch();
   const fleetWorkspaceMode = useSelector((s) => s.fleetInteraction.fleetWorkspaceMode);
   const fleetTab = useSelector((s) => s.fleetInteraction.fleetTab);
+
+  const tabSx = compact
+    ? {
+        ...tacticalTabsSx,
+        minHeight: 26,
+        '& .MuiTab-root': {
+          ...tacticalTabsSx['& .MuiTab-root'],
+          minHeight: 26,
+          px: 0.55,
+          fontSize: '0.67rem',
+        },
+      }
+    : tacticalTabsSx;
 
   const workspaceIndex = Math.max(
     0,
@@ -70,7 +83,7 @@ const FleetTabs = () => {
           dispatch(fleetInteractionActions.setFleetWorkspaceMode(next.id));
         }}
         variant="fullWidth"
-        sx={tacticalTabsSx}
+        sx={tabSx}
       >
         {FLEET_WORKSPACE_TABS.map((t) => (
           <Tab
@@ -89,7 +102,7 @@ const FleetTabs = () => {
             value={filterIndex}
             onChange={(_, i) => dispatch(fleetInteractionActions.setFleetTab(FILTER_TABS[i].id))}
             variant="fullWidth"
-            sx={tacticalTabsSx}
+            sx={tabSx}
           >
             {FILTER_TABS.map((t) => (
               <Tab key={t.id} label={t.label} sx={{ flex: 1, maxWidth: 'none' }} />

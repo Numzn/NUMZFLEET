@@ -8,13 +8,16 @@ import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { devicesActions, fleetInteractionActions } from '../store';
+import { selectAllNotifications } from '../store/notifications/notificationSelectors.js';
 import usePersistedState from '../common/util/usePersistedState';
+import { useManager } from '../common/util/permissions';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
 import PremiumTopBar from './components/PremiumTopBar';
 import MapDevicePopup from './components/MapDevicePopup';
 import FleetLayout from './fleet/FleetLayout';
 import FleetSidebar from './fleet/FleetSidebar';
+import { fetchVehicles } from '../fleet/vehiclesApi.js';
 
 const useStyles = makeStyles()(() => ({
   root: {
@@ -40,6 +43,8 @@ const MainPage = () => {
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const manager = useManager();
+  const user = useSelector((state) => state.session.user);
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
   const positions = useSelector((state) => state.session.positions);
   const devices = useSelector((state) => state.devices.items);
@@ -47,9 +52,11 @@ const MainPage = () => {
   const fleetTab = useSelector((state) => state.fleetInteraction.fleetTab);
   const fleetWorkspaceMode = useSelector((state) => state.fleetInteraction.fleetWorkspaceMode);
   const searchQuery = useSelector((state) => state.fleetInteraction.searchQuery);
+  const allNotifications = useSelector(selectAllNotifications);
 
   const [filteredPositions, setFilteredPositions] = useState([]);
   const [filteredDevices, setFilteredDevices] = useState([]);
+  const [deviceFleetVehicleIdByDeviceId, setDeviceFleetVehicleIdByDeviceId] = useState({});
   const selectedPosition = useMemo(
     () => (selectedDeviceId != null ? positions[selectedDeviceId] : undefined),
     [positions, selectedDeviceId],
@@ -64,6 +71,67 @@ const MainPage = () => {
 
   const effectiveFleetTab = fleetWorkspaceMode === 'live' ? fleetTab : 'all';
 
+  const deviceStats = useMemo(() => {
+    const deviceList = Object.values(devices);
+    const total = deviceList.length;
+    const onlineList = deviceList.filter((d) => d.status === 'online');
+    const offline = deviceList.filter((d) => d.status === 'offline').length;
+    const positionList = Object.values(positions || {});
+    const movingDeviceIds = new Set(
+      positionList.filter((p) => Number(p.speed) > 0).map((p) => p.deviceId),
+    );
+    const moving = onlineList.filter((d) => movingDeviceIds.has(d.id)).length;
+    const idling = onlineList.filter((d) => !movingDeviceIds.has(d.id)).length;
+
+    return {
+      total,
+      online: onlineList.length,
+      moving,
+      idling,
+      offline,
+    };
+  }, [devices, positions]);
+
+  const alertDeviceIds = useMemo(() => {
+    const s = new Set();
+    allNotifications.forEach((n) => {
+      if (n.read || n.archived) return;
+      const id = n.metadata?.deviceId;
+      if (id != null && id !== '') {
+        const num = typeof id === 'number' ? id : Number(id);
+        if (!Number.isNaN(num)) s.add(num);
+      }
+    });
+    return s;
+  }, [allNotifications]);
+
+  const operationalPresence = useMemo(() => ({
+    hasMoving: deviceStats.moving > 0,
+    hasIdle: deviceStats.idling > 0,
+    hasOffline: deviceStats.offline > 0,
+    hasAlerts: alertDeviceIds.size > 0,
+  }), [
+    deviceStats.moving,
+    deviceStats.idling,
+    deviceStats.offline,
+    alertDeviceIds,
+  ]);
+
+  useEffect(() => {
+    const { hasMoving, hasIdle, hasOffline, hasAlerts } = operationalPresence;
+
+    const invalid =
+      (fleetTab === 'moving' && !hasMoving)
+      || (fleetTab === 'idle' && !hasIdle)
+      || (fleetTab === 'offline' && !hasOffline)
+      || (fleetTab === 'alerts' && !hasAlerts)
+      || fleetTab === 'online';
+
+    if (invalid) {
+      dispatch(fleetInteractionActions.setFleetTab('all'));
+    }
+  }, [fleetTab, operationalPresence, dispatch]);
+
   useFilter(
     searchQuery,
     filter,
@@ -73,17 +141,34 @@ const MainPage = () => {
     setFilteredDevices,
     setFilteredPositions,
     effectiveFleetTab,
+    alertDeviceIds,
   );
 
-  const deviceStats = useMemo(() => {
-    const total = Object.values(devices).length;
-    const online = Object.values(devices).filter((d) => d.status === 'online').length;
-    const moving = Object.values(positions).filter((p) => p.speed > 0).length;
-    const idling = online - moving;
-    const offline = Object.values(devices).filter((d) => d.status === 'offline').length;
-
-    return { total, online, moving, idling, offline };
-  }, [devices, positions]);
+  useEffect(() => {
+    if (!manager || !user) {
+      setDeviceFleetVehicleIdByDeviceId({});
+      return undefined;
+    }
+    let cancelled = false;
+    fetchVehicles(user)
+      .then((rows) => {
+        if (cancelled || !Array.isArray(rows)) return;
+        const m = {};
+        rows.forEach((row) => {
+          const deviceId = row.assignment?.deviceId;
+          if (deviceId != null) {
+            m[Number(deviceId)] = row.id;
+          }
+        });
+        setDeviceFleetVehicleIdByDeviceId(m);
+      })
+      .catch(() => {
+        if (!cancelled) setDeviceFleetVehicleIdByDeviceId({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [manager, user]);
 
   const handleDashboardClick = useCallback(() => {
     navigate('/');
@@ -162,7 +247,9 @@ const MainPage = () => {
                 sortBy: filterSort,
                 mapOnly: filterMap,
               }}
-              deviceStats={deviceStats}
+              operationalPresence={operationalPresence}
+              deviceFleetVehicleIdByDeviceId={deviceFleetVehicleIdByDeviceId}
+              effectiveFleetTab={effectiveFleetTab}
               onFilterChange={handlePremiumFilterChange}
             />
           )}
@@ -176,6 +263,7 @@ const MainPage = () => {
                 <MapDevicePopup
                   device={devices[selectedDeviceId]}
                   position={selectedPosition}
+                  fleetVehicleId={deviceFleetVehicleIdByDeviceId[Number(selectedDeviceId)]}
                   onClose={handleClosePopup}
                 />
               )}

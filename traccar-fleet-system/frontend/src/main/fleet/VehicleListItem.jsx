@@ -2,7 +2,6 @@ import {
   Box,
   IconButton,
   ListItemButton,
-  Tooltip,
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -10,31 +9,36 @@ import { useDispatch } from 'react-redux';
 import { useTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import DriverValue from '../../common/components/DriverValue';
 import { devicesActions } from '../../store';
 import DeviceQuickActions from './DeviceQuickActions';
-import DeviceTelemetryPanel from './DeviceTelemetryPanel';
-import getOperationalIndicators from './vehicleOperationalIndicators';
+import { normalizePositionTelemetry } from '../../fleet/vehicleDetail/telemetryUtils.js';
 
 dayjs.extend(relativeTime);
-
-function formatDurationShort(ms) {
-  if (ms == null || Number.isNaN(ms) || ms < 0) return null;
-  const totalMin = Math.floor(ms / 60000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m`;
-  return '<1m';
-}
 
 function formatDistanceKm(raw) {
   if (raw == null || raw === '') return null;
   const n = Number(String(raw).replace(/,/g, ''));
   if (Number.isNaN(n)) return null;
-  if (n >= 100) return `${Math.round(n)}km`;
-  if (n >= 10) return `${n.toFixed(1)}km`;
-  return `${n.toFixed(1)}km`;
+  if (n >= 100) return `${Math.round(n)} km`;
+  if (n >= 10) return `${n.toFixed(1)} km`;
+  return `${n.toFixed(1)} km`;
+}
+
+function ignitionPhrase(attrs) {
+  const { ignition } = normalizePositionTelemetry(attrs);
+  if (ignition === true || ignition === 'true' || ignition === 1 || ignition === '1') return 'Ignition ON';
+  if (ignition === false || ignition === 'false' || ignition === 0 || ignition === '0') return 'Ignition OFF';
+  return null;
+}
+
+function pickRightInsight({ device, position, motionLabel, distLabel, fixRel }) {
+  if (device.status === 'offline') {
+    if (fixRel) return `Last seen ${fixRel}`;
+    if (device.lastUpdate) return `Last seen ${dayjs(device.lastUpdate).fromNow()}`;
+    return null;
+  }
+  if (distLabel) return distLabel;
+  return null;
 }
 
 const VehicleListItem = ({
@@ -43,6 +47,7 @@ const VehicleListItem = ({
   selected,
   onSelect,
   onHover,
+  fleetVehicleId,
 }) => {
   const theme = useTheme();
   const dispatch = useDispatch();
@@ -57,45 +62,33 @@ const VehicleListItem = ({
     motionLabel = position && Number(position.speed) > 0 ? 'Moving' : 'Idle';
   }
 
-  const driverUid = device.attributes?.driverUniqueId;
-  const plate = device.plateNumber || device.attributes?.plateNumber;
-  const assetBits = [plate, device.category, device.model].filter(Boolean);
-  const assetTail = assetBits.length ? assetBits.join(' · ') : (device.uniqueId || '');
-
   const fixRel = position?.fixTime ? dayjs(position.fixTime).fromNow() : null;
-  const fixAgeMs = position?.fixTime ? Date.now() - new Date(position.fixTime).getTime() : null;
-  const durationLabel = formatDurationShort(fixAgeMs);
 
   const rawDist = position?.attributes?.distance ?? device.attributes?.distance;
   const distLabel = formatDistanceKm(rawDist);
 
   const address = position?.address?.trim?.() || '';
-  const destHint = device.attributes?.destination
-    || position?.attributes?.destination
-    || position?.attributes?.tripDestination;
-
-  const indicators = getOperationalIndicators(device, position);
-  const indicatorSuffix = indicators.length
-    ? indicators.map((ind) => ind.label).join(' · ')
-    : null;
-
-  const identityRight = distLabel
-    || (device.status === 'online' && motionLabel === 'Moving' && speedKmh != null ? `${speedKmh}km/h` : '—');
-
-  const lineCurrent = address
-    || (device.status === 'online' ? 'Position resolving…' : 'No live position');
-  const lineDest = destHint
-    || (fixRel ? `Last fix ${fixRel}` : (device.lastUpdate ? `Device ${dayjs(device.lastUpdate).fromNow()}` : null));
+  const ign = device.status === 'online' ? ignitionPhrase(position?.attributes) : null;
 
   const telemetryParts = [];
-  if (durationLabel) telemetryParts.push(durationLabel);
-  if (distLabel) telemetryParts.push(distLabel);
-  telemetryParts.push(motionLabel);
-  const telemetryCore = telemetryParts.join(' · ');
+  if (device.status === 'online') {
+    if (speedKmh != null) telemetryParts.push(`${speedKmh} km/h`);
+    if (ign) telemetryParts.push(ign);
+    if (fixRel) telemetryParts.push(fixRel);
+  } else {
+    telemetryParts.push('Offline');
+  }
+  const telemetryLine = telemetryParts.join(' · ');
 
-  const routeSecondary = Boolean(lineDest);
+  const insight = pickRightInsight({
+    device,
+    position,
+    motionLabel,
+    distLabel,
+    fixRel,
+  });
 
-  const expansionBg = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.03)';
+  const expansionBg = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.02)';
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -106,249 +99,158 @@ const VehicleListItem = ({
         onMouseLeave={() => onHover(null)}
         sx={{
           alignItems: 'stretch',
-          py: 0.4,
-          px: 0.75,
-          mx: 0.65,
-          my: 0.12,
+          py: 0.45,
+          px: 0.5,
+          mx: 0.35,
+          my: 0.06,
           borderRadius: selected ? '4px 4px 0 0' : 1,
-          border: '1px solid',
-          borderColor: selected ? 'primary.main' : 'divider',
-          borderLeftWidth: 2,
+          borderLeft: '2px solid',
           borderLeftColor: selected ? 'primary.main' : 'transparent',
+          borderTop: 'none',
+          borderRight: 'none',
+          borderBottom: 'none',
           bgcolor: selected
-            ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'action.selected')
-            : (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'background.paper'),
-          boxShadow: selected ? `inset 0 0 0 1px ${theme.palette.primary.main}22` : 'none',
-          transition: theme.transitions.create(['background-color', 'border-color', 'box-shadow', 'border-radius'], {
+            ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'action.selected')
+            : 'transparent',
+          transition: theme.transitions.create(['background-color', 'border-color'], {
             duration: theme.transitions.duration.shortest,
           }),
           '&:hover': {
             bgcolor: selected
-              ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'action.selected')
+              ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'action.selected')
               : 'action.hover',
           },
           '&.Mui-selected': {
-            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'action.selected',
+            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'action.selected',
           },
         }}
       >
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'stretch',
-          gap: 0.75,
-          minWidth: 0,
-          width: '100%',
-        }}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            pt: 0.2,
-            flexShrink: 0,
-            width: 8,
-          }}
-        >
-          <Box
-            sx={{
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              bgcolor: motionDotColor,
-              boxShadow: (t) => `0 0 0 1px ${t.palette.background.paper}`,
-            }}
-          />
-        </Box>
-
-        <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1, minWidth: 0 }}>
-            <Typography
-              variant="body2"
-              noWrap
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                fontWeight: 700,
-                fontSize: '0.8125rem',
-                lineHeight: 1.25,
-                letterSpacing: '0.01em',
-              }}
-            >
-              {device.name}
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                flexShrink: 0,
-                fontWeight: 700,
-                fontSize: '0.6875rem',
-                color: 'text.secondary',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {identityRight}
-            </Typography>
-          </Box>
-
-          <Typography
-            variant="caption"
-            noWrap
-            sx={{
-              fontSize: '0.6875rem',
-              lineHeight: 1.3,
-              color: 'text.secondary',
-              opacity: 0.88,
-            }}
-          >
-            {driverUid ? (
-              <>
-                <DriverValue driverUniqueId={driverUid} />
-                {assetTail ? ` · ${assetTail}` : ''}
-              </>
-            ) : (
-              assetTail || '—'
-            )}
-          </Typography>
-
-          {routeSecondary ? (
+        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 0.5, width: '100%', minWidth: 0 }}>
+          <Box sx={{ pt: 0.35, flexShrink: 0, width: 8 }}>
             <Box
               sx={{
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                gap: 1.25,
-                minWidth: 0,
-                width: '100%',
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                bgcolor: motionDotColor,
               }}
-            >
-              <Typography
-                variant="caption"
-                noWrap
-                title={lineCurrent}
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  fontSize: '0.625rem',
-                  lineHeight: 1.35,
-                  color: 'text.secondary',
-                  opacity: 0.9,
-                }}
-              >
-                ○ {lineCurrent}
-              </Typography>
-              <Typography
-                variant="caption"
-                noWrap
-                title={lineDest}
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  fontSize: '0.625rem',
-                  lineHeight: 1.35,
-                  color: 'text.secondary',
-                  opacity: 0.75,
-                }}
-              >
-                ○ {lineDest}
-              </Typography>
-            </Box>
-          ) : (
-            <Typography
-              variant="caption"
-              noWrap
-              title={lineCurrent}
-              sx={{
-                fontSize: '0.625rem',
-                lineHeight: 1.35,
-                color: 'text.secondary',
-                opacity: 0.88,
-              }}
-            >
-              ○ {lineCurrent}
-            </Typography>
-          )}
-
-          <Tooltip
-            title={[durationLabel && `Since fix: ${durationLabel}`, distLabel && `Distance: ${distLabel}`, indicatorSuffix].filter(Boolean).join(' · ') || ''}
-            placement="top"
-            enterTouchDelay={400}
-            disableHoverListener={!durationLabel && !distLabel && !indicatorSuffix}
-          >
-            <Typography
-              component="div"
-              variant="caption"
-              sx={{
-                fontSize: '0.6875rem',
-                lineHeight: 1.35,
-                fontWeight: 600,
-                color: 'text.primary',
-                opacity: 0.9,
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: 0.35,
-                minWidth: 0,
-              }}
-            >
-              <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {telemetryCore}
-              </Box>
-              {indicatorSuffix ? (
-                <Box
-                  component="span"
+            />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', gap: 0.75 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 0.75, minWidth: 0 }}>
+                <Typography
+                  variant="body2"
+                  noWrap
                   sx={{
-                    fontSize: '0.625rem',
-                    fontWeight: 700,
-                    color: indicators.some((i) => i.color === 'error')
-                      ? 'error.main'
-                      : indicators.some((i) => i.color === 'warning')
-                        ? 'warning.main'
-                        : 'text.secondary',
+                    flex: 1,
+                    minWidth: 0,
+                    fontWeight: 800,
+                    fontSize: '0.8125rem',
+                    lineHeight: 1.2,
                   }}
                 >
-                  · {indicatorSuffix}
-                </Box>
+                  {device.name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  noWrap
+                  sx={{
+                    flexShrink: 0,
+                    fontWeight: 700,
+                    fontSize: '0.65rem',
+                    color: motionDotColor,
+                  }}
+                >
+                  {motionLabel}
+                </Typography>
+              </Box>
+              <Typography
+                variant="caption"
+                noWrap
+                sx={{
+                  display: 'block',
+                  mt: 0.1,
+                  fontSize: '0.65rem',
+                  lineHeight: 1.3,
+                  color: 'text.secondary',
+                  opacity: 0.92,
+                  fontWeight: 500,
+                }}
+              >
+                {telemetryLine || '—'}
+              </Typography>
+              {address ? (
+                <Typography
+                  variant="caption"
+                  noWrap
+                  title={address}
+                  sx={{
+                    display: 'block',
+                    mt: 0.08,
+                    fontSize: '0.62rem',
+                    lineHeight: 1.3,
+                    color: 'text.secondary',
+                    opacity: 0.75,
+                  }}
+                >
+                  {address}
+                </Typography>
               ) : null}
-            </Typography>
-          </Tooltip>
+            </Box>
+            {insight ? (
+              <Typography
+                variant="caption"
+                textAlign="right"
+                sx={{
+                  flexShrink: 0,
+                  alignSelf: 'flex-start',
+                  maxWidth: '36%',
+                  fontSize: '0.6rem',
+                  lineHeight: 1.25,
+                  color: 'text.secondary',
+                  opacity: 0.65,
+                  fontWeight: 500,
+                  pt: 0.15,
+                }}
+              >
+                {insight}
+              </Typography>
+            ) : null}
+          </Box>
         </Box>
-      </Box>
-    </ListItemButton>
-    {selected ? (
-      <Box
-        sx={{
-          mx: 0.65,
-          mb: 0.5,
-          px: 0.75,
-          pt: 0.35,
-          pb: 0.65,
-          border: '1px solid',
-          borderColor: 'primary.main',
-          borderTopWidth: 0,
-          borderLeftWidth: 2,
-          borderLeftColor: 'primary.main',
-          borderRadius: '0 0 4px 4px',
-          bgcolor: expansionBg,
-          boxShadow: `inset 0 0 0 1px ${theme.palette.primary.main}22`,
-        }}
-      >
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 0.25 }}>
-          <IconButton
-            size="small"
-            onClick={() => dispatch(devicesActions.selectId(null))}
-            aria-label="Clear selection"
-            sx={{ mr: -0.5 }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
+      </ListItemButton>
+      {selected ? (
+        <Box
+          sx={{
+            mx: 0.35,
+            mb: 0.25,
+            px: 0.45,
+            py: 0.25,
+            borderLeft: '2px solid',
+            borderLeftColor: 'primary.main',
+            borderRadius: '0 0 4px 4px',
+            bgcolor: expansionBg,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5, minWidth: 0 }}>
+            <DeviceQuickActions
+              device={device}
+              position={position}
+              fleetVehicleId={fleetVehicleId}
+              justifyContent="flex-start"
+            />
+            <IconButton
+              size="small"
+              onClick={() => dispatch(devicesActions.selectId(null))}
+              aria-label="Clear selection"
+              sx={{ p: 0.2 }}
+            >
+              <CloseIcon sx={{ fontSize: '0.95rem' }} />
+            </IconButton>
+          </Box>
         </Box>
-        <DeviceQuickActions device={device} position={position} justifyContent="flex-start" />
-        <DeviceTelemetryPanel position={position} />
-      </Box>
-    ) : null}
+      ) : null}
     </Box>
   );
 };

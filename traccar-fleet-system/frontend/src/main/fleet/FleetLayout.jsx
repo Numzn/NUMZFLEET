@@ -64,7 +64,7 @@ const FleetLayout = ({ sidebar, map }) => {
           ModalProps={{ keepMounted: true }}
           PaperProps={{
             sx: {
-              width: 'min(92vw, 400px)',
+              width: `min(88vw, ${FLEET_SIDEBAR_WIDTH_PX}px)`,
               boxSizing: 'border-box',
             },
           }}

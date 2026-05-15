@@ -9,11 +9,10 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { savePersistedState } from '../../common/util/usePersistedState';
 import { fleetInteractionActions } from '../../store';
-import FleetSummaryHeader from './FleetSummaryHeader';
-import FleetTabs from './FleetTabs';
+import FleetOperationalPills from './FleetOperationalPills';
 import FleetSearch from './FleetSearch';
 import FleetFilters from './FleetFilters';
 import VehicleList from './VehicleList';
@@ -26,7 +25,9 @@ const FleetSidebar = ({
   groups,
   filters,
   onFilterChange,
-  deviceStats,
+  operationalPresence,
+  deviceFleetVehicleIdByDeviceId,
+  effectiveFleetTab,
 }) => {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
@@ -80,7 +81,9 @@ const FleetSidebar = ({
   }
 
   const railBg = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.22)' : 'background.paper';
-  const controlBg = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.02)';
+  const controlBg = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.02)';
+  const padX = variant === 'mobile' ? 1 : 1;
+  const edge = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)';
 
   return (
     <Box
@@ -92,86 +95,88 @@ const FleetSidebar = ({
         bgcolor: railBg,
       }}
     >
-      {/* Phase 1 — compact header: identity + live + collapse */}
       <Box
         sx={{
-          px: 1.25,
-          py: 0.45,
+          px: padX,
+          py: variant === 'mobile' ? 0.5 : 0.65,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 0.75,
-          minHeight: 32,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
+          gap: 0.5,
+          minHeight: variant === 'mobile' ? 44 : 48,
+          maxHeight: variant === 'mobile' ? 48 : 52,
+          borderBottom: `1px solid ${edge}`,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, minWidth: 0, flex: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, flex: 1 }}>
           <Typography
             component="span"
-            variant="caption"
             sx={{
-              fontWeight: 800,
-              letterSpacing: '0.06em',
-              fontSize: '0.7rem',
-              lineHeight: 1,
+              fontWeight: 900,
+              letterSpacing: '0.04em',
+              fontSize: '0.65rem',
+              lineHeight: 1.1,
               color: 'text.primary',
             }}
           >
-            Fleet
+            NUMZFLEET
           </Typography>
-          <Box
-            sx={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              bgcolor: 'success.main',
-              flexShrink: 0,
-              boxShadow: (t) => `0 0 0 2px ${t.palette.success.main}33`,
-            }}
-          />
           <Typography
+            component="span"
             variant="caption"
             color="text.secondary"
             noWrap
-            sx={{ fontWeight: 600, fontSize: '0.68rem', lineHeight: 1 }}
+            sx={{ fontWeight: 600, fontSize: '0.65rem', lineHeight: 1.1 }}
           >
-            Live Map
+            Fleet · Live
           </Typography>
+          <Box
+            sx={{
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              bgcolor: 'success.main',
+              flexShrink: 0,
+              opacity: 0.9,
+            }}
+          />
         </Box>
         {desktop && variant === 'desktop' && (
           <Tooltip title="Collapse to rail">
             <IconButton size="small" onClick={() => persistCollapse(true)} sx={{ p: 0.35 }}>
-              <ChevronLeftIcon sx={{ fontSize: '1.1rem' }} />
+              <ChevronLeftIcon sx={{ fontSize: '1.05rem' }} />
             </IconButton>
           </Tooltip>
         )}
       </Box>
 
-      {deviceStats ? <FleetSummaryHeader deviceStats={deviceStats} /> : null}
-
       <Box
         sx={{
-          px: 1.25,
-          pt: 0.55,
-          pb: 0.55,
+          px: padX,
+          pt: variant === 'mobile' ? 0.5 : 0.6,
+          pb: variant === 'mobile' ? 0.5 : 0.6,
           flexShrink: 0,
           bgcolor: controlBg,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
+          borderBottom: `1px solid ${edge}`,
         }}
       >
-        <FleetTabs />
+        <FleetOperationalPills fleetTab={effectiveFleetTab} presence={operationalPresence} />
         <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0.65,
-          mt: 0.5,
-          minWidth: 0,
-        }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            mt: 0.5,
+            minWidth: 0,
+          }}
         >
-          <FleetSearch />
+          <FleetSearch
+            compact={variant !== 'mobile'}
+            sx={variant === 'mobile' ? {
+              '& .MuiInputBase-root': { minHeight: 28, fontSize: '0.72rem' },
+              '& .MuiInputBase-input': { py: 0.35 },
+            } : {}}
+          />
           <FleetFilters
             groups={groups}
             filters={filters}
@@ -189,7 +194,11 @@ const FleetSidebar = ({
           bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'background.default',
         }}
       >
-        <VehicleList devices={filteredDevices} positions={positions} />
+        <VehicleList
+          devices={filteredDevices}
+          positions={positions}
+          deviceFleetVehicleIdByDeviceId={deviceFleetVehicleIdByDeviceId}
+        />
       </Box>
     </Box>
   );

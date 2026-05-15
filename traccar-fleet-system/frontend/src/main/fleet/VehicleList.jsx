@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { devicesActions, fleetInteractionActions } from '../../store';
 import VehicleListItem from './VehicleListItem';
 
-const VehicleList = ({ devices = [], positions = {} }) => {
+const VehicleList = ({ devices = [], positions = {}, deviceFleetVehicleIdByDeviceId = {} }) => {
   const dispatch = useDispatch();
   const selectedId = useSelector((s) => s.devices.selectedId);
   const scrollTarget = useSelector((s) => s.fleetInteraction.listScrollTargetDeviceId);
@@ -34,13 +34,14 @@ const VehicleList = ({ devices = [], positions = {} }) => {
   }
 
   return (
-    <List dense disablePadding sx={{ py: 0.35, display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <List dense disablePadding sx={{ py: 0.25, display: 'flex', flexDirection: 'column', gap: 0 }}>
       {devices.map((device) => (
         <Box key={device.id} ref={setRef(device.id)}>
           <VehicleListItem
             device={device}
             position={positions[device.id]}
             selected={selectedId === device.id}
+            fleetVehicleId={deviceFleetVehicleIdByDeviceId[Number(device.id)]}
             onSelect={(id) => {
               dispatch(devicesActions.selectId(id));
               dispatch(fleetInteractionActions.setMobileDrawerOpen(false));

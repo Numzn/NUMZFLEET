@@ -25,6 +25,7 @@ function deviceIcon(device, sx) {
 const MapDevicePopup = ({
   device,
   position,
+  fleetVehicleId,
   onClose,
 }) => {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -67,16 +68,16 @@ const MapDevicePopup = ({
         transform: 'translate(-50%, calc(-100% - 14px))',
         zIndex: 1100,
         minWidth: 220,
-        maxWidth: 320,
-        p: 1,
+        maxWidth: 300,
+        p: 0.75,
         borderRadius: 2,
         pointerEvents: 'auto',
         border: (theme) => `1px solid ${theme.palette.divider}`,
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-        <Box sx={{ pt: 0.25 }}>
-          {deviceIcon(device, { fontSize: '1.25rem', color: 'primary.main' })}
+        <Box sx={{ pt: 0.15 }}>
+          {deviceIcon(device, { fontSize: '1.1rem', color: 'primary.main' })}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="subtitle2" fontWeight={800} noWrap>
@@ -94,8 +95,8 @@ const MapDevicePopup = ({
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.75 }}>
-        <DeviceQuickActions device={device} position={position} justifyContent="flex-end" />
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5, flexWrap: 'wrap', gap: 0.25 }}>
+        <DeviceQuickActions device={device} position={position} fleetVehicleId={fleetVehicleId} justifyContent="flex-end" />
       </Box>
     </Paper>
   );
