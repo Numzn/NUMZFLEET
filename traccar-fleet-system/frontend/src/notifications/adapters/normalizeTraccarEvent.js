@@ -10,8 +10,15 @@ import { stableNotificationId, truncateMessage } from '../../store/notifications
  */
 export function normalizeTraccarEvent(event, options = {}) {
   if (!event || event.id == null) return null;
-  const { t } = options;
   const type = event.type || 'unknown';
+
+  // Per-device GSM/link flips are high-volume; they are not surfaced as app notifications
+  // (map + device list already show state). Avoids toast + bell badge noise.
+  if (type === 'deviceOnline' || type === 'deviceOffline') {
+    return null;
+  }
+
+  const { t } = options;
   const msg = event.attributes?.message != null
     ? String(event.attributes.message)
     : '';
@@ -22,9 +29,6 @@ export function normalizeTraccarEvent(event, options = {}) {
   if (type === 'alarm') {
     category = 'security';
     severity = SEVERITY.CRITICAL;
-  } else if (type === 'deviceOffline' || type === 'deviceOnline') {
-    category = 'tracking';
-    severity = type === 'deviceOffline' ? SEVERITY.WARNING : SEVERITY.INFO;
   } else if (type === 'maintenance') {
     category = 'maintenance';
     severity = SEVERITY.WARNING;

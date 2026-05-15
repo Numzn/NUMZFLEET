@@ -1,9 +1,46 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Snackbar, Alert } from '@mui/material';
+import { Snackbar, Box, Typography } from '@mui/material';
 import useConnectivity from './useConnectivity.js';
 
-const RESTORED_TOAST_MS = 3000;
+const RESTORED_TOAST_MS = 2800;
+
+/** @param {{ kind: 'down' | 'up'; label: string }} props */
+function ConnectivityStrip({ kind, label }) {
+  const dotSx = {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    flexShrink: 0,
+    mt: 0.15,
+    bgcolor: kind === 'down' ? 'warning.main' : 'success.main',
+  };
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 0.75,
+        px: 1.25,
+        py: 0.5,
+        minWidth: 260,
+        maxWidth: 'min(420px, 92vw)',
+        borderRadius: 1,
+        border: '1px solid',
+        borderColor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'),
+        bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.92)'),
+        backdropFilter: 'blur(8px)',
+        boxShadow: (t) => (t.palette.mode === 'dark' ? 2 : '0 1px 6px rgba(15,23,42,0.08)'),
+      }}
+    >
+      <Box sx={dotSx} />
+      <Typography variant="caption" sx={{ fontSize: '0.75rem', lineHeight: 1.35, color: 'text.primary' }}>
+        {label}
+      </Typography>
+    </Box>
+  );
+}
 
 function readBottomNavInsetPx() {
   if (typeof document === 'undefined') return 0;
@@ -17,20 +54,14 @@ function readBottomNavInsetPx() {
 }
 
 /**
- * Global connectivity banner. Sits at the bottom of the screen and surfaces
- * one calm message at a time:
- *
- *   - "You're offline. Trying to reconnect..."        when browser is offline
- *   - "Cannot reach server. Trying to reconnect..."   when backend unreachable
- *   - "Connection unstable. Live updates delayed."    when latency is high / blips
- *   - "Connection restored."                          transient on recovery
+ * Minimal connectivity strip — only truly disconnected vs brief “back online”.
+ * Intentionally ignores transient latency / heartbeat blips (no “unstable” toasts).
  */
 const ConnectivityBanner = () => {
   const { pathname } = useLocation();
-  const { isBrowserOnline, backendReachable, unstableConnection } = useConnectivity();
+  const { isBrowserOnline, backendReachable } = useConnectivity();
   const [showRestored, setShowRestored] = useState(false);
   const [bottomNavInset, setBottomNavInset] = useState(0);
-  const restoredTimerRef = useRef(null);
   const wasDownRef = useRef(false);
 
   useLayoutEffect(() => {
@@ -49,51 +80,37 @@ const ConnectivityBanner = () => {
   }, []);
 
   const isDown = !isBrowserOnline || !backendReachable;
-  const isUnstable = !isDown && unstableConnection;
 
   useEffect(() => {
     if (isDown) {
       wasDownRef.current = true;
-      if (restoredTimerRef.current) {
-        clearTimeout(restoredTimerRef.current);
-        restoredTimerRef.current = null;
-      }
       setShowRestored(false);
       return undefined;
     }
     if (wasDownRef.current && !isDown) {
       wasDownRef.current = false;
       setShowRestored(true);
-      if (restoredTimerRef.current) clearTimeout(restoredTimerRef.current);
-      restoredTimerRef.current = setTimeout(() => {
-        setShowRestored(false);
-        restoredTimerRef.current = null;
-      }, RESTORED_TOAST_MS);
     }
     return undefined;
   }, [isDown]);
 
-  useEffect(() => () => {
-    if (restoredTimerRef.current) clearTimeout(restoredTimerRef.current);
-  }, []);
+  const handleRestoreClose = (_, reason) => {
+    if (reason === 'timeout' || reason === 'clickaway') {
+      setShowRestored(false);
+    }
+  };
 
-  let message = null;
-  let severity = 'info';
+  /** @type {{ kind: 'down'|'up', label: string } | null} */
+  let strip = null;
   if (!isBrowserOnline) {
-    message = "You're offline. Trying to reconnect...";
-    severity = 'warning';
+    strip = { kind: 'down', label: "You're offline. Reconnecting when the network is back…" };
   } else if (!backendReachable) {
-    message = 'Cannot reach server. Trying to reconnect...';
-    severity = 'warning';
-  } else if (isUnstable) {
-    message = 'Connection unstable. Live updates may be delayed.';
-    severity = 'info';
+    strip = { kind: 'down', label: "Can't reach the server. Reconnecting…" };
   } else if (showRestored) {
-    message = 'Connection restored.';
-    severity = 'success';
+    strip = { kind: 'up', label: 'Back online.' };
   }
 
-  if (!message) return null;
+  if (!strip) return null;
 
   const snackBottom =
     bottomNavInset > 0
@@ -104,19 +121,16 @@ const ConnectivityBanner = () => {
     <Snackbar
       open
       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      autoHideDuration={strip.kind === 'up' ? RESTORED_TOAST_MS : null}
+      onClose={strip.kind === 'up' ? handleRestoreClose : undefined}
       sx={{
         pointerEvents: 'none',
         ...(snackBottom != null ? { bottom: snackBottom } : {}),
       }}
     >
-      <Alert
-        severity={severity}
-        variant="filled"
-        elevation={6}
-        sx={{ pointerEvents: 'auto', minWidth: 280 }}
-      >
-        {message}
-      </Alert>
+      <Box sx={{ pointerEvents: 'auto' }}>
+        <ConnectivityStrip kind={strip.kind} label={strip.label} />
+      </Box>
     </Snackbar>
   );
 };

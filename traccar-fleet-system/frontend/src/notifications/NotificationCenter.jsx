@@ -147,7 +147,7 @@ const NotificationCenter = () => {
   return (
     <>
       <IconButton onClick={handleClick} aria-label="notifications">
-        <Badge badgeContent={unread} color="error" max={99}>
+        <Badge variant="dot" invisible={unread === 0} color="error" overlap="circular">
           <NotificationsIcon />
         </Badge>
       </IconButton>
