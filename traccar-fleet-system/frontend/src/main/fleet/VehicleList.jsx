@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { List, Typography, Box } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import { devicesActions, fleetInteractionActions } from '../../store';
 import VehicleListItem from './VehicleListItem';
 
 const VehicleList = ({ devices = [], positions = {}, deviceFleetVehicleIdByDeviceId = {} }) => {
+  const theme = useTheme();
   const dispatch = useDispatch();
   const selectedId = useSelector((s) => s.devices.selectedId);
   const scrollTarget = useSelector((s) => s.fleetInteraction.listScrollTargetDeviceId);
@@ -33,8 +35,24 @@ const VehicleList = ({ devices = [], positions = {}, deviceFleetVehicleIdByDevic
     );
   }
 
+  const rowRule = theme.palette.mode === 'dark'
+    ? alpha(theme.palette.common.white, 0.055)
+    : alpha(theme.palette.common.black, 0.055);
+
   return (
-    <List dense disablePadding sx={{ py: 0.25, display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <List
+      dense
+      disablePadding
+      sx={{
+        py: 0.2,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0,
+        '& > .MuiBox-root:not(:last-of-type)': {
+          borderBottom: `1px solid ${rowRule}`,
+        },
+      }}
+    >
       {devices.map((device) => (
         <Box key={device.id} ref={setRef(device.id)}>
           <VehicleListItem

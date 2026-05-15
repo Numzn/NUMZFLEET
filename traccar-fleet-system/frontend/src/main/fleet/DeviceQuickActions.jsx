@@ -67,8 +67,11 @@ const DeviceQuickActions = ({
         flexWrap: 'wrap',
         alignItems: 'center',
         justifyContent,
-        gap: 0.15,
+        gap: 0.25,
         minWidth: 0,
+        '& .MuiIconButton-root': {
+          margin: 0,
+        },
       }}
     >
       {hasFix ? (
@@ -77,9 +80,9 @@ const DeviceQuickActions = ({
             size="small"
             onClick={() => focusMapOnPosition(position)}
             aria-label="Focus"
-            sx={{ p: 0.35 }}
+            sx={{ p: 0.32 }}
           >
-            <MyLocationIcon sx={{ fontSize: '1.05rem' }} />
+            <MyLocationIcon sx={{ fontSize: '1rem' }} />
           </IconButton>
         </Tooltip>
       ) : null}
@@ -89,9 +92,9 @@ const DeviceQuickActions = ({
             size="small"
             onClick={() => navigate(`/replay?deviceId=${deviceId}`)}
             aria-label={t('reportReplay')}
-            sx={{ p: 0.35 }}
+            sx={{ p: 0.32 }}
           >
-            <PlayArrowIcon sx={{ fontSize: '1.05rem' }} />
+            <PlayArrowIcon sx={{ fontSize: '1rem' }} />
           </IconButton>
         </Tooltip>
       ) : null}
@@ -101,9 +104,9 @@ const DeviceQuickActions = ({
             size="small"
             aria-label={t('sharedExtra')}
             onClick={(e) => setAnchorEl(e.currentTarget)}
-            sx={{ p: 0.35 }}
+            sx={{ p: 0.32 }}
           >
-            <MoreHorizIcon sx={{ fontSize: '1.05rem' }} />
+            <MoreHorizIcon sx={{ fontSize: '1rem' }} />
           </IconButton>
         </span>
       </Tooltip>

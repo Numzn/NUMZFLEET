@@ -108,25 +108,18 @@ const FleetSidebar = ({
           borderBottom: `1px solid ${edge}`,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, flex: 1 }}>
-          <Typography
-            component="span"
-            sx={{
-              fontWeight: 900,
-              letterSpacing: '0.04em',
-              fontSize: '0.65rem',
-              lineHeight: 1.1,
-              color: 'text.primary',
-            }}
-          >
-            NUMZFLEET
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, minWidth: 0, flex: 1 }}>
           <Typography
             component="span"
             variant="caption"
-            color="text.secondary"
             noWrap
-            sx={{ fontWeight: 600, fontSize: '0.65rem', lineHeight: 1.1 }}
+            sx={{
+              fontWeight: 600,
+              fontSize: '0.72rem',
+              lineHeight: 1.15,
+              color: 'text.primary',
+              letterSpacing: '0.01em',
+            }}
           >
             Fleet · Live
           </Typography>
@@ -137,9 +130,23 @@ const FleetSidebar = ({
               borderRadius: '50%',
               bgcolor: 'success.main',
               flexShrink: 0,
-              opacity: 0.9,
+              opacity: 0.75,
             }}
           />
+          <Typography
+            component="span"
+            sx={{
+              fontWeight: 600,
+              letterSpacing: '0.035em',
+              fontSize: '0.575rem',
+              lineHeight: 1.15,
+              color: 'text.secondary',
+              opacity: 0.8,
+              textTransform: 'uppercase',
+            }}
+          >
+            NUMZFLEET
+          </Typography>
         </Box>
         {desktop && variant === 'desktop' && (
           <Tooltip title="Collapse to rail">
@@ -164,9 +171,9 @@ const FleetSidebar = ({
         <Box
           sx={{
             display: 'flex',
-            alignItems: 'center',
-            gap: 0.5,
-            mt: 0.5,
+            alignItems: 'stretch',
+            gap: 0.35,
+            mt: 0.45,
             minWidth: 0,
           }}
         >

@@ -158,6 +158,21 @@ const useStyles = makeStyles()((theme) => ({
       backgroundColor: theme.palette.primary.dark,
     },
   },
+  railFilterButton: {
+    padding: theme.spacing(0.5),
+    minWidth: 34,
+    width: 34,
+    height: 34,
+    borderRadius: theme.shape.borderRadius,
+    color: theme.palette.text.secondary,
+    backgroundColor: theme.palette.action.hover,
+    transition: theme.transitions.create(['background-color', 'color'], { duration: 120 }),
+    '&:hover': {
+      backgroundColor: theme.palette.action.selected,
+      color: theme.palette.text.primary,
+      transform: 'none',
+    },
+  },
   compactButton: {
     padding: '6px',
     minWidth: 'auto',
@@ -167,6 +182,8 @@ const useStyles = makeStyles()((theme) => ({
 const FiltersFlyout = ({
   onFilterChange,
   compact = false,
+  /** Minimal visual weight for fleet sidebar search row (do not change top bar behavior). */
+  sidebarRail = false,
   filters = {},
   groups = [],
   devices = [],
@@ -244,15 +261,24 @@ const FiltersFlyout = ({
     ...(localFilters.cluster ? [{ type: 'cluster', value: 'cluster', label: 'Clustered' }] : []),
   ];
 
-  const FilterButton = () => (
-    <IconButton
-      onClick={handleOpen}
-      className={`${classes.filterButton} ${compact ? classes.compactButton : ''}`}
-      title="Filters & Sort"
-    >
-      <TuneIcon fontSize="small" />
-    </IconButton>
-  );
+  const FilterButton = () => {
+    const rail = Boolean(sidebarRail && compact);
+    return (
+      <IconButton
+        onClick={handleOpen}
+        size={rail ? 'small' : 'medium'}
+        className={
+          rail
+            ? classes.railFilterButton
+            : `${classes.filterButton} ${compact ? classes.compactButton : ''}`
+        }
+        title="Filters & Sort"
+        sx={rail ? { '& .MuiSvgIcon-root': { fontSize: '0.95rem' } } : undefined}
+      >
+        <TuneIcon fontSize={rail ? 'inherit' : 'small'} />
+      </IconButton>
+    );
+  };
 
   return (
     <>

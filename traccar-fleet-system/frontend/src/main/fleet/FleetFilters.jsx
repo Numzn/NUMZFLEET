@@ -15,6 +15,7 @@ const FleetFilters = ({
     <FiltersFlyout
       onFilterChange={onFilterChange}
       compact
+      sidebarRail
       groups={groups}
       filters={filters}
       devices={devices}
