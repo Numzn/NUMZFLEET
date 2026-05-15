@@ -1,13 +1,19 @@
 import {
   Box,
+  IconButton,
   ListItemButton,
   Tooltip,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { useDispatch } from 'react-redux';
 import { useTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import DriverValue from '../../common/components/DriverValue';
+import { devicesActions } from '../../store';
+import DeviceQuickActions from './DeviceQuickActions';
+import DeviceTelemetryPanel from './DeviceTelemetryPanel';
 import getOperationalIndicators from './vehicleOperationalIndicators';
 
 dayjs.extend(relativeTime);
@@ -39,6 +45,7 @@ const VehicleListItem = ({
   onHover,
 }) => {
   const theme = useTheme();
+  const dispatch = useDispatch();
 
   const speedKmh = position ? Math.round(Number(position.speed || 0) * 1.852) : null;
   const motionDotColor = device.status !== 'online'
@@ -88,40 +95,43 @@ const VehicleListItem = ({
 
   const routeSecondary = Boolean(lineDest);
 
+  const expansionBg = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.03)';
+
   return (
-    <ListItemButton
-      selected={selected}
-      onClick={() => onSelect(device.id)}
-      onMouseEnter={() => onHover(device.id)}
-      onMouseLeave={() => onHover(null)}
-      sx={{
-        alignItems: 'stretch',
-        py: 0.4,
-        px: 0.75,
-        mx: 0.65,
-        my: 0.12,
-        borderRadius: 1,
-        border: '1px solid',
-        borderColor: selected ? 'primary.main' : 'divider',
-        borderLeftWidth: 2,
-        borderLeftColor: selected ? 'primary.main' : 'transparent',
-        bgcolor: selected
-          ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'action.selected')
-          : (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'background.paper'),
-        boxShadow: selected ? `inset 0 0 0 1px ${theme.palette.primary.main}22` : 'none',
-        transition: theme.transitions.create(['background-color', 'border-color', 'box-shadow'], {
-          duration: theme.transitions.duration.shortest,
-        }),
-        '&:hover': {
+    <Box sx={{ width: '100%' }}>
+      <ListItemButton
+        selected={selected}
+        onClick={() => onSelect(device.id)}
+        onMouseEnter={() => onHover(device.id)}
+        onMouseLeave={() => onHover(null)}
+        sx={{
+          alignItems: 'stretch',
+          py: 0.4,
+          px: 0.75,
+          mx: 0.65,
+          my: 0.12,
+          borderRadius: selected ? '4px 4px 0 0' : 1,
+          border: '1px solid',
+          borderColor: selected ? 'primary.main' : 'divider',
+          borderLeftWidth: 2,
+          borderLeftColor: selected ? 'primary.main' : 'transparent',
           bgcolor: selected
-            ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'action.selected')
-            : 'action.hover',
-        },
-        '&.Mui-selected': {
-          bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'action.selected',
-        },
-      }}
-    >
+            ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'action.selected')
+            : (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'background.paper'),
+          boxShadow: selected ? `inset 0 0 0 1px ${theme.palette.primary.main}22` : 'none',
+          transition: theme.transitions.create(['background-color', 'border-color', 'box-shadow', 'border-radius'], {
+            duration: theme.transitions.duration.shortest,
+          }),
+          '&:hover': {
+            bgcolor: selected
+              ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'action.selected')
+              : 'action.hover',
+          },
+          '&.Mui-selected': {
+            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'action.selected',
+          },
+        }}
+      >
       <Box
         sx={{
           display: 'flex',
@@ -307,6 +317,39 @@ const VehicleListItem = ({
         </Box>
       </Box>
     </ListItemButton>
+    {selected ? (
+      <Box
+        sx={{
+          mx: 0.65,
+          mb: 0.5,
+          px: 0.75,
+          pt: 0.35,
+          pb: 0.65,
+          border: '1px solid',
+          borderColor: 'primary.main',
+          borderTopWidth: 0,
+          borderLeftWidth: 2,
+          borderLeftColor: 'primary.main',
+          borderRadius: '0 0 4px 4px',
+          bgcolor: expansionBg,
+          boxShadow: `inset 0 0 0 1px ${theme.palette.primary.main}22`,
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 0.25 }}>
+          <IconButton
+            size="small"
+            onClick={() => dispatch(devicesActions.selectId(null))}
+            aria-label="Clear selection"
+            sx={{ mr: -0.5 }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+        <DeviceQuickActions device={device} position={position} justifyContent="flex-start" />
+        <DeviceTelemetryPanel position={position} />
+      </Box>
+    ) : null}
+    </Box>
   );
 };
 

@@ -42,6 +42,11 @@ const MainMap = ({ filteredPositions, selectedPosition }) => {
     dispatch(fleetInteractionActions.setHoveredDeviceId(deviceId));
   }, [dispatch]);
 
+  const onMapBackgroundClick = useCallback(() => {
+    dispatch(devicesActions.selectId(null));
+    dispatch(fleetInteractionActions.setHoveredDeviceId(null));
+  }, [dispatch]);
+
   return (
     <MapErrorBoundary>
       <MapView>
@@ -53,6 +58,7 @@ const MainMap = ({ filteredPositions, selectedPosition }) => {
         <MarkerAnimations />
         <EnhancedMarkers
           positions={filteredPositions}
+          onMapClick={onMapBackgroundClick}
           onMarkerClick={onMarkerClick}
           selectedPosition={selectedPosition}
           showStatus

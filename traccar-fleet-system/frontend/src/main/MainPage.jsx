@@ -1,5 +1,5 @@
 import {
-  useCallback, useMemo, useState,
+  useCallback, useEffect, useMemo, useState,
 } from 'react';
 import { Box } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
@@ -50,7 +50,10 @@ const MainPage = () => {
 
   const [filteredPositions, setFilteredPositions] = useState([]);
   const [filteredDevices, setFilteredDevices] = useState([]);
-  const selectedPosition = filteredPositions.find((position) => selectedDeviceId && position.deviceId === selectedDeviceId);
+  const selectedPosition = useMemo(
+    () => (selectedDeviceId != null ? positions[selectedDeviceId] : undefined),
+    [positions, selectedDeviceId],
+  );
 
   const [filter, setFilter] = usePersistedState('filter', {
     statuses: [],
@@ -89,6 +92,18 @@ const MainPage = () => {
   const handleClosePopup = useCallback(() => {
     dispatch(devicesActions.selectId(null));
   }, [dispatch]);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+      if (selectedDeviceId == null) return;
+      dispatch(devicesActions.selectId(null));
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [dispatch, selectedDeviceId]);
 
   const handlePremiumFilterChange = useCallback((nextFilter) => {
     if (typeof nextFilter === 'string') {
@@ -157,7 +172,7 @@ const MainPage = () => {
                 filteredPositions={filteredPositions}
                 selectedPosition={selectedPosition}
               />
-              {selectedDeviceId && selectedPosition && devices[selectedDeviceId] && (
+              {!desktop && selectedDeviceId && selectedPosition && devices[selectedDeviceId] && (
                 <MapDevicePopup
                   device={devices[selectedDeviceId]}
                   position={selectedPosition}

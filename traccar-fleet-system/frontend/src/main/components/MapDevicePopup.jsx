@@ -3,24 +3,14 @@ import {
   Box,
   Typography,
   IconButton,
-  Tooltip,
   Paper,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
-import MyLocationIcon from '@mui/icons-material/MyLocation';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { useNavigate } from 'react-router-dom';
 import { map } from '../../map/core/MapView';
-
-const easeInOutCirc = (t) => (
-  t < 0.5
-    ? (1 - Math.sqrt(1 - (2 * t) ** 2)) / 2
-    : (Math.sqrt(1 - (-2 * t + 2) ** 2) + 1) / 2
-);
+import DeviceQuickActions from '../fleet/DeviceQuickActions';
 
 function deviceIcon(device, sx) {
   const c = (device.category || device.attributes?.deviceType)?.toLowerCase?.();
@@ -30,14 +20,13 @@ function deviceIcon(device, sx) {
 }
 
 /**
- * Lightweight anchored popup — identity, speed, compact actions (no expandable dashboard).
+ * Lightweight anchored popup — mobile fallback; actions shared with fleet sidebar.
  */
 const MapDevicePopup = ({
   device,
   position,
   onClose,
 }) => {
-  const navigate = useNavigate();
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -68,36 +57,6 @@ const MapDevicePopup = ({
 
   const speedKmh = Math.round((position.speed || 0) * 1.852);
 
-  const handleFocus = () => {
-    map.easeTo({
-      center: [position.longitude, position.latitude],
-      zoom: Math.max(map.getZoom(), 12),
-      duration: 900,
-      easing: easeInOutCirc,
-      essential: true,
-    });
-  };
-
-  const actions = (
-    <>
-      <Tooltip title="Focus map">
-        <IconButton size="small" onClick={handleFocus} aria-label="Focus">
-          <MyLocationIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-      <Tooltip title="Replay">
-        <IconButton size="small" onClick={() => navigate(`/replay?deviceId=${device.id}`)} aria-label="Replay">
-          <PlayArrowIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-      <Tooltip title="Details">
-        <IconButton size="small" onClick={() => navigate(`/settings/device/${device.id}`)} aria-label="Details">
-          <InfoOutlinedIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    </>
-  );
-
   return (
     <Paper
       elevation={8}
@@ -108,7 +67,7 @@ const MapDevicePopup = ({
         transform: 'translate(-50%, calc(-100% - 14px))',
         zIndex: 1100,
         minWidth: 220,
-        maxWidth: 280,
+        maxWidth: 320,
         p: 1,
         borderRadius: 2,
         pointerEvents: 'auto',
@@ -131,12 +90,12 @@ const MapDevicePopup = ({
             {device.status === 'online' ? 'Online' : 'Offline'}
           </Typography>
         </Box>
-        <IconButton size="small" onClick={onClose} sx={{ mt: -0.5 }}>
+        <IconButton size="small" onClick={onClose} sx={{ mt: -0.5 }} aria-label="Close">
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.25, mt: 0.75 }}>
-        {actions}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.75 }}>
+        <DeviceQuickActions device={device} position={position} justifyContent="flex-end" />
       </Box>
     </Paper>
   );

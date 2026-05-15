@@ -107,17 +107,33 @@ const EnhancedMarkers = ({
   }, [onHoverDeviceChange]);
 
   const onMapClickCallback = useCallback((event) => {
-    if (!event.defaultPrevented && onMapClick) {
+    if (!onMapClick) return;
+    const markerClusterLayers = [
+      id, selected, clusters,
+      `status-${id}`, `status-${selected}`,
+      `direction-${id}`, `direction-${selected}`,
+      `speed-${id}`, `speed-${selected}`,
+    ].filter((layerId) => map.getLayer(layerId));
+
+    if (markerClusterLayers.length) {
+      try {
+        const hits = map.queryRenderedFeatures(event.point, { layers: markerClusterLayers });
+        if (hits.length > 0) return;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!event.defaultPrevented) {
       onMapClick(event.lngLat.lat, event.lngLat.lng);
     }
-  }, [onMapClick]);
+  }, [onMapClick, id, selected, clusters]);
 
   const onMarkerClickCallback = useCallback((event) => {
     event.preventDefault();
-    const feature = event.features[0];
-    if (onMarkerClick) {
-      onMarkerClick(feature.properties.id, feature.properties.deviceId);
-    }
+    const feature = event.features?.[0];
+    if (!feature?.properties || !onMarkerClick) return;
+    onMarkerClick(feature.properties.id, feature.properties.deviceId);
   }, [onMarkerClick]);
 
   const onClusterClick = useCatchCallback(async (event) => {
@@ -125,16 +141,27 @@ const EnhancedMarkers = ({
     const features = map.queryRenderedFeatures(event.point, {
       layers: [clusters],
     });
-    const clusterId = features[0].properties.cluster_id;
-    const zoom = await map.getSource(id).getClusterExpansionZoom(clusterId);
+    const hit = features[0];
+    if (!hit || hit.properties.cluster_id == null || !hit.geometry?.coordinates?.length) return;
+
+    const source = map.getSource(id);
+    if (!source || typeof source.getClusterExpansionZoom !== 'function') return;
+
+    let zoom;
+    try {
+      zoom = await source.getClusterExpansionZoom(hit.properties.cluster_id);
+    } catch {
+      return;
+    }
+
     map.easeTo({
-      center: features[0].geometry.coordinates,
+      center: hit.geometry.coordinates,
       zoom,
       duration: 1000,
       easing: easeOutCubic,
       essential: true,
     });
-  }, [clusters]);
+  }, [clusters, id]);
 
   useEffect(() => {
     // Add sources
@@ -383,7 +410,20 @@ const EnhancedMarkers = ({
         map.removeSource(hovered);
       }
     };
-  }, [mapCluster, clusters, onMarkerClickCallback, onClusterClick, onMouseEnter, onMouseLeave]);
+  }, [
+    mapCluster,
+    clusters,
+    hovered,
+    id,
+    iconScale,
+    selected,
+    titleField,
+    onMarkerClickCallback,
+    onClusterClick,
+    onMouseEnter,
+    onMouseLeave,
+    onMapClickCallback,
+  ]);
 
   useEffect(() => {
     const src = map.getSource(hovered);
@@ -445,13 +485,9 @@ const EnhancedMarkers = ({
     });
   }, [labelsMode, selectedDeviceId, externalHoveredDeviceId, id, selected, titleField]);
 
-  /** Dim non-selected markers when one device is selected; emphasize selected marker icon size. */
+  /** Selected marker slight size bump; keep all markers at full opacity (no dimming). */
   useEffect(() => {
     if (!map.getLayer(id)) return;
-
-    const dimMain = selectedDeviceId != null;
-    const mainOpacity = dimMain ? 0.88 : 1;
-    const clusterOpacity = dimMain ? 0.92 : 1;
 
     const applyPaint = (layerId, paint) => {
       if (!map.getLayer(layerId)) return;
@@ -460,19 +496,13 @@ const EnhancedMarkers = ({
       });
     };
 
-    applyPaint(id, {
-      'icon-opacity': mainOpacity,
-      'text-opacity': dimMain ? 0.86 : 1,
-    });
-    applyPaint(`status-${id}`, { 'circle-opacity': dimMain ? 0.68 : 0.9 });
-    applyPaint(`direction-${id}`, { 'icon-opacity': dimMain ? 0.85 : 1 });
-    applyPaint(`speed-${id}`, { 'icon-opacity': dimMain ? 0.85 : 1 });
-    applyPaint(clusters, {
-      'icon-opacity': clusterOpacity,
-      'text-opacity': dimMain ? 0.9 : 1,
-    });
+    applyPaint(id, { 'icon-opacity': 1, 'text-opacity': 1 });
+    applyPaint(`status-${id}`, { 'circle-opacity': 0.9 });
+    applyPaint(`direction-${id}`, { 'icon-opacity': 1 });
+    applyPaint(`speed-${id}`, { 'icon-opacity': 1 });
+    applyPaint(clusters, { 'icon-opacity': 1, 'text-opacity': 1 });
 
-    const bump = dimMain ? 1.12 : 1;
+    const bump = selectedDeviceId != null ? 1.12 : 1;
     const sizeExpr = [
       'interpolate',
       ['linear'],
@@ -511,7 +541,7 @@ const EnhancedMarkers = ({
           properties: createFeature(devices, position, selectedPosition && selectedPosition.id),
         };
       });
-  }, [safePositions, devices, selectedDeviceId, selectedPosition, id]);
+  }, [safePositions, devices, selectedDeviceId, selectedPosition, id, directionType, showStatus]);
 
   useEffect(() => {
     const prev = prevCoordsRef.current;

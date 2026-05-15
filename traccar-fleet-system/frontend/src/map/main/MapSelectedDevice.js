@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import dimensions from '../../common/theme/dimensions';
 import { map } from '../core/MapView';
 import { usePrevious } from '../../reactHelper';
@@ -14,6 +16,8 @@ const easeInOutCirc = (t) => (
 const easeOutQuint = (t) => 1 - (1 - t) ** 5;
 
 const MapSelectedDevice = ({ mapReady }) => {
+  const theme = useTheme();
+  const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const currentTime = useSelector((state) => state.devices.selectTime);
   const currentId = useSelector((state) => state.devices.selectedId);
   const previousTime = usePrevious(currentTime);
@@ -35,16 +39,17 @@ const MapSelectedDevice = ({ mapReady }) => {
 
     if ((isSelectionChange || isFollowUpdate) && position) {
       const isPremiumFocus = isSelectionChange;
+      const verticalNudge = desktop ? 56 : dimensions.popupMapOffset / 2;
       map.easeTo({
         center: [position.longitude, position.latitude],
         zoom: Math.max(map.getZoom(), selectZoom),
-        offset: [0, -dimensions.popupMapOffset / 2],
+        offset: [0, -verticalNudge],
         duration: isPremiumFocus ? 1500 : 850,
         easing: isPremiumFocus ? easeInOutCirc : easeOutQuint,
         essential: true,
       });
     }
-  }, [currentId, previousId, currentTime, previousTime, mapFollow, position, previousPosition, selectZoom, mapReady]);
+  }, [currentId, previousId, currentTime, previousTime, mapFollow, position, previousPosition, selectZoom, mapReady, desktop]);
 
   return null;
 };
