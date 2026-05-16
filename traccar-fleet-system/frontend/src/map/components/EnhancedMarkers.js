@@ -3,13 +3,19 @@ import { useSelector } from 'react-redux';
 import { useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { map } from '../core/MapView';
-import { formatTime, getStatusColor } from '../../common/util/formatter';
-import { mapIconKey } from '../core/preloadImages';
+import { formatTime } from '../../common/util/formatter';
+import { mapIconKey } from '../core/enhancedPreloadImages';
 import { useAttributePreference } from '../../common/util/preferences';
 import { useCatchCallback } from '../../reactHelper';
 import { findFonts } from '../core/mapUtil';
 
-const LERP_DURATION = 1200;
+const LERP_DURATION = 1450;
+const STYLE_TRANSITION_MS = 480;
+const MOVE_PULSE = '#34d399';
+const IDLE_PULSE = '#fcd34d';
+const RING_MOVING = 'rgba(52,211,153,0.95)';
+const RING_IDLE = 'rgba(251,191,36,0.9)';
+const RING_OFFLINE = 'rgba(139,148,154,0.88)';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -18,7 +24,7 @@ const EnhancedMarkers = ({
   positions,
   onMapClick,
   onMarkerClick,
-  showStatus,
+  showStatus: _ignoredShowStatus,
   selectedPosition,
   titleField,
   labelsMode = 'all',
@@ -46,41 +52,42 @@ const EnhancedMarkers = ({
   const createFeature = (devices, position, selectedPositionId) => {
     const device = devices[position.deviceId];
     const displayName = device?.attributes?.vehicleName || device?.name || `Device ${position.deviceId}`;
-    let showDirection;
-    switch (directionType) {
-      case 'none':
-        showDirection = false;
-        break;
-      case 'all':
-        showDirection = position.course > 0;
-        break;
-      default:
-        showDirection = selectedPositionId === position.id && position.course > 0;
-        break;
-    }
-
-    // Enhanced status detection
     const isOnline = device?.status === 'online';
     const isMoving = position.speed > 0;
     const isSelected = selectedPositionId === position.id;
-    const onlineState = isOnline ? 'online' : 'offline';
-    
+    const course = Number(position.course) || 0;
+    const hasHeading = course > 5;
+
+    /** Direction chevron only when clearly moving — calm at standstill. */
+    let showDirection = false;
+    switch (directionType) {
+      case 'none':
+        break;
+      case 'all':
+        showDirection = hasHeading && isOnline && isMoving;
+        break;
+      default:
+        showDirection = isSelected && hasHeading && isOnline && isMoving;
+        break;
+    }
+
+    const category = mapIconKey(device?.category);
+    const pulseState = !isOnline ? 'offline' : (isMoving ? 'moving' : 'idle');
+
     return {
       id: position.id,
       deviceId: position.deviceId,
       name: displayName,
       fixTime: formatTime(position.fixTime, 'seconds'),
-      category: mapIconKey(device?.category),
-      color: showStatus ? position.attributes?.color || getStatusColor(device?.status) : 'neutral',
-      rotation: position.course,
+      category,
+      markerIconKey: `${category}-live`,
+      rotation: course,
       direction: showDirection,
-      // Enhanced properties
-      isOnline,
-      onlineState,
+      pulseState,
+      markerSelected: isSelected ? 1 : 0,
       isMoving,
-      isSelected,
       speed: position.speed || 0,
-      course: position.course || 0,
+      course,
       lastUpdate: position.fixTime,
     };
   };
@@ -108,12 +115,11 @@ const EnhancedMarkers = ({
 
   const onMapClickCallback = useCallback((event) => {
     if (!onMapClick) return;
-    const markerClusterLayers = [
-      id, selected, clusters,
-      `status-${id}`, `status-${selected}`,
-      `direction-${id}`, `direction-${selected}`,
-      `speed-${id}`, `speed-${selected}`,
-    ].filter((layerId) => map.getLayer(layerId));
+    const telemetrySurfacePrefix = [`pulse-mov-${id}`, `pulse-idle-${id}`, `telemetry-ring-${id}`, `telemetry-core-${id}`,
+      id, `direction-${id}`,
+      `pulse-mov-${selected}`, `pulse-idle-${selected}`, `telemetry-ring-${selected}`, `telemetry-core-${selected}`,
+      selected, `direction-${selected}`];
+    const markerClusterLayers = [clusters, hovered, ...telemetrySurfacePrefix].filter((layerId) => map.getLayer(layerId));
 
     if (markerClusterLayers.length) {
       try {
@@ -127,7 +133,7 @@ const EnhancedMarkers = ({
     if (!event.defaultPrevented) {
       onMapClick(event.lngLat.lat, event.lngLat.lng);
     }
-  }, [onMapClick, id, selected, clusters]);
+  }, [onMapClick, id, selected, clusters, hovered]);
 
   const onMarkerClickCallback = useCallback((event) => {
     event.preventDefault();
@@ -192,122 +198,179 @@ const EnhancedMarkers = ({
       },
     });
 
-    // Enhanced marker layers with better styling
-    [id, selected].forEach((source) => {
-      // Main marker layer
+    const uncluster = ['!', ['has', 'point_count']];
+
+    [id, selected].forEach((sourceId) => {
+      /** Soft outer aura — animated opacity (moving) */
       map.addLayer({
-        id: source,
+        id: `pulse-mov-${sourceId}`,
+        type: 'circle',
+        source: sourceId,
+        filter: ['all', uncluster, ['==', ['get', 'pulseState'], 'moving']],
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            9, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 20, 17],
+            14, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 26, 22],
+            18, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 30, 26],
+          ],
+          'circle-color': MOVE_PULSE,
+          'circle-opacity': 0.11,
+          'circle-blur': 0.85,
+          'circle-pitch-alignment': 'map',
+        },
+      });
+
+      map.addLayer({
+        id: `pulse-idle-${sourceId}`,
+        type: 'circle',
+        source: sourceId,
+        filter: ['all', uncluster, ['==', ['get', 'pulseState'], 'idle']],
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            9, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 17, 14],
+            14, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 21, 18],
+            18, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 24, 21],
+          ],
+          'circle-color': IDLE_PULSE,
+          'circle-opacity': 0.09,
+          'circle-blur': 0.9,
+          'circle-pitch-alignment': 'map',
+        },
+      });
+
+      /** Sharp status ring — no blur */
+      map.addLayer({
+        id: `telemetry-ring-${sourceId}`,
+        type: 'circle',
+        source: sourceId,
+        filter: uncluster,
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            9, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 11.2, 9.8],
+            14, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 13.8, 12.1],
+            18, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 15.5, 13.8],
+          ],
+          'circle-color': 'transparent',
+          'circle-opacity': 0,
+          'circle-stroke-color': [
+            'match',
+            ['get', 'pulseState'],
+            'moving', RING_MOVING,
+            'idle', RING_IDLE,
+            'offline', RING_OFFLINE,
+            RING_OFFLINE,
+          ],
+          'circle-stroke-width': ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 2.4, 1.75],
+          'circle-stroke-opacity': ['match', ['get', 'pulseState'], 'offline', 0.7, 0.92],
+          'circle-blur': 0,
+          'circle-pitch-alignment': 'map',
+        },
+      });
+
+      /** Dark inner core — depth between ring and glyph */
+      map.addLayer({
+        id: `telemetry-core-${sourceId}`,
+        type: 'circle',
+        source: sourceId,
+        filter: uncluster,
+        paint: {
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            9, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 8.2, 7.25],
+            14, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 10.5, 9.35],
+            18, ['case', ['==', ['to-number', ['get', 'markerSelected']], 1], 11.9, 10.65],
+          ],
+          'circle-color': '#101822',
+          'circle-opacity': 0.94,
+          'circle-stroke-color': 'rgba(255,255,255,0.1)',
+          'circle-stroke-width': 0.65,
+          'circle-blur': 0,
+          'circle-pitch-alignment': 'map',
+        },
+      });
+
+      map.addLayer({
+        id: sourceId,
         type: 'symbol',
-        source,
-        filter: ['!has', 'point_count'],
+        source: sourceId,
+        filter: uncluster,
         layout: {
-          'icon-image': '{category}-{color}',
+          'icon-image': ['get', 'markerIconKey'],
+          'icon-anchor': 'center',
           'icon-size': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            0, iconScale * 0.6,
-            10, iconScale * 0.8,
-            15, iconScale * 1.0,
-            20, iconScale * 1.2
+            'interpolate', ['linear'], ['zoom'],
+            0, iconScale * 0.58,
+            10, iconScale * 0.76,
+            15, iconScale * 0.94,
+            20, iconScale * 1.08,
           ],
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
           'text-field': `{${titleField || 'name'}}`,
           'text-allow-overlap': true,
-          'text-anchor': 'bottom',
-          'text-offset': [0, -2 * iconScale],
+          'text-anchor': 'top',
+          'text-offset': [0, 1.58 * iconScale],
           'text-font': findFonts(map),
           'text-size': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
+            'interpolate', ['linear'], ['zoom'],
             0, 10,
             10, 12,
-            15, 14,
-            20, 16
+            15, 13,
+            20, 15,
           ],
           'text-optional': true,
         },
         paint: {
-          'text-halo-color': 'rgba(255, 255, 255, 0.8)',
-          'text-halo-width': 2,
-          'text-halo-blur': 1,
+          'text-color': '#e8eef5',
+          'text-halo-color': 'rgba(5, 8, 14, 0.94)',
+          'text-halo-width': 2.65,
+          'text-halo-blur': 0.35,
         },
       });
 
-      // Status indicator layer
       map.addLayer({
-        id: `status-${source}`,
-        type: 'circle',
-        source,
-        filter: ['!has', 'point_count'],
-        paint: {
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            0, 3,
-            10, 4,
-            15, 5,
-            20, 6
-          ],
-          'circle-color': [
-            'match',
-            ['get', 'onlineState'],
-            'online', '#4caf50',
-            'offline', '#f44336',
-            '#9e9e9e' // Gray for unknown
-          ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': 'white',
-          'circle-opacity': 0.9,
-        },
-      });
-
-      // Direction layer
-      map.addLayer({
-        id: `direction-${source}`,
+        id: `direction-${sourceId}`,
         type: 'symbol',
-        source,
-        filter: [
-          'all',
-          ['!has', 'point_count'],
-          ['==', 'direction', true],
-        ],
+        source: sourceId,
+        filter: ['all', uncluster, ['==', ['get', 'direction'], true]],
         layout: {
           'icon-image': 'direction',
-          'icon-size': iconScale * 0.8,
+          'icon-anchor': 'center',
+          'icon-size': [
+            'interpolate', ['linear'], ['zoom'],
+            11, iconScale * 0.42,
+            14, iconScale * 0.48,
+            18, iconScale * 0.54,
+          ],
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
+          'icon-offset': [0, ['interpolate', ['linear'], ['zoom'], 10, -0.92, 16, -1.06]],
           'icon-rotate': ['get', 'rotation'],
           'icon-rotation-alignment': 'map',
         },
-      });
-
-      // Speed indicator for moving vehicles (using direction icon as fallback)
-      map.addLayer({
-        id: `speed-${source}`,
-        type: 'symbol',
-        source,
-        filter: [
-          'all',
-          ['!has', 'point_count'],
-          ['>', 'speed', 0],
-        ],
-        layout: {
-          'icon-image': 'direction', // Use existing direction icon instead of non-existent speed-indicator
-          'icon-size': iconScale * 0.4,
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-offset': [0, -1.5 * iconScale],
+        paint: {
+          'icon-opacity': 0.88,
         },
       });
 
-      // Event handlers
-      map.on('mouseenter', source, onMouseEnter);
-      map.on('mouseleave', source, onMouseLeave);
-      map.on('click', source, onMarkerClickCallback);
+      map.on('mouseenter', sourceId, onMouseEnter);
+      map.on('mouseleave', sourceId, onMouseLeave);
+      map.on('click', sourceId, onMarkerClickCallback);
+    });
+
+    /** Eased puck + label resizing when selection changes */
+    [id, selected].forEach((markerLayerId) => {
+      if (!map.getLayer(markerLayerId)) return;
+      try {
+        map.setLayoutProperty(markerLayerId, 'icon-size-transition', { duration: STYLE_TRANSITION_MS, delay: 0 });
+        map.setPaintProperty(markerLayerId, 'text-opacity-transition', { duration: STYLE_TRANSITION_MS, delay: 0 });
+        map.setPaintProperty(markerLayerId, 'icon-opacity-transition', { duration: STYLE_TRANSITION_MS, delay: 0 });
+      } catch {
+        /* older MapLibre may omit transition props */
+      }
     });
 
     // Enhanced cluster layer
@@ -394,7 +457,7 @@ const EnhancedMarkers = ({
         map.off('mouseleave', source, onMouseLeave);
         map.off('click', source, onMarkerClickCallback);
 
-        ['', 'status-', 'direction-', 'speed-'].forEach((prefix) => {
+        ['pulse-mov-', 'pulse-idle-', 'telemetry-ring-', 'telemetry-core-', '', 'direction-'].forEach((prefix) => {
           const layerId = prefix + source;
           if (map.getLayer(layerId)) {
             map.removeLayer(layerId);
@@ -485,41 +548,92 @@ const EnhancedMarkers = ({
     });
   }, [labelsMode, selectedDeviceId, externalHoveredDeviceId, id, selected, titleField]);
 
-  /** Selected marker slight size bump; keep all markers at full opacity (no dimming). */
+  /** Gentle breathing halo on moving/idle blobs (offline layers have no pulse — empty filter). */
+  useEffect(() => {
+    let rafId = 0;
+    const movePeriodMs = 2850;
+    const idlePeriodMs = 3480;
+
+    /** Smooth plateau at inhale/exhale (no strobing edges). */
+    const breathe = (u) => {
+      const lin = Math.sin(u * Math.PI * 2) * 0.5 + 0.5;
+      return lin * lin * (3 - 2 * lin);
+    };
+
+    const tick = (nowMs) => {
+      const pulseSpecs = [
+        { layerId: `pulse-mov-${id}`, periodMs: movePeriodMs, low: 0.068, high: 0.165, glow: id },
+        { layerId: `pulse-mov-${selected}`, periodMs: movePeriodMs, low: 0.068, high: 0.165, glow: selected },
+        { layerId: `pulse-idle-${id}`, periodMs: idlePeriodMs, low: 0.046, high: 0.115, glow: id },
+        { layerId: `pulse-idle-${selected}`, periodMs: idlePeriodMs, low: 0.046, high: 0.115, glow: selected },
+      ];
+
+      pulseSpecs.forEach(({ layerId, periodMs, low, high, glow }) => {
+        if (!map.getLayer(layerId)) return;
+        const boostHigh = glow === selected ? 1.12 : 1;
+        const w = breathe((nowMs % periodMs) / periodMs);
+        map.setPaintProperty(layerId, 'circle-opacity', lerp(low, high * boostHigh, w));
+      });
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [id, selected]);
+
+  /** Selected puck + heading bump (markerSelected in GeoJSON already scales pulses / rings). */
   useEffect(() => {
     if (!map.getLayer(id)) return;
 
-    const applyPaint = (layerId, paint) => {
-      if (!map.getLayer(layerId)) return;
-      Object.entries(paint).forEach(([prop, val]) => {
-        map.setPaintProperty(layerId, prop, val);
-      });
-    };
-
-    applyPaint(id, { 'icon-opacity': 1, 'text-opacity': 1 });
-    applyPaint(`status-${id}`, { 'circle-opacity': 0.9 });
-    applyPaint(`direction-${id}`, { 'icon-opacity': 1 });
-    applyPaint(`speed-${id}`, { 'icon-opacity': 1 });
-    applyPaint(clusters, { 'icon-opacity': 1, 'text-opacity': 1 });
-
     const bump = selectedDeviceId != null ? 1.12 : 1;
-    const sizeExpr = [
-      'interpolate',
-      ['linear'],
-      ['zoom'],
-      0, iconScale * 0.6 * bump,
-      10, iconScale * 0.8 * bump,
-      15, iconScale * 1.0 * bump,
-      20, iconScale * 1.2 * bump,
-    ];
+    const iconSizeSel = bump === 1
+      ? [
+        'interpolate', ['linear'], ['zoom'],
+        0, iconScale * 0.58,
+        10, iconScale * 0.76,
+        15, iconScale * 0.94,
+        20, iconScale * 1.08,
+      ]
+      : [
+        'interpolate', ['linear'], ['zoom'],
+        0, iconScale * 0.58 * bump,
+        10, iconScale * 0.76 * bump,
+        15, iconScale * 0.94 * bump,
+        20, iconScale * 1.08 * bump,
+      ];
+
+    if (map.getLayer(id)) {
+      map.setPaintProperty(id, 'icon-opacity', 1);
+      map.setPaintProperty(id, 'text-opacity', 1);
+    }
+    if (map.getLayer(`direction-${id}`)) {
+      map.setPaintProperty(`direction-${id}`, 'icon-opacity', 0.88);
+    }
+
+    const directionSizeSel = bump === 1
+      ? [
+        'interpolate', ['linear'], ['zoom'],
+        11, iconScale * 0.42,
+        14, iconScale * 0.48,
+        18, iconScale * 0.54,
+      ]
+      : [
+        'interpolate', ['linear'], ['zoom'],
+        11, iconScale * 0.42 * bump,
+        14, iconScale * 0.48 * bump,
+        18, iconScale * 0.54 * bump,
+      ];
+
     if (map.getLayer(selected)) {
-      map.setLayoutProperty(selected, 'icon-size', sizeExpr);
+      map.setLayoutProperty(selected, 'icon-size', iconSizeSel);
     }
     if (map.getLayer(`direction-${selected}`)) {
-      map.setLayoutProperty(`direction-${selected}`, 'icon-size', iconScale * 0.8 * bump);
+      map.setLayoutProperty(`direction-${selected}`, 'icon-size', directionSizeSel);
     }
-    if (map.getLayer(`speed-${selected}`)) {
-      map.setLayoutProperty(`speed-${selected}`, 'icon-size', iconScale * 0.4 * bump);
+
+    if (map.getLayer(clusters)) {
+      map.setPaintProperty(clusters, 'icon-opacity', 1);
+      map.setPaintProperty(clusters, 'text-opacity', 1);
     }
   }, [selectedDeviceId, id, selected, clusters, iconScale]);
 
@@ -541,7 +655,7 @@ const EnhancedMarkers = ({
           properties: createFeature(devices, position, selectedPosition && selectedPosition.id),
         };
       });
-  }, [safePositions, devices, selectedDeviceId, selectedPosition, id, directionType, showStatus]);
+  }, [safePositions, devices, selectedDeviceId, selectedPosition, id, directionType]);
 
   useEffect(() => {
     const prev = prevCoordsRef.current;

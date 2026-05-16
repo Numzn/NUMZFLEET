@@ -1,5 +1,5 @@
-import { grey } from '@mui/material/colors';
-import { createTheme } from '@mui/material';
+
+
 import { loadImage, prepareIcon } from './mapUtil';
 
 import directionSvg from '../../resources/images/direction.svg';
@@ -60,113 +60,82 @@ export const mapIconKey = (category) => {
     case 'trolleybus':
       return 'bus';
     default:
-      return mapIcons.hasOwnProperty(category) ? category : 'default';
+      return Object.prototype.hasOwnProperty.call(mapIcons, category) ? category : 'default';
   }
 };
 
 export const mapImages = {};
 
-const theme = createTheme({
-  palette: {
-    // Enhanced color palette for better status indication
-    success: { main: '#4caf50' }, // Green for online
-    error: { main: '#f44336' },    // Red for offline
-    warning: { main: '#ff9800' },  // Orange for moving
-    info: { main: '#2196f3' },    // Blue for idle
-    neutral: { main: grey[500] },  // Gray for unknown
-  },
-});
+const LIVE_PX = 56;
 
-// Enhanced icon preparation with better styling
-const prepareEnhancedIcon = async (background, icon, color, status = 'neutral') => {
+/**
+ * Minimal enterprise-style puck: soft depth shadow, cool radial body, hairline ring,
+ * small monochrome vehicle glyph (state is shown by map circle layers, not this bitmap).
+ */
+async function prepareMinimalLivePuck(iconImg) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(LIVE_PX * dpr);
   const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = w;
   const ctx = canvas.getContext('2d');
-  
-  // Set canvas size
-  canvas.width = 32;
-  canvas.height = 32;
-  
-  // Draw background circle with status color
+  ctx.scale(dpr, dpr);
+  const cx = LIVE_PX / 2;
+  const cy = LIVE_PX / 2;
+  const bodyR = 17.5;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(8, 12, 22, 0.55)';
+  ctx.shadowBlur = 7;
+  ctx.shadowOffsetY = 2.2;
   ctx.beginPath();
-  ctx.arc(16, 16, 15, 0, 2 * Math.PI);
-  ctx.fillStyle = color;
+  ctx.arc(cx, cy + 0.35, bodyR, 0, Math.PI * 2);
+  const g = ctx.createRadialGradient(cx - 4, cy - 5, 2, cx, cy, bodyR);
+  g.addColorStop(0, '#4a5d78');
+  g.addColorStop(0.55, '#2b384c');
+  g.addColorStop(1, '#141b26');
+  ctx.fillStyle = g;
   ctx.fill();
-  
-  // Add white border
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, bodyR - 0.35, 0, Math.PI * 2);
   ctx.stroke();
-  
-  // Draw icon in center
-  if (icon) {
-    const iconSize = 20;
-    const iconX = (32 - iconSize) / 2;
-    const iconY = (32 - iconSize) / 2;
-    ctx.drawImage(icon, iconX, iconY, iconSize, iconSize);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 0.75;
+  ctx.beginPath();
+  ctx.arc(cx, cy, bodyR - 2.4, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (iconImg) {
+    const glyph = 20;
+    const gx = (LIVE_PX - glyph) / 2;
+    const gy = (LIVE_PX - glyph) / 2;
+    ctx.save();
+    ctx.globalAlpha = 0.88;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(210, 220, 235, 0.97)';
+    ctx.fillRect(gx - 1, gy - 1, glyph + 2, glyph + 2);
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(iconImg, gx, gy, glyph, glyph);
+    ctx.restore();
   }
-  
-  // Add status indicator dot
-  ctx.beginPath();
-  ctx.arc(24, 8, 4, 0, 2 * Math.PI);
-  ctx.fillStyle = theme.palette[status].main;
-  ctx.fill();
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  
-  return ctx.getImageData(0, 0, canvas.width, canvas.height);
-};
+
+  return ctx.getImageData(0, 0, w, w);
+}
 
 export default async () => {
   const background = await loadImage(backgroundSvg);
   mapImages.background = await prepareIcon(background);
   mapImages.direction = await prepareIcon(await loadImage(directionSvg));
-  
-  // Create speed indicator icon
-  const speedCanvas = document.createElement('canvas');
-  const speedCtx = speedCanvas.getContext('2d');
-  speedCanvas.width = 16;
-  speedCanvas.height = 16;
-  
-  speedCtx.beginPath();
-  speedCtx.arc(8, 8, 6, 0, 2 * Math.PI);
-  speedCtx.fillStyle = '#ff9800';
-  speedCtx.fill();
-  speedCtx.strokeStyle = 'white';
-  speedCtx.lineWidth = 1;
-  speedCtx.stroke();
-  
-  speedCtx.fillStyle = 'white';
-  speedCtx.font = '10px Arial';
-  speedCtx.textAlign = 'center';
-  speedCtx.fillText('⚡', 8, 12);
-  
-  mapImages['speed-indicator'] = await prepareIcon(speedCanvas);
-  
-  // Create enhanced icons for each category and status
-  await Promise.all(Object.keys(mapIcons).map(async (category) => {
-    const results = [];
-    ['info', 'success', 'error', 'warning', 'neutral'].forEach((status) => {
-      results.push(loadImage(mapIcons[category]).then((icon) => {
-        const color = status === 'success' ? '#4caf50' :
-                     status === 'error' ? '#f44336' :
-                     status === 'warning' ? '#ff9800' :
-                     status === 'info' ? '#2196f3' :
-                     '#9e9e9e';
-        return prepareEnhancedIcon(background, icon, color, status).then((preparedIcon) => {
-          mapImages[`${category}-${status}`] = preparedIcon;
-        });
-      }));
-    });
-    await Promise.all(results);
-  }));
+
+  await Promise.all(
+    Object.keys(mapIcons).map(async (category) => {
+      const icon = await loadImage(mapIcons[category]);
+      mapImages[`${category}-live`] = await prepareMinimalLivePuck(icon);
+    }),
+  );
 };
-
-
-
-
-
-
-
-
-
