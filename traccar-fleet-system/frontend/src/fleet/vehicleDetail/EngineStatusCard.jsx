@@ -1,7 +1,7 @@
 import { Box, Chip, Typography } from '@mui/material';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 
-import { vehicleDashboardCardSx } from './dashboardCardSx.js';
+import { vehicleModuleSx } from './dashboardCardSx.js';
 
 const ignitionLabel = (raw) => {
   if (raw === true || raw === 'true' || raw === 1 || raw === '1') return 'Running';
@@ -17,12 +17,12 @@ export default function EngineStatusCard({ telemetry }) {
     (ign == null || ign === 'Running');
 
   return (
-    <Box sx={vehicleDashboardCardSx}>
+    <Box sx={vehicleModuleSx}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <PrecisionManufacturingIcon color="primary" fontSize="small" />
           <Typography variant="subtitle1" fontWeight={600}>
-            Engine status
+            Health & engine
           </Typography>
         </Box>
         <Chip

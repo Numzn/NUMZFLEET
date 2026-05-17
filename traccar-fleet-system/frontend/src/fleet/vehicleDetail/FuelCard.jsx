@@ -2,13 +2,13 @@ import { Box, Typography, LinearProgress } from '@mui/material';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
-import { vehicleDashboardCardSx } from './dashboardCardSx.js';
+import { vehicleModuleSx } from './dashboardCardSx.js';
 
 export default function FuelCard({ fuel }) {
   const pct = fuel.levelPct != null ? Math.max(0, Math.min(100, fuel.levelPct)) : null;
 
   return (
-    <Box sx={vehicleDashboardCardSx}>
+    <Box sx={vehicleModuleSx}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <LocalGasStationIcon color="primary" fontSize="small" />
         <Typography variant="subtitle1" fontWeight={600}>

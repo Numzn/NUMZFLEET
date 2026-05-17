@@ -23,7 +23,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import DirectionsCarFilledIcon from '@mui/icons-material/DirectionsCarFilled';
 import { VEHICLE_TYPES } from './vehicleDetailSections.js';
-import { vehicleDashboardCardSx } from './dashboardCardSx.js';
+import { vehicleSetupSx } from './dashboardCardSx.js';
 
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'CNG'];
 
@@ -101,7 +101,7 @@ export default function VehicleConfigPanel({ vehicle, saveConfig }) {
       key: 'driver',
       label: 'Driver assignment',
       done: Boolean(driverName),
-      detail: driverName || 'Assign driver/contact in Traccar device settings.',
+      detail: driverName || 'Use Assign driver on the Live tab (vehicle workspace).',
       icon: <PersonIcon sx={{ fontSize: 16 }} />,
     },
     {
@@ -155,7 +155,7 @@ export default function VehicleConfigPanel({ vehicle, saveConfig }) {
     <Box
       id="vehicle-config-panel"
       sx={[
-        vehicleDashboardCardSx,
+        ...vehicleSetupSx,
         {
           height: 'auto',
           overflow: 'hidden',
@@ -330,7 +330,7 @@ export default function VehicleConfigPanel({ vehicle, saveConfig }) {
           <Divider />
 
           <Typography variant="overline" color="text.secondary">
-            Device & driver linkage
+            Device linkage
           </Typography>
           <TextField
             label="Device ID"
@@ -338,15 +338,7 @@ export default function VehicleConfigPanel({ vehicle, saveConfig }) {
             fullWidth
             size="small"
             disabled
-            helperText="Change assignment from Fleet vehicles list"
-          />
-          <TextField
-            label="Driver assignment"
-            value={driverName || '—'}
-            fullWidth
-            size="small"
-            disabled
-            helperText="Assign in Traccar device settings (contact/driver)"
+            helperText="Change assignment from Fleet vehicles list. Assign driver from the vehicle Live tab."
           />
           <TextField
             label="Preferred update interval (sec)"

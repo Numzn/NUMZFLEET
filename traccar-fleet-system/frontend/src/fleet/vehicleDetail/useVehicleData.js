@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 import { fetchVehicle, updateVehicleConfig as putVehicleConfig } from '../vehiclesApi.js';
 import { normalizePositionTelemetry } from './telemetryUtils.js';
+import { getIgnitionPhrase, getMotionLabel } from './vehicleMotionStatus.js';
 
 const erbFuelKey = (fuelType) => {
   if (!fuelType) return 'diesel';
@@ -36,6 +37,8 @@ export default function useVehicleData(vehicleId) {
   const user = useSelector((s) => s.session.user);
   const positions = useSelector((s) => s.session.positions);
   const events = useSelector((s) => s.events.items);
+  const devicesById = useSelector((s) => s.devices.items);
+  const groupsById = useSelector((s) => s.groups.items);
 
   const [vehicle, setVehicle] = useState(null);
   const [erbState, setErbState] = useState({
@@ -170,6 +173,27 @@ export default function useVehicleData(vehicleId) {
       }));
   }, [events, deviceId]);
 
+  const groupName = useMemo(() => {
+    if (deviceId == null) return null;
+    const d = devicesById[deviceId];
+    const gid = d?.groupId;
+    if (gid == null) return null;
+    return groupsById[gid]?.name ?? null;
+  }, [devicesById, groupsById, deviceId]);
+
+  const motionLabel = useMemo(
+    () => getMotionLabel(vehicle?.device?.status, livePosition?.speed),
+    [vehicle?.device?.status, livePosition?.speed],
+  );
+
+  const ignitionPhrase = useMemo(
+    () =>
+      vehicle?.device?.status === 'online'
+        ? getIgnitionPhrase(livePosition?.attributes)
+        : null,
+    [vehicle?.device?.status, livePosition?.attributes],
+  );
+
   const saveConfig = useCallback(
     async (body) => {
       if (!user || !vehicleId) throw new Error('Not ready');
@@ -192,5 +216,8 @@ export default function useVehicleData(vehicleId) {
     saveConfig,
     livePosition,
     deviceId,
+    groupName,
+    motionLabel,
+    ignitionPhrase,
   };
 }

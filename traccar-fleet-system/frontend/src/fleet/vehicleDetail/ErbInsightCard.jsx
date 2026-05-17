@@ -1,5 +1,6 @@
 import { Box, Button, Typography } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { vehicleModuleSx } from './dashboardCardSx.js';
 
 const formatErbTime = (iso) => {
   if (!iso) return null;
@@ -10,11 +11,9 @@ const formatErbTime = (iso) => {
   }
 };
 
-import { vehicleDashboardCardSx } from './dashboardCardSx.js';
-
 export default function ErbInsightCard({ erb, vehicleSpec }) {
   return (
-    <Box sx={vehicleDashboardCardSx}>
+    <Box sx={vehicleModuleSx}>
       <Typography variant="subtitle1" fontWeight={600} gutterBottom>
         Fuel price (ERB)
       </Typography>

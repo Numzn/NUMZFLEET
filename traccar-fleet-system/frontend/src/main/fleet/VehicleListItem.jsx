@@ -11,7 +11,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { devicesActions } from '../../store';
 import DeviceQuickActions from './DeviceQuickActions';
-import { normalizePositionTelemetry } from '../../fleet/vehicleDetail/telemetryUtils.js';
+import { getIgnitionPhrase, getMotionLabel } from '../../fleet/vehicleDetail/vehicleMotionStatus.js';
 
 dayjs.extend(relativeTime);
 
@@ -33,13 +33,6 @@ function formatDistanceTodayInsight(raw) {
   const rounded = Math.round(n * 10) / 10;
   if (Math.abs(rounded - Math.round(n)) < 1e-6) return `${Math.round(n)} km today`;
   return `${n.toFixed(1)} km today`;
-}
-
-function ignitionPhrase(attrs) {
-  const { ignition } = normalizePositionTelemetry(attrs);
-  if (ignition === true || ignition === 'true' || ignition === 1 || ignition === '1') return 'Ignition ON';
-  if (ignition === false || ignition === 'false' || ignition === 0 || ignition === '0') return 'Ignition OFF';
-  return null;
 }
 
 function pickRightInsight({ device, position, todayDistInsight, fixRel }) {
@@ -68,10 +61,7 @@ const VehicleListItem = ({
     ? theme.palette.error.main
     : (position && Number(position.speed) > 0 ? theme.palette.success.main : theme.palette.warning.main);
 
-  let motionLabel = 'Offline';
-  if (device.status === 'online') {
-    motionLabel = position && Number(position.speed) > 0 ? 'Moving' : 'Idle';
-  }
+  let motionLabel = getMotionLabel(device.status, position?.speed);
 
   const fixRel = position?.fixTime ? dayjs(position.fixTime).fromNow() : null;
 
@@ -79,7 +69,7 @@ const VehicleListItem = ({
   const todayDistInsight = formatDistanceTodayInsight(rawDist);
 
   const address = position?.address?.trim?.() || '';
-  const ign = device.status === 'online' ? ignitionPhrase(position?.attributes) : null;
+  const ign = device.status === 'online' ? getIgnitionPhrase(position?.attributes) : null;
 
   const telemetryParts = [];
   if (device.status === 'online') {
