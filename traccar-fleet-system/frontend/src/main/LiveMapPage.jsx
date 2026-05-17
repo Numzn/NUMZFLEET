@@ -1,8 +1,7 @@
 import {
-  useCallback, useEffect, useMemo, useState,
+  useCallback, useEffect, useLayoutEffect, useMemo, useState,
 } from 'react';
 import { Box } from '@mui/material';
-import { makeStyles } from 'tss-react/mui';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -13,36 +12,18 @@ import usePersistedState from '../common/util/usePersistedState';
 import { useManager } from '../common/util/permissions';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
-import PremiumTopBar from './components/PremiumTopBar';
 import MapDevicePopup from './components/MapDevicePopup';
 import FleetLayout from './fleet/FleetLayout';
 import FleetSidebar from './fleet/FleetSidebar';
 import { fetchVehicles } from '../fleet/vehiclesApi.js';
+import { useLiveMapChrome } from './fleet/LiveMapChromeContext';
 
-const useStyles = makeStyles()(() => ({
-  root: {
-    height: '100dvh',
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  mainRow: {
-    flex: 1,
-    minHeight: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-  },
-}));
-
-const MainPage = () => {
-  const { classes } = useStyles();
+const LiveMapPage = () => {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { setLiveMapChrome } = useLiveMapChrome();
   const manager = useManager();
   const user = useSelector((state) => state.session.user);
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
@@ -204,75 +185,115 @@ const MainPage = () => {
     setFilterMap(Boolean(nextFilter.mapOnly));
   }, [setFilter, setFilterSort, setFilterMap]);
 
-  return (
-    <Box className={classes.root}>
-      <PremiumTopBar
-        flatBottomOnMobile
-        devices={Object.values(devices)}
-        stats={deviceStats}
-        onFilterChange={handlePremiumFilterChange}
-        onNavigateToDashboard={handleDashboardClick}
-        groups={Object.values(groups)}
-        filters={{
-          statuses: filter.statuses,
-          groups: filter.groups,
-          sortBy: filterSort,
-          mapOnly: filterMap,
-        }}
-        hideCenterSearch
-        mapRouteOperationalChrome
-        showMobileFleetDrawerButton={!desktop}
-        onOpenMobileFleetDrawer={() => dispatch(fleetInteractionActions.setMobileDrawerOpen(true))}
-      />
+  const sidebarFleetProps = useMemo(() => ({
+    filteredDevices,
+    positions,
+    groups: Object.values(groups),
+    filters: {
+      statuses: filter.statuses,
+      groups: filter.groups,
+      sortBy: filterSort,
+      mapOnly: filterMap,
+    },
+    operationalPresence,
+    deviceFleetVehicleIdByDeviceId,
+    effectiveFleetTab,
+    onFilterChange: handlePremiumFilterChange,
+  }), [
+    filteredDevices,
+    positions,
+    groups,
+    filter.statuses,
+    filter.groups,
+    filterSort,
+    filterMap,
+    operationalPresence,
+    deviceFleetVehicleIdByDeviceId,
+    effectiveFleetTab,
+    handlePremiumFilterChange,
+  ]);
 
-      <Box
-        className={classes.mainRow}
-        sx={{
-          mt: {
-            xs: 'calc(env(safe-area-inset-top, 0px) + 50px)',
-            md: 'calc(env(safe-area-inset-top, 0px) + 56px)',
-          },
-        }}
-      >
+  const topBarProps = useMemo(() => ({
+    devices: Object.values(devices),
+    stats: deviceStats,
+    onFilterChange: handlePremiumFilterChange,
+    onNavigateToDashboard: handleDashboardClick,
+    groups: Object.values(groups),
+    filters: {
+      statuses: filter.statuses,
+      groups: filter.groups,
+      sortBy: filterSort,
+      mapOnly: filterMap,
+    },
+    hideCenterSearch: true,
+    mapRouteOperationalChrome: true,
+    showMobileFleetDrawerButton: !desktop,
+    onOpenMobileFleetDrawer: () => dispatch(fleetInteractionActions.setMobileDrawerOpen(true)),
+  }), [
+    devices,
+    deviceStats,
+    handlePremiumFilterChange,
+    handleDashboardClick,
+    groups,
+    filter.statuses,
+    filter.groups,
+    filterSort,
+    filterMap,
+    desktop,
+    dispatch,
+  ]);
+
+  useLayoutEffect(() => {
+    setLiveMapChrome({
+      topBarProps,
+      sidebarFleetProps,
+    });
+    return () => setLiveMapChrome(null);
+  }, [setLiveMapChrome, topBarProps, sidebarFleetProps]);
+
+  const mapColumn = (
+    <Box sx={{ position: 'relative', flex: 1, minHeight: 0, width: '100%' }}>
+      <MainMap
+        filteredPositions={filteredPositions}
+        selectedPosition={selectedPosition}
+      />
+      {!desktop && selectedDeviceId && selectedPosition && devices[selectedDeviceId] && (
+        <MapDevicePopup
+          device={devices[selectedDeviceId]}
+          position={selectedPosition}
+          fleetVehicleId={deviceFleetVehicleIdByDeviceId[Number(selectedDeviceId)]}
+          onClose={handleClosePopup}
+        />
+      )}
+    </Box>
+  );
+
+  return (
+    <Box
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      {desktop ? (
+        mapColumn
+      ) : (
         <FleetLayout
           sidebar={(opts) => (
             <FleetSidebar
               {...opts}
-              filteredDevices={filteredDevices}
-              positions={positions}
-              groups={Object.values(groups)}
-              filters={{
-                statuses: filter.statuses,
-                groups: filter.groups,
-                sortBy: filterSort,
-                mapOnly: filterMap,
-              }}
-              operationalPresence={operationalPresence}
-              deviceFleetVehicleIdByDeviceId={deviceFleetVehicleIdByDeviceId}
-              effectiveFleetTab={effectiveFleetTab}
-              onFilterChange={handlePremiumFilterChange}
+              {...sidebarFleetProps}
             />
           )}
-          map={(
-            <Box sx={{ position: 'relative', flex: 1, minHeight: 0, width: '100%' }}>
-              <MainMap
-                filteredPositions={filteredPositions}
-                selectedPosition={selectedPosition}
-              />
-              {!desktop && selectedDeviceId && selectedPosition && devices[selectedDeviceId] && (
-                <MapDevicePopup
-                  device={devices[selectedDeviceId]}
-                  position={selectedPosition}
-                  fleetVehicleId={deviceFleetVehicleIdByDeviceId[Number(selectedDeviceId)]}
-                  onClose={handleClosePopup}
-                />
-              )}
-            </Box>
-          )}
+          map={mapColumn}
         />
-      </Box>
+      )}
     </Box>
   );
 };
 
-export default MainPage;
+export default LiveMapPage;

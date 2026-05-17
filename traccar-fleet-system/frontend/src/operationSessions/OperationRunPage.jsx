@@ -19,7 +19,6 @@ import {
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import AppLayout from '../common/components/AppLayout';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import {
   RUNTIME_CONTAINER_PY,
@@ -253,7 +252,7 @@ const OperationRunPage = () => {
   };
 
   return (
-    <AppLayout showSidebar>
+    <>
       <Container maxWidth="sm" disableGutters sx={{ px: { xs: 1.25, sm: 2 }, py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
           <Box
@@ -435,7 +434,7 @@ const OperationRunPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </AppLayout>
+    </>
   );
 };
 

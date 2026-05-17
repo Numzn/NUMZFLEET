@@ -11,7 +11,6 @@ import {
 import ReportFilter, { updateReportParams } from './components/ReportFilter';
 import { useAttributePreference } from '../common/util/preferences';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import usePersistedState from '../common/util/usePersistedState';
 import ColumnSelect from './components/ColumnSelect';
@@ -123,7 +122,7 @@ const SummaryReportPage = () => {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className={classes.header}>
         <ReportFilter onShow={onShow} onExport={onExport} onSchedule={onSchedule} deviceType="multiple" loading={loading}>
           <div className={classes.filterItem}>
@@ -162,7 +161,7 @@ const SummaryReportPage = () => {
           )) : (<TableShimmer columns={columns.length + 1} />)}
         </TableBody>
       </Table>
-    </AppLayout>
+    </>
   );
 };
 

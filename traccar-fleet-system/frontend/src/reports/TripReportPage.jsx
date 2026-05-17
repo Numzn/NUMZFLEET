@@ -13,7 +13,6 @@ import {
 import ReportFilter from './components/ReportFilter';
 import { useAttributePreference } from '../common/util/preferences';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import ColumnSelect from './components/ColumnSelect';
 import usePersistedState from '../common/util/usePersistedState';
@@ -168,7 +167,6 @@ const TripReportPage = () => {
   };
 
   return (
-    <AppLayout>
       <div className={classes.container}>
         {selectedItem && (
           <div className={classes.containerMap}>
@@ -225,7 +223,6 @@ const TripReportPage = () => {
           </Table>
         </div>
       </div>
-    </AppLayout>
   );
 };
 

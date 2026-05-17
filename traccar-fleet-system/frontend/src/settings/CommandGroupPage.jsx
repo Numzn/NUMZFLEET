@@ -18,14 +18,12 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
-import SettingsMenu from './components/SettingsMenu';
 import { useCatch } from '../reactHelper';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import { traccarPath } from '../config/traccarApi.js';
 
-const CommandDevicePage = () => {
+const CommandGroupPage = () => {
   const navigate = useNavigate();
   const { classes } = useSettingsStyles();
   const t = useTranslation();
@@ -47,7 +45,6 @@ const CommandDevicePage = () => {
   });
 
   return (
-    <AppLayout>
       <Container maxWidth="xs" className={classes.container}>
         <Accordion defaultExpanded>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -95,8 +92,7 @@ const CommandDevicePage = () => {
           </Button>
         </div>
       </Container>
-    </AppLayout>
   );
 };
 
-export default CommandDevicePage;
+export default CommandGroupPage;

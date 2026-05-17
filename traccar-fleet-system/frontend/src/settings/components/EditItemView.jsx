@@ -4,13 +4,12 @@ import {
 } from '@mui/material';
 import { useCatch, useEffectAsync } from '../../reactHelper';
 import { useTranslation } from '../../common/components/LocalizationProvider';
-import AppLayout from '../../common/components/AppLayout';
 import useSettingsStyles from '../common/useSettingsStyles';
 import fetchOrThrow from '../../common/util/fetchOrThrow';
 import { traccarPath } from '../../config/traccarApi.js';
 
 const EditItemView = ({
-  children, endpoint, item, setItem, defaultItem, validate, onItemSaved, menu, breadcrumbs,
+  children, endpoint, item, setItem, defaultItem, validate, onItemSaved,
 }) => {
   const navigate = useNavigate();
   const { classes } = useSettingsStyles();
@@ -48,7 +47,6 @@ const EditItemView = ({
   });
 
   return (
-    <AppLayout>
       <Container maxWidth="xs" className={classes.container}>
         {item ? children : (
           <Accordion defaultExpanded>
@@ -85,7 +83,6 @@ const EditItemView = ({
           </Button>
         </div>
       </Container>
-    </AppLayout>
   );
 };
 

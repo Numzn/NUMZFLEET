@@ -14,7 +14,6 @@ import {
 import ReportFilter from './components/ReportFilter';
 import { useAttributePreference } from '../common/util/preferences';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import ColumnSelect from './components/ColumnSelect';
 import usePersistedState from '../common/util/usePersistedState';
@@ -125,7 +124,6 @@ const StopReportPage = () => {
   };
 
   return (
-    <AppLayout>
       <div className={classes.container}>
         {selectedItem && (
           <div className={classes.containerMap}>
@@ -185,7 +183,6 @@ const StopReportPage = () => {
           </Table>
         </div>
       </div>
-    </AppLayout>
   );
 };
 

@@ -9,7 +9,6 @@ import {
 import ReportFilter from './components/ReportFilter';
 import { formatTime } from '../common/util/formatter';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import usePositionAttributes from '../common/attributes/usePositionAttributes';
 import { useCatch } from '../reactHelper';
@@ -112,7 +111,7 @@ const ChartReportPage = () => {
   ];
 
   return (
-    <AppLayout>
+    <>
       <ReportFilter onShow={onShow} deviceType="single">
         <div className={classes.filterItem}>
           <FormControl fullWidth>
@@ -195,7 +194,7 @@ const ChartReportPage = () => {
           </ResponsiveContainer>
         </div>
       )}
-    </AppLayout>
+    </>
   );
 };
 

@@ -7,7 +7,6 @@ import {
 import { useEffectAsync } from '../reactHelper';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import { useAdministrator } from '../common/util/permissions';
-import AppLayout from '../common/components/AppLayout';
 import CollectionFab from './components/CollectionFab';
 import CollectionActions from './components/CollectionActions';
 import TableShimmer from '../common/components/TableShimmer';
@@ -36,7 +35,7 @@ const ComputedAttributesPage = () => {
   }, [timestamp]);
 
   return (
-    <AppLayout>
+    <>
       <SearchHeader keyword={searchKeyword} setKeyword={setSearchKeyword} />
       <Table className={classes.table}>
         <TableHead>
@@ -65,7 +64,7 @@ const ComputedAttributesPage = () => {
         </TableBody>
       </Table>
       <CollectionFab editPath="/settings/attribute" disabled={!administrator} />
-    </AppLayout>
+    </>
   );
 };
 

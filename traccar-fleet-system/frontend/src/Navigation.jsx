@@ -3,7 +3,8 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import MainPage from './main/MainPage';
+import UnifiedShell from './common/components/UnifiedShell';
+import LiveMapPage from './main/LiveMapPage';
 import DashboardPage from './dashboard/DashboardPage';
 import CombinedReportPage from './reports/CombinedReportPage';
 import PositionsReportPage from './reports/PositionsReportPage';
@@ -67,6 +68,7 @@ import ToastNotificationTest from './test/ToastNotificationTest';
 import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
 import VehiclesPage from './fleet/VehiclesPage';
 import VehicleDetailPage from './fleet/vehicleDetail/VehicleDetailPage';
+import VehicleSetupPage from './fleet/vehicleDetail/VehicleSetupPage';
 import OperationSessionsPage from './operationSessions/OperationSessionsPage';
 import CreateSessionPage from './operationSessions/CreateSessionPage';
 import PlanningPage from './operationSessions/PlanningPage';
@@ -128,26 +130,28 @@ const Navigation = () => {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/change-server" element={<ChangeServerPage />} />
       <Route path="/" element={<App />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="map" element={<MainPage />} />
-        <Route path="fuel-requests" element={<FuelRequestsPage />} />
-        <Route path="fleet/vehicles/:vehicleId" element={<VehicleDetailPage />} />
-        <Route path="fleet/vehicles" element={<VehiclesPage />} />
-        <Route path="fleet/operation-sessions" element={<OperationSessionsPage />} />
-        <Route path="fleet/operation-sessions/create" element={<CreateSessionPage />} />
-        <Route path="fleet/operation-sessions/plan" element={<PlanningPage />} />
-        <Route path="fleet/operation-sessions/run/:sessionId" element={<OperationRunPage />} />
-        <Route path="fleet/operation-sessions/history" element={<OperationSessionsHistoryPage />} />
+        <Route element={<UnifiedShell />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="map" element={<LiveMapPage />} />
+          <Route path="fuel-requests" element={<FuelRequestsPage />} />
+          <Route path="fleet/vehicles/:vehicleId/setup" element={<VehicleSetupPage />} />
+          <Route path="fleet/vehicles/:vehicleId" element={<VehicleDetailPage />} />
+          <Route path="fleet/vehicles" element={<VehiclesPage />} />
+          <Route path="fleet/operation-sessions" element={<OperationSessionsPage />} />
+          <Route path="fleet/operation-sessions/create" element={<CreateSessionPage />} />
+          <Route path="fleet/operation-sessions/plan" element={<PlanningPage />} />
+          <Route path="fleet/operation-sessions/run/:sessionId" element={<OperationRunPage />} />
+          <Route path="fleet/operation-sessions/history" element={<OperationSessionsHistoryPage />} />
 
-        <Route path="position/:id" element={<PositionPage />} />
-        <Route path="network/:positionId" element={<NetworkPage />} />
-        <Route path="event/:id" element={<EventPage />} />
-        <Route path="replay" element={<ReplayPage />} />
-        <Route path="geofences" element={<GeofencesPage />} />
-        <Route path="emulator" element={<EmulatorPage />} />
-        <Route path="test/toast-notifications" element={<ToastNotificationTest />} />
+          <Route path="position/:id" element={<PositionPage />} />
+          <Route path="network/:positionId" element={<NetworkPage />} />
+          <Route path="event/:id" element={<EventPage />} />
+          <Route path="replay" element={<ReplayPage />} />
+          <Route path="geofences" element={<GeofencesPage />} />
+          <Route path="emulator" element={<EmulatorPage />} />
+          <Route path="test/toast-notifications" element={<ToastNotificationTest />} />
 
-        <Route path="settings">
+          <Route path="settings">
           <Route path="accumulators/:deviceId" element={<AccumulatorsPage />} />
           <Route path="announcement" element={<AnnouncementPage />} />
           <Route path="calendars" element={<CalendarsPage />} />
@@ -187,20 +191,21 @@ const Navigation = () => {
           <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
           <Route path="user" element={<UserPage />} />
-        </Route>
+          </Route>
 
-        <Route path="reports">
-          <Route path="combined" element={<CombinedReportPage />} />
-          <Route path="chart" element={<ChartReportPage />} />
-          <Route path="events" element={<EventReportPage />} />
-          <Route path="route" element={<PositionsReportPage />} />
-          <Route path="stops" element={<StopReportPage />} />
-          <Route path="summary" element={<SummaryReportPage />} />
-          <Route path="trips" element={<TripReportPage />} />
-          <Route path="scheduled" element={<ScheduledPage />} />
-          <Route path="statistics" element={<StatisticsPage />} />
-          <Route path="audit" element={<AuditPage />} />
-          <Route path="logs" element={<LogsPage />} />
+          <Route path="reports">
+            <Route path="combined" element={<CombinedReportPage />} />
+            <Route path="chart" element={<ChartReportPage />} />
+            <Route path="events" element={<EventReportPage />} />
+            <Route path="route" element={<PositionsReportPage />} />
+            <Route path="stops" element={<StopReportPage />} />
+            <Route path="summary" element={<SummaryReportPage />} />
+            <Route path="trips" element={<TripReportPage />} />
+            <Route path="scheduled" element={<ScheduledPage />} />
+            <Route path="statistics" element={<StatisticsPage />} />
+            <Route path="audit" element={<AuditPage />} />
+            <Route path="logs" element={<LogsPage />} />
+          </Route>
         </Route>
       </Route>
     </Routes>

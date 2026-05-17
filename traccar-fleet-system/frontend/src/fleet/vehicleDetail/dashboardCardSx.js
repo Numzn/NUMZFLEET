@@ -1,3 +1,13 @@
+/** Phase 2 flat workspace card (no gradient shadow). */
+export const vehicleWorkspaceCardSx = {
+  p: { xs: 2, md: 3 },
+  borderRadius: '16px',
+  border: 1,
+  borderColor: 'divider',
+  bgcolor: 'background.paper',
+  boxShadow: 'none',
+};
+
 /** Shared shell for vehicle dashboard widgets (mockup-style cards). */
 export const vehicleDashboardCardSx = {
   p: 2,

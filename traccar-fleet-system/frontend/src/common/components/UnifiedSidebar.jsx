@@ -14,18 +14,30 @@ import { makeStyles } from 'tss-react/mui';
 import { useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import DirectionsCarOutlinedIcon from '@mui/icons-material/DirectionsCarOutlined';
 import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
-import DrawOutlinedIcon from '@mui/icons-material/DrawOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ChevronLeftOutlinedIcon from '@mui/icons-material/ChevronLeftOutlined';
 import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
+import TuneIcon from '@mui/icons-material/Tune';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import PersonIcon from '@mui/icons-material/Person';
+import FolderIcon from '@mui/icons-material/Folder';
+import TodayIcon from '@mui/icons-material/Today';
+import SendIcon from '@mui/icons-material/Send';
+import HelpIcon from '@mui/icons-material/Help';
+import PaymentIcon from '@mui/icons-material/Payment';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import CalculateIcon from '@mui/icons-material/Calculate';
+import BuildIcon from '@mui/icons-material/Build';
+import SettingsIcon from '@mui/icons-material/Settings';
+import PeopleIcon from '@mui/icons-material/People';
 import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from './UserMenuDropdown';
 import usePersistedState from '../util/usePersistedState';
@@ -33,6 +45,7 @@ import { useAdministrator, useManager, useRestriction } from '../util/permission
 import useFeatures from '../util/useFeatures';
 import LogoImage from '../../login/LogoImage';
 import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
+import { useTranslation } from './LocalizationProvider';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -149,11 +162,6 @@ const useStyles = makeStyles()((theme) => ({
       transform: 'translateY(-50%)',
     },
   },
-  divider: {
-    margin: theme.spacing(2.5, 2),
-    backgroundColor: theme.palette.divider,
-    opacity: 0.5,
-  },
   badge: {
     '& .MuiBadge-badge': {
       backgroundColor: theme.palette.error.main,
@@ -181,7 +189,7 @@ const useStyles = makeStyles()((theme) => ({
 const SIDEBAR_WIDTH_EXPANDED = 168;
 const SIDEBAR_WIDTH_COLLAPSED = 68;
 
-const ModernSidebar = ({
+const UnifiedSidebar = ({
   collapsed: collapsedProp,
   setCollapsed: setCollapsedProp,
   forceExpanded = false,
@@ -191,20 +199,22 @@ const ModernSidebar = ({
   const { classes } = useStyles();
   const location = useLocation();
   const navigate = useNavigate();
-  
-  // Permissions
+  const t = useTranslation();
+
   const readonly = useRestriction('readonly');
   const admin = useAdministrator();
   const manager = useManager();
   const features = useFeatures();
-  
-  // Get pending counts for badges
+  const userId = useSelector((state) => state.session.user.id);
+  const supportLink = useSelector((state) => state.session.server.attributes.support);
+  const billingLink = useSelector((state) => state.session.user.attributes.billingLink);
+
   const fuelRequests = useSelector((state) => state.fuelRequests?.items || {});
   const pendingFuelCount = Object.values(fuelRequests).filter((request) => {
     const status = request.status?.toLowerCase?.() || '';
     return status === 'pending' || status === 'submitted' || status === 'awaiting_approval';
   }).length;
-  
+
   const liveAlertBufferCount = useSelector((state) => state.events?.items?.length ?? 0);
   const alertsBadgeCount =
     liveAlertBufferCount > 0 ? Math.min(liveAlertBufferCount, 99) : undefined;
@@ -213,26 +223,126 @@ const ModernSidebar = ({
   const collapsed = forceExpanded ? false : (collapsedProp ?? collapsedState);
   const setCollapsed = setCollapsedProp ?? setCollapsedState;
 
-  const [openState, setOpenState] = usePersistedState('sidebarNavOpen', {
+  const [openState, setOpenState] = usePersistedState('unifiedSidebarNavOpen', {
     fleet: true,
     fuel: true,
+    system: false,
   });
 
-  const pathActive = useCallback((path, exact = false) => {
-    if (!path) return false;
-    if (exact) return location.pathname === path;
-    return location.pathname === path || location.pathname.startsWith(`${path}/`);
-  }, [location.pathname]);
-
-  const isAnyChildActive = useCallback((children) => {
-    if (!Array.isArray(children) || !children.length) return false;
-    return children.some((c) => pathActive(c.path));
-  }, [pathActive]);
+  const systemChildren = useMemo(() => {
+    const out = [];
+    if (!readonly) {
+      out.push({ title: t('sharedPreferences'), path: '/settings/preferences', icon: TuneIcon });
+      out.push({
+        title: t('sharedNotifications'),
+        path: '/settings/notifications',
+        icon: NotificationsIcon,
+        activeMatch: (path) => path.startsWith('/settings/notification'),
+      });
+      out.push({
+        title: t('settingsUser'),
+        path: `/settings/user/${userId}`,
+        icon: PersonIcon,
+        activeMatch: (path) => path === `/settings/user/${userId}`,
+      });
+      if (!features.disableGroups) {
+        out.push({
+          title: t('settingsGroups'),
+          path: '/settings/groups',
+          icon: FolderIcon,
+          activeMatch: (path) => path.startsWith('/settings/group'),
+        });
+      }
+      if (!features.disableCalendars) {
+        out.push({
+          title: t('sharedCalendars'),
+          path: '/settings/calendars',
+          icon: TodayIcon,
+          activeMatch: (path) => path.startsWith('/settings/calendar'),
+        });
+      }
+      if (!features.disableComputedAttributes) {
+        out.push({
+          title: t('sharedComputedAttributes'),
+          path: '/settings/attributes',
+          icon: CalculateIcon,
+          activeMatch: (path) => path.startsWith('/settings/attribute'),
+        });
+      }
+      if (!features.disableMaintenance) {
+        out.push({
+          title: t('sharedMaintenance'),
+          path: '/settings/maintenances',
+          icon: BuildIcon,
+          activeMatch: (path) => path.startsWith('/settings/maintenance'),
+        });
+      }
+      if (!features.disableSavedCommands) {
+        out.push({
+          title: t('sharedSavedCommands'),
+          path: '/settings/commands',
+          icon: SendIcon,
+          activeMatch: (path) => path.startsWith('/settings/command'),
+        });
+      }
+    }
+    if (billingLink) {
+      out.push({
+        title: t('userBilling'),
+        href: billingLink,
+        icon: PaymentIcon,
+        external: true,
+      });
+    }
+    if (supportLink) {
+      out.push({
+        title: t('settingsSupport'),
+        href: supportLink,
+        icon: HelpIcon,
+        external: true,
+      });
+    }
+    if (manager && !readonly) {
+      out.push({
+        title: t('serverAnnouncement'),
+        path: '/settings/announcement',
+        icon: CampaignIcon,
+      });
+      if (admin) {
+        out.push({
+          title: t('settingsServer'),
+          path: '/settings/server',
+          icon: SettingsIcon,
+        });
+      }
+      out.push({
+        title: t('settingsUsers'),
+        path: '/settings/users',
+        icon: PeopleIcon,
+        activeMatch: (path) => path.startsWith('/settings/user') && path !== `/settings/user/${userId}`,
+      });
+    }
+    return out;
+  }, [
+    admin,
+    billingLink,
+    features.disableCalendars,
+    features.disableComputedAttributes,
+    features.disableGroups,
+    features.disableMaintenance,
+    features.disableSavedCommands,
+    manager,
+    readonly,
+    supportLink,
+    t,
+    userId,
+  ]);
 
   const navGroups = useMemo(() => ([
     {
       key: 'primary',
       items: [
+        { title: 'Live Map', path: '/map', icon: MapOutlinedIcon },
         { title: 'Dashboard', path: '/', icon: DashboardOutlinedIcon },
       ],
     },
@@ -245,9 +355,9 @@ const ModernSidebar = ({
           title: 'Fleet',
           icon: DirectionsCarOutlinedIcon,
           show: !readonly,
+          badge: alertsBadgeCount,
           children: [
             { title: 'Vehicles', path: '/fleet/vehicles', show: manager },
-            { title: 'Devices', path: '/settings/devices' },
             { title: 'Drivers', path: '/settings/drivers', show: !features.disableDrivers },
             { title: 'Geofences', path: '/geofences' },
           ].filter((c) => c.show !== false),
@@ -259,7 +369,6 @@ const ModernSidebar = ({
           show: !readonly,
           badge: pendingFuelCount > 0 ? pendingFuelCount : undefined,
           children: [
-            { title: 'Overview', path: '/fuel-requests' },
             { title: 'Requests', path: '/fuel-requests' },
             { title: 'Sessions', path: '/fleet/operation-sessions' },
             { title: 'New session', path: '/fleet/operation-sessions/create' },
@@ -279,16 +388,37 @@ const ModernSidebar = ({
       key: 'system',
       label: 'SYSTEM',
       items: [
-        { title: 'Settings', path: '/settings/preferences', icon: SettingsOutlinedIcon, show: !readonly },
         {
-          title: 'Admin',
-          path: admin ? '/settings/server' : '/settings/users',
-          icon: AdminPanelSettingsOutlinedIcon,
-          show: admin,
+          key: 'system',
+          title: 'System',
+          icon: SettingsOutlinedIcon,
+          children: systemChildren,
         },
-      ].filter((i) => i.show !== false),
+      ],
     },
-  ]), [admin, features.disableDrivers, manager, pendingFuelCount, readonly]);
+  ]), [
+    alertsBadgeCount,
+    features.disableDrivers,
+    manager,
+    pendingFuelCount,
+    readonly,
+    systemChildren,
+  ]);
+
+  const pathActive = useCallback((path, exact = false) => {
+    if (!path) return false;
+    if (exact) return location.pathname === path;
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  }, [location.pathname]);
+
+  const isAnyChildActive = useCallback((children) => {
+    if (!Array.isArray(children) || !children.length) return false;
+    return children.some((c) => {
+      if (c.external) return false;
+      if (c.activeMatch) return c.activeMatch(location.pathname);
+      return pathActive(c.path);
+    });
+  }, [location.pathname, pathActive]);
 
   const handleGo = useCallback((path) => {
     if (!path) return;
@@ -309,16 +439,31 @@ const ModernSidebar = ({
     return item.title;
   }, [collapsed]);
 
+  const leafActive = useCallback((item) => {
+    if (item.activeMatch) return item.activeMatch(location.pathname);
+    if (!item.path) return false;
+    return pathActive(item.path);
+  }, [location.pathname, pathActive]);
+
   const renderLeaf = useCallback((item, opts = {}) => {
     const { dense = false, keyPrefix = '' } = opts;
-    const active = pathActive(item.path);
+    const active = leafActive(item);
     const tooltip = buildTooltip(item);
+
+    const go = () => {
+      if (item.external && item.href) {
+        window.open(item.href, '_blank', 'noopener,noreferrer');
+        onNavigate?.();
+        return;
+      }
+      handleGo(item.path);
+    };
 
     const button = (
       <ListItemButton
         key={`${keyPrefix}${item.title}`}
         className={`${classes.menuItem} ${dense ? classes.subMenuItem : ''} ${active ? classes.menuItemActive : ''}`}
-        onClick={() => handleGo(item.path)}
+        onClick={go}
         sx={{
           justifyContent: collapsed ? 'center' : 'flex-start',
           px: collapsed ? 1 : undefined,
@@ -351,7 +496,7 @@ const ModernSidebar = ({
         </Box>
       </Tooltip>
     );
-  }, [buildTooltip, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, classes.subMenuItem, collapsed, handleGo, pathActive]);
+  }, [buildTooltip, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, classes.subMenuItem, collapsed, handleGo, leafActive, onNavigate]);
 
   const renderParent = useCallback((item) => {
     const open = Boolean(openState?.[item.key]);
@@ -362,7 +507,8 @@ const ModernSidebar = ({
 
     const onClick = () => {
       if (collapsed) {
-        handleGo(item.children?.[0]?.path);
+        const first = item.children?.find((c) => c.path);
+        handleGo(first?.path);
         return;
       }
       toggleOpen(item.key);
@@ -502,5 +648,4 @@ const ModernSidebar = ({
   );
 };
 
-export default ModernSidebar;
-
+export default UnifiedSidebar;

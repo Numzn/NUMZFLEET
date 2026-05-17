@@ -31,7 +31,10 @@ const normalizeErbPrices = (raw) => {
 };
 
 /**
- * @param {string} vehicleId — fleet vehicle UUID
+ * Vehicle-centric operational data keyed by fleet vehicle id.
+ * @param {string} vehicleId Fleet vehicle UUID
+ * @returns {object} Shape includes `deviceId` (Traccar assignment for sockets/live map/events). Treat as internal wiring;
+ *   user-facing navigation should stay on `/fleet/vehicles/…`, not `/settings/device/…`.
  */
 export default function useVehicleData(vehicleId) {
   const user = useSelector((s) => s.session.user);

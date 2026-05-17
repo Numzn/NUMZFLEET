@@ -13,7 +13,6 @@ import ErrorBoundary from './ErrorBoundary';
 import AppThemeProvider from './AppThemeProvider';
 import ConnectivityProvider from './connectivity/ConnectivityProvider';
 import ConnectivityBanner from './connectivity/ConnectivityBanner';
-import CommandPalette from './common/components/CommandPalette';
 
 preloadImages();
 
@@ -29,7 +28,6 @@ root.render(
               <ServerProvider>
                 <BrowserRouter>
                   <Navigation />
-                  <CommandPalette />
                   <ConnectivityBanner />
                 </BrowserRouter>
                 <ErrorHandler />

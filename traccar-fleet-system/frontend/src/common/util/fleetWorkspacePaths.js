@@ -1,6 +1,6 @@
 /**
  * Single source of truth for Fleet workspace tab routes (Operations / Fuel / Vehicles).
- * Used by ContextStrip and FleetWorkspaceShell to avoid matcher drift.
+ * Used by FleetWorkspaceTabs and route matchers.
  */
 export const FLEET_WORKSPACE_TABS = [
   {

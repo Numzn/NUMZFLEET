@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import { useCatchCallback } from '../reactHelper';
 import useSettingsStyles from './common/useSettingsStyles';
 import SelectField from '../common/components/SelectField';
@@ -41,7 +40,6 @@ const AnnouncementPage = () => {
   }, [users, notificator, message, navigate]);
 
   return (
-    <AppLayout>
       <Container maxWidth="xs" className={classes.container}>
         <Accordion defaultExpanded>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -97,7 +95,6 @@ const AnnouncementPage = () => {
           </Button>
         </div>
       </Container>
-    </AppLayout>
   );
 };
 

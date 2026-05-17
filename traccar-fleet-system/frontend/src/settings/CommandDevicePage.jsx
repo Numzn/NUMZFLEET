@@ -13,7 +13,6 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import BaseCommandView from './components/BaseCommandView';
-import AppLayout from '../common/components/AppLayout';
 import { useCatch } from '../reactHelper';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
@@ -50,7 +49,6 @@ const CommandDevicePage = () => {
   const validate = () => savedId || (item && item.type);
 
   return (
-    <AppLayout>
       <Container maxWidth="xs" className={classes.container}>
         <Accordion defaultExpanded>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -89,7 +87,6 @@ const CommandDevicePage = () => {
           </Button>
         </div>
       </Container>
-    </AppLayout>
   );
 };
 

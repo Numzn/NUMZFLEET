@@ -4,7 +4,6 @@ import {
 } from '@mui/material';
 import { formatTime } from '../common/util/formatter';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import ReportFilter from './components/ReportFilter';
 import usePersistedState from '../common/util/usePersistedState';
@@ -45,7 +44,7 @@ const AuditPage = () => {
   });
 
   return (
-    <AppLayout>
+    <>
       <div className={classes.header}>
         <ReportFilter onShow={onShow} deviceType="none" loading={loading}>
           <ColumnSelect columns={columns} setColumns={setColumns} columnsArray={columnsArray} />
@@ -69,7 +68,7 @@ const AuditPage = () => {
           )) : (<TableShimmer columns={columns.length} />)}
         </TableBody>
       </Table>
-    </AppLayout>
+    </>
   );
 };
 

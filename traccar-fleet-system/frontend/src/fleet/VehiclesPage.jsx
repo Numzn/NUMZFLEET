@@ -35,7 +35,6 @@ import AddIcon from '@mui/icons-material/Add';
 import LinkIcon from '@mui/icons-material/Link';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
-import AppLayout from '../common/components/AppLayout';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import { useManager } from '../common/util/permissions';
 import { fetchVehicles, createVehicle, assignVehicleDevice, deleteVehicle } from './vehiclesApi';
@@ -161,20 +160,17 @@ const VehiclesPage = () => {
 
   if (!manager) {
     return (
-      <AppLayout showSidebar>
-        <Container maxWidth="md" className={classes.container}>
-          <FleetWorkspaceShell>
-            <Alert severity="info">Fleet vehicles are available to managers and administrators only.</Alert>
-          </FleetWorkspaceShell>
-        </Container>
-      </AppLayout>
+      <Container maxWidth="md" className={classes.container}>
+        <FleetWorkspaceShell>
+          <Alert severity="info">Fleet vehicles are available to managers and administrators only.</Alert>
+        </FleetWorkspaceShell>
+      </Container>
     );
   }
 
   return (
-    <AppLayout showSidebar>
-      <Container maxWidth="xl" className={classes.container}>
-        <FleetWorkspaceShell>
+    <Container maxWidth="xl" className={classes.container}>
+      <FleetWorkspaceShell>
         <Box className={classes.header}>
           <Typography variant="h4">Fleet vehicles</Typography>
           <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
@@ -378,7 +374,6 @@ const VehiclesPage = () => {
         </Dialog>
         </FleetWorkspaceShell>
       </Container>
-    </AppLayout>
   );
 };
 

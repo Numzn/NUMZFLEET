@@ -8,7 +8,6 @@ import { makeStyles } from 'tss-react/mui';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import { sessionActions } from '../store';
 
@@ -38,7 +37,6 @@ const LogsPage = () => {
   };
 
   return (
-    <AppLayout>
       <Table>
         <TableHead>
           <TableRow>
@@ -71,7 +69,6 @@ const LogsPage = () => {
           ))}
         </TableBody>
       </Table>
-    </AppLayout>
   );
 };
 

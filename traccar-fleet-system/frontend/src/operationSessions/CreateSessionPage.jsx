@@ -15,7 +15,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import AppLayout from '../common/components/AppLayout';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import {
   RUNTIME_CONTAINER_PY,
@@ -158,7 +157,6 @@ const CreateSessionPage = () => {
   };
 
   return (
-    <AppLayout showSidebar>
       <Container maxWidth="lg" sx={{ py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
           <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
@@ -273,7 +271,6 @@ const CreateSessionPage = () => {
           </Stack>
         </FleetWorkspaceShell>
       </Container>
-    </AppLayout>
   );
 };
 

@@ -9,9 +9,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LinkField from '../common/components/LinkField';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import SettingsMenu from './components/SettingsMenu';
 import { formatNotificationTitle } from '../common/util/formatter';
-import AppLayout from '../common/components/AppLayout';
 import useFeatures from '../common/util/useFeatures';
 import useSettingsStyles from './common/useSettingsStyles';
 import { traccarPath } from '../config/traccarApi.js';
@@ -25,7 +23,6 @@ const GroupConnectionsPage = () => {
   const features = useFeatures();
 
   return (
-    <AppLayout>
       <Container maxWidth="xs" className={classes.container}>
         <Accordion defaultExpanded>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -97,7 +94,6 @@ const GroupConnectionsPage = () => {
           </AccordionDetails>
         </Accordion>
       </Container>
-    </AppLayout>
   );
 };
 

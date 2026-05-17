@@ -25,7 +25,6 @@ import { sessionActions } from '../store';
 import EditAttributesAccordion from './components/EditAttributesAccordion';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import SelectField from '../common/components/SelectField';
-import AppLayout from '../common/components/AppLayout';
 import useCommonDeviceAttributes from '../common/attributes/useCommonDeviceAttributes';
 import useCommonUserAttributes from '../common/attributes/useCommonUserAttributes';
 import { useCatch } from '../reactHelper';
@@ -69,7 +68,6 @@ const ServerPage = () => {
   });
 
   return (
-    <AppLayout>
       <Container maxWidth="xs" className={classes.container}>
         {item && (
           <>
@@ -296,7 +294,6 @@ const ServerPage = () => {
           </Button>
         </div>
       </Container>
-    </AppLayout>
   );
 };
 

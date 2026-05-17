@@ -11,7 +11,6 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CachedIcon from '@mui/icons-material/Cached';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useTranslation, useTranslationKeys } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import usePositionAttributes from '../common/attributes/usePositionAttributes';
 import { prefixString, unprefixString } from '../common/util/stringUtils';
 import SelectField from '../common/components/SelectField';
@@ -87,7 +86,6 @@ const PreferencesPage = () => {
   });
 
   return (
-    <AppLayout>
       <Container maxWidth="xs" className={classes.container}>
         {!readonly && (
           <>
@@ -414,7 +412,6 @@ const PreferencesPage = () => {
           </>
         )}
       </Container>
-    </AppLayout>
   );
 };
 

@@ -10,7 +10,6 @@ import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import LocationSearchingIcon from '@mui/icons-material/LocationSearching';
 import ReportFilter, { updateReportParams } from './components/ReportFilter';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import PositionValue from '../common/components/PositionValue';
 import ColumnSelect from './components/ColumnSelect';
@@ -109,7 +108,6 @@ const PositionsReportPage = () => {
   });
 
   return (
-    <AppLayout>
       <div className={classes.container}>
         {selectedItem && (
           <div className={classes.containerMap}>
@@ -201,7 +199,6 @@ const PositionsReportPage = () => {
           </Table>
         </div>
       </div>
-    </AppLayout>
   );
 };
 

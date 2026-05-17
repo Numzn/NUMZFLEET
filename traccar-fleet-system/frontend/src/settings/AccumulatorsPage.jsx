@@ -12,7 +12,6 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import { useCatch } from '../reactHelper';
 import { useAttributePreference } from '../common/util/preferences';
 import { distanceFromMeters, distanceToMeters, distanceUnitString } from '../common/util/converter';
@@ -52,7 +51,7 @@ const AccumulatorsPage = () => {
   });
 
   return (
-    <AppLayout>
+    <>
       {item && (
         <Container maxWidth="xs" className={classes.container}>
           <Accordion defaultExpanded>
@@ -96,7 +95,7 @@ const AccumulatorsPage = () => {
           </div>
         </Container>
       )}
-    </AppLayout>
+    </>
   );
 };
 

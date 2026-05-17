@@ -8,7 +8,6 @@ import LinkIcon from '@mui/icons-material/Link';
 import { useTheme } from '@mui/material/styles';
 import { useEffectAsync } from '../reactHelper';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import CollectionFab from './components/CollectionFab';
 import CollectionActions from './components/CollectionActions';
 import TableShimmer from '../common/components/TableShimmer';
@@ -79,7 +78,7 @@ const DevicesPage = () => {
   };
 
   return (
-    <AppLayout>
+    <>
       <SearchHeader keyword={searchKeyword} setKeyword={setSearchKeyword} />
       <Table className={classes.table}>
         <TableHead>
@@ -152,7 +151,7 @@ const DevicesPage = () => {
         </TableFooter>
       </Table>
       <CollectionFab editPath="/settings/device" />
-    </AppLayout>
+    </>
   );
 };
 

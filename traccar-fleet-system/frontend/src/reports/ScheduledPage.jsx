@@ -7,7 +7,6 @@ import { makeStyles } from 'tss-react/mui';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useEffectAsync } from '../reactHelper';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import TableShimmer from '../common/components/TableShimmer';
 import RemoveDialog from '../common/components/RemoveDialog';
@@ -60,7 +59,7 @@ const ScheduledPage = () => {
   };
 
   return (
-    <AppLayout>
+    <>
       <Table>
         <TableHead>
           <TableRow>
@@ -97,7 +96,7 @@ const ScheduledPage = () => {
           }
         }}
       />
-    </AppLayout>
+    </>
   );
 };
 

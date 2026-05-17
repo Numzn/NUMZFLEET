@@ -6,7 +6,6 @@ import {
 } from '@mui/material';
 import { useEffectAsync } from '../reactHelper';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import CollectionFab from './components/CollectionFab';
 import CollectionActions from './components/CollectionActions';
 import TableShimmer from '../common/components/TableShimmer';
@@ -34,7 +33,7 @@ const CalendarsPage = () => {
   }, [timestamp]);
 
   return (
-    <AppLayout>
+    <>
       <SearchHeader keyword={searchKeyword} setKeyword={setSearchKeyword} />
       <Table className={classes.table}>
         <TableHead>
@@ -55,7 +54,7 @@ const CalendarsPage = () => {
         </TableBody>
       </Table>
       <CollectionFab editPath="/settings/calendar" />
-    </AppLayout>
+    </>
   );
 };
 

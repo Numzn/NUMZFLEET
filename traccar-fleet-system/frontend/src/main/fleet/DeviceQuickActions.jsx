@@ -12,6 +12,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { useNavigate } from 'react-router-dom';
 import { map } from '../../map/core/MapView';
 import { useTranslation } from '../../common/components/LocalizationProvider';
+import { useToastNotifications } from '../../hooks/useToastNotifications';
 
 export const easeInOutCirc = (t) => (
   t < 0.5
@@ -43,6 +44,7 @@ const DeviceQuickActions = ({
 }) => {
   const navigate = useNavigate();
   const t = useTranslation();
+  const { showToast, ToastNotification } = useToastNotifications();
 
   const [anchorEl, setAnchorEl] = useState(null);
   const menuOpen = Boolean(anchorEl);
@@ -51,17 +53,20 @@ const DeviceQuickActions = ({
 
   const deviceId = device.id;
   const hasFix = Boolean(position?.latitude && position?.longitude);
-  const openPath = fleetVehicleId
-    ? `/fleet/vehicles/${encodeURIComponent(fleetVehicleId)}`
-    : `/settings/device/${deviceId}`;
 
   const handleOpen = () => {
     setAnchorEl(null);
-    navigate(openPath);
+    if (fleetVehicleId) {
+      navigate(`/fleet/vehicles/${encodeURIComponent(fleetVehicleId)}`);
+      return;
+    }
+    showToast('Vehicle not registered in fleet manager', 'warning');
   };
 
   return (
-    <Box
+    <>
+      <ToastNotification />
+      <Box
       sx={{
         display: 'flex',
         flexWrap: 'wrap',
@@ -124,6 +129,7 @@ const DeviceQuickActions = ({
         </MenuItem>
       </Menu>
     </Box>
+    </>
   );
 };
 

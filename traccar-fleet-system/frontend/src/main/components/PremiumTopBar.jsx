@@ -14,6 +14,7 @@ import { makeStyles } from 'tss-react/mui';
 import { useSelector } from 'react-redux';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import MenuIcon from '@mui/icons-material/Menu';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 import LogoImage from '../../login/LogoImage';
 import DeviceStatsChips from './DeviceStatsChips';
 import SearchWithDropdown from './SearchWithDropdown';
@@ -150,6 +151,11 @@ const PremiumTopBar = ({
   onOpenMobileFleetDrawer,
   /** Live map: hide stats + filters from top bar (sidebar owns operations). */
   mapRouteOperationalChrome = false,
+  /** When true, bar sits in-flow under UnifiedShell instead of fixed to the viewport. */
+  embedded = false,
+  /** Mobile: open global app nav (UnifiedSidebar) */
+  showAppNavMenuButton = false,
+  onOpenAppNavMenu,
 }) => {
   const { classes } = useStyles();
   const theme = useTheme();
@@ -185,15 +191,17 @@ const PremiumTopBar = ({
 
   return (
     <AppBar 
-      position="fixed" 
+      position={embedded ? 'relative' : 'fixed'}
+      elevation={embedded ? 0 : undefined}
       className={classes.premiumAppBar}
       sx={{
-        height: `calc(env(safe-area-inset-top, 0px) + ${toolbarHeight}px)`,
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        top: 0,
-        left: 0,
-        right: 0,
-        borderRadius: flatBottomOnMobile && isMobile ? 0 : '0 0 14px 14px',
+        height: embedded ? `${toolbarHeight}px` : `calc(env(safe-area-inset-top, 0px) + ${toolbarHeight}px)`,
+        paddingTop: embedded ? 0 : 'env(safe-area-inset-top, 0px)',
+        top: embedded ? undefined : 0,
+        left: embedded ? undefined : 0,
+        right: embedded ? undefined : 0,
+        width: embedded ? '100%' : undefined,
+        borderRadius: embedded ? 0 : (flatBottomOnMobile && isMobile ? 0 : '0 0 14px 14px'),
         boxShadow: isScrolled
           ? (theme.palette.mode === 'dark'
             ? '0 16px 34px rgba(0, 0, 0, 0.4)'
@@ -214,6 +222,18 @@ const PremiumTopBar = ({
           className={`${classes.brandSection} ${isMobile ? classes.mobileBrandSection : ''}`}
           sx={isMobile ? { pr: 0 } : undefined}
         >
+          {showAppNavMenuButton && isMobile && (
+            <Tooltip title="Menu">
+              <IconButton
+                edge="start"
+                size="small"
+                onClick={() => onOpenAppNavMenu?.()}
+                sx={{ mr: 0.25 }}
+              >
+                <MenuIcon sx={{ fontSize: '1.15rem' }} />
+              </IconButton>
+            </Tooltip>
+          )}
           {showMobileFleetDrawerButton && isMobile && (
             <Tooltip title="Fleet list">
               <IconButton
@@ -222,7 +242,7 @@ const PremiumTopBar = ({
                 onClick={() => onOpenMobileFleetDrawer?.()}
                 sx={{ mr: 0.25 }}
               >
-                <MenuIcon sx={{ fontSize: '1.15rem' }} />
+                <ListAltIcon sx={{ fontSize: '1.15rem' }} />
               </IconButton>
             </Tooltip>
           )}

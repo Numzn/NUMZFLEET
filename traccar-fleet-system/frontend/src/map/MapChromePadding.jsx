@@ -55,7 +55,7 @@ const MapChromePadding = ({ sidebarInset = 0 }) => {
   useEffect(() => {
     const container = map.getContainer();
     const topPad = safeTop + chromeTop;
-    // Bottom nav can be visible at any viewport width (--app-bottomnav-height from AppLayout or map route).
+    // Bottom nav can be visible at any viewport width (--app-bottomnav-height from UnifiedShell / map route).
     const bottomPad = safeBottom + chromeBottom;
     const left = theme.direction === 'rtl' ? 0 : sidebarInset;
     const right = theme.direction === 'rtl' ? sidebarInset : 0;

@@ -13,7 +13,6 @@ import { formatSpeed, formatTime } from '../common/util/formatter';
 import ReportFilter, { updateReportParams } from './components/ReportFilter';
 import { prefixString, unprefixString } from '../common/util/stringUtils';
 import { useTranslation, useTranslationKeys } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import usePersistedState from '../common/util/usePersistedState';
 import ColumnSelect from './components/ColumnSelect';
@@ -208,7 +207,6 @@ const EventReportPage = () => {
   };
 
   return (
-    <AppLayout>
       <div className={classes.container}>
         {selectedItem && (
           <div className={classes.containerMap}>
@@ -295,7 +293,6 @@ const EventReportPage = () => {
           </Table>
         </div>
       </div>
-    </AppLayout>
   );
 };
 

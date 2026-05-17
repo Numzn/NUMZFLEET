@@ -5,7 +5,6 @@ import {
 } from '@mui/material';
 import ReportFilter from './components/ReportFilter';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import ReportsMenu from './components/ReportsMenu';
 import { useCatch } from '../reactHelper';
 import MapView from '../map/core/MapView';
@@ -54,7 +53,6 @@ const CombinedReportPage = () => {
   });
 
   return (
-    <AppLayout>
       <div className={classes.container}>
         {Boolean(items.length) && (
           <div className={classes.containerMap}>
@@ -98,7 +96,6 @@ const CombinedReportPage = () => {
           </Table>
         </div>
       </div>
-    </AppLayout>
   );
 };
 

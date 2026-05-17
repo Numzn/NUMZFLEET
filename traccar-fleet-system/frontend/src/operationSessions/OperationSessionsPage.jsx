@@ -21,7 +21,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import AppLayout from '../common/components/AppLayout';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import {
   RUNTIME_CONTAINER_PY,
@@ -156,7 +155,7 @@ const OperationSessionsPage = () => {
   };
 
   return (
-    <AppLayout showSidebar>
+    <>
       <Container maxWidth="md" sx={{ py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
           <Stack spacing={RUNTIME_STACK_GAP}>
@@ -335,7 +334,7 @@ const OperationSessionsPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </AppLayout>
+    </>
   );
 };
 

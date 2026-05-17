@@ -9,7 +9,6 @@ import LinkIcon from '@mui/icons-material/Link';
 import PublishIcon from '@mui/icons-material/Publish';
 import { useEffectAsync } from '../reactHelper';
 import { useTranslation } from '../common/components/LocalizationProvider';
-import AppLayout from '../common/components/AppLayout';
 import CollectionFab from './components/CollectionFab';
 import CollectionActions from './components/CollectionActions';
 import TableShimmer from '../common/components/TableShimmer';
@@ -55,7 +54,7 @@ const GroupsPage = () => {
   };
 
   return (
-    <AppLayout>
+    <>
       <SearchHeader keyword={searchKeyword} setKeyword={setSearchKeyword} />
       <Table className={classes.table}>
         <TableHead>
@@ -82,7 +81,7 @@ const GroupsPage = () => {
         </TableBody>
       </Table>
       <CollectionFab editPath="/settings/group" />
-    </AppLayout>
+    </>
   );
 };
 

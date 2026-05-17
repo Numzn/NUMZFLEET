@@ -17,7 +17,6 @@ import DirectionsCarFilledOutlinedIcon from '@mui/icons-material/DirectionsCarFi
 import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
-import AppLayout from '../common/components/AppLayout';
 import KPICards from './components/KPICards';
 import ErbPricesCard from './components/ErbPricesCard';
 import useFilter from '../main/useFilter';
@@ -100,7 +99,6 @@ const DashboardPage = () => {
   const handleFuelQueueJump = () => navigate('/fuel-requests');
 
   return (
-    <AppLayout showSidebar={true}>
       <Box sx={{
         px: { xs: 1.5, sm: 2.5, md: 3.5, lg: 4 },
         py: { xs: 1.25, sm: 2, md: 2.5 },
@@ -409,7 +407,6 @@ const DashboardPage = () => {
         </Box>
 
       </Box>
-    </AppLayout>
   );
 };
 
