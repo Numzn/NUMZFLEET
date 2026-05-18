@@ -6,26 +6,27 @@ import {
 import { Outlet, useLocation } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import MenuIcon from '@mui/icons-material/Menu';
 import UnifiedSidebar from './UnifiedSidebar';
 import FleetWorkspaceTabs from './FleetWorkspaceTabs';
-import PremiumTopBar from '../../main/components/PremiumTopBar';
+import LiveMapTopBar from '../../main/components/LiveMapTopBar';
 import FleetSidebar from '../../main/fleet/FleetSidebar';
-import usePersistedState from '../util/usePersistedState';
+import usePersistedState, { savePersistedState } from '../util/usePersistedState';
 import { getWorkspaceType } from '../util/workspaceTypes';
 import {
   FLEET_SIDEBAR_RAIL_WIDTH_PX,
   FLEET_SIDEBAR_WIDTH_PX,
 } from '../../main/fleet/fleetLayoutConstants';
 import { LiveMapChromeProvider, useLiveMapChrome } from '../../main/fleet/LiveMapChromeContext';
+import { fleetInteractionActions } from '../../store';
 import { RUNTIME_WORKSPACE_PX } from '../styles/runtimeDensity';
 
 const DRAWER_WIDTH_EXPANDED = 260;
 const DRAWER_WIDTH_COLLAPSED = 72;
 const CHROME_GAP = 8;
 
-const useStyles = makeStyles()((theme) => ({
+const useStyles = makeStyles()(() => ({
   root: {
     display: 'flex',
     flexDirection: 'row',
@@ -34,12 +35,21 @@ const useStyles = makeStyles()((theme) => ({
     height: '100svh',
     overflow: 'hidden',
   },
+  rootLiveDesktop: {
+    flexDirection: 'column',
+  },
+  bodyRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
   /** In-flow nav column — avoids MUI permanent Drawer double horizontal reservation */
   navRail: {
     flexShrink: 0,
     boxSizing: 'border-box',
     height: '100%',
-    maxHeight: '100svh',
     overflow: 'hidden',
     borderRight: '1px solid var(--surface-border)',
     backgroundColor: 'var(--surface-card)',
@@ -75,11 +85,13 @@ const useStyles = makeStyles()((theme) => ({
 function UnifiedShellContent() {
   const { classes } = useStyles();
   const theme = useTheme();
+  const dispatch = useDispatch();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const location = useLocation();
   const workspaceType = getWorkspaceType(location.pathname);
   const isLive = workspaceType === 'live';
   const isFullscreen = workspaceType === 'fullscreen';
+  const liveDesktop = isLive && desktop;
 
   const { chrome } = useLiveMapChrome();
   const fleetSidebarCollapsed = useSelector((s) => s.fleetInteraction.sidebarCollapsed);
@@ -96,6 +108,16 @@ function UnifiedShellContent() {
       setAppNavOpen(false);
     }
   }, [desktop]);
+
+  const handleToggleFleetCollapse = useCallback(() => {
+    const next = !fleetSidebarCollapsed;
+    dispatch(fleetInteractionActions.setSidebarCollapsed(next));
+    savePersistedState('fleetSidebarCollapsed', next);
+  }, [dispatch, fleetSidebarCollapsed]);
+
+  const handleOpenMobileFleetDrawer = useCallback(() => {
+    dispatch(fleetInteractionActions.setMobileDrawerOpen(true));
+  }, [dispatch]);
 
   const appDrawerWidth = desktop
     ? (collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED)
@@ -127,13 +149,15 @@ function UnifiedShellContent() {
       window.removeEventListener('resize', read);
       vv?.removeEventListener('resize', read);
     };
-  }, [topbarHeight]);
+  }, [topbarHeight, isLive, desktop]);
 
   const showDefaultNavDrawer = !isLive && !isFullscreen;
   const showLiveFleetPermanentDrawer = isLive && desktop;
 
   const showDefaultPermanentNav = showDefaultNavDrawer && desktop;
   const showDefaultTemporaryNav = showDefaultNavDrawer && !desktop;
+
+  const sidebarFleetProps = chrome?.sidebarFleetProps;
 
   const renderAppSidebar = () => (
     <UnifiedSidebar
@@ -146,32 +170,39 @@ function UnifiedShellContent() {
   );
 
   const renderLiveFleetSidebar = () => {
-    if (!chrome?.sidebarFleetProps) {
+    if (!sidebarFleetProps) {
       return <Box sx={{ width: '100%', p: 1 }} />;
     }
     return (
       <FleetSidebar
-        {...chrome.sidebarFleetProps}
+        {...sidebarFleetProps}
         collapsed={fleetSidebarCollapsed}
         variant="desktop"
+        hideHeader
+        hideOperationalPills
       />
     );
   };
 
-  return (
-    <Box className={classes.root}>
-      {showLiveFleetPermanentDrawer && (
-        <Box className={classes.navRail} sx={{ width: liveDrawerWidth }}>
-          {renderLiveFleetSidebar()}
-        </Box>
-      )}
+  const renderLiveMapTopBar = () => {
+    if (!isLive || !sidebarFleetProps) return null;
+    return (
+      <LiveMapTopBar
+        desktop={desktop}
+        fleetCollapsed={fleetSidebarCollapsed}
+        onToggleFleetCollapse={handleToggleFleetCollapse}
+        effectiveFleetTab={sidebarFleetProps.effectiveFleetTab}
+        operationalPresence={sidebarFleetProps.operationalPresence}
+        showAppNavMenuButton={!desktop}
+        onOpenAppNavMenu={() => setAppNavOpen(true)}
+        showMobileFleetDrawerButton={!desktop}
+        onOpenMobileFleetDrawer={handleOpenMobileFleetDrawer}
+      />
+    );
+  };
 
-      {showDefaultPermanentNav && (
-        <Box className={classes.navRail} sx={{ width: appDrawerWidth }}>
-          {renderAppSidebar()}
-        </Box>
-      )}
-
+  const renderDrawers = () => (
+    <>
       {showDefaultTemporaryNav && (
         <Drawer
           variant="temporary"
@@ -228,8 +259,28 @@ function UnifiedShellContent() {
           {renderAppSidebar()}
         </Drawer>
       )}
+    </>
+  );
 
-      <Box className={classes.mainColumn}>
+  const renderNavRails = () => (
+    <>
+      {showLiveFleetPermanentDrawer && (
+        <Box className={classes.navRail} sx={{ width: liveDrawerWidth }}>
+          {renderLiveFleetSidebar()}
+        </Box>
+      )}
+
+      {showDefaultPermanentNav && (
+        <Box className={classes.navRail} sx={{ width: appDrawerWidth }}>
+          {renderAppSidebar()}
+        </Box>
+      )}
+    </>
+  );
+
+  const renderMainColumn = () => (
+    <Box className={classes.mainColumn}>
+      {!liveDesktop && (
         <Box ref={topbarRef} sx={{ flexShrink: 0, pt: isFullscreen ? 'env(safe-area-inset-top, 0px)' : 0 }}>
           {workspaceType === 'default' && !desktop && (
             <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.5, borderBottom: 1, borderColor: 'divider' }}>
@@ -241,14 +292,7 @@ function UnifiedShellContent() {
 
           {workspaceType === 'default' && <FleetWorkspaceTabs />}
 
-          {isLive && chrome?.topBarProps && (
-            <PremiumTopBar
-              embedded
-              {...chrome.topBarProps}
-              showAppNavMenuButton={!desktop}
-              onOpenAppNavMenu={() => setAppNavOpen(true)}
-            />
-          )}
+          {isLive && sidebarFleetProps && renderLiveMapTopBar()}
 
           {isFullscreen && (
             <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
@@ -258,18 +302,41 @@ function UnifiedShellContent() {
             </Box>
           )}
         </Box>
+      )}
 
-        <Box
-          component="main"
-          className={classes.main}
-          sx={{
-            pb: mainPaddingBottom,
-            px: workspaceType === 'default' ? RUNTIME_WORKSPACE_PX : 0,
-          }}
-        >
-          <Outlet />
+      <Box
+        component="main"
+        className={classes.main}
+        sx={{
+          pb: mainPaddingBottom,
+          px: workspaceType === 'default' ? RUNTIME_WORKSPACE_PX : 0,
+        }}
+      >
+        <Outlet />
+      </Box>
+    </Box>
+  );
+
+  if (liveDesktop) {
+    return (
+      <Box className={`${classes.root} ${classes.rootLiveDesktop}`}>
+        <Box ref={topbarRef} sx={{ flexShrink: 0, width: '100%' }}>
+          {renderLiveMapTopBar()}
+        </Box>
+        <Box className={classes.bodyRow}>
+          {renderNavRails()}
+          {renderDrawers()}
+          {renderMainColumn()}
         </Box>
       </Box>
+    );
+  }
+
+  return (
+    <Box className={classes.root}>
+      {renderNavRails()}
+      {renderDrawers()}
+      {renderMainColumn()}
     </Box>
   );
 }

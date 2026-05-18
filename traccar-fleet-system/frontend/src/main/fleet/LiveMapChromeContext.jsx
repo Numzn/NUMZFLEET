@@ -3,8 +3,8 @@ import {
 } from 'react';
 
 /**
- * Live map route registers top bar props and fleet sidebar props with the shell
- * (sidebar and top bar render outside <Outlet />).
+ * Live map route registers fleet sidebar props with the shell
+ * (unified top bar + sidebar render outside <Outlet />).
  */
 const LiveMapChromeContext = createContext({
   chrome: null,

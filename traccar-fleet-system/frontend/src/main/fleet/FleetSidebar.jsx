@@ -28,6 +28,10 @@ const FleetSidebar = ({
   operationalPresence,
   deviceFleetVehicleIdByDeviceId,
   effectiveFleetTab,
+  /** Desktop live map: header lives in LiveMapTopBar */
+  hideHeader = false,
+  /** Operational pills live in LiveMapTopBar */
+  hideOperationalPills = false,
 }) => {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
@@ -54,7 +58,12 @@ const FleetSidebar = ({
 
   if (!desktop && variant === 'desktop') return null;
 
+  const railBg = 'var(--surface-card)';
+
   if (collapsed && desktop && variant === 'desktop') {
+    if (hideHeader) {
+      return <Box sx={{ width: '100%', height: '100%', bgcolor: railBg }} />;
+    }
     return (
       <Box
         sx={{
@@ -80,7 +89,6 @@ const FleetSidebar = ({
     );
   }
 
-  const railBg = 'var(--surface-card)';
   const controlBg = 'var(--surface-workspace)';
   const padX = variant === 'mobile' ? 1 : 1;
   const edge = 'var(--surface-border-subtle)';
@@ -95,68 +103,70 @@ const FleetSidebar = ({
         bgcolor: railBg,
       }}
     >
-      <Box
-        sx={{
-          px: padX,
-          py: variant === 'mobile' ? 0.5 : 0.65,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 0.5,
-          minHeight: variant === 'mobile' ? 44 : 48,
-          maxHeight: variant === 'mobile' ? 48 : 52,
-          borderBottom: `1px solid ${edge}`,
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, minWidth: 0, flex: 1 }}>
-          <Typography
-            component="span"
-            variant="caption"
-            noWrap
-            sx={{
-              fontWeight: 500,
-              fontSize: '12px',
-              lineHeight: 1.15,
-              color: 'var(--color-text-secondary)',
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-            }}
-          >
-            FLEET · LIVE
-          </Typography>
-          <Box
-            sx={{
-              width: 5,
-              height: 5,
-              borderRadius: '50%',
-              bgcolor: 'success.main',
-              flexShrink: 0,
-              opacity: 0.75,
-            }}
-          />
-          <Typography
-            component="span"
-            sx={{
-              fontWeight: 600,
-              letterSpacing: '0.035em',
-              fontSize: '0.575rem',
-              lineHeight: 1.15,
-              color: 'text.secondary',
-              opacity: 0.8,
-              textTransform: 'uppercase',
-            }}
-          >
-            NUMZFLEET
-          </Typography>
+      {!hideHeader && (
+        <Box
+          sx={{
+            px: padX,
+            py: variant === 'mobile' ? 0.5 : 0.65,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 0.5,
+            minHeight: variant === 'mobile' ? 44 : 48,
+            maxHeight: variant === 'mobile' ? 48 : 52,
+            borderBottom: `1px solid ${edge}`,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, minWidth: 0, flex: 1 }}>
+            <Typography
+              component="span"
+              variant="caption"
+              noWrap
+              sx={{
+                fontWeight: 500,
+                fontSize: '12px',
+                lineHeight: 1.15,
+                color: 'var(--color-text-secondary)',
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+              }}
+            >
+              FLEET · LIVE
+            </Typography>
+            <Box
+              sx={{
+                width: 5,
+                height: 5,
+                borderRadius: '50%',
+                bgcolor: 'success.main',
+                flexShrink: 0,
+                opacity: 0.75,
+              }}
+            />
+            <Typography
+              component="span"
+              sx={{
+                fontWeight: 600,
+                letterSpacing: '0.035em',
+                fontSize: '0.575rem',
+                lineHeight: 1.15,
+                color: 'text.secondary',
+                opacity: 0.8,
+                textTransform: 'uppercase',
+              }}
+            >
+              NUMZFLEET
+            </Typography>
+          </Box>
+          {desktop && variant === 'desktop' && (
+            <Tooltip title="Collapse to rail">
+              <IconButton size="small" onClick={() => persistCollapse(true)} sx={{ p: 0.35 }}>
+                <ChevronLeftIcon sx={{ fontSize: '1.05rem' }} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
-        {desktop && variant === 'desktop' && (
-          <Tooltip title="Collapse to rail">
-            <IconButton size="small" onClick={() => persistCollapse(true)} sx={{ p: 0.35 }}>
-              <ChevronLeftIcon sx={{ fontSize: '1.05rem' }} />
-            </IconButton>
-          </Tooltip>
-        )}
-      </Box>
+      )}
 
       <Box
         sx={{
@@ -168,13 +178,15 @@ const FleetSidebar = ({
           borderBottom: `1px solid ${edge}`,
         }}
       >
-        <FleetOperationalPills fleetTab={effectiveFleetTab} presence={operationalPresence} />
+        {!hideOperationalPills && (
+          <FleetOperationalPills fleetTab={effectiveFleetTab} presence={operationalPresence} />
+        )}
         <Box
           sx={{
             display: 'flex',
             alignItems: 'stretch',
             gap: 0.35,
-            mt: 0.45,
+            mt: hideOperationalPills ? 0 : 0.45,
             minWidth: 0,
           }}
         >

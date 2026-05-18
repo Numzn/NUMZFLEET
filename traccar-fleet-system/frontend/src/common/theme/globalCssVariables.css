@@ -31,6 +31,8 @@
   --color-text-primary: #111827;
   --color-text-secondary: #6B7280;
   --color-text-disabled: #9CA3AF;
+  --text-on-surface-primary: var(--color-text-primary);
+  --text-on-surface-secondary: var(--color-text-secondary);
 
   /* Typography */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -74,6 +76,8 @@
   --color-text-primary: #F1F5F9;
   --color-text-secondary: #94A3B8;
   --color-text-disabled: #64748B;
+  --text-on-surface-primary: var(--color-text-primary);
+  --text-on-surface-secondary: var(--color-text-secondary);
 
   --color-primary-light: rgba(26, 86, 219, 0.25);
   --color-success-light: rgba(5, 150, 105, 0.2);

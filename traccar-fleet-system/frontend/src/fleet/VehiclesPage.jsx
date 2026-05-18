@@ -1,81 +1,41 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Alert,
   Box,
   Button,
-  Chip,
-  Container,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  Stack,
   TextField,
   Typography,
-  Paper,
-  IconButton,
-  Tooltip,
-  LinearProgress,
-  Link,
 } from '@mui/material';
-import { makeStyles } from 'tss-react/mui';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import AddIcon from '@mui/icons-material/Add';
-import LinkIcon from '@mui/icons-material/Link';
-import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
+import {
+  RUNTIME_CONTAINER_PY,
+  RUNTIME_STACK_GAP,
+} from '../common/styles/runtimeDensity';
 import { useManager } from '../common/util/permissions';
 import { fetchVehicles, createVehicle, assignVehicleDevice, deleteVehicle } from './vehiclesApi';
-
-const useStyles = makeStyles()((theme) => ({
-  container: {
-    padding: 0,
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing(2),
-    flexWrap: 'wrap',
-    gap: theme.spacing(1),
-  },
-  table: {
-    marginTop: theme.spacing(1),
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--surface-border)',
-    overflow: 'auto',
-    boxShadow: 'none',
-    backgroundColor: 'var(--surface-card)',
-  },
-  muted: {
-    color: theme.palette.text.secondary,
-  },
-}));
-
-const formatFix = (iso) => {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-};
+import VehicleRegistryHeader from './vehicleRegistry/VehicleRegistryHeader';
+import VehicleRegistryCard from './vehicleRegistry/VehicleRegistryCard';
+import VehicleRegistryTable from './vehicleRegistry/VehicleRegistryTable';
+import { vehicleWorkspacePath } from './vehicleRegistry/vehicleRegistryUtils';
 
 const VehiclesPage = () => {
-  const { classes } = useStyles();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const manager = useManager();
   const user = useSelector((state) => state.session.user);
   const devices = useSelector((state) => state.devices.items) || {};
@@ -143,9 +103,9 @@ const VehiclesPage = () => {
     }
   };
 
-  const openAssign = (vehicleId, currentDeviceId) => {
-    setAssignVehicleId(vehicleId);
-    setAssignDeviceId(currentDeviceId != null ? String(currentDeviceId) : '');
+  const openAssign = (row) => {
+    setAssignVehicleId(row.id);
+    setAssignDeviceId(row.assignment?.deviceId != null ? String(row.assignment.deviceId) : '');
     setAssignOpen(true);
   };
 
@@ -161,223 +121,166 @@ const VehiclesPage = () => {
     }
   };
 
+  const handleOpenWorkspace = (vehicleId) => {
+    navigate(vehicleWorkspacePath(vehicleId));
+  };
+
   const deviceList = Object.values(devices).filter(Boolean);
+
+  const dialogs = (
+    <>
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Add vehicle</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <TextField
+            label="Name"
+            value={createName}
+            onChange={(e) => setCreateName(e.target.value)}
+            required
+            fullWidth
+            autoFocus
+          />
+          <TextField
+            label="Plate number"
+            value={createPlate}
+            onChange={(e) => setCreatePlate(e.target.value)}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleCreate} disabled={!createName.trim()}>
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={assignOpen} onClose={() => setAssignOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Assign Traccar device</DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="assign-device-label">Device</InputLabel>
+            <Select
+              labelId="assign-device-label"
+              label="Device"
+              value={assignDeviceId}
+              onChange={(e) => setAssignDeviceId(e.target.value)}
+            >
+              {deviceList.map((d) => (
+                <MenuItem key={d.id} value={String(d.id)}>
+                  {d.name} (ID {d.id})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {deviceList.length === 0 && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              No devices loaded. Open the live map or devices list first so Traccar devices sync into the app.
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleAssign} disabled={!assignDeviceId}>
+            Assign
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete vehicle</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete <strong>{deleteVehicleRow?.name}</strong>? This cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleDelete}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
 
   if (!manager) {
     return (
-      <Container maxWidth="md" className={classes.container}>
+      <Box sx={{ width: '100%', py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
           <Alert severity="info">Fleet vehicles are available to managers and administrators only.</Alert>
         </FleetWorkspaceShell>
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth={false} disableGutters className={classes.container} sx={{ width: '100%' }}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        py: RUNTIME_CONTAINER_PY,
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
+      }}
+    >
       <FleetWorkspaceShell>
-        <Box className={classes.header}>
-          <Typography variant="h4">Fleet vehicles</Typography>
-          <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-            <Tooltip title="Refresh">
-              <span style={{ display: 'inline-flex' }}>
-                <IconButton onClick={() => load()} disabled={loading} aria-label="Refresh list">
-                  <RefreshIcon />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
-              Add vehicle
-            </Button>
-          </Box>
-        </Box>
+        <Stack spacing={RUNTIME_STACK_GAP} sx={{ minWidth: 0 }}>
+          <VehicleRegistryHeader
+            loading={loading}
+            onRefresh={load}
+            onAdd={() => setCreateOpen(true)}
+          />
 
-        <Typography variant="body2" className={classes.muted} paragraph sx={{ mb: 1 }}>
-          Open a vehicle for telemetry, fuel, ERB, alerts, and setup in one screen.
-        </Typography>
+          {error && (
+            <Alert severity="error" onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-        {error && (
-          <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+          {loading && <LinearProgress sx={{ borderRadius: 'var(--radius-sm)' }} />}
 
-        {loading && <LinearProgress sx={{ mb: 1 }} />}
-
-        <TableContainer component={Paper} className={classes.table}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Plate</TableCell>
-                <TableCell>Device</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Speed</TableCell>
-                <TableCell>Last fix</TableCell>
-                <TableCell align="right">Tank (L)</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+          {isMobile ? (
+            <Stack spacing={1.5} sx={{ width: '100%', minWidth: 0 }}>
               {rows.length === 0 && !loading ? (
-                <TableRow>
-                  <TableCell colSpan={8}>
-                    <Typography variant="body2" className={classes.muted}>
-                      No vehicles yet. Add one or assign a Traccar device.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                <Box
+                  sx={{
+                    p: 'var(--space-4)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px dashed var(--surface-border)',
+                    bgcolor: 'var(--surface-card)',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ color: 'var(--color-text-secondary)' }}>
+                    No vehicles yet. Add one or assign a Traccar device.
+                  </Typography>
+                </Box>
               ) : (
                 rows.map((row) => (
-                  <TableRow key={row.id} hover>
-                    <TableCell>
-                      <Link
-                        component={RouterLink}
-                        to={`/fleet/vehicles/${encodeURIComponent(row.id)}`}
-                        fontWeight={600}
-                        underline="hover"
-                        color="primary"
-                      >
-                        {row.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        component={RouterLink}
-                        to={`/fleet/vehicles/${encodeURIComponent(row.id)}`}
-                        underline="hover"
-                        color="inherit"
-                      >
-                        {row.plateNumber || '—'}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {row.device?.name || (row.assignment ? `ID ${row.assignment.deviceId}` : '—')}
-                    </TableCell>
-                    <TableCell>
-                      {row.device?.status ? (
-                        <Chip
-                          size="small"
-                          label={row.device.status === 'online' ? 'Live' : 'Offline'}
-                          variant={row.device.status === 'online' ? 'live' : 'offline'}
-                        />
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
-                    <TableCell align="right">
-                      {row.position?.speed != null ? `${Math.round(row.position.speed)} km/h` : '—'}
-                    </TableCell>
-                    <TableCell>{formatFix(row.position?.fixTime)}</TableCell>
-                    <TableCell align="right">
-                      {row.vehicleSpec?.tankCapacity != null ? row.vehicleSpec.tankCapacity : '—'}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Box display="flex" justifyContent="flex-end" alignItems="center" gap={0.5} flexWrap="wrap">
-                        <Button
-                          size="small"
-                          variant="text"
-                          startIcon={<DashboardOutlinedIcon />}
-                          onClick={() => navigate(`/fleet/vehicles/${encodeURIComponent(row.id)}`)}
-                        >
-                          Dashboard
-                        </Button>
-                        <Button
-                          size="small"
-                          startIcon={<LinkIcon />}
-                          onClick={() => openAssign(row.id, row.assignment?.deviceId)}
-                        >
-                          {row.assignment ? 'Change device' : 'Assign device'}
-                        </Button>
-                        <Tooltip title="Delete vehicle">
-                          <IconButton size="small" color="error" onClick={() => openDeleteConfirm(row)} aria-label="Delete vehicle">
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                  <VehicleRegistryCard
+                    key={row.id}
+                    row={row}
+                    onOpenWorkspace={handleOpenWorkspace}
+                    onChangeDevice={openAssign}
+                    onDelete={openDeleteConfirm}
+                  />
                 ))
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle>Add vehicle</DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-            <TextField
-              label="Name"
-              value={createName}
-              onChange={(e) => setCreateName(e.target.value)}
-              required
-              fullWidth
-              autoFocus
+            </Stack>
+          ) : (
+            <VehicleRegistryTable
+              rows={rows}
+              loading={loading}
+              onOpenWorkspace={handleOpenWorkspace}
+              onChangeDevice={openAssign}
+              onDelete={openDeleteConfirm}
             />
-            <TextField
-              label="Plate number"
-              value={createPlate}
-              onChange={(e) => setCreatePlate(e.target.value)}
-              fullWidth
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button variant="contained" onClick={handleCreate} disabled={!createName.trim()}>
-              Create
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        <Dialog open={assignOpen} onClose={() => setAssignOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Assign Traccar device</DialogTitle>
-          <DialogContent sx={{ pt: 1 }}>
-            <FormControl fullWidth margin="normal">
-              <InputLabel id="assign-device-label">Device</InputLabel>
-              <Select
-                labelId="assign-device-label"
-                label="Device"
-                value={assignDeviceId}
-                onChange={(e) => setAssignDeviceId(e.target.value)}
-              >
-                {deviceList.map((d) => (
-                  <MenuItem key={d.id} value={String(d.id)}>
-                    {d.name} (ID {d.id})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            {deviceList.length === 0 && (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                No devices loaded. Open the live map or devices list first so Traccar devices sync into the app.
-              </Alert>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setAssignOpen(false)}>Cancel</Button>
-            <Button variant="contained" onClick={handleAssign} disabled={!assignDeviceId}>
-              Assign
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Delete confirmation dialog */}
-        <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle>Delete vehicle</DialogTitle>
-          <DialogContent>
-            <Typography>
-              Are you sure you want to delete <strong>{deleteVehicleRow?.name}</strong>? This cannot be undone.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-            <Button variant="contained" color="error" onClick={handleDelete}>
-              Delete
-            </Button>
-          </DialogActions>
-        </Dialog>
-        </FleetWorkspaceShell>
-      </Container>
+          )}
+        </Stack>
+      </FleetWorkspaceShell>
+      {dialogs}
+    </Box>
   );
 };
 

@@ -3,7 +3,6 @@ import {
 } from 'react';
 import { Box } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { devicesActions, fleetInteractionActions } from '../store';
@@ -22,7 +21,6 @@ const LiveMapPage = () => {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { setLiveMapChrome } = useLiveMapChrome();
   const manager = useManager();
   const user = useSelector((state) => state.session.user);
@@ -151,10 +149,6 @@ const LiveMapPage = () => {
     };
   }, [manager, user]);
 
-  const handleDashboardClick = useCallback(() => {
-    navigate('/');
-  }, [navigate]);
-
   const handleClosePopup = useCallback(() => {
     dispatch(devicesActions.selectId(null));
   }, [dispatch]);
@@ -213,43 +207,10 @@ const LiveMapPage = () => {
     handlePremiumFilterChange,
   ]);
 
-  const topBarProps = useMemo(() => ({
-    devices: Object.values(devices),
-    stats: deviceStats,
-    onFilterChange: handlePremiumFilterChange,
-    onNavigateToDashboard: handleDashboardClick,
-    groups: Object.values(groups),
-    filters: {
-      statuses: filter.statuses,
-      groups: filter.groups,
-      sortBy: filterSort,
-      mapOnly: filterMap,
-    },
-    hideCenterSearch: true,
-    mapRouteOperationalChrome: true,
-    showMobileFleetDrawerButton: !desktop,
-    onOpenMobileFleetDrawer: () => dispatch(fleetInteractionActions.setMobileDrawerOpen(true)),
-  }), [
-    devices,
-    deviceStats,
-    handlePremiumFilterChange,
-    handleDashboardClick,
-    groups,
-    filter.statuses,
-    filter.groups,
-    filterSort,
-    filterMap,
-    desktop,
-    dispatch,
-  ]);
-
   useLayoutEffect(() => {
-    setLiveMapChrome({
-      topBarProps,
-      sidebarFleetProps,
-    });
+    setLiveMapChrome({ sidebarFleetProps });
     return () => setLiveMapChrome(null);
-  }, [setLiveMapChrome, topBarProps, sidebarFleetProps]);
+  }, [setLiveMapChrome, sidebarFleetProps]);
 
   const mapColumn = (
     <Box sx={{ position: 'relative', flex: 1, minHeight: 0, width: '100%' }}>
@@ -287,6 +248,8 @@ const LiveMapPage = () => {
             <FleetSidebar
               {...opts}
               {...sidebarFleetProps}
+              hideHeader
+              hideOperationalPills
             />
           )}
           map={mapColumn}
