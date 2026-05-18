@@ -6,8 +6,10 @@ import {
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import MenuIcon from '@mui/icons-material/Menu';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import FleetOperationalPills from '../fleet/FleetOperationalPills';
 import NotificationCenter from '../../notifications/NotificationCenter';
@@ -30,13 +32,77 @@ const BAR_SX = {
   backgroundImage: 'none',
 };
 
-const connectionPulse = {
-  '@keyframes liveMapPulse': {
-    '0%': { boxShadow: '0 0 0 0 rgba(5, 150, 105, 0.45)' },
-    '70%': { boxShadow: '0 0 0 6px rgba(5, 150, 105, 0)' },
-    '100%': { boxShadow: '0 0 0 0 rgba(5, 150, 105, 0)' },
+const connectionKeyframes = {
+  '@keyframes liveMapPulseRing': {
+    '0%': {
+      transform: 'scale(0.95)',
+      opacity: 0.85,
+      boxShadow: '0 0 0 0 rgba(16, 185, 129, 0.5)',
+    },
+    '70%': {
+      transform: 'scale(1.12)',
+      opacity: 0.4,
+      boxShadow: '0 0 0 6px rgba(16, 185, 129, 0)',
+    },
+    '100%': {
+      transform: 'scale(0.95)',
+      opacity: 0.85,
+      boxShadow: '0 0 0 0 rgba(16, 185, 129, 0)',
+    },
+  },
+  '@keyframes liveMapDisconnectedBlink': {
+    '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+    '50%': { opacity: 0.5, transform: 'scale(0.95)' },
   },
 };
+
+const ConnectionIndicator = ({ socketConnected }) => (
+  <Tooltip
+    title={socketConnected ? 'Live feed connected' : 'Live feed disconnected — reconnecting…'}
+    arrow
+  >
+    <Box
+      role="status"
+      aria-live="polite"
+      aria-label={socketConnected ? 'Live feed connected' : 'Live feed disconnected'}
+      sx={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 14,
+        height: 14,
+        flexShrink: 0,
+      }}
+    >
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: '50%',
+          border: '1.5px solid',
+          borderColor: socketConnected ? 'var(--color-success)' : 'var(--color-critical)',
+          bgcolor: socketConnected ? 'rgba(5, 150, 105, 0.14)' : 'rgba(220, 38, 38, 0.12)',
+          animation: socketConnected
+            ? 'liveMapPulseRing 2s ease-out infinite'
+            : 'liveMapDisconnectedBlink 1.2s ease-in-out infinite',
+        }}
+      />
+      <Box
+        sx={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          zIndex: 1,
+          bgcolor: socketConnected ? 'var(--color-success)' : 'var(--color-critical)',
+          boxShadow: socketConnected
+            ? '0 0 6px rgba(5, 150, 105, 0.6)'
+            : '0 0 5px rgba(220, 38, 38, 0.55)',
+        }}
+      />
+    </Box>
+  </Tooltip>
+);
 
 const FleetLiveIdentity = ({ socketConnected }) => (
   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
@@ -54,21 +120,7 @@ const FleetLiveIdentity = ({ socketConnected }) => (
     >
       FLEET · LIVE
     </Typography>
-    <Tooltip
-      title={socketConnected ? 'Live feed connected' : 'Live feed disconnected — reconnecting…'}
-      arrow
-    >
-      <Box
-        sx={{
-          width: 7,
-          height: 7,
-          borderRadius: '50%',
-          flexShrink: 0,
-          bgcolor: socketConnected ? 'var(--color-success)' : 'var(--color-critical)',
-          animation: socketConnected ? 'liveMapPulse 2s infinite' : 'none',
-        }}
-      />
-    </Tooltip>
+    <ConnectionIndicator socketConnected={socketConnected} />
   </Box>
 );
 
@@ -88,6 +140,7 @@ const LiveMapTopBar = ({
   showMobileFleetDrawerButton = false,
   onOpenMobileFleetDrawer,
 }) => {
+  const navigate = useNavigate();
   const socketConnected = useSelector((state) => !!state.session.socket);
 
   return (
@@ -97,7 +150,7 @@ const LiveMapTopBar = ({
       aria-label="Fleet live operations"
       sx={{
         ...BAR_SX,
-        ...connectionPulse,
+        ...connectionKeyframes,
         px: { xs: 'var(--space-4)', md: 'var(--space-6)' },
         pt: { xs: 'env(safe-area-inset-top, 0px)', md: 0 },
         height: {
@@ -213,6 +266,21 @@ const LiveMapTopBar = ({
           flexShrink: 0,
         }}
       >
+        {desktop && (
+          <Tooltip title="Fleet dashboard">
+            <IconButton
+              size="small"
+              onClick={() => navigate('/')}
+              aria-label="Back to fleet dashboard"
+              sx={{
+                color: 'var(--text-on-surface-secondary)',
+                '&:hover': { bgcolor: 'var(--surface-card-hover)' },
+              }}
+            >
+              <DashboardOutlinedIcon sx={{ fontSize: '1.2rem' }} />
+            </IconButton>
+          </Tooltip>
+        )}
         <NotificationCenter />
         <UserMenuDropdown />
       </Box>
