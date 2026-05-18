@@ -9,7 +9,6 @@ import { useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import MenuIcon from '@mui/icons-material/Menu';
 import UnifiedSidebar from './UnifiedSidebar';
-import FleetWorkspaceTabs from './FleetWorkspaceTabs';
 import LiveMapTopBar from '../../main/components/LiveMapTopBar';
 import FleetSidebar from '../../main/fleet/FleetSidebar';
 import usePersistedState, { savePersistedState } from '../util/usePersistedState';
@@ -20,7 +19,7 @@ import {
 } from '../../main/fleet/fleetLayoutConstants';
 import { LiveMapChromeProvider, useLiveMapChrome } from '../../main/fleet/LiveMapChromeContext';
 import { fleetInteractionActions } from '../../store';
-import { RUNTIME_WORKSPACE_PX } from '../styles/runtimeDensity';
+import { RUNTIME_WORKSPACE_PT, RUNTIME_WORKSPACE_PX } from '../styles/runtimeDensity';
 
 const DRAWER_WIDTH_EXPANDED = 260;
 const DRAWER_WIDTH_COLLAPSED = 72;
@@ -35,7 +34,7 @@ const useStyles = makeStyles()(() => ({
     height: '100svh',
     overflow: 'hidden',
   },
-  rootLiveDesktop: {
+  rootLiveStacked: {
     flexDirection: 'column',
   },
   bodyRow: {
@@ -91,10 +90,9 @@ function UnifiedShellContent() {
   const workspaceType = getWorkspaceType(location.pathname);
   const isLive = workspaceType === 'live';
   const isFullscreen = workspaceType === 'fullscreen';
-  const liveDesktop = isLive && desktop;
-
   const { chrome } = useLiveMapChrome();
   const fleetSidebarCollapsed = useSelector((s) => s.fleetInteraction.sidebarCollapsed);
+  const mobileFleetDrawerOpen = useSelector((s) => s.fleetInteraction.mobileDrawerOpen);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [appNavOpen, setAppNavOpen] = useState(false);
@@ -222,6 +220,31 @@ function UnifiedShellContent() {
         </Drawer>
       )}
 
+      {isLive && !desktop && sidebarFleetProps && (
+        <Drawer
+          anchor="left"
+          open={mobileFleetDrawerOpen}
+          onClose={() => dispatch(fleetInteractionActions.setMobileDrawerOpen(false))}
+          className={classes.drawer}
+          ModalProps={{ keepMounted: true }}
+          PaperProps={{
+            sx: {
+              width: `min(88vw, ${FLEET_SIDEBAR_WIDTH_PX}px)`,
+              boxSizing: 'border-box',
+              bgcolor: 'var(--surface-card)',
+            },
+          }}
+        >
+          <FleetSidebar
+            {...sidebarFleetProps}
+            collapsed={false}
+            variant="mobile"
+            hideHeader
+            hideOperationalPills
+          />
+        </Drawer>
+      )}
+
       {isLive && !desktop && (
         <Drawer
           variant="temporary"
@@ -280,7 +303,7 @@ function UnifiedShellContent() {
 
   const renderMainColumn = () => (
     <Box className={classes.mainColumn}>
-      {!liveDesktop && (
+      {!isLive && (
         <Box ref={topbarRef} sx={{ flexShrink: 0, pt: isFullscreen ? 'env(safe-area-inset-top, 0px)' : 0 }}>
           {workspaceType === 'default' && !desktop && (
             <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.5, borderBottom: 1, borderColor: 'divider' }}>
@@ -289,10 +312,6 @@ function UnifiedShellContent() {
               </IconButton>
             </Box>
           )}
-
-          {workspaceType === 'default' && <FleetWorkspaceTabs />}
-
-          {isLive && sidebarFleetProps && renderLiveMapTopBar()}
 
           {isFullscreen && (
             <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
@@ -309,6 +328,7 @@ function UnifiedShellContent() {
         className={classes.main}
         sx={{
           pb: mainPaddingBottom,
+          pt: workspaceType === 'default' ? RUNTIME_WORKSPACE_PT : 0,
           px: workspaceType === 'default' ? RUNTIME_WORKSPACE_PX : 0,
         }}
       >
@@ -317,9 +337,9 @@ function UnifiedShellContent() {
     </Box>
   );
 
-  if (liveDesktop) {
+  if (isLive) {
     return (
-      <Box className={`${classes.root} ${classes.rootLiveDesktop}`}>
+      <Box className={`${classes.root} ${classes.rootLiveStacked}`}>
         <Box ref={topbarRef} sx={{ flexShrink: 0, width: '100%' }}>
           {renderLiveMapTopBar()}
         </Box>

@@ -25,8 +25,22 @@ import {
   RUNTIME_CONTAINER_PY,
   RUNTIME_STACK_GAP,
 } from '../common/styles/runtimeDensity';
+import {
+  operationalDialogActionsSx,
+  operationalDialogContentSx,
+  operationalDialogFieldSlotProps,
+  operationalDialogPaperProps,
+  operationalDialogPrimaryActionSx,
+  operationalDialogTitleSx,
+} from '../common/styles/operationalDialogSx';
 import { useManager } from '../common/util/permissions';
-import { fetchVehicles, createVehicle, assignVehicleDevice, deleteVehicle } from './vehiclesApi';
+import {
+  fetchVehicles,
+  createVehicle,
+  assignVehicleDevice,
+  deleteVehicle,
+  fuelApiErrorMessage,
+} from './vehiclesApi';
 import VehicleRegistryHeader from './vehicleRegistry/VehicleRegistryHeader';
 import VehicleRegistryCard from './vehicleRegistry/VehicleRegistryCard';
 import VehicleRegistryTable from './vehicleRegistry/VehicleRegistryTable';
@@ -99,7 +113,7 @@ const VehiclesPage = () => {
       setDeleteVehicleRow(null);
       await load();
     } catch (e) {
-      setError(e.message || 'Delete failed');
+      setError(fuelApiErrorMessage(e, 'Delete failed'));
     }
   };
 
@@ -129,37 +143,67 @@ const VehiclesPage = () => {
 
   const dialogs = (
     <>
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Add vehicle</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+      <Dialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={operationalDialogPaperProps}
+      >
+        <DialogTitle sx={operationalDialogTitleSx}>Add vehicle</DialogTitle>
+        <DialogContent sx={operationalDialogContentSx}>
           <TextField
             label="Name"
             value={createName}
             onChange={(e) => setCreateName(e.target.value)}
             required
             fullWidth
+            size="medium"
             autoFocus
+            slotProps={operationalDialogFieldSlotProps}
           />
           <TextField
             label="Plate number"
             value={createPlate}
             onChange={(e) => setCreatePlate(e.target.value)}
             fullWidth
+            size="medium"
+            slotProps={operationalDialogFieldSlotProps}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreate} disabled={!createName.trim()}>
+        <DialogActions sx={operationalDialogActionsSx}>
+          <Button onClick={() => setCreateOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCreate}
+            disabled={!createName.trim()}
+            sx={operationalDialogPrimaryActionSx}
+          >
             Create
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={assignOpen} onClose={() => setAssignOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Assign Traccar device</DialogTitle>
-        <DialogContent sx={{ pt: 1 }}>
-          <FormControl fullWidth margin="normal">
-            <InputLabel id="assign-device-label">Device</InputLabel>
+      <Dialog
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={operationalDialogPaperProps}
+      >
+        <DialogTitle sx={operationalDialogTitleSx}>Assign Traccar device</DialogTitle>
+        <DialogContent sx={operationalDialogContentSx}>
+          <FormControl fullWidth size="medium">
+            <InputLabel
+              id="assign-device-label"
+              sx={{
+                ...operationalDialogFieldSlotProps.inputLabel.sx,
+              }}
+            >
+              Device
+            </InputLabel>
             <Select
               labelId="assign-device-label"
               label="Device"
@@ -174,29 +218,53 @@ const VehiclesPage = () => {
             </Select>
           </FormControl>
           {deviceList.length === 0 && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
+            <Alert severity="warning">
               No devices loaded. Open the live map or devices list first so Traccar devices sync into the app.
             </Alert>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAssignOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAssign} disabled={!assignDeviceId}>
+        <DialogActions sx={operationalDialogActionsSx}>
+          <Button onClick={() => setAssignOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleAssign}
+            disabled={!assignDeviceId}
+            sx={operationalDialogPrimaryActionSx}
+          >
             Assign
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete vehicle</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to delete <strong>{deleteVehicleRow?.name}</strong>? This cannot be undone.
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={operationalDialogPaperProps}
+      >
+        <DialogTitle sx={operationalDialogTitleSx}>Delete vehicle</DialogTitle>
+        <DialogContent sx={{ ...operationalDialogContentSx, gap: 0 }}>
+          <Typography sx={{ color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+            Are you sure you want to delete{' '}
+            <Box component="span" sx={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
+              {deleteVehicleRow?.name}
+            </Box>
+            ? This cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleDelete}>
+        <DialogActions sx={operationalDialogActionsSx}>
+          <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDelete}
+            sx={{ ...operationalDialogPrimaryActionSx, minWidth: 96 }}
+          >
             Delete
           </Button>
         </DialogActions>

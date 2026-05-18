@@ -12,8 +12,6 @@ import { useManager } from '../common/util/permissions';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
 import MapDevicePopup from './components/MapDevicePopup';
-import FleetLayout from './fleet/FleetLayout';
-import FleetSidebar from './fleet/FleetSidebar';
 import { fetchVehicles } from '../fleet/vehiclesApi.js';
 import { useLiveMapChrome } from './fleet/LiveMapChromeContext';
 
@@ -240,21 +238,7 @@ const LiveMapPage = () => {
         overflow: 'hidden',
       }}
     >
-      {desktop ? (
-        mapColumn
-      ) : (
-        <FleetLayout
-          sidebar={(opts) => (
-            <FleetSidebar
-              {...opts}
-              {...sidebarFleetProps}
-              hideHeader
-              hideOperationalPills
-            />
-          )}
-          map={mapColumn}
-        />
-      )}
+      {mapColumn}
     </Box>
   );
 };

@@ -3,16 +3,16 @@
  */
 
 /** Vertical padding for workspace page blocks */
-export const RUNTIME_CONTAINER_PY = 1.25;
+export const RUNTIME_CONTAINER_PY = 1.75;
+
+/** Top inset on UnifiedShell main (replaces removed tab-strip chrome) */
+export const RUNTIME_WORKSPACE_PT = { xs: 1.25, md: 1.5 };
 
 /** Horizontal inset for UnifiedShell main — single source (pages should not add outer px) */
-export const RUNTIME_WORKSPACE_PX = { xs: 2, md: 2 };
+export const RUNTIME_WORKSPACE_PX = { xs: 2, md: 2.5 };
 
 /** Primary Stack spacing between sections */
-export const RUNTIME_STACK_GAP = 1.25;
+export const RUNTIME_STACK_GAP = 1.5;
 
 /** Tighter stacks (lists, nested groups) */
 export const RUNTIME_STACK_GAP_TIGHT = 1;
-
-/** Bottom padding under fleet workspace tabs / top chrome row */
-export const RUNTIME_CONTEXT_STRIP_PB = 1;

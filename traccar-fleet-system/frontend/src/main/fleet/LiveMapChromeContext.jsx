@@ -3,8 +3,19 @@ import {
 } from 'react';
 
 /**
- * Live map route registers fleet sidebar props with the shell
- * (unified top bar + sidebar render outside <Outlet />).
+ * Live map workspace contract (`/map`, workspaceType `live`)
+ *
+ * LiveMapPage registers `{ sidebarFleetProps }` here. UnifiedShell reads it and renders:
+ * - LiveMapTopBar — full-width 56px operational chrome (identity, pills, account)
+ * - FleetSidebar — rail only (search, filters, vehicle list); no duplicate header/pills
+ *
+ * Layout (UnifiedShell) — mobile and desktop:
+ *   [ LiveMapTopBar — full width ]
+ *   [ Fleet rail 280px | 44px collapsed (desktop only) ] [ MainMap via <Outlet /> ]
+ *
+ * Mobile: fleet list drawer + app nav drawer owned by UnifiedShell (not FleetLayout).
+ *
+ * Do not reintroduce a second map-only title bar or PremiumTopBar on this route.
  */
 const LiveMapChromeContext = createContext({
   chrome: null,

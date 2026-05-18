@@ -184,15 +184,35 @@ export async function updateVehicle(id, { name, plateNumber }) {
 }
 
 export async function deleteVehicle(id) {
-  const vehicle = await Vehicle.findByPk(id);
+  const vid = String(id);
+  const vehicle = await Vehicle.findByPk(vid);
   if (!vehicle) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
   }
-  // Deactivate any device assignments first
-  await DeviceAssignment.update({ isActive: false }, { where: { vehicleId: id } });
-  await vehicle.destroy();
+
+  const activeAssignment = await DeviceAssignment.findOne({
+    where: { vehicleId: vid, isActive: true },
+  });
+
+  await sequelize.transaction(async (transaction) => {
+    // Rows must be removed — FK is ON DELETE RESTRICT; soft-deactivate alone blocks destroy().
+    await DeviceAssignment.destroy({ where: { vehicleId: vid }, transaction });
+    await vehicle.destroy({ transaction });
+  });
+
+  if (activeAssignment?.deviceId != null) {
+    try {
+      await upsertTraccarDeviceAttribute(Number(activeAssignment.deviceId), 'fleetVehicleId', null);
+      await upsertTraccarDeviceAttribute(Number(activeAssignment.deviceId), 'vehicleName', null);
+    } catch (traccarErr) {
+      console.warn(
+        'Vehicle deleted in Postgres but Traccar device labels were not cleared:',
+        traccarErr?.message || traccarErr,
+      );
+    }
+  }
 }
 
 export async function listVehiclesMerged() {

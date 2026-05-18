@@ -16,6 +16,13 @@ import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from '../../common/components/UserMenuDropdown';
 import { TOPBAR_HEIGHT } from '../../common/styles/topbarStyles';
 
+/**
+ * Single operational command surface for `/map`.
+ * Left: FLEET · LIVE + feed connection dot + rail collapse (desktop).
+ * Center: FleetOperationalPills. Right: dashboard (desktop), notifications, user.
+ * Surfaces: --surface-card / --surface-border only (no gradient/cyan chrome).
+ */
+
 const BAR_SX = {
   flexShrink: 0,
   width: '100%',
@@ -111,7 +118,7 @@ const FleetLiveIdentity = ({ socketConnected }) => (
       noWrap
       sx={{
         fontWeight: 700,
-        fontSize: '12px',
+        fontSize: { xs: '10px', sm: '12px' },
         lineHeight: 1.2,
         letterSpacing: '0.07em',
         textTransform: 'uppercase',
@@ -151,26 +158,22 @@ const LiveMapTopBar = ({
       sx={{
         ...BAR_SX,
         ...connectionKeyframes,
-        px: { xs: 'var(--space-4)', md: 'var(--space-6)' },
-        pt: { xs: 'env(safe-area-inset-top, 0px)', md: 0 },
-        height: {
-          xs: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
-          md: TOPBAR_HEIGHT,
-        },
-        minHeight: {
-          xs: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
-          md: TOPBAR_HEIGHT,
-        },
+        gap: { xs: 'var(--space-2)', md: 'var(--space-3)' },
+        px: { xs: 'var(--space-3)', sm: 'var(--space-4)', md: 'var(--space-6)' },
+        pt: 'env(safe-area-inset-top, 0px)',
+        height: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
+        minHeight: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
       }}
     >
-      {/* Identity + rail control */}
+      {/* Identity + rail / drawer controls */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 'var(--space-1)',
-          flexShrink: 0,
+          gap: { xs: 0.25, sm: 'var(--space-1)' },
+          flexShrink: { xs: 1, sm: 0 },
           minWidth: 0,
+          maxWidth: { xs: '46%', sm: 'none' },
         }}
       >
         {showAppNavMenuButton && (
@@ -229,14 +232,14 @@ const LiveMapTopBar = ({
         )}
       </Box>
 
-      {/* Operational filters — grows into open space */}
+      {/* Operational filters */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
           flex: 1,
           minWidth: 0,
-          justifyContent: { xs: 'flex-end', md: 'flex-start' },
+          justifyContent: 'flex-start',
           overflow: 'hidden',
         }}
       >
@@ -266,21 +269,19 @@ const LiveMapTopBar = ({
           flexShrink: 0,
         }}
       >
-        {desktop && (
-          <Tooltip title="Fleet dashboard">
-            <IconButton
-              size="small"
-              onClick={() => navigate('/')}
-              aria-label="Back to fleet dashboard"
-              sx={{
-                color: 'var(--text-on-surface-secondary)',
-                '&:hover': { bgcolor: 'var(--surface-card-hover)' },
-              }}
-            >
-              <DashboardOutlinedIcon sx={{ fontSize: '1.2rem' }} />
-            </IconButton>
-          </Tooltip>
-        )}
+        <Tooltip title="Fleet dashboard">
+          <IconButton
+            size="small"
+            onClick={() => navigate('/')}
+            aria-label="Back to fleet dashboard"
+            sx={{
+              color: 'var(--text-on-surface-secondary)',
+              '&:hover': { bgcolor: 'var(--surface-card-hover)' },
+            }}
+          >
+            <DashboardOutlinedIcon sx={{ fontSize: '1.2rem' }} />
+          </IconButton>
+        </Tooltip>
         <NotificationCenter />
         <UserMenuDropdown />
       </Box>

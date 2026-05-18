@@ -41,6 +41,18 @@ export async function updateVehicle(user, vehicleId, { name, plateNumber }) {
   return res.json();
 }
 
+/** Extract `{ error }` from fuel-api JSON bodies thrown by fetchOrThrow. */
+export function fuelApiErrorMessage(thrown, fallback = 'Request failed') {
+  const raw = thrown?.message || '';
+  try {
+    const body = JSON.parse(raw);
+    if (body?.error) return String(body.error);
+  } catch {
+    /* plain text or HTML */
+  }
+  return raw.trim() || fallback;
+}
+
 export async function deleteVehicle(user, vehicleId) {
   await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
     method: 'DELETE',
