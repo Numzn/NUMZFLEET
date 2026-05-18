@@ -46,8 +46,10 @@ const FleetOperationalPills = ({ fleetTab, presence }) => {
             fontWeight: 600,
             textTransform: 'none',
             '&.Mui-selected': {
-              bgcolor: 'action.selected',
-              fontWeight: 700,
+              bgcolor: 'var(--color-primary-light)',
+              color: 'var(--color-primary)',
+              borderColor: 'var(--color-primary)',
+              fontWeight: 600,
             },
           },
         }}

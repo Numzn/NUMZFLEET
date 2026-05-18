@@ -52,7 +52,8 @@ const useStyles = makeStyles()((theme) => ({
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: 'var(--surface-card)',
+    borderRight: '1px solid var(--color-border)',
     overflowX: 'hidden',
     minWidth: 0,
   },
@@ -68,49 +69,50 @@ const useStyles = makeStyles()((theme) => ({
       backgroundColor: 'transparent',
     },
     '&::-webkit-scrollbar-thumb': {
-      backgroundColor: 'rgba(6, 182, 212, 0.2)',
+      backgroundColor: 'var(--color-border)',
       borderRadius: '3px',
       '&:hover': {
-        backgroundColor: 'rgba(6, 182, 212, 0.3)',
+        backgroundColor: 'var(--color-border-hover)',
       },
     },
   },
   sectionHeader: {
-    padding: theme.spacing(1.5, 1.5, 0.75, 1.5),
-    marginTop: theme.spacing(1.5),
+    padding: 'var(--space-3) var(--space-4)',
+    marginTop: 'var(--space-3)',
     '&:first-of-type': {
       marginTop: 0,
     },
   },
   sectionTitle: {
-    fontSize: '0.688rem',
-    fontWeight: 700,
-    letterSpacing: '1px',
+    fontSize: '12px',
+    fontWeight: 500,
+    letterSpacing: '0.5px',
     textTransform: 'uppercase',
-    color: theme.palette.text.secondary,
-    opacity: 0.7,
+    color: 'var(--color-text-secondary)',
   },
   menuItem: {
-    borderRadius: theme.spacing(1.25),
+    borderRadius: 'var(--radius-md)',
     marginBottom: theme.spacing(0.25),
-    padding: theme.spacing(1, 1.25),
+    minHeight: 40,
+    padding: '0 var(--space-4)',
     transition: 'background-color 0.15s ease, color 0.15s ease',
     position: 'relative',
     '&:hover': {
-      backgroundColor: theme.palette.action.hover,
+      backgroundColor: 'var(--color-surface-alt)',
     },
   },
   menuItemActive: {
-    backgroundColor: theme.palette.action.selected,
-    color: theme.palette.text.primary,
+    backgroundColor: 'var(--color-primary-light)',
+    color: 'var(--color-primary)',
     '&:hover': {
-      backgroundColor: theme.palette.action.selected,
+      backgroundColor: 'var(--color-primary-light)',
     },
     '& .MuiListItemIcon-root': {
-      color: theme.palette.primary.main,
+      color: 'var(--color-primary)',
     },
     '& .MuiListItemText-primary': {
-      fontWeight: 700,
+      fontWeight: 600,
+      color: 'var(--color-primary)',
     },
     '&::before': {
       content: '""',
@@ -119,15 +121,15 @@ const useStyles = makeStyles()((theme) => ({
       top: '20%',
       bottom: '20%',
       width: '3px',
-      backgroundColor: theme.palette.primary.main,
+      backgroundColor: 'var(--color-primary)',
       borderRadius: '0 3px 3px 0',
     },
   },
   menuItemIcon: {
-    minWidth: 38,
-    color: theme.palette.text.secondary,
+    minWidth: 36,
+    color: 'var(--color-text-secondary)',
     '& .MuiSvgIcon-root': {
-      fontSize: '1.3rem',
+      fontSize: '20px',
     },
   },
   menuItemIconActive: {
@@ -176,7 +178,7 @@ const useStyles = makeStyles()((theme) => ({
   footer: {
     padding: theme.spacing(1, 1.25, 1.25, 1.25),
     borderTop: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: 'var(--surface-card)',
   },
   footerRow: {
     display: 'flex',
@@ -565,7 +567,7 @@ const UnifiedSidebar = ({
     <Box
       className={classes.root}
       sx={{
-        width: forceExpanded ? '100%' : (collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED),
+        width: (forceExpanded || showHeaderLogo) ? '100%' : (collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED),
       }}
     >
       {showHeaderLogo && !forceExpanded && (

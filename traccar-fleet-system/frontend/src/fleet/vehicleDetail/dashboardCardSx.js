@@ -1,72 +1,45 @@
-/** Phase 2 flat workspace card (no gradient shadow). */
+/** Phase 3 flat workspace card — mode-aware surface tokens. */
 export const vehicleWorkspaceCardSx = {
-  p: { xs: 2, md: 3 },
-  borderRadius: '16px',
-  border: 1,
-  borderColor: 'divider',
-  bgcolor: 'background.paper',
+  p: 'var(--space-4)',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--surface-border)',
+  bgcolor: 'var(--surface-card)',
   boxShadow: 'none',
 };
 
-/** Shared shell for vehicle dashboard widgets (mockup-style cards). */
+/** Shared shell for vehicle dashboard widgets. */
 export const vehicleDashboardCardSx = {
-  p: 2,
+  p: 'var(--space-4)',
   height: '100%',
-  borderRadius: 2.5,
-  border: 1,
-  borderColor: 'divider',
-  bgcolor: 'background.paper',
-  boxShadow: (t) =>
-    t.palette.mode === 'dark' ? '0 12px 40px rgba(0, 0, 0, 0.35)' : '0 2px 16px rgba(15, 23, 42, 0.06)',
-  backgroundImage: (t) =>
-    t.palette.mode === 'dark'
-      ? 'linear-gradient(165deg, rgba(59, 130, 246, 0.08) 0%, transparent 50%)'
-      : 'linear-gradient(180deg, rgba(59, 130, 246, 0.03) 0%, transparent 32%)',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--surface-border)',
+  bgcolor: 'var(--surface-card)',
+  boxShadow: 'none',
 };
 
-/** Operational hero strip — distinct from generic cards. */
-export const vehicleHeroSx = {
-  p: 2.5,
-  borderRadius: 2.5,
-  border: 1,
-  borderColor: 'divider',
-  bgcolor: (t) =>
-    t.palette.mode === 'dark'
-      ? 'rgba(15, 23, 42, 0.72)'
-      : t.palette.background.paper,
-  backgroundImage: (t) =>
-    t.palette.mode === 'dark'
-      ? 'linear-gradient(145deg, rgba(30, 58, 138, 0.14) 0%, transparent 46%)'
-      : 'linear-gradient(180deg, rgba(59, 130, 246, 0.06) 0%, transparent 40%)',
-  boxShadow: (t) =>
-    t.palette.mode === 'dark' ? '0 8px 32px rgba(0, 0, 0, 0.28)' : '0 2px 12px rgba(15, 23, 42, 0.08)',
-};
+/** Operational hero strip — legacy alias. */
+export const vehicleHeroSx = vehicleWorkspaceCardSx;
 
-/** Standard operational modules — alias for dashboard cards. */
+/** Standard operational modules. */
 export const vehicleModuleSx = vehicleDashboardCardSx;
 
-/** Alerts surface — stronger elevation when there are items. */
+/** Alerts surface. */
 export function vehicleAlertSx(hasAlerts) {
   return [
     vehicleDashboardCardSx,
     hasAlerts
       ? {
-          borderColor: 'warning.light',
-          boxShadow: (t) =>
-            t.palette.mode === 'dark'
-              ? '0 12px 40px rgba(245, 158, 11, 0.12)'
-              : '0 2px 16px rgba(245, 158, 11, 0.2)',
+          borderColor: 'var(--color-warning)',
         }
       : {},
   ];
 }
 
-/** Setup / configuration (secondary administrative tone). */
+/** Setup / configuration. */
 export const vehicleSetupSx = [
   vehicleDashboardCardSx,
   {
-    opacity: 1,
-    bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.45)' : t.palette.grey[50]),
+    bgcolor: 'var(--surface-workspace)',
     borderStyle: 'dashed',
   },
 ];

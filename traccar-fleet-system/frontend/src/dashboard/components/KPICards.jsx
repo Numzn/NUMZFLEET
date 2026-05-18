@@ -85,7 +85,7 @@ const KPICards = ({ devices, positions }) => {
   }, [fuelRequests]);
 
   return (
-    <Grid container spacing={2.5} sx={{ alignItems: 'stretch', width: '100%' }}>
+    <Grid container spacing="var(--space-5)" sx={{ alignItems: 'stretch', width: '100%', gap: 'var(--space-5)' }}>
       <Grid size={{ xs: 12, sm: 6, md: 3 }} sx={{ display: 'flex' }}>
         <ModernKPICard
           value={deviceStats.moving}

@@ -78,13 +78,13 @@ export default function VehicleAlertsColumn({ alerts, deviceId }) {
                 <Box
                   key={a.id}
                   sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: 1,
-                    borderColor: 'divider',
+                    p: 'var(--space-3)',
+                    mb: 'var(--space-3)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--surface-border)',
                     borderLeftWidth: 3,
                     borderLeftColor: SEVERITY_BORDER[a.severity] || SEVERITY_BORDER.warning,
-                    bgcolor: 'background.default',
+                    bgcolor: 'var(--surface-card)',
                   }}
                 >
                   <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>

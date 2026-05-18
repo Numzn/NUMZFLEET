@@ -41,7 +41,7 @@ import { fetchVehicles, createVehicle, assignVehicleDevice, deleteVehicle } from
 
 const useStyles = makeStyles()((theme) => ({
   container: {
-    padding: theme.spacing(2),
+    padding: 0,
   },
   header: {
     display: 'flex',
@@ -53,6 +53,11 @@ const useStyles = makeStyles()((theme) => ({
   },
   table: {
     marginTop: theme.spacing(1),
+    borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--surface-border)',
+    overflow: 'auto',
+    boxShadow: 'none',
+    backgroundColor: 'var(--surface-card)',
   },
   muted: {
     color: theme.palette.text.secondary,
@@ -169,7 +174,7 @@ const VehiclesPage = () => {
   }
 
   return (
-    <Container maxWidth="xl" className={classes.container}>
+    <Container maxWidth={false} disableGutters className={classes.container} sx={{ width: '100%' }}>
       <FleetWorkspaceShell>
         <Box className={classes.header}>
           <Typography variant="h4">Fleet vehicles</Typography>
@@ -253,9 +258,8 @@ const VehiclesPage = () => {
                       {row.device?.status ? (
                         <Chip
                           size="small"
-                          label={row.device.status}
-                          color={row.device.status === 'online' ? 'success' : 'default'}
-                          variant="outlined"
+                          label={row.device.status === 'online' ? 'Live' : 'Offline'}
+                          variant={row.device.status === 'online' ? 'live' : 'offline'}
                         />
                       ) : (
                         '—'
@@ -272,7 +276,7 @@ const VehiclesPage = () => {
                       <Box display="flex" justifyContent="flex-end" alignItems="center" gap={0.5} flexWrap="wrap">
                         <Button
                           size="small"
-                          variant="contained"
+                          variant="text"
                           startIcon={<DashboardOutlinedIcon />}
                           onClick={() => navigate(`/fleet/vehicles/${encodeURIComponent(row.id)}`)}
                         >

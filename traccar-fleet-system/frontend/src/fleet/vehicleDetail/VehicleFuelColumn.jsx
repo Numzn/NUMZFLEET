@@ -67,7 +67,7 @@ export default function VehicleFuelColumn({
         </AccordionSummary>
         <AccordionDetails sx={{ pt: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <SubCard title="PENDING REQUESTS">
-            <Typography variant="h4" fontWeight={700} textAlign="center" sx={{ my: 1 }}>
+            <Typography variant="metricValue" textAlign="center" sx={{ my: 1, fontSize: '32px' }}>
               {pendingCount}
             </Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mb: 1.5 }}>
@@ -125,7 +125,7 @@ export default function VehicleFuelColumn({
           </SubCard>
 
           <SubCard title="FUEL EFFICIENCY">
-            <Typography variant="h5" fontWeight={700} textAlign="center">
+            <Typography variant="metricValue" textAlign="center">
               {efficiencyLabel}
             </Typography>
             {erb?.pricePerL != null && (
@@ -154,18 +154,17 @@ function SubCard({ title, children }) {
   return (
     <Box
       sx={{
-        p: 2,
-        borderRadius: 2,
-        border: 1,
-        borderColor: 'divider',
-        bgcolor: 'background.default',
+        p: 'var(--space-4)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--surface-border)',
+        bgcolor: 'var(--surface-workspace)',
       }}
     >
       <Typography
         variant="caption"
         fontWeight={600}
         color="text.secondary"
-        sx={{ letterSpacing: '0.06em' }}
+        sx={{ letterSpacing: '0.5px', textTransform: 'uppercase' }}
       >
         {title}
       </Typography>

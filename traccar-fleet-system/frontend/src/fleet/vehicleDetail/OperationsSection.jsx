@@ -14,14 +14,14 @@ export default function OperationsSection({
 
   return (
     <Box>
-      <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
+      <Typography variant="h2" sx={{ mb: 'var(--space-3)', color: 'var(--color-text-primary)' }}>
         Operations
       </Typography>
       <Box
         sx={{
           display: 'grid',
           gridTemplateColumns: operationsGridColumns,
-          gap: 2,
+          gap: 'var(--space-6)',
           alignItems: 'start',
         }}
       >

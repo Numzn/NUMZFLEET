@@ -106,7 +106,7 @@ const PendingRefuelCard = ({
         borderColor: 'divider',
         borderRadius: 2,
         p: 1.25,
-        bgcolor: 'background.paper',
+        bgcolor: 'var(--surface-card)',
       }}
     >
       <Stack spacing={1}>
@@ -260,7 +260,7 @@ const OperationRunPage = () => {
               position: 'sticky',
               top: 0,
               zIndex: 10,
-              bgcolor: 'background.default',
+              bgcolor: 'var(--surface-workspace)',
               pt: 0.75,
               pb: 0.75,
               mb: 0.75,

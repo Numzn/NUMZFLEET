@@ -68,7 +68,7 @@ const useStyles = makeStyles()((theme) => ({
   brandTitle: {
     fontSize: '1.05rem',
     fontWeight: 700,
-    background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+    background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     backgroundClip: 'text',
@@ -212,7 +212,7 @@ const PremiumTopBar = ({
       <Toolbar 
         className={`${classes.toolbar} ${isMobile ? classes.mobileToolbar : ''}`}
         sx={{
-          minHeight: `${toolbarHeight}px !important`,
+          minHeight: `${toolbarHeight}px`,
           height: toolbarHeight,
           px: { xs: 1, sm: 1.35, md: 1.7 },
         }}
@@ -252,7 +252,7 @@ const PremiumTopBar = ({
             sx={{ display: { xs: 'none', md: 'flex' } }}
           >
             <LogoImage 
-              color="#06b6d4" 
+              color="var(--color-primary)" 
               style={{ 
                 width: '38px', 
                 height: '38px',
@@ -279,7 +279,7 @@ const PremiumTopBar = ({
             <Box
               className={classes.connectionDot}
               sx={{
-                backgroundColor: socketConnected ? '#22c55e' : '#ef4444',
+                backgroundColor: socketConnected ? 'var(--color-success)' : 'var(--color-critical)',
                 animation: socketConnected ? 'pulse 2s infinite' : 'none',
               }}
             />

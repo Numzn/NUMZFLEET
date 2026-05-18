@@ -1,5 +1,5 @@
 /** Expanded fleet sidebar width (px) — keep in sync with MapChromePadding inset */
-export const FLEET_SIDEBAR_WIDTH_PX = 300;
+export const FLEET_SIDEBAR_WIDTH_PX = 280;
 
 /** Collapsed desktop rail width (px) — thin utility strip only */
 export const FLEET_SIDEBAR_RAIL_WIDTH_PX = 44;

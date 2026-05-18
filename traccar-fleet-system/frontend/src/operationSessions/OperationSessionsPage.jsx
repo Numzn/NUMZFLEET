@@ -156,7 +156,7 @@ const OperationSessionsPage = () => {
 
   return (
     <>
-      <Container maxWidth="md" sx={{ py: RUNTIME_CONTAINER_PY }}>
+      <Container maxWidth={false} disableGutters sx={{ width: '100%', py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
           <Stack spacing={RUNTIME_STACK_GAP}>
 

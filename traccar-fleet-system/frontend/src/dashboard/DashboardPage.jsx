@@ -100,8 +100,8 @@ const DashboardPage = () => {
 
   return (
       <Box sx={{
-        px: { xs: 1.5, sm: 2.5, md: 3.5, lg: 4 },
-        py: { xs: 1.25, sm: 2, md: 2.5 },
+        px: 0,
+        py: { xs: 1.25, sm: 1.5, md: 2 },
         pb: 'calc(var(--app-bottomnav-height, 0px) + env(safe-area-inset-bottom, 0px) + 28px)',
         background: theme.palette.mode === 'dark'
           ? 'radial-gradient(circle at top, rgba(8, 145, 178, 0.1), transparent 28%), linear-gradient(180deg, rgba(2, 6, 23, 0.96) 0%, rgba(6, 23, 42, 0.9) 100%)'

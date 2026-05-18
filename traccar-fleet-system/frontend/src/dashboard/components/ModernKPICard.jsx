@@ -1,38 +1,35 @@
 import React from 'react';
 import { Card, CardContent, Box, Typography, LinearProgress } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import { lightTokens } from '../../common/theme/designTokens';
 
-const StyledCard = styled(Card)(({ theme, color }) => ({
-  borderRadius: '12px',
-  boxShadow: theme.palette.mode === 'dark' 
-    ? '0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2)'
-    : '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
-  border: theme.palette.mode === 'dark' 
-    ? '1px solid rgba(255, 255, 255, 0.1)'
-    : '1px solid rgba(0, 0, 0, 0.05)',
-  backgroundColor: theme.palette.background.paper,
-  transition: 'all 0.2s ease-in-out',
+const { colors: c } = lightTokens;
+
+const StyledCard = styled(Card)(() => ({
+  borderRadius: 'var(--radius-md)',
+  boxShadow: 'none',
+  border: '1px solid var(--color-border)',
+  backgroundColor: 'var(--surface-card)',
+  transition: 'border-color 0.15s ease',
   height: '100%',
   '&:hover': {
-    boxShadow: theme.palette.mode === 'dark'
-      ? '0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)'
-      : '0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)',
-    transform: 'translateY(-2px)',
+    borderColor: 'var(--color-border-hover)',
+    transform: 'none',
   },
 }));
 
-const IconContainer = styled(Box)(({ theme, color }) => ({
-  width: 40,  // Reduced from 48
-  height: 40, // Reduced from 48
-  borderRadius: '10px', // Reduced from 12px
+const IconContainer = styled(Box)(({ iconcolor }) => ({
+  width: 32,
+  height: 32,
+  borderRadius: 'var(--radius-md)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: getIconBackgroundColor(color),
-  marginBottom: theme.spacing(1.5), // Reduced from 2
+  backgroundColor: getIconBackgroundColor(iconcolor),
+  marginBottom: 'var(--space-3)',
   '& svg': {
-    fontSize: '1.25rem', // Reduced from 1.5rem
-    color: getIconColor(color),
+    fontSize: '1.25rem',
+    color: getIconColor(iconcolor),
   },
 }));
 
@@ -42,68 +39,67 @@ const TrendIndicator = styled(Box)(({ theme }) => ({
   gap: theme.spacing(0.5),
   fontSize: '0.75rem',
   fontWeight: 600,
-  color: theme.palette.success.main,
+  color: c.success,
 }));
 
-const ValueText = styled(Typography)(({ theme }) => ({
-  fontSize: '2rem', // Reduced from 2.5rem
+const ValueText = styled(Typography)(() => ({
+  fontSize: '28px',
   fontWeight: 700,
-  lineHeight: 1,
-  color: theme.palette.text.primary,
-  marginBottom: theme.spacing(0.5),
+  lineHeight: 1.3,
+  color: 'var(--color-text-primary)',
+  marginBottom: 'var(--space-1)',
 }));
 
-const LabelText = styled(Typography)(({ theme }) => ({
-  fontSize: '0.75rem', // Reduced from 0.875rem
-  fontWeight: 600,
-  color: theme.palette.text.secondary,
+const LabelText = styled(Typography)(() => ({
+  fontSize: '12px',
+  fontWeight: 500,
+  color: 'var(--color-text-secondary)',
   textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  marginBottom: theme.spacing(1), // Reduced from 2
+  letterSpacing: '0.5px',
+  marginBottom: 'var(--space-2)',
 }));
 
-const ProgressContainer = styled(Box)(({ theme }) => ({
-  marginTop: theme.spacing(1),
+const ProgressContainer = styled(Box)(() => ({
+  marginTop: 'var(--space-2)',
 }));
 
-const StyledProgress = styled(LinearProgress)(({ theme }) => ({
+const StyledProgress = styled(LinearProgress)(() => ({
   height: 6,
-  borderRadius: 3,
-  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
+  borderRadius: 'var(--radius-sm)',
+  backgroundColor: c.fuelBarTrack,
   '& .MuiLinearProgress-bar': {
-    borderRadius: 3,
-    backgroundColor: theme.palette.primary.main,
+    borderRadius: 'var(--radius-sm)',
+    backgroundColor: c.primary,
   },
 }));
 
-// Color helper functions
 function getIconBackgroundColor(color) {
   switch (color) {
     case 'primary':
-      return '#EBF4FF';
+      return c.primaryLight;
     case 'success':
-      return '#ECFDF5';
+      return c.successLight;
     case 'warning':
-      return '#FFFBEB';
+      return c.warningLight;
     case 'danger':
-      return '#FEF2F2';
+      return c.criticalLight;
     default:
-      return '#F1F5F9';
+      return c.surfaceAlt;
   }
 }
 
 function getIconColor(color) {
   switch (color) {
     case 'primary':
-      return '#3B82F6';
+      return c.primary;
     case 'success':
-      return '#10B981';
+      return c.success;
     case 'warning':
-      return '#F59E0B';
+      return c.warning;
     case 'danger':
-      return '#EF4444';
+      return c.critical;
     default:
-      return '#64748B';
+      return c.textSecondary;
   }
 }
 
@@ -116,66 +112,59 @@ const ModernKPICard = ({
   trend,
   trendLabel,
   ...props
-}) => {
-  return (
-    <StyledCard color={color} {...props}>
-      <CardContent sx={{ 
-        p: 2, 
-        height: '100%', 
-        display: 'flex', 
+}) => (
+  <StyledCard {...props}>
+    <CardContent
+      sx={{
+        p: 'var(--space-4)',
+        height: '100%',
+        display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',  // Add: Better vertical distribution
-        minWidth: 0  // Add: Prevent overflow issues
-      }}>  {/* Reduced padding from 3 to 2 */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'flex-start', 
+        justifyContent: 'space-between',
+        minWidth: 0,
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
           mb: 1,
-          width: '100%'  // Add: Ensure full width
-        }}>
-          <IconContainer color={color}>
-            {icon}
-          </IconContainer>
-          {trend && (
-            <TrendIndicator>
-              <span>{trend}</span>
-              {trendLabel && (
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {trendLabel}
-                </Typography>
-              )}
-            </TrendIndicator>
-          )}
-        </Box>
-
-        <Box sx={{ width: '100%', overflow: 'hidden' }}>  {/* Add: Prevent text overflow */}
-          <ValueText sx={{ 
-            fontSize: '2rem',
-            whiteSpace: 'nowrap',  // Add: Prevent wrapping
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
-            {value}
-          </ValueText>
-        </Box>
-
-        <LabelText sx={{
-          whiteSpace: 'nowrap',  // Add: Prevent label wrapping
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}>
-          {label}
-        </LabelText>
-
-        {progress !== undefined && (
-          <ProgressContainer>
-            <StyledProgress variant="determinate" value={progress} />
-          </ProgressContainer>
+          width: '100%',
+        }}
+      >
+        <IconContainer iconcolor={color}>
+          {icon}
+        </IconContainer>
+        {trend && (
+          <TrendIndicator>
+            <span>{trend}</span>
+            {trendLabel && (
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {trendLabel}
+              </Typography>
+            )}
+          </TrendIndicator>
         )}
-      </CardContent>
-    </StyledCard>
-  );
-};
+      </Box>
+
+      <Box sx={{ width: '100%', overflow: 'hidden' }}>
+        <ValueText sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {value}
+        </ValueText>
+      </Box>
+
+      <LabelText sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {label}
+      </LabelText>
+
+      {progress !== undefined && (
+        <ProgressContainer>
+          <StyledProgress variant="determinate" value={progress} />
+        </ProgressContainer>
+      )}
+    </CardContent>
+  </StyledCard>
+);
 
 export default ModernKPICard;

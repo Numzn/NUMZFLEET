@@ -2,8 +2,11 @@
  * Shared MUI `sx` spacing scale (theme spacing units) for runtime / operational surfaces.
  */
 
-/** Vertical padding for standard UnifiedShell main Container blocks */
+/** Vertical padding for workspace page blocks */
 export const RUNTIME_CONTAINER_PY = 1.25;
+
+/** Horizontal inset for UnifiedShell main — single source (pages should not add outer px) */
+export const RUNTIME_WORKSPACE_PX = { xs: 2, md: 2 };
 
 /** Primary Stack spacing between sections */
 export const RUNTIME_STACK_GAP = 1.25;

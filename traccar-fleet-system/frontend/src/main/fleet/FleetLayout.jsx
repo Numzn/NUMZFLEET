@@ -22,7 +22,7 @@ const FleetLayout = ({ sidebar, map }) => {
     ? (collapsed ? FLEET_SIDEBAR_RAIL_WIDTH_PX : FLEET_SIDEBAR_WIDTH_PX)
     : 0;
 
-  const edgeLine = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.12)';
+  const edgeLine = 'var(--surface-border)';
 
   return (
     <Box
@@ -41,7 +41,7 @@ const FleetLayout = ({ sidebar, map }) => {
             width: sidebarWidth,
             flexShrink: 0,
             borderRight: `1px solid ${edgeLine}`,
-            bgcolor: 'background.paper',
+            bgcolor: 'var(--surface-card)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',

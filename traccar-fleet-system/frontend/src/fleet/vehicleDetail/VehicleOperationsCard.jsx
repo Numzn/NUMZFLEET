@@ -167,7 +167,7 @@ export default function VehicleOperationsCard({
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: density.mobile ? 0.75 : 1, justifyContent: 'flex-end' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
           <CommandBtn
             icon={<MyLocationIcon fontSize="small" />}
             label="Locate"
@@ -309,10 +309,9 @@ function MetricTile({ label, value, unit, density, fuelBar, sub }) {
     <Box
       sx={{
         p: density.mobile ? 1.5 : 2,
-        borderRadius: 2,
-        bgcolor: WORKSPACE_COLORS.surfaceSubtle,
-        border: 1,
-        borderColor: 'divider',
+        borderRadius: 'var(--radius-md)',
+        bgcolor: 'var(--surface-workspace)',
+        border: '1px solid var(--surface-border)',
         minWidth: 0,
       }}
     >
@@ -344,7 +343,7 @@ function MetricTile({ label, value, unit, density, fuelBar, sub }) {
             mt: 1,
             height: density.mobile ? 6 : 8,
             borderRadius: 1,
-            bgcolor: WORKSPACE_COLORS.fuelBarTrack,
+            bgcolor: 'var(--surface-elevated)',
             '& .MuiLinearProgress-bar': { bgcolor: WORKSPACE_COLORS.fuelBar, borderRadius: 1 },
           }}
         />

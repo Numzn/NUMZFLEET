@@ -80,10 +80,10 @@ const FleetSidebar = ({
     );
   }
 
-  const railBg = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.22)' : 'background.paper';
-  const controlBg = theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.02)';
+  const railBg = 'var(--surface-card)';
+  const controlBg = 'var(--surface-workspace)';
   const padX = variant === 'mobile' ? 1 : 1;
-  const edge = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)';
+  const edge = 'var(--surface-border-subtle)';
 
   return (
     <Box
@@ -114,14 +114,15 @@ const FleetSidebar = ({
             variant="caption"
             noWrap
             sx={{
-              fontWeight: 600,
-              fontSize: '0.72rem',
+              fontWeight: 500,
+              fontSize: '12px',
               lineHeight: 1.15,
-              color: 'text.primary',
-              letterSpacing: '0.01em',
+              color: 'var(--color-text-secondary)',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
             }}
           >
-            Fleet · Live
+            FLEET · LIVE
           </Typography>
           <Box
             sx={{

@@ -202,7 +202,7 @@ export default function VehicleConfigPanel({ vehicle, saveConfig }) {
               borderColor: 'divider',
               borderRadius: 2,
               p: 1.5,
-              bgcolor: 'background.default',
+              bgcolor: 'var(--surface-workspace)',
               display: 'flex',
               flexDirection: 'column',
               gap: 1,

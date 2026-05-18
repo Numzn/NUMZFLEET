@@ -1,3 +1,4 @@
+import './common/theme/globalCssVariables.css';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';

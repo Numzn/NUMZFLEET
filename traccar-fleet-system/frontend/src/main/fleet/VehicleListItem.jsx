@@ -99,8 +99,8 @@ const VehicleListItem = ({
         onMouseLeave={() => onHover(null)}
         sx={{
           alignItems: 'stretch',
-          py: 0.45,
-          px: 0.5,
+          py: 'var(--space-3)',
+          px: 'var(--space-3)',
           mx: 0.25,
           my: 0,
           borderRadius: selected ? '4px 4px 0 0' : 0,

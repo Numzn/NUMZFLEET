@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { ThemeProvider, useMediaQuery } from '@mui/material';
 import { CacheProvider } from '@emotion/react';
@@ -32,6 +33,10 @@ const AppThemeProvider = ({ children }) => {
     : systemPrefersDark;
 
   const themeInstance = theme(server, darkMode, direction);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   return (
     <CacheProvider value={cache[direction]}>

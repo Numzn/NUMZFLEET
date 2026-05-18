@@ -74,9 +74,9 @@ export default function DiagnosticsSection({ telemetry }) {
         sx={{
           bgcolor: 'transparent',
           '&:before': { display: 'none' },
-          border: 1,
-          borderColor: 'divider',
-          borderRadius: 2,
+          border: '1px solid var(--surface-border)',
+          borderRadius: 'var(--radius-md)',
+          bgcolor: 'var(--surface-card)',
         }}
       >
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -89,7 +89,7 @@ export default function DiagnosticsSection({ telemetry }) {
             sx={{
               display: 'grid',
               gridTemplateColumns: diagnosticsColumns,
-              gap: 2,
+              gap: 'var(--space-4)',
             }}
           >
             <DiagnosticTile

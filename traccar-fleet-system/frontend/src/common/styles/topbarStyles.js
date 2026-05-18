@@ -4,36 +4,31 @@ export const getTopbarStyles = (theme) => ({
   height: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
   minHeight: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
   paddingTop: 'env(safe-area-inset-top, 0px)',
-  paddingLeft: theme.spacing(1),
-  paddingRight: theme.spacing(1),
+  paddingLeft: 'var(--space-6)',
+  paddingRight: 'var(--space-6)',
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(0.7),
-  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(5, 12, 24, 0.84)' : 'rgba(255, 255, 255, 0.86)',
-  border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(103, 232, 249, 0.16)' : 'rgba(15, 23, 42, 0.08)'}`,
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 12px 28px rgba(0, 0, 0, 0.34)'
-    : '0 12px 28px rgba(7, 89, 133, 0.14)',
-  backgroundImage: theme.palette.mode === 'dark'
-    ? 'linear-gradient(180deg, rgba(34, 211, 238, 0.08) 0%, rgba(0, 0, 0, 0) 100%)'
-    : 'linear-gradient(180deg, rgba(6, 182, 212, 0.09) 0%, rgba(255, 255, 255, 0) 100%)',
+  backgroundColor: 'var(--surface-elevated)',
+  borderBottom: '1px solid var(--surface-border)',
+  boxShadow: 'none',
+  backgroundImage: 'none',
   zIndex: theme.zIndex.appBar + 2,
-  borderRadius: '0 0 12px 12px',
-  backdropFilter: 'blur(14px)',
+  borderRadius: 0,
+  backdropFilter: 'none',
   width: '100%',
   left: 0,
   right: 0,
   top: 0,
-  [theme.breakpoints.up('md')]: {
-    borderRadius: '0 0 14px 14px',
-  },
   [theme.breakpoints.down('md')]: {
     height: `calc(env(safe-area-inset-top, 0px) + 50px)`,
     minHeight: `calc(env(safe-area-inset-top, 0px) + 50px)`,
+    paddingLeft: 'var(--space-4)',
+    paddingRight: 'var(--space-4)',
   },
 });
 
-export const getLogoContainerStyles = (theme) => ({
+export const getLogoContainerStyles = () => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -48,32 +43,36 @@ export const getSearchFieldStyles = (theme) => ({
   flex: 1,
   maxWidth: 400,
   '& .MuiOutlinedInput-root': {
-    backgroundColor: theme.palette.background.default,
-    borderRadius: theme.spacing(1),
+    backgroundColor: 'var(--color-surface-alt)',
+    borderRadius: 'var(--radius-md)',
     transition: 'all 0.2s',
     '&:hover': {
-      backgroundColor: theme.palette.action.hover,
+      backgroundColor: 'var(--color-surface-alt)',
     },
     '&.Mui-focused': {
-      backgroundColor: theme.palette.background.paper,
-      boxShadow: `0 0 0 2px ${theme.palette.primary.light}`,
+      backgroundColor: 'var(--surface-card)',
+      boxShadow: `0 0 0 2px var(--color-primary-light)`,
     },
   },
 });
 
-export const getActionButtonStyles = (theme) => ({
-  padding: theme.spacing(0.75),
+export const getActionButtonStyles = () => ({
+  padding: '8px',
+  minWidth: 40,
+  width: 40,
+  height: 40,
+  borderRadius: 'var(--radius-md)',
   '&:hover': {
-    backgroundColor: 'rgba(6, 182, 212, 0.08)',
+    backgroundColor: 'var(--color-surface-alt)',
   },
 });
 
-export const getChipStyles = (theme) => ({
+export const getChipStyles = () => ({
   fontSize: '0.75rem',
-  fontWeight: 600,
+  fontWeight: 500,
   '& .MuiChip-label': {
     fontSize: '0.75rem',
-  }
+  },
 });
 
 export const getTopbarLayoutStyles = (theme) => ({
@@ -88,7 +87,7 @@ export const getTopbarLayoutStyles = (theme) => ({
   gap: theme.spacing(0.6),
   [theme.breakpoints.down('md')]: {
     height: 50,
-    minHeight: '50px !important',
+    minHeight: 50,
     padding: theme.spacing(0, 0.55),
     gap: theme.spacing(0.4),
   },
@@ -123,68 +122,66 @@ export const getRightSectionStyles = (theme) => ({
 export const getDividerStyles = (theme) => ({
   height: '20px',
   width: '1px',
-  backgroundColor: theme.palette.divider,
+  backgroundColor: 'var(--color-border)',
   mx: theme.spacing(1),
-  display: { xs: 'none', md: 'block' }
+  display: { xs: 'none', md: 'block' },
 });
 
-// Unified component styles for consistent appearance
-// Standard border radius for all components
-const UNIFIED_BORDER_RADIUS = 8; // 8px for consistent curved edges
+const UNIFIED_BORDER_RADIUS = 8;
 
 export const getUnifiedSearchFieldStyles = (theme) => ({
   width: '100%',
   '& .MuiOutlinedInput-root': {
-    backgroundColor: theme.palette.background.default,
+    backgroundColor: 'var(--color-surface-alt)',
     borderRadius: UNIFIED_BORDER_RADIUS,
     height: '40px',
     fontSize: '0.875rem',
     '&:hover': {
-      backgroundColor: theme.palette.action.hover,
+      backgroundColor: 'var(--color-surface-alt)',
     },
     '&.Mui-focused': {
-      backgroundColor: theme.palette.background.paper,
-      boxShadow: `0 0 0 2px ${theme.palette.primary.main}`,
+      backgroundColor: 'var(--surface-card)',
+      boxShadow: `0 0 0 2px var(--color-primary-light)`,
     },
     '& .MuiOutlinedInput-notchedOutline': {
-      borderColor: theme.palette.divider,
+      borderColor: 'var(--color-border)',
     },
     '&:hover .MuiOutlinedInput-notchedOutline': {
-      borderColor: theme.palette.primary.light,
+      borderColor: 'var(--color-border-hover)',
     },
     '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-      borderColor: theme.palette.primary.main,
-      borderWidth: '2px',
+      borderColor: 'var(--color-primary)',
+      borderWidth: '1px',
     },
   },
   '& .MuiInputAdornment-root': {
-    color: theme.palette.text.secondary,
+    color: 'var(--color-text-secondary)',
   },
 });
 
-export const getUnifiedActionButtonStyles = (theme) => ({
-  padding: theme.spacing(0.75),
+export const getUnifiedActionButtonStyles = () => ({
+  padding: '8px',
   minWidth: '40px',
   height: '40px',
   borderRadius: UNIFIED_BORDER_RADIUS,
-  transition: 'all 0.2s ease-in-out',
+  transition: 'background-color 0.15s ease',
   '&:hover': {
-    backgroundColor: 'rgba(6, 182, 212, 0.08)',
-    transform: 'scale(1.05)',
+    backgroundColor: 'var(--color-surface-alt)',
+    transform: 'none',
   },
   '& .MuiSvgIcon-root': {
     fontSize: '1.1rem',
   },
 });
 
-export const getUnifiedIconButtonStyles = (theme) => ({
-  padding: theme.spacing(0.5),
-  minWidth: '32px',
-  height: '32px',
+export const getUnifiedIconButtonStyles = () => ({
+  padding: '8px',
+  minWidth: '40px',
+  height: '40px',
   borderRadius: UNIFIED_BORDER_RADIUS,
-  transition: 'all 0.2s ease-in-out',
+  transition: 'background-color 0.15s ease',
   '&:hover': {
-    backgroundColor: 'rgba(6, 182, 212, 0.08)',
+    backgroundColor: 'var(--color-surface-alt)',
   },
   '& .MuiSvgIcon-root': {
     fontSize: '1rem',
@@ -194,11 +191,18 @@ export const getUnifiedIconButtonStyles = (theme) => ({
 export const getUnifiedChipStyles = (theme) => ({
   height: '24px',
   fontSize: '0.75rem',
-  fontWeight: 600,
+  fontWeight: 500,
   borderRadius: UNIFIED_BORDER_RADIUS,
   '& .MuiChip-label': {
     fontSize: '0.75rem',
-    fontWeight: 600,
+    fontWeight: 500,
     padding: theme.spacing(0, 1),
   },
+});
+
+export const getPageTitleStyles = () => ({
+  fontSize: '18px',
+  fontWeight: 500,
+  lineHeight: 1.4,
+  color: 'var(--color-text-primary)',
 });

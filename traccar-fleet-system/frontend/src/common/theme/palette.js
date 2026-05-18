@@ -1,97 +1,99 @@
-import { grey, green, indigo } from '@mui/material/colors';
+import { grey } from '@mui/material/colors';
+import { lightTokens } from './designTokens';
+import { darkSurfaces, lightSurfaces } from './surfaceTokens';
 
-const validatedColor = (color) => (/^#([0-9A-Fa-f]{3}){1,2}$/.test(color) ? color : null);
+const { colors: c } = lightTokens;
 
 export default (server, darkMode) => {
   if (darkMode) {
-    // Professional dark mode with navy/cyan theme
     return {
       mode: 'dark',
       background: {
-        default: '#0F172A',    // Deep navy
-        paper: '#1E293B',       // Slate navy
+        default: darkSurfaces.app,
+        paper: darkSurfaces.card,
       },
       primary: {
-        main: '#06B6D4',       // Cyan
-        light: '#22D3EE',      // Bright cyan
-        dark: '#0891B2',       // Deep cyan
-      },
-      secondary: {
-        main: '#0EA5E9',       // Sky blue
-        light: '#38BDF8',
-        dark: '#0284C7',
-      },
-      text: {
-        primary: '#F1F5F9',    // Almost white
-        secondary: '#94A3B8',  // Muted gray
-      },
-      success: {
-        main: '#10B981',       // Professional green
-        light: '#34D399',
-      },
-      warning: {
-        main: '#F59E0B',       // Amber
-        light: '#FBBF24',
-      },
-      error: {
-        main: '#EF4444',       // Coral red
-        light: '#F87171',
-      },
-      divider: 'rgba(255, 255, 255, 0.1)',
-      neutral: {
-        main: grey[500],
-      },
-      geometry: {
-        main: '#06B6D4',       // Cyan for geometry
-      },
-      alwaysDark: {
-        main: '#1E293B',
-      }
-    };
-  } else {
-    // Professional light mode
-    return {
-      mode: 'light',
-      background: {
-        default: '#F8FAFC',    // Subtle gray background
-        paper: '#FFFFFF',      // Clean white cards
-      },
-      primary: {
-        main: '#3B82F6',       // Professional blue
+        main: c.primary,
         light: '#60A5FA',
-        dark: '#2563EB',
+        dark: c.primaryDark,
       },
       secondary: {
-        main: '#06B6D4',       // Teal accent for success/active states
-        light: '#22D3EE',
-        dark: '#0891B2',
+        main: c.info,
+        light: '#38BDF8',
+        dark: c.primaryDark,
       },
       text: {
-        primary: '#1E293B',    // Charcoal text
-        secondary: '#64748B',  // Muted gray text
+        primary: darkSurfaces.textOnSurface,
+        secondary: darkSurfaces.textMutedOnSurface,
+        disabled: '#64748B',
       },
       success: {
-        main: '#10B981',       // Professional green
+        main: c.success,
         light: '#34D399',
       },
       warning: {
-        main: '#F59E0B',       // Amber
+        main: c.warning,
         light: '#FBBF24',
       },
       error: {
-        main: '#EF4444',       // Coral red
+        main: c.critical,
         light: '#F87171',
       },
-      divider: 'rgba(0, 0, 0, 0.06)',
+      divider: darkSurfaces.border,
       neutral: {
         main: grey[500],
       },
       geometry: {
-        main: '#3B82F6',
+        main: c.primary,
       },
       alwaysDark: {
-        main: '#1E293B',
-      }
+        main: darkSurfaces.elevated,
+      },
     };
   }
+
+  return {
+    mode: 'light',
+    background: {
+      default: lightSurfaces.app,
+      paper: lightSurfaces.card,
+    },
+    primary: {
+      main: c.primary,
+      light: c.primaryLight,
+      dark: c.primaryDark,
+    },
+    secondary: {
+      main: c.info,
+      light: c.infoLight,
+      dark: c.primaryDark,
+    },
+    text: {
+      primary: lightSurfaces.textOnSurface,
+      secondary: lightSurfaces.textMutedOnSurface,
+      disabled: c.textDisabled,
+    },
+    success: {
+      main: c.success,
+      light: c.successLight,
+    },
+    warning: {
+      main: c.warning,
+      light: c.warningLight,
+    },
+    error: {
+      main: c.critical,
+      light: c.criticalLight,
+    },
+    divider: lightSurfaces.border,
+    neutral: {
+      main: grey[500],
+    },
+    geometry: {
+      main: c.primary,
+    },
+    alwaysDark: {
+      main: lightSurfaces.textOnSurface,
+    },
+  };
 };

@@ -157,7 +157,7 @@ const CreateSessionPage = () => {
   };
 
   return (
-      <Container maxWidth="lg" sx={{ py: RUNTIME_CONTAINER_PY }}>
+      <Container maxWidth={false} disableGutters sx={{ width: '100%', py: RUNTIME_CONTAINER_PY }}>
         <FleetWorkspaceShell>
           <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>

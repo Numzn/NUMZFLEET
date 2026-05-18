@@ -10,9 +10,9 @@ import VehicleOperationsCard from './VehicleOperationsCard.jsx';
 import OperationsSection from './OperationsSection.jsx';
 import DiagnosticsSection from './DiagnosticsSection.jsx';
 
-const useStyles = makeStyles()((theme) => ({
+const useStyles = makeStyles()(() => ({
   container: {
-    padding: theme.spacing(2),
+    padding: 0,
   },
 }));
 
@@ -113,7 +113,7 @@ export default function VehicleDetailPage() {
   const showBody = Boolean(vehicle);
 
   return (
-    <Container maxWidth={false} className={classes.container} sx={{ maxWidth: 1320, mx: 'auto' }}>
+    <Box className={classes.container} sx={{ width: '100%', maxWidth: '100%' }}>
       <FleetWorkspaceShell>
         {showSkeleton && <VehicleWorkspaceSkeleton />}
 
@@ -140,6 +140,6 @@ export default function VehicleDetailPage() {
           <Alert severity="warning">Vehicle not found or access denied.</Alert>
         )}
       </FleetWorkspaceShell>
-    </Container>
+    </Box>
   );
 }

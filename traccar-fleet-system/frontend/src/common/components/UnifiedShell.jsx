@@ -19,9 +19,10 @@ import {
   FLEET_SIDEBAR_WIDTH_PX,
 } from '../../main/fleet/fleetLayoutConstants';
 import { LiveMapChromeProvider, useLiveMapChrome } from '../../main/fleet/LiveMapChromeContext';
+import { RUNTIME_WORKSPACE_PX } from '../styles/runtimeDensity';
 
-const DRAWER_WIDTH_EXPANDED = 168;
-const DRAWER_WIDTH_COLLAPSED = 68;
+const DRAWER_WIDTH_EXPANDED = 260;
+const DRAWER_WIDTH_COLLAPSED = 72;
 const CHROME_GAP = 8;
 
 const useStyles = makeStyles()((theme) => ({
@@ -33,18 +34,24 @@ const useStyles = makeStyles()((theme) => ({
     height: '100svh',
     overflow: 'hidden',
   },
-  drawer: {
+  /** In-flow nav column — avoids MUI permanent Drawer double horizontal reservation */
+  navRail: {
     flexShrink: 0,
+    boxSizing: 'border-box',
+    height: '100%',
+    maxHeight: '100svh',
+    overflow: 'hidden',
+    borderRight: '1px solid var(--surface-border)',
+    backgroundColor: 'var(--surface-card)',
+  },
+  drawer: {
     '& .MuiDrawer-paper': {
       boxSizing: 'border-box',
-      position: 'relative',
-      top: 0,
       height: '100%',
       maxHeight: '100svh',
-      borderRight: `1px solid ${theme.palette.divider}`,
       borderRadius: 0,
-      backgroundColor: theme.palette.background.paper,
-      backgroundImage: 'linear-gradient(to bottom, rgba(6, 182, 212, 0.01) 0%, transparent 100%)',
+      backgroundColor: 'var(--surface-card)',
+      backgroundImage: 'none',
       overflowX: 'hidden',
     },
   },
@@ -61,6 +68,7 @@ const useStyles = makeStyles()((theme) => ({
     overflow: 'auto',
     WebkitOverflowScrolling: 'touch',
     boxSizing: 'border-box',
+    backgroundColor: 'var(--surface-app)',
   },
 }));
 
@@ -153,39 +161,15 @@ function UnifiedShellContent() {
   return (
     <Box className={classes.root}>
       {showLiveFleetPermanentDrawer && (
-        <Drawer
-          variant="permanent"
-          open
-          className={classes.drawer}
-          sx={{
-            width: liveDrawerWidth,
-            '& .MuiDrawer-paper': {
-              width: liveDrawerWidth,
-              overflow: 'hidden',
-            },
-          }}
-        >
+        <Box className={classes.navRail} sx={{ width: liveDrawerWidth }}>
           {renderLiveFleetSidebar()}
-        </Drawer>
+        </Box>
       )}
 
       {showDefaultPermanentNav && (
-        <Drawer
-          variant="permanent"
-          open
-          onClose={() => setSidebarOpen(false)}
-          className={classes.drawer}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            width: appDrawerWidth,
-            '& .MuiDrawer-paper': {
-              width: appDrawerWidth,
-              maxWidth: desktop ? undefined : 420,
-            },
-          }}
-        >
+        <Box className={classes.navRail} sx={{ width: appDrawerWidth }}>
           {renderAppSidebar()}
-        </Drawer>
+        </Box>
       )}
 
       {showDefaultTemporaryNav && (
@@ -275,7 +259,14 @@ function UnifiedShellContent() {
           )}
         </Box>
 
-        <Box component="main" className={classes.main} sx={{ pb: mainPaddingBottom }}>
+        <Box
+          component="main"
+          className={classes.main}
+          sx={{
+            pb: mainPaddingBottom,
+            px: workspaceType === 'default' ? RUNTIME_WORKSPACE_PX : 0,
+          }}
+        >
           <Outlet />
         </Box>
       </Box>

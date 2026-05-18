@@ -21,7 +21,7 @@ const FleetWorkspaceTabs = () => {
     <Box
       sx={{
         flexShrink: 0,
-        px: { xs: 1, sm: 1.5 },
+        px: 0,
         pb: RUNTIME_CONTEXT_STRIP_PB,
         borderBottom: 1,
         borderColor: 'divider',

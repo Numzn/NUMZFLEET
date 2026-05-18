@@ -24,27 +24,23 @@ import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 
 const useStyles = makeStyles()((theme) => ({
   paper: {
-    padding: theme.spacing(4),
+    padding: 'var(--space-4)',
     height: '100%',
     width: '100%',
     maxWidth: '100%',
-    borderRadius: '16px',
-    boxShadow: theme.palette.mode === 'dark' 
-      ? '0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)'
-      : '0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.05)',
-    border: theme.palette.mode === 'dark'
-      ? '1px solid rgba(255, 255, 255, 0.12)'
-      : '1px solid rgba(0, 0, 0, 0.08)',
-    backgroundColor: theme.palette.background.paper,
+    borderRadius: 'var(--radius-md)',
+    boxShadow: 'none',
+    border: '1px solid var(--color-border)',
+    backgroundColor: 'var(--surface-card)',
     boxSizing: 'border-box',
   },
   statsGrid: {
     marginTop: theme.spacing(3),
     marginBottom: theme.spacing(4),
-    width: '100% !important',
-    maxWidth: '100% !important',
-    marginLeft: '0 !important',
-    marginRight: '0 !important',
+    width: '100%',
+    maxWidth: '100%',
+    marginLeft: 0,
+    marginRight: 0,
     '& > .MuiGrid-item': {
       paddingTop: theme.spacing(2),
       display: 'flex',
@@ -54,23 +50,21 @@ const useStyles = makeStyles()((theme) => ({
   statCard: {
     height: '100%',
     width: '100%',
-    borderRadius: '12px',
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    borderRadius: 'var(--radius-md)',
+    transition: 'border-color 0.15s ease',
     cursor: 'pointer',
-    border: '1px solid transparent',
+    border: '1px solid var(--color-border)',
     position: 'relative',
+    boxShadow: 'none',
     '&:hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: theme.palette.mode === 'dark'
-        ? '0 4px 12px rgba(0, 0, 0, 0.4)'
-        : '0 4px 12px rgba(0, 0, 0, 0.1)',
+      borderColor: 'var(--color-border-hover)',
+      transform: 'none',
     },
     '&.active': {
       borderWidth: '2px',
-      transform: 'translateY(-2px)',
-      boxShadow: theme.palette.mode === 'dark'
-        ? '0 6px 16px rgba(0, 0, 0, 0.5)'
-        : '0 6px 16px rgba(0, 0, 0, 0.15)',
+      borderColor: 'var(--color-primary)',
+      transform: 'none',
+      boxShadow: 'none',
     },
   },
   statCardPending: {
@@ -206,13 +200,13 @@ const useStyles = makeStyles()((theme) => ({
     flex: '1 1 300px',
     minWidth: 250,
     '& .MuiOutlinedInput-root': {
-      backgroundColor: theme.palette.background.paper,
+      backgroundColor: 'var(--surface-card)',
     },
   },
   filterField: {
     minWidth: 160,
     '& .MuiOutlinedInput-root': {
-      backgroundColor: theme.palette.background.paper,
+      backgroundColor: 'var(--surface-card)',
     },
   },
   accordionSection: {
