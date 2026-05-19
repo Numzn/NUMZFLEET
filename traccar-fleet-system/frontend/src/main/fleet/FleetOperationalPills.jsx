@@ -1,4 +1,4 @@
-import { Box, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { useDispatch } from 'react-redux';
 import { fleetInteractionActions } from '../../store';
 
@@ -26,41 +26,43 @@ const FleetOperationalPills = ({ fleetTab, presence }) => {
   };
 
   return (
-    <Box sx={{ width: '100%', overflowX: 'auto', pb: 0.15 }}>
-      <ToggleButtonGroup
-        exclusive
-        value={tabValue}
-        onChange={handleChange}
-        size="small"
-        sx={{
-          flexWrap: 'wrap',
-          gap: 0.35,
-          '& .MuiToggleButton-root': {
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: '6px',
-            px: 0.85,
-            py: 0.2,
-            minHeight: 26,
-            fontSize: '0.68rem',
+    <ToggleButtonGroup
+      exclusive
+      value={tabValue}
+      onChange={handleChange}
+      size="small"
+      sx={{
+        display: 'inline-flex',
+        flexWrap: 'nowrap',
+        gap: 0.35,
+        width: 'max-content',
+        '& .MuiToggleButton-root': {
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: '6px',
+          px: 0.85,
+          py: 0.2,
+          minHeight: 26,
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+          fontSize: '0.68rem',
+          fontWeight: 600,
+          textTransform: 'none',
+          '&.Mui-selected': {
+            bgcolor: 'var(--color-primary-light)',
+            color: 'var(--color-primary)',
+            borderColor: 'var(--color-primary)',
             fontWeight: 600,
-            textTransform: 'none',
-            '&.Mui-selected': {
-              bgcolor: 'var(--color-primary-light)',
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-              fontWeight: 600,
-            },
           },
-        }}
-      >
-        {pills.map((p) => (
-          <ToggleButton key={p.id} value={p.id} aria-label={p.label}>
-            {p.label}
-          </ToggleButton>
-        ))}
-      </ToggleButtonGroup>
-    </Box>
+        },
+      }}
+    >
+      {pills.map((p) => (
+        <ToggleButton key={p.id} value={p.id} aria-label={p.label}>
+          {p.label}
+        </ToggleButton>
+      ))}
+    </ToggleButtonGroup>
   );
 };
 

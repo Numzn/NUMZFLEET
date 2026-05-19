@@ -111,22 +111,36 @@ const ConnectionIndicator = ({ socketConnected }) => (
   </Tooltip>
 );
 
-const FleetLiveIdentity = ({ socketConnected }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-    <Typography
-      component="span"
-      noWrap
-      sx={{
-        fontWeight: 700,
-        fontSize: { xs: '10px', sm: '12px' },
-        lineHeight: 1.2,
-        letterSpacing: '0.07em',
-        textTransform: 'uppercase',
-        color: 'var(--text-on-surface-primary)',
-      }}
-    >
-      FLEET · LIVE
-    </Typography>
+const pillsScrollSx = {
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  minWidth: 0,
+  maxWidth: '100%',
+  maxHeight: '100%',
+  WebkitOverflowScrolling: 'touch',
+  '&::-webkit-scrollbar': { display: 'none' },
+  msOverflowStyle: 'none',
+  scrollbarWidth: 'none',
+};
+
+const FleetLiveIdentity = ({ socketConnected, compact = false }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, flexShrink: 0 }}>
+    {!compact && (
+      <Typography
+        component="span"
+        noWrap
+        sx={{
+          fontWeight: 700,
+          fontSize: { xs: '10px', sm: '12px' },
+          lineHeight: 1.2,
+          letterSpacing: '0.07em',
+          textTransform: 'uppercase',
+          color: 'var(--text-on-surface-primary)',
+        }}
+      >
+        FLEET · LIVE
+      </Typography>
+    )}
     <ConnectionIndicator socketConnected={socketConnected} />
   </Box>
 );
@@ -149,6 +163,7 @@ const LiveMapTopBar = ({
 }) => {
   const navigate = useNavigate();
   const socketConnected = useSelector((state) => !!state.session.socket);
+  const compactIdentity = !desktop && showAppNavMenuButton && showMobileFleetDrawerButton;
 
   return (
     <Box
@@ -171,9 +186,8 @@ const LiveMapTopBar = ({
           display: 'flex',
           alignItems: 'center',
           gap: { xs: 0.25, sm: 'var(--space-1)' },
-          flexShrink: { xs: 1, sm: 0 },
+          flexShrink: 0,
           minWidth: 0,
-          maxWidth: { xs: '46%', sm: 'none' },
         }}
       >
         {showAppNavMenuButton && (
@@ -208,7 +222,7 @@ const LiveMapTopBar = ({
         )}
 
         {(!desktop || !fleetCollapsed) && (
-          <FleetLiveIdentity socketConnected={socketConnected} />
+          <FleetLiveIdentity socketConnected={socketConnected} compact={compactIdentity} />
         )}
 
         {desktop && (
@@ -232,32 +246,20 @@ const LiveMapTopBar = ({
         )}
       </Box>
 
-      {/* Operational filters */}
+      {/* Operational filters — single horizontal scroll row; no vertical wrap */}
       <Box
         sx={{
+          ...pillsScrollSx,
           display: 'flex',
           alignItems: 'center',
           flex: 1,
-          minWidth: 0,
           justifyContent: 'flex-start',
-          overflow: 'hidden',
         }}
       >
-        <Box
-          sx={{
-            overflowX: 'auto',
-            minWidth: 0,
-            maxWidth: '100%',
-            '&::-webkit-scrollbar': { display: 'none' },
-            msOverflowStyle: 'none',
-            scrollbarWidth: 'none',
-          }}
-        >
-          <FleetOperationalPills
-            fleetTab={effectiveFleetTab}
-            presence={operationalPresence}
-          />
-        </Box>
+        <FleetOperationalPills
+          fleetTab={effectiveFleetTab}
+          presence={operationalPresence}
+        />
       </Box>
 
       {/* Account chrome */}
