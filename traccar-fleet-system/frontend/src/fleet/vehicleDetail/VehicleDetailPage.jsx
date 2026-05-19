@@ -47,6 +47,8 @@ function VehicleWorkspaceBody({
   fuel,
   erb,
   alerts,
+  geofenceAlertsHidden,
+  geofenceAlertsSuppressed,
   livePosition,
   deviceId,
   motionLabel,
@@ -72,6 +74,8 @@ function VehicleWorkspaceBody({
         fleetVehicleId={fleetVehicleId ?? vehicle?.id}
         fuel={fuel}
         erb={erb}
+        geofenceAlertsHidden={geofenceAlertsHidden}
+        geofenceAlertsSuppressed={geofenceAlertsSuppressed}
       />
       <DiagnosticsSection telemetry={telemetry} />
     </Box>
@@ -89,6 +93,8 @@ export default function VehicleDetailPage() {
     fuel,
     erb,
     alerts,
+    geofenceAlertsHidden,
+    geofenceAlertsSuppressed,
     loading,
     error,
     refresh,
@@ -128,6 +134,8 @@ export default function VehicleDetailPage() {
             fuel={fuel}
             erb={erb}
             alerts={alerts}
+            geofenceAlertsHidden={geofenceAlertsHidden}
+            geofenceAlertsSuppressed={geofenceAlertsSuppressed}
             livePosition={livePosition}
             deviceId={deviceId}
             motionLabel={motionLabel}

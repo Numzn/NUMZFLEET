@@ -15,6 +15,7 @@ export default function VehicleDriverSection({
   deviceId,
   telemetry,
   onRefreshVehicle,
+  embedded = false,
 }) {
   const features = useFeatures();
   const { linkedDrivers, reloadLinked, loading } = useLinkedDrivers(deviceId);
@@ -31,12 +32,16 @@ export default function VehicleDriverSection({
   const lastTs = telemetry?.fixTime || vehicle?.device?.lastUpdate;
   const lastActive = lastTs ? dayjs(lastTs).fromNow() : null;
 
+  const shellSx = embedded ? { height: 'auto' } : [vehicleModuleSx, { height: 'auto' }];
+
   if (features.disableDrivers) {
     return (
-      <Box sx={[vehicleModuleSx, { height: 'auto' }]}>
-        <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-          Assigned driver
-        </Typography>
+      <Box sx={shellSx}>
+        {!embedded && (
+          <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+            Assigned driver
+          </Typography>
+        )}
         <Typography variant="body2" color="text.secondary">
           Driver linking is disabled for this server profile. Use device fields where available.
         </Typography>
@@ -51,11 +56,13 @@ export default function VehicleDriverSection({
 
   return (
     <>
-      <Box sx={[vehicleModuleSx, { height: 'auto' }]}>
-        <Typography variant="subtitle1" fontWeight={700} gutterBottom display="flex" alignItems="center" gap={1}>
-          <PersonOutlineIcon fontSize="small" />
-          Assigned driver
-        </Typography>
+      <Box sx={shellSx}>
+        {!embedded && (
+          <Typography variant="subtitle1" fontWeight={700} gutterBottom display="flex" alignItems="center" gap={1}>
+            <PersonOutlineIcon fontSize="small" />
+            Assigned driver
+          </Typography>
+        )}
         {deviceId == null ? (
           <Typography variant="body2" color="text.secondary">
             Assign a Traccar device to this fleet vehicle before linking a driver.

@@ -17,6 +17,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LinkIcon from '@mui/icons-material/Link';
 import {
   getDeviceLabel,
+  getSetupChipProps,
   getStatusChipProps,
 } from './vehicleRegistryUtils';
 
@@ -42,13 +43,14 @@ const VehicleRegistryTable = ({
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Vehicle</TableCell>
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Device</TableCell>
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Status</TableCell>
+          <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Setup</TableCell>
           <TableCell align="right" sx={{ fontWeight: 600, py: 1.25 }}>Actions</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
         {rows.length === 0 && !loading ? (
           <TableRow>
-            <TableCell colSpan={4}>
+            <TableCell colSpan={5}>
               <Typography variant="body2" sx={{ color: 'var(--color-text-secondary)', py: 1 }}>
                 No vehicles yet. Add one or assign a Traccar device.
               </Typography>
@@ -57,6 +59,7 @@ const VehicleRegistryTable = ({
         ) : (
           rows.map((row) => {
             const statusChip = getStatusChipProps(row);
+            const setupChip = getSetupChipProps(row);
             return (
               <TableRow key={row.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
                 <TableCell sx={{ py: 1.25, maxWidth: 220 }}>
@@ -78,6 +81,9 @@ const VehicleRegistryTable = ({
                   ) : (
                     '—'
                   )}
+                </TableCell>
+                <TableCell sx={{ py: 1.25 }}>
+                  <Chip size="small" label={setupChip.label} variant={setupChip.variant} />
                 </TableCell>
                 <TableCell align="right" sx={{ py: 1.25 }}>
                   <Box

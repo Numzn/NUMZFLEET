@@ -32,7 +32,12 @@ const severityIcon = (severity) => {
   return '✅';
 };
 
-export default function VehicleAlertsColumn({ alerts, deviceId }) {
+export default function VehicleAlertsColumn({
+  alerts,
+  deviceId,
+  geofenceAlertsHidden = false,
+  geofenceAlertsSuppressed = 0,
+}) {
   const navigate = useNavigate();
   const { showToast } = useToastNotifications();
   const enriched = useMemo(() => enrichAlerts(alerts), [alerts]);
@@ -69,7 +74,9 @@ export default function VehicleAlertsColumn({ alerts, deviceId }) {
                 No active alerts
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                All systems operating normally
+                {geofenceAlertsHidden && geofenceAlertsSuppressed > 0
+                  ? 'Geofence alerts are hidden by vehicle preference.'
+                  : 'All systems operating normally'}
               </Typography>
             </Box>
           ) : (

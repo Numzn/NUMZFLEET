@@ -4,6 +4,7 @@ import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 import { fetchVehicle, updateVehicleConfig as putVehicleConfig } from '../vehiclesApi.js';
 import { normalizePositionTelemetry } from './telemetryUtils.js';
 import { getIgnitionPhrase, getMotionLabel } from './vehicleMotionStatus.js';
+import { isGeofenceEventType } from './vehicleAlertUtils.js';
 
 const erbFuelKey = (fuelType) => {
   if (!fuelType) return 'diesel';
@@ -163,18 +164,31 @@ export default function useVehicleData(vehicleId) {
     return { levelPct, capacityL: cap, litresLeft, rangeKm, lPer100km, fuelEfficiencyKmL: eff };
   }, [vehicle, telemetry.fuelPct]);
 
-  const alerts = useMemo(() => {
-    if (deviceId == null) return [];
-    return events
-      .filter((e) => e.deviceId === deviceId)
-      .slice(0, 12)
-      .map((e) => ({
+  const showGeofenceAlerts = vehicle?.fleetConfig?.alerts?.geofence !== false;
+
+  const { alerts, geofenceAlertsSuppressed } = useMemo(() => {
+    if (deviceId == null) {
+      return { alerts: [], geofenceAlertsSuppressed: 0 };
+    }
+    const deviceEvents = events.filter((e) => e.deviceId === deviceId);
+    let suppressed = 0;
+    const visible = deviceEvents.filter((e) => {
+      if (!showGeofenceAlerts && isGeofenceEventType(e.type)) {
+        suppressed += 1;
+        return false;
+      }
+      return true;
+    });
+    return {
+      alerts: visible.slice(0, 12).map((e) => ({
         id: e.id,
         type: e.type,
         message: e.attributes?.message || e.type,
         time: e.serverTime || e.deviceTime || null,
-      }));
-  }, [events, deviceId]);
+      })),
+      geofenceAlertsSuppressed: suppressed,
+    };
+  }, [events, deviceId, showGeofenceAlerts]);
 
   const groupName = useMemo(() => {
     if (deviceId == null) return null;
@@ -213,6 +227,8 @@ export default function useVehicleData(vehicleId) {
     fuel,
     erb: erbState,
     alerts,
+    geofenceAlertsHidden: !showGeofenceAlerts,
+    geofenceAlertsSuppressed,
     loading,
     error,
     refresh,

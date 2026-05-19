@@ -9,6 +9,8 @@ export default function OperationsSection({
   fleetVehicleId,
   fuel,
   erb,
+  geofenceAlertsHidden,
+  geofenceAlertsSuppressed,
 }) {
   const { operationsGridColumns } = useVehicleWorkspaceDensity();
 
@@ -25,7 +27,12 @@ export default function OperationsSection({
           alignItems: 'start',
         }}
       >
-        <VehicleAlertsColumn alerts={alerts} deviceId={deviceId} />
+        <VehicleAlertsColumn
+          alerts={alerts}
+          deviceId={deviceId}
+          geofenceAlertsHidden={geofenceAlertsHidden}
+          geofenceAlertsSuppressed={geofenceAlertsSuppressed}
+        />
         <VehicleFuelColumn
           deviceId={deviceId}
           fleetVehicleId={fleetVehicleId}

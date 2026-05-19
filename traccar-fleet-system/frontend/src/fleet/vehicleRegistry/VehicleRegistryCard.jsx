@@ -12,6 +12,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import { vehicleWorkspaceCardSx } from '../vehicleDetail/dashboardCardSx';
 import {
   getDeviceLabel,
+  getSetupChipProps,
   getStatusChipProps,
 } from './vehicleRegistryUtils';
 
@@ -23,6 +24,7 @@ const VehicleRegistryCard = ({
 }) => {
   const deviceLabel = getDeviceLabel(row);
   const statusChip = getStatusChipProps(row);
+  const setupChip = getSetupChipProps(row);
 
   return (
     <Box
@@ -54,9 +56,12 @@ const VehicleRegistryCard = ({
               {row.plateNumber || 'No plate'}
             </Typography>
           </Box>
-          {statusChip && (
-            <Chip size="small" label={statusChip.label} variant={statusChip.variant} />
-          )}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-end' }}>
+            {statusChip && (
+              <Chip size="small" label={statusChip.label} variant={statusChip.variant} />
+            )}
+            <Chip size="small" label={setupChip.label} variant={setupChip.variant} />
+          </Box>
           <Tooltip title="Delete vehicle">
             <IconButton
               size="small"

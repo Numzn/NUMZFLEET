@@ -1,6 +1,13 @@
 const CRITICAL_TYPES = new Set(['alarm', 'sos', 'fault', 'panic', 'emergency']);
 const WARNING_TYPES = new Set(['overspeed', 'geofenceEnter', 'geofenceExit', 'maintenance', 'fuelDrop']);
 
+/** Traccar geofence event types — used for display filtering (Traccar still records events). */
+export const GEOFENCE_EVENT_TYPES = new Set(['geofenceEnter', 'geofenceExit']);
+
+export function isGeofenceEventType(type) {
+  return GEOFENCE_EVENT_TYPES.has(String(type || ''));
+}
+
 export function mapAlertSeverity(type) {
   const t = String(type || '').toLowerCase();
   if (CRITICAL_TYPES.has(t) || t.includes('critical') || t.includes('sos')) return 'critical';

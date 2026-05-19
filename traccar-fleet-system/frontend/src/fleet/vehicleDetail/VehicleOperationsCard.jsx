@@ -19,7 +19,12 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { devicesActions } from '../../store';
-import { vehicleImmobilizerPath } from '../vehicleRegistry/vehicleRegistryUtils.js';
+import {
+  vehicleImmobilizerPath,
+  vehicleSetupPath,
+} from '../vehicleRegistry/vehicleRegistryUtils.js';
+import useFeatures from '../../common/util/useFeatures.js';
+import { hasBlockingSetupIncomplete } from './setup/vehicleSetupReadiness.js';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import { WORKSPACE_COLORS } from './vehicleWorkspaceTokens.js';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
@@ -51,7 +56,9 @@ export default function VehicleOperationsCard({
   const dispatch = useDispatch();
   const { vehicleId } = useParams();
   const density = useVehicleWorkspaceDensity();
+  const features = useFeatures();
   const { linkedDrivers } = useLinkedDrivers(deviceId);
+  const setupIncomplete = vehicle && hasBlockingSetupIncomplete(vehicle, linkedDrivers, features.disableDrivers);
 
   const status = vehicle?.device?.status;
   const online = status === 'online';
@@ -168,7 +175,16 @@ export default function VehicleOperationsCard({
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {setupIncomplete && (
+            <Chip
+              size="small"
+              color="warning"
+              variant="outlined"
+              label="Setup incomplete"
+              sx={{ mr: 0.5 }}
+            />
+          )}
           <CommandBtn
             icon={<MyLocationIcon fontSize="small" />}
             label="Locate"
@@ -189,8 +205,8 @@ export default function VehicleOperationsCard({
           />
           <CommandBtn
             icon={<SettingsOutlinedIcon fontSize="small" />}
-            label="Settings"
-            onClick={() => vehicleId && navigate(`/fleet/vehicles/${encodeURIComponent(vehicleId)}/setup`)}
+            label={setupIncomplete ? 'Setup' : 'Vehicle setup'}
+            onClick={() => vehicleId && navigate(vehicleSetupPath(vehicleId))}
             disabled={!vehicleId}
           />
         </Box>
