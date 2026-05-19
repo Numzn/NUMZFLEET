@@ -19,6 +19,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { devicesActions } from '../../store';
+import { vehicleImmobilizerPath } from '../vehicleRegistry/vehicleRegistryUtils.js';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import { WORKSPACE_COLORS } from './vehicleWorkspaceTokens.js';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
@@ -183,8 +184,8 @@ export default function VehicleOperationsCard({
           <CommandBtn
             icon={<BlockIcon fontSize="small" />}
             label="Immobilize"
-            onClick={() => hasDevice && navigate(`/settings/device/${deviceId}/command`)}
-            disabled={!hasDevice}
+            onClick={() => vehicleId && navigate(vehicleImmobilizerPath(vehicleId))}
+            disabled={!vehicleId}
           />
           <CommandBtn
             icon={<SettingsOutlinedIcon fontSize="small" />}

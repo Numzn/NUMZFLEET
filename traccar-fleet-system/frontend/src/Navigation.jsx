@@ -69,6 +69,7 @@ import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
 import VehiclesPage from './fleet/VehiclesPage';
 import VehicleDetailPage from './fleet/vehicleDetail/VehicleDetailPage';
 import VehicleSetupPage from './fleet/vehicleDetail/VehicleSetupPage';
+import VehicleImmobilizerPage from './fleet/vehicleDetail/VehicleImmobilizerPage';
 import OperationSessionsPage from './operationSessions/OperationSessionsPage';
 import CreateSessionPage from './operationSessions/CreateSessionPage';
 import PlanningPage from './operationSessions/PlanningPage';
@@ -135,6 +136,7 @@ const Navigation = () => {
           <Route path="map" element={<LiveMapPage />} />
           <Route path="fuel-requests" element={<FuelRequestsPage />} />
           <Route path="fleet/vehicles/:vehicleId/setup" element={<VehicleSetupPage />} />
+          <Route path="fleet/vehicles/:vehicleId/immobilizer" element={<VehicleImmobilizerPage />} />
           <Route path="fleet/vehicles/:vehicleId" element={<VehicleDetailPage />} />
           <Route path="fleet/vehicles" element={<VehiclesPage />} />
           <Route path="fleet/operation-sessions" element={<OperationSessionsPage />} />

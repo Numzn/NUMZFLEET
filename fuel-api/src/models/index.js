@@ -6,6 +6,7 @@ import DeviceAssignmentModel from './DeviceAssignment.js';
 import OperationSessionModel from './OperationSession.js';
 import OperationSessionRefuelModel from './OperationSessionRefuel.js';
 import UserNotificationModel from './UserNotification.js';
+import VehicleImmobilizationIntentModel from './VehicleImmobilizationIntent.js';
 
 // Initialize models
 const FuelRequest = FuelRequestModel(sequelize);
@@ -15,10 +16,13 @@ const DeviceAssignment = DeviceAssignmentModel(sequelize);
 const OperationSession = OperationSessionModel(sequelize);
 const OperationSessionRefuel = OperationSessionRefuelModel(sequelize);
 const UserNotification = UserNotificationModel(sequelize);
+const VehicleImmobilizationIntent = VehicleImmobilizationIntentModel(sequelize);
 
 // Define associations
 Vehicle.hasMany(DeviceAssignment, { foreignKey: 'vehicleId' });
 DeviceAssignment.belongsTo(Vehicle, { foreignKey: 'vehicleId' });
+Vehicle.hasMany(VehicleImmobilizationIntent, { foreignKey: 'vehicleId', as: 'immobilizationIntents' });
+VehicleImmobilizationIntent.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
 // VehicleSpec belongs to device (via deviceId)
 // FuelRequest belongs to device (via deviceId)
 OperationSession.hasMany(OperationSessionRefuel, {
@@ -135,6 +139,7 @@ export {
   OperationSession,
   OperationSessionRefuel,
   UserNotification,
+  VehicleImmobilizationIntent,
 };
 export default sequelize;
 

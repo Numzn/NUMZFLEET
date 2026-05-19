@@ -22,6 +22,11 @@ import notificationsRouter from './modules/notifications/routes.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
 import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.js';
+import { startImmobilizationEvaluatorScheduler } from './jobs/immobilizationEvaluatorScheduler.js';
+import {
+  reconcileStuckExecuting,
+  shouldReconcileOnStartup,
+} from './immobilization/executionRecovery.js';
 import { reconcileDeviceAssignmentLabels } from './services/vehicleFleetService.js';
 import {
   ensurePublicLoginInsightFromErb,
@@ -430,6 +435,19 @@ try {
 // Start server with retry logic for database connections
 /** Stops ERB → login insight interval (if started). */
 let stopErbLoginInsightScheduler = () => {};
+let stopImmobilizationEvaluatorScheduler = () => {};
+
+async function runImmobilizationStartupReconcile() {
+  if (!shouldReconcileOnStartup()) return;
+  try {
+    const stats = await reconcileStuckExecuting();
+    if (isDev && (stats.reconciled > 0 || stats.failed > 0)) {
+      console.log('[immobilization] startup reconcile', stats);
+    }
+  } catch (err) {
+    console.warn('[immobilization] startup reconcile failed:', err?.message || err);
+  }
+}
 
 const startServer = async () => {
   const MAX_RETRIES = 8;
@@ -530,6 +548,9 @@ const startServer = async () => {
       if (!traccarConnected) console.log(`❌ Traccar MySQL: NOT CONNECTED`);
       console.log('');
       stopErbLoginInsightScheduler = startErbLoginInsightScheduler();
+      void runImmobilizationStartupReconcile().finally(() => {
+        stopImmobilizationEvaluatorScheduler = startImmobilizationEvaluatorScheduler();
+      });
     });
     
     return; // Exit early (sync already attempted if Postgres was reachable)
@@ -557,6 +578,9 @@ const startServer = async () => {
       console.log('\n🎯 Ready to accept fuel requests!\n');
     }
     stopErbLoginInsightScheduler = startErbLoginInsightScheduler();
+    void runImmobilizationStartupReconcile().finally(() => {
+      stopImmobilizationEvaluatorScheduler = startImmobilizationEvaluatorScheduler();
+    });
     reconcileDeviceAssignmentLabels()
       .then((stats) => {
         if (process.env.NODE_ENV === 'development') {
@@ -577,6 +601,7 @@ process.on('SIGTERM', () => {
     console.log('\n📴 SIGTERM received, shutting down gracefully...');
   }
   stopErbLoginInsightScheduler();
+  stopImmobilizationEvaluatorScheduler();
   httpServer.close(() => {
     if (isDev) {
       console.log('✅ Server closed');

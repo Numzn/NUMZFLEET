@@ -323,13 +323,49 @@ export const getTraccarLatestPositionsByDeviceIds = async (ids) => {
   const pool = getTraccarPool();
   const placeholders = unique.map(() => '?').join(',');
   const [rows] = await pool.execute(
-    `SELECT d.id AS deviceId, p.id, p.latitude, p.longitude, p.speed, p.course, p.altitude, p.fixtime, p.attributes
+    `SELECT d.id AS deviceId, p.id, p.latitude, p.longitude, p.speed, p.course, p.altitude, p.fixtime, p.servertime, p.attributes
      FROM tc_devices d
      LEFT JOIN tc_positions p ON d.positionid = p.id
      WHERE d.id IN (${placeholders})`,
     unique,
   );
   rows.forEach((row) => parsePositionAttributes(row));
+  return rows;
+};
+
+const parseEventAttributes = (row) => {
+  if (!row?.attributes) return;
+  if (typeof row.attributes === 'string') {
+    try {
+      row.attributes = JSON.parse(row.attributes);
+    } catch {
+      /* keep string */
+    }
+  }
+};
+
+/**
+ * commandResult events for a device since a timestamp (immobilization ACK probe).
+ * @param {number} deviceId
+ * @param {Date|string} since
+ * @param {number} [limit]
+ * @returns {Promise<Array<{ id: number, type: string, eventtime: Date, attributes: object }>>}
+ */
+export const getTraccarCommandResultsSince = async (deviceId, since, limit = 10) => {
+  if (deviceId == null || !since) return [];
+  const pool = getTraccarPool();
+  const sinceDate = since instanceof Date ? since : new Date(since);
+  if (!Number.isFinite(sinceDate.getTime())) return [];
+  const cap = Math.min(Math.max(1, limit), 50);
+  const [rows] = await pool.execute(
+    `SELECT id, type, eventtime, attributes
+     FROM tc_events
+     WHERE deviceid = ? AND type = 'commandResult' AND eventtime >= ?
+     ORDER BY eventtime DESC
+     LIMIT ${cap}`,
+    [Number(deviceId), sinceDate],
+  );
+  rows.forEach((row) => parseEventAttributes(row));
   return rows;
 };
 
@@ -368,6 +404,7 @@ export default {
   getTraccarPosition,
   getTraccarDevicesByIds,
   getTraccarLatestPositionsByDeviceIds,
+  getTraccarCommandResultsSince,
   getDeviceAttributes,
   closeTraccarConnection,
 };

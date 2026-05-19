@@ -16,8 +16,15 @@ import {
   updateVehicle,
   deleteVehicle,
 } from '../controllers/vehicleFleetController.js';
+import {
+  getCapabilities,
+  getActive,
+  listHistory,
+  create as createImmobilizationIntent,
+  cancel as cancelImmobilizationIntent,
+} from '../controllers/immobilizationIntentController.js';
 import * as authMiddleware from '../middleware/auth.js';
-import { requireAuth, requireManager as _requireManager } from '../middleware/authGates.js';
+import { requireAuth, requireManager as _requireManager, requireRealAuth } from '../middleware/authGates.js';
 
 const router = express.Router();
 const { authenticate } = authMiddleware;
@@ -30,6 +37,19 @@ router.post('/', requireAuth, requireManager, createVehicle);
 router.get('/', requireAuth, requireManager, listVehicles);
 // assign-device before :id so "assign-device" is never captured as id
 router.post('/:vehicleId/assign-device', requireAuth, requireManager, assignDevice);
+
+// Immobilization intents (vehicle-centric operational control)
+router.get('/:vehicleId/immobilization/capabilities', requireAuth, requireManager, getCapabilities);
+router.get('/:vehicleId/immobilization-intents/active', requireAuth, requireManager, getActive);
+router.get('/:vehicleId/immobilization-intents', requireAuth, requireManager, listHistory);
+router.post('/:vehicleId/immobilization-intents', requireAuth, requireManager, requireRealAuth, createImmobilizationIntent);
+router.post(
+  '/:vehicleId/immobilization-intents/:intentId/cancel',
+  requireAuth,
+  requireManager,
+  cancelImmobilizationIntent,
+);
+
 router.get('/:id', requireAuth, requireManager, getVehicle);
 router.put('/:id/config', requireAuth, requireManager, updateVehicleConfig);
 router.put('/:id', requireAuth, requireManager, updateVehicle);

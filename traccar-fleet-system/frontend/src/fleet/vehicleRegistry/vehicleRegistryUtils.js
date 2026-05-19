@@ -21,3 +21,7 @@ export function getStatusChipProps(row) {
 export function vehicleWorkspacePath(vehicleId) {
   return `/fleet/vehicles/${encodeURIComponent(vehicleId)}`;
 }
+
+export function vehicleImmobilizerPath(vehicleId) {
+  return `/fleet/vehicles/${encodeURIComponent(vehicleId)}/immobilizer`;
+}
