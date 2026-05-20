@@ -14,7 +14,7 @@ export default function DeviceTelemetryModule({
     <>
       {!canSaveSpecs && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Assign a Traccar device from the Fleet vehicles list to unlock telemetry-based settings.
+          Assign a tracker from the Fleet vehicles list to unlock telemetry-based settings.
         </Alert>
       )}
       <TextField
@@ -53,7 +53,7 @@ export default function DeviceTelemetryModule({
             sx={{ textTransform: 'none' }}
             onClick={() => navigate(`/settings/device/${deviceId}`)}
           >
-            Traccar device admin
+            Device settings
           </Button>
           <Button
             size="small"

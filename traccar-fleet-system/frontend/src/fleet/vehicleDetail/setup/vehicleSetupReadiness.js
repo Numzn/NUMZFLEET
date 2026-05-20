@@ -1,4 +1,5 @@
 import { SETUP_MODULE_IDS } from './vehicleSetupModules.js';
+import { formatSetupBlockedReason } from './setupDisplayUtils.js';
 
 /** @typedef {'complete'|'incomplete'|'recommended'|'optional'|'blocked'} SetupStatus */
 
@@ -90,14 +91,14 @@ function computeZoneMonitoringReadiness({
     return {
       status: 'recommended',
       label: 'Checking zone links',
-      detail: 'Verifying operational zones in Traccar…',
+      detail: 'Verifying linked operational zones…',
     };
   }
   if (linkedGeofencesError) {
     return {
       status: 'recommended',
       label: 'Could not verify zones',
-      detail: 'Open Traccar to confirm zone links for this device.',
+      detail: 'Open device connections to confirm zone links for this tracker.',
     };
   }
   const linkedCount = linkedGeofences?.length ?? 0;
@@ -120,20 +121,20 @@ function computeZoneMonitoringReadiness({
     return {
       status: 'recommended',
       label: 'Zones linked',
-      detail: `${linkedCount} zone${linkedCount === 1 ? '' : 's'} in Traccar · Enable “Monitor linked zones”.`,
+      detail: `${linkedCount} zone${linkedCount === 1 ? '' : 's'} linked · Enable “Monitor linked zones”.`,
     };
   }
   if (!hasLinks && monitorEnabled) {
     return {
       status: 'recommended',
       label: 'Monitoring enabled',
-      detail: 'No operational zones linked in Traccar yet.',
+      detail: 'No operational zones linked to this device yet.',
     };
   }
   return {
     status: 'recommended',
     label: 'Zone monitoring not configured',
-    detail: 'Link zones in Traccar and enable monitoring preference.',
+    detail: 'Link operational zones and enable monitoring preference.',
   };
 }
 
@@ -180,7 +181,7 @@ export function computeVehicleSetupReadiness({
     status: hasDevice ? 'complete' : 'incomplete',
     label: hasDevice ? 'Tracker linked' : 'No device linked',
     detail: hasDevice
-      ? `Traccar device ID ${deviceId}`
+      ? `Tracker ID ${deviceId}`
       : 'Assign a device from the Fleet vehicles list.',
   });
 
@@ -270,7 +271,8 @@ export function computeVehicleSetupReadiness({
       id: SETUP_MODULE_IDS.safety,
       status: 'recommended',
       label: 'Immobilization limited',
-      detail: capabilities?.blockedReason || 'Check device protocol and immobilizer page.',
+      detail: formatSetupBlockedReason(capabilities?.blockedReason)
+        || 'Check device protocol and immobilizer page.',
     });
   }
 

@@ -79,7 +79,7 @@ export default function VehicleAlertsColumn({
                 {geofenceAlertsHidden && geofenceAlertsSuppressed > 0
                   ? 'Geofence alerts are hidden by vehicle preference.'
                   : !linkedZonesLoading && linkedZoneCount === 0 && deviceId != null
-                    ? 'No zones linked in Traccar — enter/exit events will not generate until zones are linked to this device.'
+                    ? 'No zones linked — enter/exit events will not generate until zones are linked to this device.'
                     : 'All systems operating normally'}
               </Typography>
             </Box>

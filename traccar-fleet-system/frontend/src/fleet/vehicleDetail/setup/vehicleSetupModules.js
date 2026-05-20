@@ -49,7 +49,7 @@ export const SETUP_MODULES = [
   {
     id: SETUP_MODULE_IDS.geofence,
     title: 'Zone monitoring',
-    subtitle: 'Operational preferences for Traccar-linked zones',
+    subtitle: 'Operational preferences for linked zones',
     icon: FenceIcon,
     optional: true,
   },

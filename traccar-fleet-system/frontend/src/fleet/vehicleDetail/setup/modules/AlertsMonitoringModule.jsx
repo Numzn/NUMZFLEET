@@ -40,7 +40,7 @@ export default function AlertsMonitoringModule({ form, patch, canSaveSpecs }) {
       />
       {canSaveSpecs && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: -0.5, mb: 1, ml: 4.5 }}>
-          Hides geofence events in this vehicle&apos;s workspace alert list. Traccar still records them.
+          Hides zone enter/exit in this vehicle&apos;s workspace alert list. Events are still recorded by the platform.
         </Typography>
       )}
       <FormControlLabel

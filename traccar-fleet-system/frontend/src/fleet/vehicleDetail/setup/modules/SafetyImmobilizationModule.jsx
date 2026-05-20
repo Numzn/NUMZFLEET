@@ -1,7 +1,6 @@
 import { Alert, Box, Button, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { vehicleImmobilizerPath } from '../../../vehicleRegistry/vehicleRegistryUtils.js';
-
 export default function SafetyImmobilizationModule({
   vehicleId,
   capabilities,
@@ -25,14 +24,9 @@ export default function SafetyImmobilizationModule({
           Checking device capabilities…
         </Typography>
       )}
-      {!capabilitiesLoading && capabilities && (
-        <Alert
-          severity={capabilities.canImmobilize ? 'success' : 'warning'}
-          sx={{ mb: 2 }}
-        >
-          {capabilities.canImmobilize
-            ? 'This device supports remote immobilization via the immobilizer workspace.'
-            : capabilities.blockedReason || 'Immobilization may not be available for this device.'}
+      {!capabilitiesLoading && capabilities?.canImmobilize && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          This device supports remote immobilization via the immobilizer workspace.
         </Alert>
       )}
       <Button

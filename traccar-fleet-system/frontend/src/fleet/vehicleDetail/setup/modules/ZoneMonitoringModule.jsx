@@ -35,8 +35,9 @@ export default function ZoneMonitoringModule({
   return (
     <>
       <Alert severity="info" sx={{ mb: 2 }}>
-        Geofence areas and device links are managed in Traccar. NUMZFLEET configures how this
-        vehicle operationally interacts with linked zones. Changes apply after Review setup → Save setup.
+        Zone boundaries and device links are managed under device connections. NUMZFLEET
+        stores how this vehicle operationally uses linked zones. Changes apply after Review
+        setup → Save setup.
       </Alert>
 
       {!canSaveSpecs && (
@@ -63,8 +64,8 @@ export default function ZoneMonitoringModule({
             sx={{ mb: 1, display: 'block' }}
           />
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2, ml: 4.5 }}>
-            Setup readiness only — does not create zones or start Traccar enter/exit events.
-            Use Alerts module to control workspace visibility of geofence events.
+            Setup readiness only — does not create zones or generate enter/exit events.
+            Use Alerts module to control workspace visibility of zone events.
           </Typography>
         </>
       )}
@@ -72,7 +73,7 @@ export default function ZoneMonitoringModule({
       {canSaveSpecs && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-            Linked operational zones (Traccar)
+            Linked operational zones
           </Typography>
           {linkedGeofencesLoading && (
             <Typography variant="body2" color="text.secondary">
@@ -81,7 +82,7 @@ export default function ZoneMonitoringModule({
           )}
           {!linkedGeofencesLoading && linkedGeofencesError && (
             <Typography variant="body2" color="warning.main">
-              Could not verify zone links. Use Traccar to manage connections.
+              Could not verify zone links. Manage connections from device settings.
             </Typography>
           )}
           {!linkedGeofencesLoading && !linkedGeofencesError && linkedCount === 0 && (
@@ -90,8 +91,7 @@ export default function ZoneMonitoringModule({
                 No zones linked to this device yet.
               </Typography>
               <Typography variant="caption" color="warning.main" display="block" sx={{ mt: 0.5 }}>
-                Traccar will not generate enter/exit events until at least one zone is linked and the
-                device crosses a boundary.
+                Enter/exit events require at least one linked zone and a real boundary crossing.
               </Typography>
             </>
           )}
@@ -106,7 +106,7 @@ export default function ZoneMonitoringModule({
             sx={{ textTransform: 'none', mt: 1.5 }}
             onClick={() => navigate(`/settings/device/${deviceId}/connections`)}
           >
-            Manage zones in Traccar
+            Manage zone connections
           </Button>
         </Box>
       )}
@@ -129,7 +129,7 @@ export default function ZoneMonitoringModule({
               size="small"
               type="number"
               disabled={!form.geofenceEnabled}
-              helperText="Does not create or resize zones in Traccar. For future operational hints only."
+              helperText="Does not create or resize zones. For future operational hints only."
             />
           </Collapse>
         </>
