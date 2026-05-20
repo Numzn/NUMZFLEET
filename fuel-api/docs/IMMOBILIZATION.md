@@ -7,8 +7,10 @@ Safety-governed operational intents: fuel-api evaluates conditions, Traccar deli
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `TRACCAR_SERVER_URL` | `http://traccar:8082` | Traccar base URL for command HTTP |
-| `TRACCAR_API_USER` | — | Service account email (Basic auth) |
+| `TRACCAR_API_USER` | — | Service account email (Basic auth) — dedicated Traccar user, not per-operator login |
 | `TRACCAR_API_PASSWORD` | — | Service account password |
+
+Create the user in Traccar (**Settings → Users**) before expecting capabilities to load. Wrong or missing credentials return `blockedReason: traccar_service_account_auth_failed` with `commandApiConfigured: true`.
 | `IMMOBILIZATION_EVALUATOR_INTERVAL_MS` | `2000` | Evaluator tick; `0` disables |
 | `IMMOBILIZATION_EVALUATOR_STARTUP_DELAY_MS` | `5000` | Delay before first tick |
 | `EXECUTION_CLAIM_TIMEOUT_SEC` | `45` | Stuck `executing` without Traccar delivery → `failed` |

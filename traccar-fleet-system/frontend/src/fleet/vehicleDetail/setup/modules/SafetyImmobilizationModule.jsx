@@ -1,6 +1,8 @@
 import { Alert, Box, Button, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { vehicleImmobilizerPath } from '../../../vehicleRegistry/vehicleRegistryUtils.js';
+import { describeImmobilizationCapabilities } from '../../immobilizationDisplayUtils.js';
+
 export default function SafetyImmobilizationModule({
   vehicleId,
   capabilities,
@@ -8,6 +10,7 @@ export default function SafetyImmobilizationModule({
   canSaveSpecs,
 }) {
   const navigate = useNavigate();
+  const capView = describeImmobilizationCapabilities(capabilities);
 
   if (!canSaveSpecs) {
     return (
@@ -28,6 +31,12 @@ export default function SafetyImmobilizationModule({
         <Alert severity="success" sx={{ mb: 2 }}>
           This device supports remote immobilization via the immobilizer workspace.
         </Alert>
+      )}
+      {!capabilitiesLoading && capabilities && !capabilities.canImmobilize && capView.summary && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {capView.summary}
+          {capView.detail ? ` ${capView.detail}` : ''}
+        </Typography>
       )}
       <Button
         variant="outlined"

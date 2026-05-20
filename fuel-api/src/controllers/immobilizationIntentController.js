@@ -5,6 +5,7 @@ import {
   getIntentHistory,
   getCapabilitiesForDevice,
 } from '../services/immobilizationIntentService.js';
+import { isTraccarCommandApiConfigured } from '../services/traccarCommandService.js';
 import { DeviceAssignment } from '../models/index.js';
 import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
@@ -21,6 +22,7 @@ export const getCapabilities = async (req, res) => {
     const deviceId = await resolveDeviceIdForVehicle(vehicleId);
     if (deviceId == null) {
       return res.json({
+        commandApiConfigured: isTraccarCommandApiConfigured(),
         canImmobilize: false,
         canMobilize: false,
         types: [],

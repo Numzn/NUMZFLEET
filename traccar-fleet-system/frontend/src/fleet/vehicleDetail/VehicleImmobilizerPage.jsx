@@ -38,6 +38,7 @@ import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import { vehicleWorkspacePath } from '../vehicleRegistry/vehicleRegistryUtils.js';
 import { getIgnitionPhrase, getMotionLabel } from './vehicleMotionStatus.js';
 import { formatExecutionError, formatDeliveryPhase } from './immobilizationErrors.js';
+import { describeImmobilizationCapabilities } from './immobilizationDisplayUtils.js';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -180,7 +181,8 @@ export default function VehicleImmobilizerPage() {
 
   const evaluation = activeIntent?.gateSnapshot?.evaluation;
   const gates = evaluation?.gates ? Object.values(evaluation.gates) : [];
-  const blocked = capabilities?.blockedReason || (!capabilities?.canImmobilize && !capabilities?.canMobilize);
+  const capView = describeImmobilizationCapabilities(capabilities);
+  const blocked = capView.mode !== 'ready' && capView.mode !== 'protocol_unsupported';
   const hasActive = activeIntent && ['pending', 'monitoring', 'executing'].includes(activeIntent.status);
 
   const handleConfirm = async () => {
@@ -212,7 +214,7 @@ export default function VehicleImmobilizerPage() {
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {title}
-          {deviceId != null ? ` · Device ${deviceId}` : ''}
+          {deviceId != null ? ` · Tracker ${deviceId}` : ''}
         </Typography>
 
         {(vehicleError || intentError) && (
@@ -251,27 +253,42 @@ export default function VehicleImmobilizerPage() {
                 Assign a tracker in vehicle setup before using the immobilizer.
               </Typography>
             ) : blocked ? (
-              <Typography variant="body2" color="text.secondary">
-                {capabilities?.blockedReason === 'no_device_assignment'
-                  ? 'No device assigned.'
-                  : capabilities?.blockedReason === 'traccar_command_api_not_configured'
-                    ? 'Command API is not configured on the server.'
-                    : 'This tracker does not support safe immobilization commands for this action.'}
-              </Typography>
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  {capView.summary}
+                </Typography>
+                {capView.detail && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                    {capView.detail}
+                  </Typography>
+                )}
+              </>
             ) : (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                <Chip
-                  size="small"
-                  label={capabilities?.canImmobilize ? 'Engine stop supported' : 'Immobilize not supported'}
-                  color={capabilities?.canImmobilize ? 'success' : 'default'}
-                  variant="outlined"
-                />
-                <Chip
-                  size="small"
-                  label={capabilities?.canMobilize ? 'Engine resume supported' : 'Mobilize not supported'}
-                  color={capabilities?.canMobilize ? 'success' : 'default'}
-                  variant="outlined"
-                />
+              <Box>
+                {capView.summary && (
+                  <Typography variant="caption" color="success.main" display="block" sx={{ mb: 1 }}>
+                    {capView.summary}
+                  </Typography>
+                )}
+                {capView.detail && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                    {capView.detail}
+                  </Typography>
+                )}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <Chip
+                    size="small"
+                    label={capabilities?.canImmobilize ? 'Engine stop supported' : 'Immobilize not supported'}
+                    color={capabilities?.canImmobilize ? 'success' : 'default'}
+                    variant="outlined"
+                  />
+                  <Chip
+                    size="small"
+                    label={capabilities?.canMobilize ? 'Engine resume supported' : 'Mobilize not supported'}
+                    color={capabilities?.canMobilize ? 'success' : 'default'}
+                    variant="outlined"
+                  />
+                </Box>
               </Box>
             )}
           </Box>

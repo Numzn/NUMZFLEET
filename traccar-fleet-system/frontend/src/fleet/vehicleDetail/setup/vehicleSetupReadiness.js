@@ -1,5 +1,5 @@
 import { SETUP_MODULE_IDS } from './vehicleSetupModules.js';
-import { formatSetupBlockedReason } from './setupDisplayUtils.js';
+import { setupSafetyReadinessFromCapabilities } from '../immobilizationDisplayUtils.js';
 
 /** @typedef {'complete'|'incomplete'|'recommended'|'optional'|'blocked'} SetupStatus */
 
@@ -259,20 +259,13 @@ export function computeVehicleSetupReadiness({
       label: 'Requires device',
       detail: 'Link a tracker to check immobilization support.',
     });
-  } else if (capabilities?.canImmobilize) {
-    modules.push({
-      id: SETUP_MODULE_IDS.safety,
-      status: 'complete',
-      label: 'Immobilization available',
-      detail: 'Device supports remote immobilization.',
-    });
   } else {
+    const safety = setupSafetyReadinessFromCapabilities(capabilities);
     modules.push({
       id: SETUP_MODULE_IDS.safety,
-      status: 'recommended',
-      label: 'Immobilization limited',
-      detail: formatSetupBlockedReason(capabilities?.blockedReason)
-        || 'Check device protocol and immobilizer page.',
+      status: safety.status,
+      label: safety.label,
+      detail: safety.detail,
     });
   }
 

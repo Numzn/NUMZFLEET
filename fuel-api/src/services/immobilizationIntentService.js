@@ -86,9 +86,10 @@ async function loadTelemetryForDevice(deviceId) {
  * @param {number} deviceId
  * @param {'immobilize'|'mobilize'} action
  */
-export async function getCapabilitiesForDevice(deviceId, action) {
+export async function getCapabilitiesForDevice(deviceId) {
   if (!isTraccarCommandApiConfigured()) {
     return {
+      commandApiConfigured: false,
       canImmobilize: false,
       canMobilize: false,
       types: [],
@@ -99,20 +100,35 @@ export async function getCapabilitiesForDevice(deviceId, action) {
     const types = await fetchCommandTypes(deviceId);
     const imm = resolveCommandTypeForAction(IMMOBILIZE_ACTION, types);
     const mob = resolveCommandTypeForAction(MOBILIZE_ACTION, types);
+    const canImmobilize = imm.supported;
+    const canMobilize = mob.supported;
     return {
-      canImmobilize: imm.supported,
-      canMobilize: mob.supported,
+      commandApiConfigured: true,
+      canImmobilize,
+      canMobilize,
       types: types.map((t) => t.type),
-      blockedReason: null,
+      blockedReason: canImmobilize || canMobilize ? null : 'protocol_unsupported',
       immobilizeReason: imm.reason,
       mobilizeReason: mob.reason,
     };
   } catch (e) {
+    if (e.authFailed || e.statusCode === 401 || e.statusCode === 403) {
+      return {
+        commandApiConfigured: true,
+        canImmobilize: false,
+        canMobilize: false,
+        types: [],
+        blockedReason: 'traccar_service_account_auth_failed',
+        capabilityCheckError: null,
+      };
+    }
     return {
+      commandApiConfigured: true,
       canImmobilize: false,
       canMobilize: false,
       types: [],
-      blockedReason: e.message || 'capability_check_failed',
+      blockedReason: 'capability_check_failed',
+      capabilityCheckError: e.message || null,
     };
   }
 }

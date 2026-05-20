@@ -3,7 +3,7 @@
  */
 const EXECUTION_ERROR_MESSAGES = {
   claim_timeout:
-    'Command delivery did not finish in time. Check Traccar command history before sending a new request.',
+    'Command delivery did not finish in time. Check command history on the device before sending a new request.',
   device_reassigned:
     'The tracker assignment changed before the command could be sent. Create a new request after confirming the correct device.',
   traccar_http_rejected:

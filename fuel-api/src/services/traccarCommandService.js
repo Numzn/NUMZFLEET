@@ -51,7 +51,10 @@ export async function fetchCommandTypes(deviceId) {
   if (!response.ok) {
     const text = await response.text();
     const err = new Error(text || `Traccar command types failed (${response.status})`);
-    err.statusCode = response.status >= 500 ? 502 : response.status;
+    err.statusCode = response.status;
+    if (response.status === 401 || response.status === 403) {
+      err.authFailed = true;
+    }
     throw err;
   }
   const data = await response.json();
@@ -78,7 +81,10 @@ export async function sendDeviceCommand(deviceId, command) {
   const text = await response.text();
   if (!response.ok) {
     const err = new Error(text || `Traccar command send failed (${response.status})`);
-    err.statusCode = response.status >= 500 ? 502 : response.status;
+    err.statusCode = response.status;
+    if (response.status === 401 || response.status === 403) {
+      err.authFailed = true;
+    }
     err.httpStatus = response.status;
     throw err;
   }
