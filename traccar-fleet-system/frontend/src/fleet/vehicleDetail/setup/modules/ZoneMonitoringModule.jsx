@@ -25,6 +25,7 @@ export default function ZoneMonitoringModule({
   linkedGeofences,
   linkedGeofencesLoading,
   linkedGeofencesError,
+  preferencesLoading = false,
 }) {
   const navigate = useNavigate();
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -35,7 +36,7 @@ export default function ZoneMonitoringModule({
     <>
       <Alert severity="info" sx={{ mb: 2 }}>
         Geofence areas and device links are managed in Traccar. NUMZFLEET configures how this
-        vehicle operationally interacts with linked zones.
+        vehicle operationally interacts with linked zones. Changes apply after Review setup → Save setup.
       </Alert>
 
       {!canSaveSpecs && (
@@ -44,17 +45,29 @@ export default function ZoneMonitoringModule({
         </Alert>
       )}
 
-      <FormControlLabel
-        control={(
-          <Switch
-            checked={form.geofenceEnabled}
-            onChange={(e) => patch({ geofenceEnabled: e.target.checked })}
-            disabled={!canSaveSpecs}
+      {preferencesLoading ? (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Loading preferences…
+        </Typography>
+      ) : (
+        <>
+          <FormControlLabel
+            control={(
+              <Switch
+                checked={form.geofenceEnabled}
+                onChange={(e) => patch({ geofenceEnabled: e.target.checked })}
+                disabled={!canSaveSpecs}
+              />
+            )}
+            label="Monitor linked zones"
+            sx={{ mb: 1, display: 'block' }}
           />
-        )}
-        label="Monitor linked zones"
-        sx={{ mb: 2, display: 'block' }}
-      />
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2, ml: 4.5 }}>
+            Setup readiness only — does not create zones or start Traccar enter/exit events.
+            Use Alerts module to control workspace visibility of geofence events.
+          </Typography>
+        </>
+      )}
 
       {canSaveSpecs && (
         <Box sx={{ mb: 2 }}>
@@ -72,9 +85,15 @@ export default function ZoneMonitoringModule({
             </Typography>
           )}
           {!linkedGeofencesLoading && !linkedGeofencesError && linkedCount === 0 && (
-            <Typography variant="body2" color="text.secondary">
-              No zones linked to this device yet.
-            </Typography>
+            <>
+              <Typography variant="body2" color="text.secondary">
+                No zones linked to this device yet.
+              </Typography>
+              <Typography variant="caption" color="warning.main" display="block" sx={{ mt: 0.5 }}>
+                Traccar will not generate enter/exit events until at least one zone is linked and the
+                device crosses a boundary.
+              </Typography>
+            </>
           )}
           {!linkedGeofencesLoading && !linkedGeofencesError && linkedCount > 0 && (
             <Typography variant="body2" fontWeight={600}>
@@ -92,7 +111,7 @@ export default function ZoneMonitoringModule({
         </Box>
       )}
 
-      {canSaveSpecs && (
+      {canSaveSpecs && !preferencesLoading && (
         <>
           <Button
             size="small"

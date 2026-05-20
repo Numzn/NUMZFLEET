@@ -27,6 +27,10 @@ function fleetBool(value, defaultValue = false) {
   return defaultValue;
 }
 
+function formSnapshotKey(form) {
+  return JSON.stringify(form);
+}
+
 export function buildFormFromVehicle(vehicle) {
   if (!vehicle) return defaultForm();
   const fleet = vehicle.fleetConfig;
@@ -59,18 +63,25 @@ export default function useVehicleSetupForm(vehicle) {
   const [dirty, setDirty] = useState(false);
   const vehicleId = vehicle?.id ?? null;
   const prevVehicleIdRef = useRef(null);
+  const skipNextVehicleSyncRef = useRef(false);
 
   // Hydrate on vehicle switch; sync from server when not dirty (skip refresh clobbering edits).
   useEffect(() => {
     if (!vehicleId || !vehicle) return;
     if (prevVehicleIdRef.current !== vehicleId) {
       prevVehicleIdRef.current = vehicleId;
+      skipNextVehicleSyncRef.current = false;
       setForm(buildFormFromVehicle(vehicle));
       setDirty(false);
       return;
     }
     if (dirty) return;
-    setForm(buildFormFromVehicle(vehicle));
+    if (skipNextVehicleSyncRef.current) {
+      skipNextVehicleSyncRef.current = false;
+      return;
+    }
+    const nextForm = buildFormFromVehicle(vehicle);
+    setForm((prev) => (formSnapshotKey(prev) === formSnapshotKey(nextForm) ? prev : nextForm));
   }, [vehicleId, vehicle, dirty]);
 
   const patch = useCallback((updates) => {
@@ -123,6 +134,7 @@ export default function useVehicleSetupForm(vehicle) {
         const merged = await saveConfig(built.body);
         setDirty(false);
         if (merged) {
+          skipNextVehicleSyncRef.current = true;
           setForm(buildFormFromVehicle(merged));
         }
         return merged;

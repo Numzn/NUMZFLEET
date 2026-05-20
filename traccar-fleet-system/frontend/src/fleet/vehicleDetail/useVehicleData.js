@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { traccarPath } from '../../config/traccarApi.js';
+import fetchOrThrow from '../../common/util/fetchOrThrow.js';
 import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 import { fetchVehicle, updateVehicleConfig as putVehicleConfig } from '../vehiclesApi.js';
 import { normalizePositionTelemetry } from './telemetryUtils.js';
 import { getIgnitionPhrase, getMotionLabel } from './vehicleMotionStatus.js';
-import { isGeofenceEventType } from './vehicleAlertUtils.js';
+import { isGeofenceEventType, resolveEventType } from './vehicleAlertUtils.js';
 
 const erbFuelKey = (fuelType) => {
   if (!fuelType) return 'diesel';
@@ -31,6 +33,28 @@ const normalizeErbPrices = (raw) => {
   return any ? out : null;
 };
 
+const RECENT_EVENTS_MS = 24 * 60 * 60 * 1000;
+
+function eventMatchesDevice(event, deviceId) {
+  if (deviceId == null || event?.deviceId == null) return false;
+  return Number(event.deviceId) === Number(deviceId);
+}
+
+function mergeDeviceEvents(liveEvents, historicalEvents, deviceId) {
+  const byId = new Map();
+  for (const e of historicalEvents) {
+    if (eventMatchesDevice(e, deviceId)) byId.set(e.id, e);
+  }
+  for (const e of liveEvents) {
+    if (eventMatchesDevice(e, deviceId)) byId.set(e.id, e);
+  }
+  return Array.from(byId.values()).sort((a, b) => {
+    const ta = new Date(a.eventTime || a.serverTime || a.deviceTime || 0).getTime();
+    const tb = new Date(b.eventTime || b.serverTime || b.deviceTime || 0).getTime();
+    return tb - ta;
+  });
+}
+
 /**
  * Vehicle-centric operational data keyed by fleet vehicle id.
  * @param {string} vehicleId Fleet vehicle UUID
@@ -53,6 +77,7 @@ export default function useVehicleData(vehicleId) {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [historicalEvents, setHistoricalEvents] = useState([]);
 
   const refresh = useCallback(async () => {
     if (!vehicleId || !user) return;
@@ -75,6 +100,34 @@ export default function useVehicleData(vehicleId) {
 
   const deviceId = vehicle?.assignment?.deviceId ?? null;
   const livePosition = deviceId != null ? positions[deviceId] : null;
+
+  useEffect(() => {
+    if (deviceId == null) {
+      setHistoricalEvents([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadRecentEvents = async () => {
+      const to = new Date().toISOString();
+      const from = new Date(Date.now() - RECENT_EVENTS_MS).toISOString();
+      const query = new URLSearchParams({ from, to, deviceId: String(deviceId) });
+      try {
+        const res = await fetchOrThrow(`${traccarPath('/api/reports/events')}?${query.toString()}`, {
+          headers: { Accept: 'application/json' },
+        });
+        const rows = await res.json();
+        if (!cancelled) {
+          setHistoricalEvents(Array.isArray(rows) ? rows : []);
+        }
+      } catch {
+        if (!cancelled) setHistoricalEvents([]);
+      }
+    };
+    loadRecentEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,10 +223,10 @@ export default function useVehicleData(vehicleId) {
     if (deviceId == null) {
       return { alerts: [], geofenceAlertsSuppressed: 0 };
     }
-    const deviceEvents = events.filter((e) => e.deviceId === deviceId);
+    const deviceEvents = mergeDeviceEvents(events, historicalEvents, deviceId);
     let suppressed = 0;
     const visible = deviceEvents.filter((e) => {
-      if (!showGeofenceAlerts && isGeofenceEventType(e.type)) {
+      if (!showGeofenceAlerts && isGeofenceEventType(e.type, e.attributes)) {
         suppressed += 1;
         return false;
       }
@@ -182,13 +235,14 @@ export default function useVehicleData(vehicleId) {
     return {
       alerts: visible.slice(0, 12).map((e) => ({
         id: e.id,
-        type: e.type,
-        message: e.attributes?.message || e.type,
-        time: e.serverTime || e.deviceTime || null,
+        type: resolveEventType(e.type, e.attributes),
+        message: e.attributes?.message || resolveEventType(e.type, e.attributes),
+        time: e.serverTime || e.deviceTime || e.eventTime || null,
+        attributes: e.attributes,
       })),
       geofenceAlertsSuppressed: suppressed,
     };
-  }, [events, deviceId, showGeofenceAlerts]);
+  }, [events, historicalEvents, deviceId, showGeofenceAlerts]);
 
   const groupName = useMemo(() => {
     if (deviceId == null) return null;

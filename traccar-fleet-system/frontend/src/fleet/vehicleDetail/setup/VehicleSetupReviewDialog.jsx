@@ -72,7 +72,7 @@ export default function VehicleSetupReviewDialog({
         </Button>
         <Box sx={{ flex: 1 }} />
         <Button variant="contained" onClick={onSave} disabled={saving}>
-          {saving ? 'Saving…' : 'Save & activate vehicle'}
+          {saving ? 'Saving…' : 'Save setup'}
         </Button>
       </DialogActions>
     </Dialog>

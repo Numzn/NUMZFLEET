@@ -28,7 +28,16 @@ export function normalizeTraccarEvent(event, options = {}) {
 
   if (type === 'alarm') {
     category = 'security';
-    severity = SEVERITY.CRITICAL;
+    const alarm = String(event.attributes?.alarm || '').toLowerCase();
+    if (alarm === 'geofenceenter' || alarm === 'geofenceexit' || alarm === 'geofence') {
+      category = 'tracking';
+      severity = SEVERITY.WARNING;
+    } else {
+      severity = SEVERITY.CRITICAL;
+    }
+  } else if (type === 'geofenceEnter' || type === 'geofenceExit') {
+    category = 'tracking';
+    severity = SEVERITY.WARNING;
   } else if (type === 'maintenance') {
     category = 'maintenance';
     severity = SEVERITY.WARNING;

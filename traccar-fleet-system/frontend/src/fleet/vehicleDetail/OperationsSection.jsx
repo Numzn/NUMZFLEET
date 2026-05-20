@@ -11,6 +11,8 @@ export default function OperationsSection({
   erb,
   geofenceAlertsHidden,
   geofenceAlertsSuppressed,
+  linkedZoneCount,
+  linkedZonesLoading,
 }) {
   const { operationsGridColumns } = useVehicleWorkspaceDensity();
 
@@ -32,6 +34,8 @@ export default function OperationsSection({
           deviceId={deviceId}
           geofenceAlertsHidden={geofenceAlertsHidden}
           geofenceAlertsSuppressed={geofenceAlertsSuppressed}
+          linkedZoneCount={linkedZoneCount}
+          linkedZonesLoading={linkedZonesLoading}
         />
         <VehicleFuelColumn
           deviceId={deviceId}

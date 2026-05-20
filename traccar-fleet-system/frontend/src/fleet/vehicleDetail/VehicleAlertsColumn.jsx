@@ -37,6 +37,8 @@ export default function VehicleAlertsColumn({
   deviceId,
   geofenceAlertsHidden = false,
   geofenceAlertsSuppressed = 0,
+  linkedZoneCount = null,
+  linkedZonesLoading = false,
 }) {
   const navigate = useNavigate();
   const { showToast } = useToastNotifications();
@@ -76,7 +78,9 @@ export default function VehicleAlertsColumn({
               <Typography variant="body2" color="text.secondary">
                 {geofenceAlertsHidden && geofenceAlertsSuppressed > 0
                   ? 'Geofence alerts are hidden by vehicle preference.'
-                  : 'All systems operating normally'}
+                  : !linkedZonesLoading && linkedZoneCount === 0 && deviceId != null
+                    ? 'No zones linked in Traccar — enter/exit events will not generate until zones are linked to this device.'
+                    : 'All systems operating normally'}
               </Typography>
             </Box>
           ) : (

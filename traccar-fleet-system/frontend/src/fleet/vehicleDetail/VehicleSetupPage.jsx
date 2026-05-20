@@ -34,6 +34,7 @@ import FuelSetupModule from './setup/modules/FuelSetupModule.jsx';
 import ZoneMonitoringModule from './setup/modules/ZoneMonitoringModule.jsx';
 import SafetyImmobilizationModule from './setup/modules/SafetyImmobilizationModule.jsx';
 import AlertsMonitoringModule from './setup/modules/AlertsMonitoringModule.jsx';
+import { useToastNotifications } from '../../hooks/useToastNotifications.jsx';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -89,6 +90,7 @@ function renderModuleContent(moduleId, props) {
           linkedGeofences={props.linkedGeofences}
           linkedGeofencesLoading={props.linkedGeofencesLoading}
           linkedGeofencesError={props.linkedGeofencesError}
+          preferencesLoading={props.preferencesLoading}
         />
       );
     case 'safety':
@@ -117,6 +119,7 @@ export default function VehicleSetupPage() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [capabilities, setCapabilities] = useState(null);
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
+  const { showToast, ToastNotification } = useToastNotifications();
 
   const {
     vehicle,
@@ -141,6 +144,7 @@ export default function VehicleSetupPage() {
     saving,
     err,
     setErr,
+    dirty,
     canSaveSpecs,
     save,
   } = useVehicleSetupForm(vehicle);
@@ -192,16 +196,44 @@ export default function VehicleSetupPage() {
     return () => window.removeEventListener('focus', onFocus);
   }, [deviceId, reloadLinkedGeofences]);
 
+  useEffect(() => {
+    if (!dirty || saving) return undefined;
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty, saving]);
+
+  const navigateIfClean = useCallback(
+    (path) => {
+      if (dirty && !saving) {
+        const leave = window.confirm(
+          'You have unsaved setup changes. Leave without saving?',
+        );
+        if (!leave) return;
+      }
+      navigate(path);
+    },
+    [dirty, saving, navigate],
+  );
+
   const handleConfirmSave = useCallback(async () => {
     try {
-      await save(saveConfig);
+      const merged = await save(saveConfig);
       setReviewOpen(false);
       // save() hydrates form from PUT response; refresh drivers/zones only (avoids clobbering dirty toggles).
       await Promise.all([reloadLinked(), reloadLinkedGeofences()]);
+      const zoneOn = merged?.fleetConfig?.geofenceEnabled === true;
+      showToast(
+        `Setup saved. Zone monitoring ${zoneOn ? 'on' : 'off'}.`,
+        'success',
+      );
     } catch {
       // err set in hook
     }
-  }, [save, saveConfig, reloadLinked, reloadLinkedGeofences]);
+  }, [save, saveConfig, reloadLinked, reloadLinkedGeofences, showToast]);
 
   if (!manager) {
     return (
@@ -214,6 +246,7 @@ export default function VehicleSetupPage() {
   }
 
   const detailPath = vehicleWorkspacePath(vehicleId);
+  const preferencesLoading = loading || !vehicle;
   const moduleProps = {
     form,
     patch,
@@ -228,6 +261,7 @@ export default function VehicleSetupPage() {
     linkedGeofences,
     linkedGeofencesLoading,
     linkedGeofencesError,
+    preferencesLoading,
   };
 
   return (
@@ -245,10 +279,16 @@ export default function VehicleSetupPage() {
           </Alert>
         )}
 
+        {dirty && !saving && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Unsaved setup changes — use Review setup to save before leaving.
+          </Alert>
+        )}
+
         <Button
           size="small"
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(detailPath)}
+          onClick={() => navigateIfClean(detailPath)}
           sx={{ textTransform: 'none', mb: 2 }}
         >
           Back to vehicle
@@ -293,28 +333,40 @@ export default function VehicleSetupPage() {
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: 1,
-                justifyContent: 'flex-end',
+                justifyContent: 'space-between',
                 alignItems: 'center',
               }}
             >
+              {dirty && !saving ? (
+                <Typography variant="body2" color="warning.main" fontWeight={600}>
+                  Unsaved changes
+                </Typography>
+              ) : (
+                <Box />
+              )}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
               <Button
                 variant="text"
-                onClick={() => navigate(detailPath)}
+                onClick={() => navigateIfClean(detailPath)}
                 sx={{ textTransform: 'none' }}
               >
                 Back to workspace
               </Button>
               <Button
-                variant="contained"
+                variant={dirty ? 'outlined' : 'contained'}
+                color={dirty ? 'warning' : 'primary'}
                 onClick={() => setReviewOpen(true)}
                 disabled={saving}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               >
                 Review setup
               </Button>
+              </Box>
             </Box>
           </Paper>
         )}
+
+        <ToastNotification />
 
         <VehicleSetupReviewDialog
           open={reviewOpen}

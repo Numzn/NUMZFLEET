@@ -4,6 +4,7 @@ import { makeStyles } from 'tss-react/mui';
 import FleetWorkspaceShell from '../../common/components/FleetWorkspaceShell';
 import { useManager } from '../../common/util/permissions';
 import useVehicleData from './useVehicleData';
+import { useLinkedGeofences } from './useLinkedGeofences.js';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 import VehicleWorkspaceSkeleton from './VehicleWorkspaceSkeleton.jsx';
 import VehicleOperationsCard from './VehicleOperationsCard.jsx';
@@ -49,6 +50,8 @@ function VehicleWorkspaceBody({
   alerts,
   geofenceAlertsHidden,
   geofenceAlertsSuppressed,
+  linkedZoneCount,
+  linkedZonesLoading,
   livePosition,
   deviceId,
   motionLabel,
@@ -76,6 +79,8 @@ function VehicleWorkspaceBody({
         erb={erb}
         geofenceAlertsHidden={geofenceAlertsHidden}
         geofenceAlertsSuppressed={geofenceAlertsSuppressed}
+        linkedZoneCount={linkedZoneCount}
+        linkedZonesLoading={linkedZonesLoading}
       />
       <DiagnosticsSection telemetry={telemetry} />
     </Box>
@@ -103,6 +108,12 @@ export default function VehicleDetailPage() {
     motionLabel,
     ignitionPhrase,
   } = useVehicleData(vehicleId);
+
+  const {
+    linkedGeofences,
+    loading: linkedZonesLoading,
+  } = useLinkedGeofences(deviceId);
+  const linkedZoneCount = linkedGeofences?.length ?? 0;
 
   if (!manager) {
     return (
@@ -136,6 +147,8 @@ export default function VehicleDetailPage() {
             alerts={alerts}
             geofenceAlertsHidden={geofenceAlertsHidden}
             geofenceAlertsSuppressed={geofenceAlertsSuppressed}
+            linkedZoneCount={linkedZoneCount}
+            linkedZonesLoading={linkedZonesLoading}
             livePosition={livePosition}
             deviceId={deviceId}
             motionLabel={motionLabel}
