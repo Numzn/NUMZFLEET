@@ -1,5 +1,15 @@
 import * as svc from './notificationService.js';
 
+export const syncNotifications = async (req, res) => {
+  try {
+    const data = await svc.syncForRequestUser(req);
+    res.json(data);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to sync notifications' });
+  }
+};
+
 export const listNotifications = async (req, res) => {
   try {
     const data = await svc.listForRequestUser(req);

@@ -13,6 +13,8 @@
 import eventBus from '../eventBus.js';
 import { EVENT_NAMES } from '../eventNames.js';
 import { withSafeListener } from '../safeListener.js';
+import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
+import { CHANNELS } from '../../notifications/contracts/notificationContract.js';
 
 export const registerErbPriceListeners = (io) => {
 
@@ -39,6 +41,29 @@ export const registerErbPriceListeners = (io) => {
         timestamp: payload.timestamp,
         prices:    payload.prices,
       });
+    }),
+  );
+
+  eventBus.on(
+    EVENT_NAMES.ERB_PRICES_UPDATED,
+    withSafeListener(EVENT_NAMES.ERB_PRICES_UPDATED, 'persist-notification', async (payload) => {
+      const at = payload.timestamp || new Date().toISOString();
+      await publishNotification({
+        type: 'erb.prices.updated',
+        category: 'system',
+        severity: 'info',
+        title: 'ERB fuel prices updated',
+        message: 'Latest ERB prices are available',
+        source: 'fuel-api',
+        audience: { managers: true },
+        metadata: {
+          prices: payload.prices,
+          trigger: payload.trigger,
+          dedupKey: `erb:${at}`,
+        },
+        clientDedupKey: `erb:${at}`,
+        channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+      }, { io });
     }),
   );
 };

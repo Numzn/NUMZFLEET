@@ -3,7 +3,9 @@
 ## Flags
 
 - **Unified engine (default on):** Traccar and fuel transports write to the `notifications` Redux slice; `NotificationEngine` handles toast / push / sound. Disable with Traccar server attribute `unifiedNotifications: false` or user attribute `legacyNotificationUi: true`, or env `VITE_LEGACY_NOTIFICATION_UI=true`.
-- **Persistence sync (default on):** `NotificationCenter` calls `GET/PATCH /api/notifications` when server attribute `notificationPersistenceSync` is not `false`.
+- **Persistence sync (default on):** `NotificationSyncController` calls `GET /api/notifications/sync?since=` on startup and reconnect; `NotificationCenter` still paginates with `GET /api/notifications` when opened.
+- **Tracking bridge (server):** Set `TRACKING_NOTIFICATION_BRIDGE=1` on fuel-api to poll `tc_events` and persist geofence/overspeed/panic-class events. Apply migration `20260522_notifications_dedup_and_bridge.sql`.
+- **Tracking bell ingest (client):** When `trackingNotificationPersist` is true on the server, client Traccar WS ingest into the bell is off unless `trackingBellIngest: true`.
 
 ## Legacy behavior
 
@@ -11,7 +13,24 @@ With unified off, `SocketController` restores direct alarm audio; `FuelSocketCon
 
 ## Database
 
-Apply `fuel-api/migrations/20260512_notifications.sql` on the fuel Postgres instance (or rely on Sequelize sync in dev).
+Apply on fuel Postgres (in order):
+
+1. `fuel-api/migrations/20260512_notifications.sql`
+2. `fuel-api/migrations/20260522_notifications_dedup_and_bridge.sql`
+
+Sequelize `syncDatabase()` does **not** apply these files automatically.
+
+## Staging / production enablement
+
+See [fuel-api/docs/NOTIFICATIONS_VALIDATION.md](../../../fuel-api/docs/NOTIFICATIONS_VALIDATION.md) for the full validation checklist.
+
+Quick enable:
+
+```env
+TRACKING_NOTIFICATION_BRIDGE=1
+```
+
+Set Traccar server attributes: `trackingNotificationPersist: true`, `trackingBellIngest: false` (optional explicit).
 
 ## Socket.IO security
 

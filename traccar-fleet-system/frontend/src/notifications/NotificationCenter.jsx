@@ -46,6 +46,7 @@ const NotificationCenter = () => {
   const [nextBefore, setNextBefore] = useState(null);
 
   const persistence = useSelector(isNotificationPersistenceSyncEnabled);
+  const user = useSelector((s) => s.session.user);
   const unread = useSelector(selectUnreadCount);
   const filtered = useSelector((s) => selectNotificationsWithFilters(s, {
     category: filters.category || undefined,
@@ -99,11 +100,15 @@ const NotificationCenter = () => {
     setAnchorEl(null);
   };
 
-  const onMarkRead = async (id) => {
+  const onMarkRead = async (id, entity) => {
     dispatch(notificationsActions.markRead(id));
     if (persistence) {
       try {
-        await markNotificationRead(id);
+        const dedup = entity?.metadata?.dedupKey;
+        const apiId = entity?.serverId
+          || (dedup && user?.id != null ? `${user.id}:${dedup}` : null)
+          || id;
+        await markNotificationRead(apiId);
       } catch (e) {
         console.warn(e);
       }
@@ -146,7 +151,7 @@ const NotificationCenter = () => {
 
   return (
     <>
-      <IconButton onClick={handleClick} aria-label="notifications">
+      <IconButton onClick={handleClick} aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}>
         <Badge variant="dot" invisible={unread === 0} color="error" overlap="circular">
           <NotificationsIcon />
         </Badge>
@@ -246,7 +251,7 @@ const NotificationCenter = () => {
                     />
                     <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
                       {!n.read && (
-                        <Button size="small" onClick={() => onMarkRead(n.id)}>Read</Button>
+                        <Button size="small" onClick={() => onMarkRead(n.id, n)}>Read</Button>
                       )}
                       <Button size="small" onClick={() => onAcknowledge(n.id)}>Acknowledge</Button>
                       <Button size="small" color="inherit" onClick={() => onArchive(n.id)}>Archive</Button>

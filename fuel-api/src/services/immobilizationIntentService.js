@@ -32,6 +32,7 @@ import {
   probeRecentSentIntents,
 } from '../immobilization/deviceCommandOutcomeProbe.js';
 import { logImmobilization } from '../immobilization/immobilizationLog.js';
+import { notifyImmobilizationTransition } from '../notifications/immobilizationNotificationService.js';
 import sequelize from '../config/database.js';
 
 const ACTIVE_STATUSES = ['pending', 'monitoring', 'executing'];
@@ -286,7 +287,9 @@ export async function cancelIntent(intentId, user, reason = 'operator_cancelled'
   const snap = row.gateSnapshot && typeof row.gateSnapshot === 'object' ? row.gateSnapshot : {};
   row.gateSnapshot = { ...snap, cancelReason: reason };
   await row.save();
-  return serializeIntent(row);
+  const serialized = serializeIntent(row);
+  await notifyImmobilizationTransition(serialized, { status: 'cancelled' });
+  return serialized;
 }
 
 /**
@@ -385,12 +388,15 @@ async function evaluateOneIntent(intent) {
 
   const assignment = await getActiveAssignment(intent.vehicleId);
   if (!assignment || Number(assignment.deviceId) !== Number(claimedRow.deviceId)) {
-    await finalizeExecutingIntent(intent.id, {
+    const failedRow = await finalizeExecutingIntent(intent.id, {
       status: 'failed',
       executionError: 'device_reassigned',
       confidence: 'unverified',
       deliveryPhase: 'delivery_unknown',
     });
+    if (failedRow) {
+      await notifyImmobilizationTransition(failedRow, { status: 'failed', executionError: 'device_reassigned' });
+    }
     return { claimed: true, delivered: false };
   }
 
@@ -414,6 +420,7 @@ async function evaluateOneIntent(intent) {
       traccarHttpStatus: delivery.httpStatus ?? null,
     });
     if (finalized) {
+      await notifyImmobilizationTransition(finalized, { status: 'completed' });
       try {
         await probeDeviceCommandOutcome(finalized);
       } catch (probeErr) {
@@ -422,13 +429,19 @@ async function evaluateOneIntent(intent) {
     }
     return { claimed: true, delivered: true };
   } catch (e) {
-    await finalizeExecutingIntent(intent.id, {
+    const failedRow = await finalizeExecutingIntent(intent.id, {
       status: 'failed',
       executionError: 'traccar_http_rejected',
       confidence: 'unverified',
       deliveryPhase: 'http_rejected',
       traccarHttpStatus: e.httpStatus ?? null,
     });
+    if (failedRow) {
+      await notifyImmobilizationTransition(failedRow, {
+        status: 'failed',
+        executionError: 'traccar_http_rejected',
+      });
+    }
     return { claimed: true, delivered: false };
   }
 }

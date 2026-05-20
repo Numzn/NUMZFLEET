@@ -6,10 +6,9 @@ import { useToastNotifications } from '../../hooks/useToastNotifications';
 import ConnectivityService from '../../connectivity/ConnectivityService';
 import diag from '../../common/util/diagLogger';
 import { notificationsActions } from '../../store/notifications/notificationsSlice.js';
-import { normalizeFuelRequestEvent } from '../../notifications/adapters/normalizeFuelRequestEvent.js';
-import { normalizeVehicleAssignmentEvent } from '../../notifications/adapters/normalizeVehicleAssignmentEvent.js';
-import { normalizeErbPriceEvent } from '../../notifications/adapters/normalizeErbPriceEvent.js';
+import { normalizeNotificationCreated } from '../../notifications/adapters/normalizeNotificationCreated.js';
 import { isUnifiedNotificationsEnabled } from '../../notifications/notificationFeatureFlags.js';
+import { requestNotificationSync } from '../../notifications/NotificationSyncController.jsx';
 
 const SOCKET_STATE = Object.freeze({
   CONNECTED: 'CONNECTED',
@@ -132,13 +131,6 @@ const FuelSocketController = () => {
       setState(SOCKET_STATE.OFFLINE, 'browser_offline');
     }
 
-    const ingestFuelNotification = (eventName, data) => {
-      const n = normalizeFuelRequestEvent(eventName, data);
-      if (n) {
-        dispatchRef.current(notificationsActions.upsertOneNotification(n));
-      }
-    };
-
     const showSmartNotification = (request, change, eventType) => {
       if (!request || !request.id) return;
 
@@ -237,7 +229,6 @@ const FuelSocketController = () => {
       dispatchRef.current(fuelRequestsActions.update([request]));
 
       if (unified) {
-        ingestFuelNotification('fuel-request-created', data);
         return;
       }
 
@@ -257,18 +248,6 @@ const FuelSocketController = () => {
       dispatchRef.current(fuelRequestsActions.update([request]));
 
       if (unified) {
-        ingestFuelNotification('fuel-request-updated', data);
-        if (!change && !userRef.current?.administrator && request.userId === userRef.current?.id) {
-          const n = normalizeFuelRequestEvent('fuel-request-updated', {
-            request,
-            change: {
-              type: 'updated',
-              changedAt: new Date().toISOString(),
-              message: 'Your fuel request was updated',
-            },
-          });
-          if (n) dispatchRef.current(notificationsActions.upsertOneNotification(n));
-        }
         return;
       }
 
@@ -282,17 +261,20 @@ const FuelSocketController = () => {
     });
 
     socket.off('vehicle-assignment-updated');
-    socket.on('vehicle-assignment-updated', (payload) => {
-      const n = normalizeVehicleAssignmentEvent(payload);
-      if (n && unified) {
-        dispatchRef.current(notificationsActions.upsertOneNotification(n));
-      }
+    socket.on('vehicle-assignment-updated', () => {
+      /* unified bell: notification.created only */
     });
 
     socket.off('erbPricesUpdated');
-    socket.on('erbPricesUpdated', (payload) => {
-      const n = normalizeErbPriceEvent(payload);
-      if (n && unified) {
+    socket.on('erbPricesUpdated', () => {
+      /* unified bell: notification.created only */
+    });
+
+    socket.off('notification.created');
+    socket.on('notification.created', (payload) => {
+      if (!unified) return;
+      const n = normalizeNotificationCreated(payload);
+      if (n) {
         dispatchRef.current(notificationsActions.upsertOneNotification(n));
       }
     });
@@ -301,6 +283,7 @@ const FuelSocketController = () => {
     socket.on('connect', () => {
       failureStreakRef.current = 0;
       setState(SOCKET_STATE.CONNECTED, 'connect');
+      requestNotificationSync();
     });
 
     if (socket.connected) {

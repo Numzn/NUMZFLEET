@@ -12,9 +12,9 @@ export function normalizeTraccarEvent(event, options = {}) {
   if (!event || event.id == null) return null;
   const type = event.type || 'unknown';
 
-  // Per-device GSM/link flips are high-volume; they are not surfaced as app notifications
-  // (map + device list already show state). Avoids toast + bell badge noise.
-  if (type === 'deviceOnline' || type === 'deviceOffline') {
+  // High-volume / low-signal types — server policy also skips persist (see notificationPolicyService).
+  if (type === 'deviceOnline' || type === 'deviceOffline'
+    || type === 'deviceMoving' || type === 'deviceStopped') {
     return null;
   }
 
@@ -82,7 +82,7 @@ export function normalizeTraccarEvent(event, options = {}) {
       deviceId: event.deviceId,
       traccarType: type,
       alarmAttr: event.attributes?.alarm,
-      dedupKey: `${SOURCES.TRACCAR}:${type}:${event.id}`,
+      dedupKey: `traccar:${event.id}`,
       delivered: {},
     },
   };

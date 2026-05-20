@@ -38,14 +38,38 @@ const notificationsAdapter = createEntityAdapter({
 const initialState = notificationsAdapter.getInitialState({
   /** @type {string|null} */
   syncCursor: null,
+  /** @type {string|null} */
+  lastSyncedAt: null,
 });
 
 function trimState(state) {
   const ids = state.ids;
   if (ids.length <= NOTIFICATIONS_MAX_CLIENT) return;
-  const removeCount = ids.length - NOTIFICATIONS_MAX_CLIENT;
-  const toRemove = ids.slice(-removeCount);
-  notificationsAdapter.removeMany(state, toRemove);
+
+  const unreadIds = [];
+  const readIds = [];
+  ids.forEach((id) => {
+    const e = state.entities[id];
+    if (!e) return;
+    if (!e.read && !e.archived) unreadIds.push(id);
+    else readIds.push(id);
+  });
+
+  const maxRead = Math.max(0, NOTIFICATIONS_MAX_CLIENT - unreadIds.length);
+  if (unreadIds.length + readIds.length <= NOTIFICATIONS_MAX_CLIENT) return;
+
+  const readToRemove = readIds.slice(-Math.max(0, readIds.length - maxRead));
+  if (readToRemove.length) {
+    notificationsAdapter.removeMany(state, readToRemove);
+  }
+
+  const remaining = state.ids.length;
+  if (remaining <= NOTIFICATIONS_MAX_CLIENT) return;
+  const overflow = remaining - NOTIFICATIONS_MAX_CLIENT;
+  const oldestUnread = unreadIds.slice(-overflow);
+  if (oldestUnread.length) {
+    notificationsAdapter.removeMany(state, oldestUnread);
+  }
 }
 
 const { reducer, actions, name } = createSlice({
@@ -103,6 +127,20 @@ const { reducer, actions, name } = createSlice({
     hydrateFromServer(state, action) {
       const { items, cursor } = action.payload || {};
       if (Array.isArray(items) && items.length) {
+        for (const serverEntity of items) {
+          const dedup = serverEntity.metadata?.dedupKey;
+          if (!dedup) continue;
+          Object.keys(state.entities).forEach((entityId) => {
+            const existing = state.entities[entityId];
+            if (
+              existing
+              && existing.id !== serverEntity.id
+              && existing.metadata?.dedupKey === dedup
+            ) {
+              notificationsAdapter.removeOne(state, entityId);
+            }
+          });
+        }
         notificationsAdapter.upsertMany(state, items);
         trimState(state);
       }
@@ -167,6 +205,9 @@ const { reducer, actions, name } = createSlice({
     },
     setSyncCursor(state, action) {
       state.syncCursor = action.payload ?? null;
+    },
+    setLastSyncedAt(state, action) {
+      state.lastSyncedAt = action.payload ?? null;
     },
   },
 });

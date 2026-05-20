@@ -358,6 +358,7 @@ const UnifiedSidebar = ({
           icon: DirectionsCarOutlinedIcon,
           show: !readonly,
           badge: alertsBadgeCount,
+          badgeHint: 'Live activity — recent Traccar events in this session (not notification unread)',
           children: [
             { title: 'Vehicles', path: '/fleet/vehicles', show: manager },
             { title: 'Drivers', path: '/settings/drivers', show: !features.disableDrivers },
@@ -503,9 +504,11 @@ const UnifiedSidebar = ({
   const renderParent = useCallback((item) => {
     const open = Boolean(openState?.[item.key]);
     const active = isAnyChildActive(item.children);
-    const tooltip = buildTooltip(item);
-    const Icon = item.icon;
     const badge = item.badge;
+    const tooltip = item.badgeHint && badge
+      ? `${item.title} — ${item.badgeHint}`
+      : buildTooltip(item);
+    const Icon = item.icon;
 
     const onClick = () => {
       if (collapsed) {
@@ -521,6 +524,7 @@ const UnifiedSidebar = ({
         key={item.title}
         className={`${classes.menuItem} ${active ? classes.menuItemActive : ''}`}
         onClick={onClick}
+        aria-label={item.badgeHint && badge ? `${item.title}, live activity ${badge}` : item.title}
         sx={{
           justifyContent: collapsed ? 'center' : 'flex-start',
           px: collapsed ? 1 : undefined,
@@ -529,7 +533,7 @@ const UnifiedSidebar = ({
       >
         <ListItemIcon className={classes.menuItemIcon} sx={{ minWidth: collapsed ? 'auto' : 38 }}>
           {badge ? (
-            <Badge badgeContent={badge} className={classes.badge}>
+            <Badge badgeContent={badge} className={classes.badge} aria-label={item.badgeHint || 'badge'}>
               <Icon />
             </Badge>
           ) : (

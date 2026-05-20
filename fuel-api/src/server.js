@@ -21,8 +21,10 @@ import reportsRouter from './reports/routes/reports.js';
 import notificationsRouter from './modules/notifications/routes.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
+import { setNotificationIo } from './notifications/notificationContext.js';
 import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.js';
 import { startImmobilizationEvaluatorScheduler } from './jobs/immobilizationEvaluatorScheduler.js';
+import { startTrackingNotificationBridgeScheduler } from './jobs/trackingNotificationBridgeScheduler.js';
 import {
   reconcileStuckExecuting,
   shouldReconcileOnStartup,
@@ -422,6 +424,7 @@ try {
     }
   });
   initializeSocket(io);
+  setNotificationIo(io);
   registerEventListeners({ io });
   if (process.env.NODE_ENV === 'development') {
     console.log('✅ [Socket.IO] Socket handler initialized successfully');
@@ -436,6 +439,7 @@ try {
 /** Stops ERB → login insight interval (if started). */
 let stopErbLoginInsightScheduler = () => {};
 let stopImmobilizationEvaluatorScheduler = () => {};
+let stopTrackingNotificationBridgeScheduler = () => {};
 
 async function runImmobilizationStartupReconcile() {
   if (!shouldReconcileOnStartup()) return;
@@ -550,6 +554,7 @@ const startServer = async () => {
       stopErbLoginInsightScheduler = startErbLoginInsightScheduler();
       void runImmobilizationStartupReconcile().finally(() => {
         stopImmobilizationEvaluatorScheduler = startImmobilizationEvaluatorScheduler();
+        stopTrackingNotificationBridgeScheduler = startTrackingNotificationBridgeScheduler(io);
       });
     });
     
@@ -580,6 +585,7 @@ const startServer = async () => {
     stopErbLoginInsightScheduler = startErbLoginInsightScheduler();
     void runImmobilizationStartupReconcile().finally(() => {
       stopImmobilizationEvaluatorScheduler = startImmobilizationEvaluatorScheduler();
+      stopTrackingNotificationBridgeScheduler = startTrackingNotificationBridgeScheduler(io);
     });
     reconcileDeviceAssignmentLabels()
       .then((stats) => {
@@ -602,6 +608,7 @@ process.on('SIGTERM', () => {
   }
   stopErbLoginInsightScheduler();
   stopImmobilizationEvaluatorScheduler();
+  stopTrackingNotificationBridgeScheduler();
   httpServer.close(() => {
     if (isDev) {
       console.log('✅ Server closed');

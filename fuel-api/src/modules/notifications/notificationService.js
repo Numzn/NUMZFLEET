@@ -1,9 +1,6 @@
-import { getManagerUserIds } from '../../services/userService.js';
+import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
+import { CHANNELS } from '../../notifications/contracts/notificationContract.js';
 import * as repo from './notificationRepository.js';
-
-function uniqIds(ids) {
-  return [...new Set(ids.filter((x) => Number.isFinite(Number(x))))];
-}
 
 function mapFuelSeverity(changeType, request) {
   if (changeType === 'created') {
@@ -40,8 +37,9 @@ function buildFuelTitleMessage(changeType, request, change) {
 
 /**
  * Persist fuel socket domain events for notification center / audit.
+ * @param {{ kind: string, request: object, change: object, actorUserId?: number, io?: import('socket.io').Server }} params
  */
-export async function persistFuelSocketEvent({ kind, request, change, actorUserId }) {
+export async function persistFuelSocketEvent({ kind, request, change, actorUserId, io }) {
   if (!request?.id) return;
 
   const changeType = change?.type || (kind === 'created' ? 'created' : 'updated');
@@ -49,14 +47,9 @@ export async function persistFuelSocketEvent({ kind, request, change, actorUserI
   const severity = mapFuelSeverity(changeType, request);
   const changedAt = change?.changedAt || new Date().toISOString();
 
-  const managerIds = await getManagerUserIds();
-  const driverId = Number(request.userId);
-  let recipients = [];
-  if (kind === 'created') {
-    recipients = [...managerIds];
-  } else {
-    recipients = uniqIds([driverId, ...managerIds]);
-  }
+  const audience = kind === 'created'
+    ? { managers: true }
+    : { includeDriverWithManagers: true, driverId: Number(request.userId) };
 
   const metadata = {
     requestId: request.id,
@@ -64,26 +57,22 @@ export async function persistFuelSocketEvent({ kind, request, change, actorUserI
     actorUserId: actorUserId ?? null,
     changeType,
     changedAt,
+    dedupKey: `fuel-api:${request.id}:${changeType}:${changedAt}`,
   };
 
-  const clientDedupKey = `fuel-api:${request.id}:${changeType}:${changedAt}`;
-
-  const rows = recipients.map((userId) => ({
-    userId,
-    type: `fuel.request.${changeType}`,
-    category: 'fuel',
-    severity,
-    title,
-    message,
-    source: 'fuel-api',
-    metadata,
-    read: false,
-    archived: false,
-    clientDedupKey: `${userId}:${clientDedupKey}`,
-  }));
-
   try {
-    await repo.bulkInsertNotifications(rows);
+    await publishNotification({
+      type: `fuel.request.${changeType}`,
+      category: 'fuel',
+      severity,
+      title,
+      message,
+      source: 'fuel-api',
+      audience,
+      metadata,
+      clientDedupKey: `fuel-api:${request.id}:${changeType}:${changedAt}`,
+      channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+    }, { io });
   } catch (e) {
     console.error('[notifications] persistFuelSocketEvent failed', e?.message || e);
   }
@@ -93,8 +82,12 @@ export async function listForRequestUser(req) {
   return repo.listNotificationsForUser(req.user.id, req.query || {});
 }
 
+export async function syncForRequestUser(req) {
+  return repo.syncNotificationsForUser(req.user.id, req.query || {});
+}
+
 export async function markRead(req) {
-  return repo.markReadForUser(req.user.id, req.params.id);
+  return repo.markReadForUserByIdOrDedup(req.user.id, req.params.id);
 }
 
 export async function markAllRead(req) {
@@ -102,7 +95,7 @@ export async function markAllRead(req) {
 }
 
 export async function archive(req) {
-  return repo.archiveForUser(req.user.id, req.params.id);
+  return repo.archiveForUserByIdOrDedup(req.user.id, req.params.id);
 }
 
 export async function patchLifecycle(req) {

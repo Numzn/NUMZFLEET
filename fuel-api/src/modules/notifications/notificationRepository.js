@@ -1,6 +1,8 @@
 import { Op } from 'sequelize';
 import { UserNotification } from '../../models/index.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function toApi(row) {
   if (!row) return null;
   const j = typeof row.toJSON === 'function' ? row.toJSON() : row;
@@ -26,6 +28,7 @@ function toApi(row) {
     resolvedAt: iso(j.resolvedAt),
     createdAt: iso(j.createdAt),
     updatedAt: iso(j.updatedAt),
+    clientDedupKey: j.clientDedupKey ?? j.client_dedup_key ?? null,
   };
 }
 
@@ -40,10 +43,17 @@ export async function listNotificationsForUser(userId, query) {
   if (query.read === 'true') where.read = true;
   if (query.read === 'false') where.read = false;
 
+  if (query.since) {
+    const since = new Date(query.since);
+    if (!Number.isNaN(since.getTime())) {
+      where.createdAt = { ...(where.createdAt || {}), [Op.gt]: since };
+    }
+  }
+
   if (query.before) {
     const d = new Date(query.before);
     if (!Number.isNaN(d.getTime())) {
-      where.createdAt = { [Op.lt]: d };
+      where.createdAt = { ...(where.createdAt || {}), [Op.lt]: d };
     }
   }
 
@@ -91,6 +101,18 @@ export async function archiveForUser(userId, id) {
   return true;
 }
 
+export async function archiveForUserByIdOrDedup(userId, idOrDedup) {
+  if (UUID_RE.test(String(idOrDedup))) {
+    return archiveForUser(userId, idOrDedup);
+  }
+  const row = await UserNotification.findOne({
+    where: { userId, clientDedupKey: String(idOrDedup) },
+  });
+  if (!row) return false;
+  await row.update({ archived: true, read: true });
+  return true;
+}
+
 export async function patchLifecycleForUser(userId, id, body) {
   const row = await UserNotification.findOne({ where: { id, userId, archived: false } });
   if (!row) return null;
@@ -105,6 +127,99 @@ export async function patchLifecycleForUser(userId, id, body) {
 }
 
 export async function bulkInsertNotifications(rows) {
-  if (!rows?.length) return;
-  await UserNotification.bulkCreate(rows, { validate: true });
+  if (!rows?.length) return { inserted: 0, skipped: 0, rows: [] };
+  const result = await UserNotification.bulkCreate(rows, {
+    validate: true,
+    ignoreDuplicates: true,
+  });
+  return {
+    inserted: result.length,
+    skipped: rows.length - result.length,
+    rows: result.map((r) => toApi(typeof r.toJSON === 'function' ? r.toJSON() : r)),
+  };
+}
+
+/**
+ * Load persisted rows for dedup keys (after bulk insert with ignoreDuplicates).
+ * @param {number} userId
+ * @param {string[]} clientDedupKeys full keys including userId prefix
+ */
+export async function findByClientDedupKeys(userId, clientDedupKeys) {
+  const keys = [...new Set(clientDedupKeys.filter(Boolean))];
+  if (!keys.length) return [];
+  const rows = await UserNotification.findAll({
+    where: {
+      userId,
+      clientDedupKey: { [Op.in]: keys },
+      archived: false,
+    },
+  });
+  return rows.map((r) => toApi(typeof r.toJSON === 'function' ? r.toJSON() : r));
+}
+
+/**
+ * Insert (ignore dupes) then return API rows for each dedup key.
+ */
+export async function persistNotificationRows(rows) {
+  if (!rows?.length) return [];
+  await bulkInsertNotifications(rows);
+  const byUser = new Map();
+  for (const row of rows) {
+    if (!row.clientDedupKey) continue;
+    if (!byUser.has(row.userId)) byUser.set(row.userId, []);
+    byUser.get(row.userId).push(row.clientDedupKey);
+  }
+  const out = [];
+  for (const [userId, keys] of byUser) {
+    const found = await findByClientDedupKeys(userId, keys);
+    out.push(...found);
+  }
+  return out;
+}
+
+export async function markReadForUserByIdOrDedup(userId, idOrDedup) {
+  if (UUID_RE.test(String(idOrDedup))) {
+    return markReadForUser(userId, idOrDedup);
+  }
+  const row = await UserNotification.findOne({
+    where: { userId, clientDedupKey: String(idOrDedup), archived: false },
+  });
+  if (!row) return null;
+  const now = new Date();
+  await row.update({
+    read: true,
+    viewedAt: row.viewedAt || now,
+  });
+  return toApi(await row.reload());
+}
+
+export async function syncNotificationsForUser(userId, query = {}) {
+  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 100, 1), 200);
+  const where = {
+    userId,
+    archived: false,
+  };
+  const hasSince = query.since && !Number.isNaN(new Date(query.since).getTime());
+  if (hasSince) {
+    where.createdAt = { [Op.gte]: new Date(query.since) };
+  }
+  const rows = await UserNotification.findAll({
+    where,
+    order: [['createdAt', 'DESC']],
+    limit,
+  });
+  const items = rows.map(toApi);
+  let nextSyncFrom = new Date().toISOString();
+  if (items.length) {
+    const maxTs = items.reduce((max, item) => {
+      const t = new Date(item.createdAt || 0).getTime();
+      return t > max ? t : max;
+    }, 0);
+    if (maxTs > 0) nextSyncFrom = new Date(maxTs).toISOString();
+  }
+  return {
+    items,
+    serverTime: new Date().toISOString(),
+    nextSyncFrom,
+  };
 }

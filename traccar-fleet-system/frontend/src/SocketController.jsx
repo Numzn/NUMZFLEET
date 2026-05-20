@@ -13,7 +13,8 @@ import { useAttributePreference } from './common/util/preferences';
 import { handleNativeNotificationListeners, nativePostMessage } from './common/components/NativeInterface';
 import { useTranslation } from './common/components/LocalizationProvider';
 import { normalizeTraccarEvent } from './notifications/adapters/normalizeTraccarEvent.js';
-import { isUnifiedNotificationsEnabled } from './notifications/notificationFeatureFlags.js';
+import { isUnifiedNotificationsEnabled, isTraccarBellIngestEnabled } from './notifications/notificationFeatureFlags.js';
+import { requestNotificationSync } from './notifications/NotificationSyncController.jsx';
 
 const logoutCode = 4000;
 
@@ -25,6 +26,7 @@ const SocketController = () => {
   const authenticated = useSelector((state) => Boolean(state.session.user));
   const includeLogs = useSelector((state) => state.session.includeLogs);
   const unified = useSelector(isUnifiedNotificationsEnabled);
+  const traccarBellIngest = useSelector(isTraccarBellIngestEnabled);
 
   const socketRef = useRef();
   const retryCountRef = useRef(0);
@@ -61,13 +63,17 @@ const SocketController = () => {
       dispatch(eventsActions.add(events));
     }
 
-    if (unified) {
+    if (unified && traccarBellIngest) {
       const batch = events
         .map((e) => normalizeTraccarEvent(e, { t }))
         .filter(Boolean);
       if (batch.length) {
         dispatch(notificationsActions.upsertManyNotifications(batch));
       }
+      return;
+    }
+
+    if (unified) {
       return;
     }
 
@@ -83,7 +89,7 @@ const SocketController = () => {
         });
       }
     }
-  }, [features, dispatch, soundEvents, soundAlarms, unified, t]);
+  }, [features, dispatch, soundEvents, soundAlarms, unified, traccarBellIngest, t]);
 
   const connectSocket = () => {
     const wsUrl = window.location.origin.replace(/^http/, 'ws');
@@ -94,6 +100,7 @@ const SocketController = () => {
     socket.onopen = () => {
       retryCountRef.current = 0;
       dispatch(sessionActions.updateSocket(true));
+      requestNotificationSync();
     };
 
     socket.onerror = (error) => {

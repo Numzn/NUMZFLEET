@@ -32,3 +32,25 @@ export function isNotificationPersistenceSyncEnabled(state) {
   }
   return true;
 }
+
+/**
+ * When true, Traccar WS events are still ingested into the bell slice client-side.
+ * When server persistence bridge is on, set trackingBellIngest=false to avoid double-ingest.
+ */
+export function isTraccarBellIngestEnabled(state) {
+  if (!isUnifiedNotificationsEnabled(state)) return false;
+  const server = state?.session?.server;
+  if (server?.attributes?.trackingBellIngest === true) {
+    return true;
+  }
+  if (server?.attributes?.trackingBellIngest === false) {
+    return false;
+  }
+  if (server?.attributes?.trackingNotificationPersist === true) {
+    return false;
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TRACKING_BELL_INGEST === 'true') {
+    return true;
+  }
+  return false;
+}

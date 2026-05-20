@@ -392,6 +392,8 @@ export const closeTraccarConnection = async () => {
   }
 };
 
+export { getTraccarPool };
+
 export default {
   getTraccarPool,
   testTraccarConnection,

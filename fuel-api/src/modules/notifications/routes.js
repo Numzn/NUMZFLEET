@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.use(authenticate);
 
+router.get('/sync', requireAuth, ctrl.syncNotifications);
 router.get('/', requireAuth, ctrl.listNotifications);
 router.patch('/read-all', requireAuth, ctrl.patchReadAll);
 router.patch('/:id/read', requireAuth, ctrl.patchRead);

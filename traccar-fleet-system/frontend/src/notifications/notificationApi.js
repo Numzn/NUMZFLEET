@@ -15,6 +15,19 @@ async function parseJsonResponse(res) {
 /**
  * @param {{ before?: string, limit?: number, category?: string, severity?: string, read?: string }} params
  */
+/**
+ * @param {{ since?: string, limit?: number }} params
+ */
+export async function syncNotificationsSince(params = {}) {
+  const q = new URLSearchParams();
+  if (params.since) q.set('since', params.since);
+  if (params.limit) q.set('limit', String(params.limit));
+  const qs = q.toString();
+  const res = await fetch(`/api/notifications/sync${qs ? `?${qs}` : ''}`, { credentials: 'include' });
+  if (!res.ok) throw new Error(`notifications sync ${res.status}`);
+  return parseJsonResponse(res);
+}
+
 export async function fetchNotifications(params = {}) {
   const q = new URLSearchParams();
   if (params.before) q.set('before', params.before);

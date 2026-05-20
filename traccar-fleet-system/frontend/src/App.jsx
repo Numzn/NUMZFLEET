@@ -6,6 +6,7 @@ import { makeStyles } from 'tss-react/mui';
 import SocketController from './SocketController';
 import FuelSocketController from './fuelRequests/socket/FuelSocketController';
 import NotificationEngine from './notifications/NotificationEngine';
+import NotificationSyncController from './notifications/NotificationSyncController';
 import CachingController from './CachingController';
 import { useCatch, useEffectAsync } from './reactHelper';
 import { sessionActions } from './store';
@@ -82,6 +83,7 @@ const App = () => {
     <>
       <SocketController />
       <FuelSocketController />
+      <NotificationSyncController />
       <NotificationEngine />
       <CachingController />
       <UpdateController />

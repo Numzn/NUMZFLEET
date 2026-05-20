@@ -58,6 +58,7 @@ export const registerFuelRequestListeners = (io) => {
           message: `New fuel request for ${request.requestedAmount}L from device ${request.deviceId}`,
         },
         actorUserId,
+        io,
       });
     }),
   );
@@ -107,6 +108,7 @@ export const registerFuelRequestListeners = (io) => {
           message,
         },
         actorUserId,
+        io,
       });
     }),
   );
@@ -155,6 +157,7 @@ export const registerFuelRequestListeners = (io) => {
           changedAt: new Date().toISOString(),
         },
         actorUserId,
+        io,
       });
     }),
   );
@@ -197,6 +200,7 @@ export const registerFuelRequestListeners = (io) => {
           message,
         },
         actorUserId,
+        io,
       });
     }),
   );
@@ -238,6 +242,7 @@ export const registerFuelRequestListeners = (io) => {
           message: `Fuel request #${request.id} cancelled`,
         },
         actorUserId,
+        io,
       });
     }),
   );

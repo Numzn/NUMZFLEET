@@ -91,9 +91,11 @@ export const initializeSocket = (io) => {
         
         if (userId) {
           const driverRoom = `driver-${userId}`;
+          const userRoom = `user-${userId}`;
           socket.join(driverRoom);
+          socket.join(userRoom);
           if (isDev) {
-            console.log(`✅ [Socket] ${socket.id} joined ${driverRoom}`);
+            console.log(`✅ [Socket] ${socket.id} joined ${driverRoom} and ${userRoom}`);
           }
         } else if (isDev) {
           console.warn(`⚠️ [Socket] No userId for socket ${socket.id}, skipping driver room`);
