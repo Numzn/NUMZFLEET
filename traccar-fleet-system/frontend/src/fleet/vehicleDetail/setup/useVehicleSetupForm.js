@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'CNG'];
 
@@ -19,37 +19,62 @@ const defaultForm = () => ({
   alCut: false,
 });
 
+/** Coerce fleet config booleans without treating false as missing. */
+function fleetBool(value, defaultValue = false) {
+  if (value === true || value === false) return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return defaultValue;
+}
+
+export function buildFormFromVehicle(vehicle) {
+  if (!vehicle) return defaultForm();
+  const fleet = vehicle.fleetConfig;
+  const eff = vehicle.vehicleSpec?.fuelEfficiency;
+  return {
+    name: vehicle.name ?? '',
+    plate: vehicle.plateNumber ?? '',
+    vehicleType: fleet?.vehicleType ?? 'light_duty',
+    fuelType: vehicle.vehicleSpec?.fuelType ?? 'Diesel',
+    tankCapacity:
+      vehicle.vehicleSpec?.tankCapacity != null ? String(vehicle.vehicleSpec.tankCapacity) : '',
+    lowFuelThresholdPct:
+      fleet?.lowFuelThresholdPct != null ? String(fleet.lowFuelThresholdPct) : '15',
+    lPer100km:
+      eff != null && Number(eff) > 0 ? String(Math.round((100 / Number(eff)) * 10) / 10) : '',
+    updateIntervalSec: fleet?.updateIntervalSec != null ? String(fleet.updateIntervalSec) : '10',
+    geofenceEnabled: fleetBool(fleet?.geofenceEnabled, false),
+    geofenceRadiusM: fleet?.geofenceRadiusM != null ? String(fleet.geofenceRadiusM) : '300',
+    alLow: fleet?.alerts?.lowFuel !== false,
+    alSpeed: fleet?.alerts?.speeding !== false,
+    alGeo: fleet?.alerts?.geofence !== false,
+    alCut: fleetBool(fleet?.alerts?.engineCut, false),
+  };
+}
+
 export default function useVehicleSetupForm(vehicle) {
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
+  const [dirty, setDirty] = useState(false);
+  const vehicleId = vehicle?.id ?? null;
+  const prevVehicleIdRef = useRef(null);
 
+  // Hydrate on vehicle switch; sync from server when not dirty (skip refresh clobbering edits).
   useEffect(() => {
-    if (!vehicle) return;
-    const fleet = vehicle.fleetConfig;
-    const eff = vehicle.vehicleSpec?.fuelEfficiency;
-    setForm({
-      name: vehicle.name || '',
-      plate: vehicle.plateNumber || '',
-      vehicleType: fleet?.vehicleType || 'light_duty',
-      fuelType: vehicle.vehicleSpec?.fuelType || 'Diesel',
-      tankCapacity:
-        vehicle.vehicleSpec?.tankCapacity != null ? String(vehicle.vehicleSpec.tankCapacity) : '',
-      lowFuelThresholdPct:
-        fleet?.lowFuelThresholdPct != null ? String(fleet.lowFuelThresholdPct) : '15',
-      lPer100km:
-        eff != null && Number(eff) > 0 ? String(Math.round((100 / Number(eff)) * 10) / 10) : '',
-      updateIntervalSec: fleet?.updateIntervalSec != null ? String(fleet.updateIntervalSec) : '10',
-      geofenceEnabled: Boolean(fleet?.geofenceEnabled),
-      geofenceRadiusM: fleet?.geofenceRadiusM != null ? String(fleet.geofenceRadiusM) : '300',
-      alLow: fleet?.alerts?.lowFuel !== false,
-      alSpeed: fleet?.alerts?.speeding !== false,
-      alGeo: fleet?.alerts?.geofence !== false,
-      alCut: Boolean(fleet?.alerts?.engineCut),
-    });
-  }, [vehicle]);
+    if (!vehicleId || !vehicle) return;
+    if (prevVehicleIdRef.current !== vehicleId) {
+      prevVehicleIdRef.current = vehicleId;
+      setForm(buildFormFromVehicle(vehicle));
+      setDirty(false);
+      return;
+    }
+    if (dirty) return;
+    setForm(buildFormFromVehicle(vehicle));
+  }, [vehicleId, vehicle, dirty]);
 
   const patch = useCallback((updates) => {
+    setDirty(true);
     setForm((prev) => ({ ...prev, ...updates }));
   }, []);
 
@@ -95,7 +120,12 @@ export default function useVehicleSetupForm(vehicle) {
       }
       setSaving(true);
       try {
-        await saveConfig(built.body);
+        const merged = await saveConfig(built.body);
+        setDirty(false);
+        if (merged) {
+          setForm(buildFormFromVehicle(merged));
+        }
+        return merged;
       } catch (e) {
         const msg = e.message || 'Save failed';
         setErr(msg);
@@ -113,6 +143,7 @@ export default function useVehicleSetupForm(vehicle) {
     saving,
     err,
     setErr,
+    dirty,
     deviceId,
     canSaveSpecs,
     save,

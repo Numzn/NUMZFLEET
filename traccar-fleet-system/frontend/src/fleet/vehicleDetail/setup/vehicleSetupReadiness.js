@@ -37,22 +37,29 @@ function driverDisplayName(vehicle, linkedDrivers) {
   );
 }
 
+function fleetBool(value, defaultValue = false) {
+  if (value === true || value === false) return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return defaultValue;
+}
+
 function formFromVehicle(vehicle, formDraft) {
   if (formDraft) return formDraft;
   const fleet = vehicle?.fleetConfig;
   const spec = vehicle?.vehicleSpec;
   const eff = spec?.fuelEfficiency;
   return {
-    name: vehicle?.name || '',
-    plate: vehicle?.plateNumber || '',
-    vehicleType: fleet?.vehicleType || 'light_duty',
-    fuelType: spec?.fuelType || 'Diesel',
+    name: vehicle?.name ?? '',
+    plate: vehicle?.plateNumber ?? '',
+    vehicleType: fleet?.vehicleType ?? 'light_duty',
+    fuelType: spec?.fuelType ?? 'Diesel',
     tankCapacity: spec?.tankCapacity != null ? String(spec.tankCapacity) : '',
     lowFuelThresholdPct: fleet?.lowFuelThresholdPct != null ? String(fleet.lowFuelThresholdPct) : '15',
     lPer100km:
       eff != null && Number(eff) > 0 ? String(Math.round((100 / Number(eff)) * 10) / 10) : '',
     updateIntervalSec: fleet?.updateIntervalSec != null ? String(fleet.updateIntervalSec) : '10',
-    geofenceEnabled: Boolean(fleet?.geofenceEnabled),
+    geofenceEnabled: fleetBool(fleet?.geofenceEnabled, false),
     geofenceRadiusM: fleet?.geofenceRadiusM != null ? String(fleet.geofenceRadiusM) : '300',
   };
 }
@@ -237,7 +244,7 @@ export function computeVehicleSetupReadiness({
     id: SETUP_MODULE_IDS.geofence,
     ...computeZoneMonitoringReadiness({
       hasDevice,
-      monitorEnabled: Boolean(form.geofenceEnabled),
+      monitorEnabled: form.geofenceEnabled === true,
       linkedGeofences,
       linkedGeofencesLoading,
       linkedGeofencesError,

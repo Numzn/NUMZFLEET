@@ -196,11 +196,12 @@ export default function VehicleSetupPage() {
     try {
       await save(saveConfig);
       setReviewOpen(false);
-      await refresh();
+      // save() hydrates form from PUT response; refresh drivers/zones only (avoids clobbering dirty toggles).
+      await Promise.all([reloadLinked(), reloadLinkedGeofences()]);
     } catch {
       // err set in hook
     }
-  }, [save, saveConfig, refresh]);
+  }, [save, saveConfig, reloadLinked, reloadLinkedGeofences]);
 
   if (!manager) {
     return (

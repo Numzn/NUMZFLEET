@@ -53,6 +53,13 @@ export function parseTraccarAttributesRaw(raw) {
 }
 
 /** @param {Record<string, unknown>} deviceAttributes */
+function normalizeBool(value, defaultValue) {
+  if (value === true || value === false) return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return defaultValue;
+}
+
 export function parseDeviceFleetConfig(deviceAttributes) {
   let raw = deviceAttributes?.numzFleetConfig;
   if (typeof raw === 'string') {
@@ -62,7 +69,18 @@ export function parseDeviceFleetConfig(deviceAttributes) {
       raw = null;
     }
   }
-  return deepMerge(DEFAULT_FLEET_CONFIG, raw && typeof raw === 'object' ? raw : {});
+  const merged = deepMerge(DEFAULT_FLEET_CONFIG, raw && typeof raw === 'object' ? raw : {});
+  merged.geofenceEnabled = normalizeBool(merged.geofenceEnabled, DEFAULT_FLEET_CONFIG.geofenceEnabled);
+  if (merged.alerts && typeof merged.alerts === 'object') {
+    merged.alerts = {
+      ...merged.alerts,
+      lowFuel: normalizeBool(merged.alerts.lowFuel, DEFAULT_FLEET_CONFIG.alerts.lowFuel),
+      speeding: normalizeBool(merged.alerts.speeding, DEFAULT_FLEET_CONFIG.alerts.speeding),
+      geofence: normalizeBool(merged.alerts.geofence, DEFAULT_FLEET_CONFIG.alerts.geofence),
+      engineCut: normalizeBool(merged.alerts.engineCut, DEFAULT_FLEET_CONFIG.alerts.engineCut),
+    };
+  }
+  return merged;
 }
 
 /** @param {object} current — result of parseDeviceFleetConfig */
