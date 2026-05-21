@@ -61,7 +61,11 @@ CREATE INDEX IF NOT EXISTS vehicle_immobilization_intents_expires_at
 
 DO $$ BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_immobilization_intents_vehicleId_fkey'
+    SELECT 1 FROM pg_constraint
+    WHERE conname IN (
+      'vehicle_immobilization_intents_vehicleid_fkey',
+      'vehicle_immobilization_intents_vehicleId_fkey'
+    )
   ) THEN
     ALTER TABLE vehicle_immobilization_intents
       ADD CONSTRAINT vehicle_immobilization_intents_vehicleId_fkey
