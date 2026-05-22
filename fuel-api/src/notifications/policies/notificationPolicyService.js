@@ -1,6 +1,6 @@
 /**
  * Central notification behavior registry for Traccar tracking events.
- * Aligns with frontend vehicleAlertUtils + normalizeTraccarEvent.
+ * Aligns with frontend vehicleAlertUtils for map/ops display (not bell ingest).
  */
 
 const GEOFENCE_ALARM_TYPES = new Set(['geofenceenter', 'geofenceexit', 'geofence']);

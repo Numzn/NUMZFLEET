@@ -51,19 +51,21 @@ export async function persistFuelSocketEvent({ kind, request, change, actorUserI
     ? { managers: true }
     : { includeDriverWithManagers: true, driverId: Number(request.userId) };
 
+  const dedupKey = `fuel-api:${request.id}:${changeType}`;
   const metadata = {
     requestId: request.id,
     deviceId: request.deviceId,
     actorUserId: actorUserId ?? null,
     changeType,
     changedAt,
-    dedupKey: `fuel-api:${request.id}:${changeType}:${changedAt}`,
+    dedupKey,
   };
 
   try {
     await publishNotification({
       type: `fuel.request.${changeType}`,
-      category: 'fuel',
+      entityType: 'fuel',
+      entityId: String(request.id),
       severity,
       title,
       message,

@@ -37,7 +37,8 @@ export async function notifyImmobilizationTransition(intent, extra = {}) {
 
   await publishNotification({
     type: `immobilization.${status}`,
-    category: 'security',
+    entityType: 'security',
+    entityId: String(intent.id),
     severity,
     title,
     message: String(message),
@@ -50,7 +51,7 @@ export async function notifyImmobilizationTransition(intent, extra = {}) {
       action: intent.action,
       status,
       confidence: intent.confidence,
-      dedupKey: `immobilization:${intent.id}:${status}:${at}`,
+      changedAt: at,
     },
     clientDedupKey: `immobilization:${intent.id}:${status}`,
     channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],

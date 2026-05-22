@@ -2,6 +2,7 @@ import * as repo from '../../modules/notifications/notificationRepository.js';
 import { CHANNELS } from '../contracts/notificationContract.js';
 import { resolveAudience } from './audienceResolver.js';
 import { dispatchNotificationChannels } from '../dispatcher/notificationDispatcher.js';
+import { createNotification } from '../canonicalNotification.js';
 
 /**
  * Central notification publish API.
@@ -9,18 +10,19 @@ import { dispatchNotificationChannels } from '../dispatcher/notificationDispatch
  * @param {{ io?: import('socket.io').Server }} [ctx]
  */
 export async function publishNotification(spec, ctx = {}) {
+  const notification = createNotification(spec);
   const {
     type,
     category,
     severity,
     title,
     message,
-    source = 'fuel-api',
+    source,
     audience,
-    metadata = {},
+    metadata,
     clientDedupKey,
     channels = [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
-  } = spec;
+  } = notification;
 
   const userIds = await resolveAudience(audience);
   if (!userIds.length) {
@@ -38,7 +40,7 @@ export async function publishNotification(spec, ctx = {}) {
     metadata,
     read: false,
     archived: false,
-    clientDedupKey: clientDedupKey ? `${userId}:${clientDedupKey}` : null,
+    clientDedupKey: `${userId}:${clientDedupKey}`,
   }));
 
   let persistedApiRows = [];
@@ -46,10 +48,10 @@ export async function publishNotification(spec, ctx = {}) {
     persistedApiRows = await repo.persistNotificationRows(rows);
   }
 
-  const apiByUserDedup = new Map();
+  const persistedByUserDedup = new Map();
   for (const apiRow of persistedApiRows) {
     if (apiRow?.userId != null && apiRow.clientDedupKey) {
-      apiByUserDedup.set(`${apiRow.userId}:${apiRow.clientDedupKey}`, apiRow);
+      persistedByUserDedup.set(`${apiRow.userId}:${apiRow.clientDedupKey}`, apiRow);
     }
   }
 
@@ -57,12 +59,16 @@ export async function publishNotification(spec, ctx = {}) {
   const realtimeChannels = channels.filter((c) => c !== CHANNELS.INBOX);
   if (realtimeChannels.length && io) {
     for (const row of rows) {
-      const apiRow = apiByUserDedup.get(`${row.userId}:${row.clientDedupKey}`);
-      if (!apiRow?.id) continue;
-      await dispatchNotificationChannels(io, row.userId, {
-        ...apiRow,
-        clientDedupKey: row.clientDedupKey,
-      }, realtimeChannels);
+      const apiRow = persistedByUserDedup.get(`${row.userId}:${row.clientDedupKey}`);
+      if (!apiRow?.id) {
+        console.warn('[notifications] skip websocket emit: no persisted row', {
+          type,
+          userId: row.userId,
+          clientDedupKey: row.clientDedupKey,
+        });
+        continue;
+      }
+      await dispatchNotificationChannels(io, row.userId, apiRow, realtimeChannels);
     }
   }
 

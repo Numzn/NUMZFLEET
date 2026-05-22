@@ -83,17 +83,40 @@ export async function patchNotificationLifecycle(id, body) {
   return parseJsonResponse(res);
 }
 
+/** Channels already shown before this row entered Redux (sync / paginated fetch). */
+const HYDRATE_DELIVERED = { toast: true, push: true, sound: true };
+
 /**
  * Map API row to unified Notification entity for Redux.
  * @param {object} row
+ * @param {{ markChannelsDelivered?: boolean }} [options]
+ *   markChannelsDelivered — true for sync/hydrate (skip re-toast); false for live WS (default).
  */
-export function mapServerNotificationToEntity(row) {
+export function mapServerNotificationToEntity(row, options = {}) {
   if (!row?.id) return null;
+
+  const entityType = row.entityType || row.category || 'system';
+  const entityId = row.entityId != null
+    ? String(row.entityId)
+    : (row.metadata?.entityId != null ? String(row.metadata.entityId) : String(row.id));
+  const read = row.readAt != null ? true : !!row.read;
+  const baseMeta = typeof row.metadata === 'object' && row.metadata ? row.metadata : {};
+  const metadata = {
+    ...baseMeta,
+    entityType,
+    entityId,
+  };
+  if (options.markChannelsDelivered) {
+    metadata.delivered = { ...HYDRATE_DELIVERED };
+  }
+
   return {
     id: row.id,
     serverId: row.id,
     type: row.type || 'system',
-    category: row.category || 'system',
+    category: entityType,
+    entityType,
+    entityId,
     severity: row.severity || 'info',
     title: row.title || '',
     message: row.message || '',
@@ -101,13 +124,11 @@ export function mapServerNotificationToEntity(row) {
     timestamp: row.createdAt || row.timestamp
       ? new Date(row.createdAt || row.timestamp).toISOString()
       : new Date().toISOString(),
-    read: !!row.read,
+    read,
+    readAt: row.readAt ?? null,
     archived: !!row.archived,
     actionable: row.actionable !== false,
-    metadata: {
-      ...(typeof row.metadata === 'object' && row.metadata ? row.metadata : {}),
-      delivered: { toast: true, push: true, sound: true },
-    },
+    metadata,
     viewedAt: row.viewedAt || null,
     acknowledgedAt: row.acknowledgedAt || null,
     resolvedAt: row.resolvedAt || null,

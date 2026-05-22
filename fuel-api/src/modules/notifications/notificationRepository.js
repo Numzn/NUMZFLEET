@@ -11,19 +11,35 @@ function toApi(row) {
     if (d instanceof Date) return d.toISOString();
     return d;
   };
+  const metadata = j.metadata || {};
+  const entityType = j.category || metadata.entityType || 'system';
+  const entityId = metadata.entityId != null
+    ? String(metadata.entityId)
+    : (metadata.requestId != null ? String(metadata.requestId)
+      : metadata.traccarEventId != null ? String(metadata.traccarEventId)
+        : metadata.intentId != null ? String(metadata.intentId)
+          : metadata.vehicleId != null ? String(metadata.vehicleId)
+            : String(j.id));
+  const read = !!j.read;
+  const viewedAt = iso(j.viewedAt);
+  const readAt = read ? (viewedAt || iso(j.updatedAt)) : null;
+
   return {
     id: j.id,
     userId: j.userId,
     type: j.type,
-    category: j.category,
+    category: entityType,
+    entityType,
+    entityId,
     severity: j.severity,
     title: j.title,
     message: j.message,
     source: j.source,
-    metadata: j.metadata || {},
-    read: !!j.read,
+    metadata,
+    read,
+    readAt,
     archived: !!j.archived,
-    viewedAt: iso(j.viewedAt),
+    viewedAt,
     acknowledgedAt: iso(j.acknowledgedAt),
     resolvedAt: iso(j.resolvedAt),
     createdAt: iso(j.createdAt),
@@ -162,17 +178,34 @@ export async function findByClientDedupKeys(userId, clientDedupKeys) {
  */
 export async function persistNotificationRows(rows) {
   if (!rows?.length) return [];
-  await bulkInsertNotifications(rows);
+
+  const { rows: insertedRows } = await bulkInsertNotifications(rows);
+
   const byUser = new Map();
   for (const row of rows) {
     if (!row.clientDedupKey) continue;
     if (!byUser.has(row.userId)) byUser.set(row.userId, []);
     byUser.get(row.userId).push(row.clientDedupKey);
   }
-  const out = [];
+
+  const byId = new Map();
+  for (const apiRow of insertedRows) {
+    if (apiRow?.id) byId.set(apiRow.id, apiRow);
+  }
+
   for (const [userId, keys] of byUser) {
     const found = await findByClientDedupKeys(userId, keys);
-    out.push(...found);
+    for (const apiRow of found) {
+      if (apiRow?.id) byId.set(apiRow.id, apiRow);
+    }
+  }
+
+  const out = [];
+  for (const row of rows) {
+    const match = [...byId.values()].find(
+      (r) => r.userId === row.userId && r.clientDedupKey === row.clientDedupKey,
+    );
+    if (match) out.push(match);
   }
   return out;
 }

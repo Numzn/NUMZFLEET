@@ -80,9 +80,11 @@ const registerPersistNotificationListener = (io) => {
       'persist-notification',
       async ({ vehicleId, deviceId, vehicleName, previousDeviceId, assignedAt, actorUserId }) => {
         const at = assignedAt || new Date().toISOString();
+        const entityId = String(vehicleId);
         await publishNotification({
           type: 'assignment.vehicle.updated',
-          category: 'assignment',
+          entityType: 'assignment',
+          entityId,
           severity: 'info',
           title: 'Vehicle assignment updated',
           message: vehicleName
@@ -97,7 +99,6 @@ const registerPersistNotificationListener = (io) => {
             previousDeviceId,
             assignedAt: at,
             actorUserId,
-            dedupKey: `assignment:${vehicleId}:${deviceId}:${at}`,
           },
           clientDedupKey: `assignment:${vehicleId}:${deviceId}:${at}`,
           channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],

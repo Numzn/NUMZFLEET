@@ -5,7 +5,7 @@
 - **Unified engine (default on):** Traccar and fuel transports write to the `notifications` Redux slice; `NotificationEngine` handles toast / push / sound. Disable with Traccar server attribute `unifiedNotifications: false` or user attribute `legacyNotificationUi: true`, or env `VITE_LEGACY_NOTIFICATION_UI=true`.
 - **Persistence sync (default on):** `NotificationSyncController` calls `GET /api/notifications/sync?since=` on startup and reconnect; `NotificationCenter` still paginates with `GET /api/notifications` when opened.
 - **Tracking bridge (server):** Set `TRACKING_NOTIFICATION_BRIDGE=1` on fuel-api to poll `tc_events` and persist geofence/overspeed/panic-class events. Apply migration `20260522_notifications_dedup_and_bridge.sql`.
-- **Tracking bell ingest (client):** When `trackingNotificationPersist` is true on the server, client Traccar WS ingest into the bell is off unless `trackingBellIngest: true`.
+- **Tracking bell ingest (client):** Removed in PR1 — bell rows come only from fuel-api `publishNotification` (including tracking bridge).
 
 ## Legacy behavior
 

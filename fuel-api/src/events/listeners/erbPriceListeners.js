@@ -48,20 +48,21 @@ export const registerErbPriceListeners = (io) => {
     EVENT_NAMES.ERB_PRICES_UPDATED,
     withSafeListener(EVENT_NAMES.ERB_PRICES_UPDATED, 'persist-notification', async (payload) => {
       const at = payload.timestamp || new Date().toISOString();
+      const entityId = `erb:${at}`;
       await publishNotification({
         type: 'erb.prices.updated',
-        category: 'system',
+        entityType: 'system',
+        entityId,
         severity: 'info',
         title: 'ERB fuel prices updated',
         message: 'Latest ERB prices are available',
-        source: 'fuel-api',
+        source: 'erb',
         audience: { managers: true },
         metadata: {
           prices: payload.prices,
           trigger: payload.trigger,
-          dedupKey: `erb:${at}`,
         },
-        clientDedupKey: `erb:${at}`,
+        clientDedupKey: entityId,
         channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
       }, { io });
     }),

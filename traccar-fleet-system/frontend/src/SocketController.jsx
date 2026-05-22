@@ -4,16 +4,14 @@ import {
 import { traccarPath, traccarFetch } from './config/traccarApi.js';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { devicesActions, sessionActions, notificationsActions } from './store';
+import { devicesActions, sessionActions } from './store';
 import { useCatchCallback, useEffectAsync } from './reactHelper';
 import alarm from './resources/alarm.mp3';
 import { eventsActions } from './store/events';
 import useFeatures from './common/util/useFeatures';
 import { useAttributePreference } from './common/util/preferences';
 import { handleNativeNotificationListeners, nativePostMessage } from './common/components/NativeInterface';
-import { useTranslation } from './common/components/LocalizationProvider';
-import { normalizeTraccarEvent } from './notifications/adapters/normalizeTraccarEvent.js';
-import { isUnifiedNotificationsEnabled, isTraccarBellIngestEnabled } from './notifications/notificationFeatureFlags.js';
+import { isUnifiedNotificationsEnabled } from './notifications/notificationFeatureFlags.js';
 import { requestNotificationSync } from './notifications/NotificationSyncController.jsx';
 
 const logoutCode = 4000;
@@ -21,12 +19,10 @@ const logoutCode = 4000;
 const SocketController = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const t = useTranslation();
 
   const authenticated = useSelector((state) => Boolean(state.session.user));
   const includeLogs = useSelector((state) => state.session.includeLogs);
   const unified = useSelector(isUnifiedNotificationsEnabled);
-  const traccarBellIngest = useSelector(isTraccarBellIngestEnabled);
 
   const socketRef = useRef();
   const retryCountRef = useRef(0);
@@ -63,16 +59,8 @@ const SocketController = () => {
       dispatch(eventsActions.add(events));
     }
 
-    if (unified && traccarBellIngest) {
-      const batch = events
-        .map((e) => normalizeTraccarEvent(e, { t }))
-        .filter(Boolean);
-      if (batch.length) {
-        dispatch(notificationsActions.upsertManyNotifications(batch));
-      }
-      return;
-    }
-
+    // Bell ingest is server-only (publishNotification + tracking bridge).
+    // Legacy direct alarm audio when unified notifications are off.
     if (unified) {
       return;
     }
@@ -89,7 +77,7 @@ const SocketController = () => {
         });
       }
     }
-  }, [features, dispatch, soundEvents, soundAlarms, unified, traccarBellIngest, t]);
+  }, [features, dispatch, soundEvents, soundAlarms, unified]);
 
   const connectSocket = () => {
     const wsUrl = window.location.origin.replace(/^http/, 'ws');
@@ -112,7 +100,7 @@ const SocketController = () => {
       dispatch(sessionActions.updateSocket(false));
       if (event.code !== logoutCode) {
         await refreshSnapshot();
-        const retryDelay = Math.min(1000 * Math.pow(2, retryCountRef.current), 60000);
+        const retryDelay = Math.min(1000 * 2 ** retryCountRef.current, 60000);
         retryCountRef.current += 1;
         setTimeout(connectSocket, retryDelay);
       }

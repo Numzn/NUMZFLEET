@@ -71,7 +71,9 @@ const NotificationCenter = () => {
     try {
       const json = await fetchNotifications({ before: before || undefined, limit: 40 });
       const rows = json?.items || [];
-      const mapped = rows.map(mapServerNotificationToEntity).filter(Boolean);
+      const mapped = rows
+        .map((row) => mapServerNotificationToEntity(row, { markChannelsDelivered: true }))
+        .filter(Boolean);
       if (mapped.length) {
         dispatch(notificationsActions.hydrateFromServer({
           items: mapped,

@@ -22,9 +22,16 @@ export function startTrackingNotificationBridgeScheduler(io) {
     if (tickInFlight) return;
     tickInFlight = true;
     try {
+      const started = Date.now();
       const result = await pollAndPersistTrackingNotifications(io);
-      if (process.env.NODE_ENV === 'development' && result.processed > 0) {
-        console.log('[tracking-bridge]', result);
+      const ms = Date.now() - started;
+      if (result.processed > 0 || result.persisted > 0) {
+        console.log('[tracking-bridge] poll', {
+          processed: result.processed,
+          persisted: result.persisted,
+          cursor: result.cursor,
+          ms,
+        });
       }
     } catch (e) {
       console.error('[tracking-bridge] poll failed', e?.message || e);

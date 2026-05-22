@@ -47,6 +47,29 @@ psql "postgresql://numztrak:<password>@<host>:5432/numztrak_fuel" -f "C:\Users\N
 
 `20260503_create_operation_sessions_tables.sql` uses `IF NOT EXISTS` for tables and indexes. `20260427_daily_intelligent_refueling.sql` uses `IF NOT EXISTS` for new columns and indexes where applicable, so repeated execution is idempotent for those objects.
 
+## Notification inbox (PR1)
+
+Idempotent; safe after `20260512_notifications.sql` baseline:
+
+```powershell
+.\fuel-api\scripts\apply-notification-migrations.ps1
+```
+
+Or manually:
+
+```powershell
+psql "$env:DATABASE_URL" -f "fuel-api/migrations/20260512_notifications.sql"
+psql "$env:DATABASE_URL" -f "fuel-api/migrations/20260522_notifications_dedup_and_bridge.sql"
+```
+
+Enable bridge in `backend/.env`: `TRACKING_NOTIFICATION_BRIDGE=1` (see `backend/.env.example`).
+
+Verify:
+
+```powershell
+docker exec numzfleet-backend-1 node scripts/verify-tracking-bridge.mjs
+```
+
 ## Verify migration state
 
 ```powershell

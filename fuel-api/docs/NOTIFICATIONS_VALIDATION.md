@@ -42,7 +42,8 @@ Runs `notificationPolicyService.test.js` and `notificationSync.test.js`.
 
 - Bell ingest (unified): `notification.created` + `GET /api/notifications/sync` only — not `fuel-request-*` adapters.
 - Operations: `state.events` still updates from Traccar WS independently.
-- Orchestrator: new rows via `publishNotification()` with DB `id` on websocket payload.
+- Orchestrator: new rows via `publishNotification()` → `createNotification()` with DB `id` on every `notification.created` payload (canonical shape includes `entityType`, `entityId`, `source`, `readAt`).
+- Client bell ingest from Traccar WS is disabled; tracking uses bridge + `publishNotification` only.
 
 ## Production gate
 

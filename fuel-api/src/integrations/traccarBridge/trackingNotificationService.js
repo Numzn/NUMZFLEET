@@ -50,7 +50,8 @@ export async function pollAndPersistTrackingNotifications(io) {
 
       const result = await publishNotification({
         type: policy.notificationType,
-        category: policy.category,
+        entityType: policy.category,
+        entityId: String(ev.id),
         severity: policy.severity,
         title,
         message,
@@ -61,8 +62,8 @@ export async function pollAndPersistTrackingNotifications(io) {
           deviceId: ev.deviceid,
           traccarType: ev.type,
           alarmAttr: ev.attributes?.alarm ?? null,
-          dedupKey: `traccar:${ev.id}`,
           resolvedType: policy.resolvedType,
+          dedupKey: `traccar:${ev.id}`,
         },
         clientDedupKey: `traccar:${ev.id}`,
         channels: policy.channels.includes('push')

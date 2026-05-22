@@ -22,7 +22,9 @@ export async function runNotificationSync(dispatch, user, persistenceEnabled) {
     const since = getLastSyncedAt(user.id);
     const json = await syncNotificationsSince({ since: since || undefined, limit: 100 });
     const rows = json?.items || [];
-    const mapped = rows.map(mapServerNotificationToEntity).filter(Boolean);
+    const mapped = rows
+      .map((row) => mapServerNotificationToEntity(row, { markChannelsDelivered: true }))
+      .filter(Boolean);
     if (mapped.length) {
       dispatch(notificationsActions.hydrateFromServer({ items: mapped, cursor: null }));
     }

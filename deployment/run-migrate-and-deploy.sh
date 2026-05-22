@@ -149,6 +149,8 @@ run_migrations() {
     "$MIGRATIONS_DIR/20260503_create_operation_sessions_tables.sql"
     "$MIGRATIONS_DIR/20260427_daily_intelligent_refueling.sql"
     "$MIGRATIONS_DIR/20260429_refuel_status_incomplete.sql"
+    "$MIGRATIONS_DIR/20260512_notifications.sql"
+    "$MIGRATIONS_DIR/20260522_notifications_dedup_and_bridge.sql"
     "$MIGRATIONS_DIR/20260520_vehicle_immobilization_intents.sql"
     "$MIGRATIONS_DIR/20260521_immobilization_execution_integrity.sql"
   )
