@@ -32,6 +32,7 @@ import {
   probeRecentSentIntents,
 } from '../immobilization/deviceCommandOutcomeProbe.js';
 import { logImmobilization } from '../immobilization/immobilizationLog.js';
+import { transitionIntentState } from '../immobilization/transitionIntentState.js';
 import { notifyImmobilizationTransition } from '../notifications/immobilizationNotificationService.js';
 import sequelize from '../config/database.js';
 
@@ -154,16 +155,25 @@ export async function getIntentHistory(vehicleId, limit = 20) {
 async function cancelActiveIntentsForVehicle(vehicleId, cancelledByUserId, reason, transaction) {
   const active = await VehicleImmobilizationIntent.findAll({
     where: { vehicleId, status: { [Op.in]: CANCELLABLE_STATUSES } },
+    attributes: ['id', 'gateSnapshot'],
     transaction,
   });
+  let cancelled = 0;
   for (const row of active) {
-    row.status = 'cancelled';
-    row.cancelledByUserId = cancelledByUserId;
     const snap = row.gateSnapshot && typeof row.gateSnapshot === 'object' ? row.gateSnapshot : {};
-    row.gateSnapshot = { ...snap, cancelReason: reason };
-    await row.save({ transaction });
+    const transitioned = await transitionIntentState({
+      id: row.id,
+      from: CANCELLABLE_STATUSES,
+      to: 'cancelled',
+      patch: {
+        cancelledByUserId,
+        gateSnapshot: { ...snap, cancelReason: reason },
+      },
+      transaction,
+    });
+    if (transitioned) cancelled += 1;
   }
-  return active.length;
+  return cancelled;
 }
 
 /**
@@ -282,12 +292,22 @@ export async function cancelIntent(intentId, user, reason = 'operator_cancelled'
     err.statusCode = 400;
     throw err;
   }
-  row.status = 'cancelled';
-  row.cancelledByUserId = user.id;
   const snap = row.gateSnapshot && typeof row.gateSnapshot === 'object' ? row.gateSnapshot : {};
-  row.gateSnapshot = { ...snap, cancelReason: reason };
-  await row.save();
-  const serialized = serializeIntent(row);
+  const transitioned = await transitionIntentState({
+    id: row.id,
+    from: CANCELLABLE_STATUSES,
+    to: 'cancelled',
+    patch: {
+      cancelledByUserId: user.id,
+      gateSnapshot: { ...snap, cancelReason: reason },
+    },
+  });
+  if (!transitioned) {
+    const err = new Error('Cannot cancel while command delivery is in progress');
+    err.statusCode = 409;
+    throw err;
+  }
+  const serialized = serializeIntent(transitioned);
   await notifyImmobilizationTransition(serialized, { status: 'cancelled' });
   return serialized;
 }
@@ -340,8 +360,14 @@ async function evaluateOneIntent(intent) {
   // 1. Expire
   const now = Date.now();
   if (new Date(intent.expiresAt).getTime() <= now) {
-    intent.status = 'expired';
-    await intent.save();
+    const transitioned = await transitionIntentState({
+      id: intent.id,
+      from: CANCELLABLE_STATUSES,
+      to: 'expired',
+    });
+    if (transitioned) {
+      await notifyImmobilizationTransition(transitioned, { status: 'expired' });
+    }
     return { claimed: false, delivered: false };
   }
 
@@ -362,7 +388,7 @@ async function evaluateOneIntent(intent) {
     timerState,
   });
 
-  intent.gateSnapshot = {
+  const nextGateSnapshot = {
     ...priorSnap,
     evaluation,
     timerState: evaluation.timerState,
@@ -370,15 +396,30 @@ async function evaluateOneIntent(intent) {
   };
 
   if (intent.status === 'pending') {
-    intent.status = 'monitoring';
+    const transitioned = await transitionIntentState({
+      id: intent.id,
+      from: 'pending',
+      to: 'monitoring',
+      patch: {
+        gateSnapshot: nextGateSnapshot,
+      },
+    });
+    if (!transitioned) {
+      return { claimed: false, delivered: false };
+    }
+  } else {
+    const [updated] = await VehicleImmobilizationIntent.update(
+      { gateSnapshot: nextGateSnapshot },
+      { where: { id: intent.id, status: 'monitoring' } },
+    );
+    if (!updated) {
+      return { claimed: false, delivered: false };
+    }
   }
 
   if (!evaluation.authorized) {
-    await intent.save();
     return { claimed: false, delivered: false };
   }
-
-  await intent.save();
 
   // 3. Claim and deliver
   const { claimed, row: claimedRow } = await tryClaimIntentForExecution(intent.id);

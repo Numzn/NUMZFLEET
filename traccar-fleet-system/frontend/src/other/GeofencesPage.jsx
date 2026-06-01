@@ -68,13 +68,31 @@ const GeofencesPage = () => {
   const handleFile = (event) => {
     const files = Array.from(event.target.files);
     const [file] = files;
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
       const xml = new DOMParser().parseFromString(reader.result, 'text/xml');
+      const parserError = xml.getElementsByTagName('parsererror')[0];
+      if (parserError) {
+        dispatch(errorsActions.push('Invalid GPX file: XML could not be parsed'));
+        return;
+      }
       const segment = xml.getElementsByTagName('trkseg')[0];
-      const coordinates = Array.from(segment.getElementsByTagName('trkpt'))
-        .map((point) => `${point.getAttribute('lat')} ${point.getAttribute('lon')}`)
-        .join(', ');
+      if (!segment) {
+        dispatch(errorsActions.push('Invalid GPX file: missing track segment (trkseg)'));
+        return;
+      }
+      const points = Array.from(segment.getElementsByTagName('trkpt'))
+        .map((point) => ({
+          lat: point.getAttribute('lat'),
+          lon: point.getAttribute('lon'),
+        }))
+        .filter((point) => point.lat != null && point.lon != null);
+      if (points.length < 2) {
+        dispatch(errorsActions.push('Invalid GPX file: at least two track points are required'));
+        return;
+      }
+      const coordinates = points.map((point) => `${point.lat} ${point.lon}`).join(', ');
       const area = `LINESTRING (${coordinates})`;
       const newItem = { name: t('sharedGeofence'), area };
       try {

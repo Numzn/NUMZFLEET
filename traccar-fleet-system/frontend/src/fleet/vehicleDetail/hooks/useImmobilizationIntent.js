@@ -56,6 +56,20 @@ export default function useImmobilizationIntent(vehicleId) {
     return () => clearInterval(id);
   }, [user, vehicleId, activeIntent?.id, activeIntent?.status]);
 
+  useEffect(() => {
+    if (!vehicleId) return undefined;
+    const onImmobilizationUpdated = (event) => {
+      const payloadVehicleId = event?.detail?.vehicleId;
+      if (payloadVehicleId == null) return;
+      if (String(payloadVehicleId) !== String(vehicleId)) return;
+      void refresh();
+    };
+    window.addEventListener('immobilization.updated', onImmobilizationUpdated);
+    return () => {
+      window.removeEventListener('immobilization.updated', onImmobilizationUpdated);
+    };
+  }, [vehicleId, refresh]);
+
   const requestIntent = useCallback(
     async (action) => {
       if (!user || !vehicleId) return;

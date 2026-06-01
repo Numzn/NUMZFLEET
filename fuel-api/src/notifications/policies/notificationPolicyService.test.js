@@ -9,6 +9,12 @@ describe('resolveTraccarTrackingPolicy', () => {
     assert.equal(p.severity, 'warning');
   });
 
+  it('persists lowercase geofence enter', () => {
+    const p = resolveTraccarTrackingPolicy({ type: 'geofenceenter', attributes: {} });
+    assert.equal(p.persist, true);
+    assert.equal(p.notificationType, 'tracking.geofence.entered');
+  });
+
   it('skips device moving', () => {
     const p = resolveTraccarTrackingPolicy({ type: 'deviceMoving', attributes: {} });
     assert.equal(p.persist, false);

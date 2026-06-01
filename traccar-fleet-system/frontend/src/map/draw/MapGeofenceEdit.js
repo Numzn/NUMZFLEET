@@ -134,9 +134,18 @@ const MapGeofenceEdit = ({ selectedGeofenceId }) => {
   useEffect(() => {
     if (selectedGeofenceId) {
       const feature = draw.get(selectedGeofenceId);
+      if (!feature?.geometry?.coordinates) {
+        return;
+      }
       let { coordinates } = feature.geometry;
+      if (!Array.isArray(coordinates) || coordinates.length < 2) {
+        return;
+      }
       if (Array.isArray(coordinates[0][0])) {
         [coordinates] = coordinates;
+      }
+      if (!Array.isArray(coordinates) || coordinates.length < 2) {
+        return;
       }
       const bounds = coordinates.reduce(
         (bounds, coordinate) => bounds.extend(coordinate),

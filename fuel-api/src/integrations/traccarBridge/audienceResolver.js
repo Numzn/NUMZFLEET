@@ -6,6 +6,26 @@ function uniqIds(ids) {
   return [...new Set(ids.filter((x) => Number.isFinite(Number(x))).map((x) => Number(x)))];
 }
 
+const GEOFENCE_TYPE_SET = new Set([
+  'geofenceenter',
+  'geofenceexit',
+  'tracking.geofence.entered',
+  'tracking.geofence.exited',
+]);
+
+/**
+ * Robust geofence event detection across casing / source differences.
+ * @param {string | null | undefined} traccarType
+ * @param {object | null | undefined} attributes
+ */
+export function isGeofenceTrackingEvent(traccarType, attributes) {
+  const type = String(traccarType || '').trim().toLowerCase();
+  if (GEOFENCE_TYPE_SET.has(type)) return true;
+  if (type.includes('geofence')) return true;
+  const alarm = String(attributes?.alarm || '').trim().toLowerCase();
+  return alarm.includes('geofence');
+}
+
 /**
  * Users linked to a Traccar device via tc_user_device.
  * @param {number} deviceId
@@ -36,9 +56,7 @@ export async function resolveTrackingEventAudience(deviceId, opts = {}) {
   if (opts.respectGeofenceMute) {
     const fleetConfig = await fetchFleetConfigByDeviceId(deviceId);
     if (fleetConfig?.alerts?.geofence === false) {
-      const isGeofence = opts.traccarType === 'geofenceEnter'
-        || opts.traccarType === 'geofenceExit'
-        || String(opts.attributes?.alarm || '').toLowerCase().includes('geofence');
+      const isGeofence = isGeofenceTrackingEvent(opts.traccarType, opts.attributes);
       if (isGeofence) {
         return [];
       }

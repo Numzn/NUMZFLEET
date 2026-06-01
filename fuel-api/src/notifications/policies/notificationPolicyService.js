@@ -29,15 +29,17 @@ function parseAttributes(raw) {
 }
 
 function resolveEventType(type, attributes) {
-  const t = String(type || '').toLowerCase();
-  if (t === 'geofenceenter' || t === 'geofenceexit') return type;
+  const t = String(type || '').trim().toLowerCase();
+  if (t === 'geofenceenter' || t === 'tracking.geofence.entered') return 'geofenceEnter';
+  if (t === 'geofenceexit' || t === 'tracking.geofence.exited') return 'geofenceExit';
+  if (t === 'deviceoverspeed') return 'overspeed';
   if (t === 'alarm') {
     const alarm = String(attributes?.alarm || '').toLowerCase();
     if (alarm === 'geofenceenter') return 'geofenceEnter';
     if (alarm === 'geofenceexit') return 'geofenceExit';
     if (GEOFENCE_ALARM_TYPES.has(alarm)) return 'geofenceEnter';
   }
-  return type || 'unknown';
+  return type?.trim?.() || 'unknown';
 }
 
 function isGeofenceEvent(resolvedType, attributes) {

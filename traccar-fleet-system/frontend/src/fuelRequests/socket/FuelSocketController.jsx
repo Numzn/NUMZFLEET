@@ -279,6 +279,12 @@ const FuelSocketController = () => {
       }
     });
 
+    socket.off('immobilization.updated');
+    socket.on('immobilization.updated', (payload) => {
+      if (typeof window === 'undefined') return;
+      window.dispatchEvent(new CustomEvent('immobilization.updated', { detail: payload }));
+    });
+
     socket.off('connect');
     socket.on('connect', () => {
       failureStreakRef.current = 0;
