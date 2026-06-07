@@ -31,12 +31,18 @@ export async function getBranchHead(branch) {
 
 export async function getLatestWorkflowRun(workflowFile) {
   const [owner, repo] = config.github.repository.split('/');
-  const data = await githubFetch(
-    `/repos/${owner}/${repo}/actions/workflows/${workflowFile}.yml/runs?per_page=1`,
-  );
-  const run = data.workflow_runs?.[0];
-  if (!run) return null;
-  return mapWorkflowRun(run, workflowFile);
+  try {
+    const data = await githubFetch(
+      `/repos/${owner}/${repo}/actions/workflows/${workflowFile}.yml/runs?per_page=1`,
+    );
+    const run = data.workflow_runs?.[0];
+    if (!run) return null;
+    return mapWorkflowRun(run, workflowFile);
+  } catch (err) {
+    if (!String(err.message).includes('404')) throw err;
+    // Workflow may exist only on develop until merged to default branch.
+    return { workflowName: workflowFile, error: 'Workflow not on default branch yet (404)' };
+  }
 }
 
 export async function listWorkflowRuns(workflowFile, { perPage = 20 } = {}) {
