@@ -1,6 +1,43 @@
-# Production: registry-based deployment (single model)
+# Release Pipeline v3: staging + production promotion
 
-Production uses **prebuilt images only** on the server: `docker compose pull` and `docker compose up -d` — **no** `docker compose build`.
+NUMZFLEET v3 uses immutable SHA-tagged images and promotion-based releases:
+
+- `develop` -> build images -> deploy to NumzLab staging
+- staging success -> manual approval -> promote exact SHA to OCI production
+- OCI remains pull-only (`docker compose pull` + `up`), never local build
+
+## v3 hard rules
+
+1. Docker Hub is the only artifact source.
+2. Production deploy uses an already-tested SHA from staging.
+3. Promotion never rebuilds images.
+4. `main` is a release pointer (fast-forward to promoted SHA).
+
+## Primary v3 commands
+
+Staging deploy wrapper:
+
+```bash
+bash deployment/deploy/deploy-to-staging.sh <full-git-sha> deployment/.env.staging
+```
+
+Production promotion wrapper:
+
+```bash
+bash deployment/deploy/promote-to-production.sh <full-git-sha> deployment/.env
+```
+
+Promotion gate check:
+
+```bash
+bash deployment/verify/verify-staging-promotion.sh <full-git-sha> numz14
+```
+
+---
+
+## Legacy details (kept for reference)
+
+The sections below document the previous single-track production flow and remain as operational reference while v3 rollout is in progress.
 
 ## Images (Docker Hub)
 

@@ -655,6 +655,12 @@ def main() -> int:
         metavar="BRANCH",
         help="Git branch for push and server pull (default: env NUMZFLEET_BRANCH or main, after auto_deploy.env load)",
     )
+    parser.add_argument(
+        "--target",
+        choices=("staging", "production"),
+        default="production",
+        help="Deploy target. staging=NumzLab flow, production=OCI flow (default: production).",
+    )
     parser.add_argument("--skip-git", action="store_true", help="Do not add/commit/push; deploy current HEAD only.")
     parser.add_argument("--dry-run", action="store_true", help="Print what would run; no git or SSH.")
     parser.add_argument("--skip-deploy", action="store_true", help="Stop after push (no SSH).")
@@ -715,6 +721,12 @@ def main() -> int:
         action="store_true",
         help="After deploy, skip wait + external HTTP health probes (NUMZFLEET_POST_VERIFY).",
     )
+    parser.add_argument(
+        "--promoted-sha",
+        metavar="SHA",
+        default=None,
+        help="Production-only: deploy this staging-validated SHA (40 chars).",
+    )
     args = parser.parse_args()
 
     repo: Path = args.repo.resolve()
@@ -731,11 +743,14 @@ def main() -> int:
 
     fix_legacy_opt_repo_path()
 
-    branch = (args.branch or os.environ.get("NUMZFLEET_BRANCH") or "main").strip()
+    target = (args.target or "production").strip().lower()
+    default_branch = "develop" if target == "staging" else "main"
+    branch = (args.branch or os.environ.get("NUMZFLEET_BRANCH") or default_branch).strip()
     user = (args.ssh_user or os.environ.get("NUMZFLEET_SSH_USER") or "ubuntu").strip()
     host = (args.ssh_host or os.environ.get("NUMZFLEET_SSH_HOST") or "").strip()
     server_path = os.environ.get("NUMZFLEET_SERVER_REPO_PATH", REMOTE_REPO_DEFAULT).rstrip("/")
-    deploy_env = os.environ.get("NUMZFLEET_DEPLOY_ENV", "deployment/.env")
+    deploy_env_default = "deployment/.env.staging" if target == "staging" else "deployment/.env"
+    deploy_env = os.environ.get("NUMZFLEET_DEPLOY_ENV", deploy_env_default)
     use_migrations = _env_bool("NUMZFLEET_USE_MIGRATIONS", True) and not args.no_migrations
     # Three registry images (frontend, backend, ERB) often need >90s on GitHub-hosted runners.
     wait_sec = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS", 210)
@@ -754,7 +769,7 @@ def main() -> int:
         return 2
 
     print("\n==============================")
-    print("NUMZFLEET AUTO DEPLOY")
+    print(f"NUMZFLEET AUTO DEPLOY ({target.upper()})")
     print("==============================\n")
 
     if args.dry_run:
@@ -818,6 +833,15 @@ def main() -> int:
 
     image_tag_source = (args.deploy_image_tag or os.environ.get("NUMZFLEET_DEPLOY_IMAGE_TAG") or "").strip()
     deploy_sha = sha
+    promoted_sha = (args.promoted_sha or "").strip()
+    if target == "production":
+        if not promoted_sha:
+            print("[auto_deploy] --promoted-sha is required for --target production.", file=sys.stderr)
+            return 2
+        if len(promoted_sha) != 40:
+            print("[auto_deploy] --promoted-sha must be a full 40-char SHA.", file=sys.stderr)
+            return 2
+        deploy_sha = promoted_sha
     if image_tag_source:
         try:
             deploy_sha = get_output(["git", "rev-parse", image_tag_source], cwd=repo)
@@ -864,15 +888,16 @@ def main() -> int:
         print("No image rebuild required from path filters (config-only or unrelated paths).")
         print("Registry deploy still pins images to this commit SHA.\n")
 
-    deploy_sha = adjust_deploy_sha_for_registry_images(
-        repo,
-        head_sha=sha,
-        deploy_sha=deploy_sha,
-        image_tag_source=image_tag_source,
-        flags=flags,
-        skip_deploy=args.skip_deploy,
-        no_auto_image_sha=args.no_auto_image_sha,
-    )
+    if target == "staging":
+        deploy_sha = adjust_deploy_sha_for_registry_images(
+            repo,
+            head_sha=sha,
+            deploy_sha=deploy_sha,
+            image_tag_source=image_tag_source,
+            flags=flags,
+            skip_deploy=args.skip_deploy,
+            no_auto_image_sha=args.no_auto_image_sha,
+        )
 
     sp = shlex.quote(server_path)
     env_q = shlex.quote(deploy_env)
@@ -886,24 +911,27 @@ def main() -> int:
         # Deploy servers: discard tracked edits so pull never blocks (local compose tweaks, etc.).
         pull_cmd = f"git fetch origin {shlex.quote(branch)} && git reset --hard FETCH_HEAD"
 
-    compose_restart_tail = (
-        f"docker compose -f deployment/compose/docker-compose.prod.yml "
-        f"--env-file {env_q} restart traccar"
-    )
-
-    if flags["migrations"] and use_migrations:
+    if target == "production":
         deploy_body = (
-            "chmod +x deployment/run-migrate-and-deploy.sh && "
-            f"./deployment/run-migrate-and-deploy.sh {sha_q} {env_q}"
+            "chmod +x deployment/deploy/promote-to-production.sh && "
+            f"bash deployment/deploy/promote-to-production.sh {sha_q} {env_q}"
         )
-        deploy_label = "migrate + deploy"
+        deploy_label = "promote to production"
     else:
-        deploy_body = f"bash deployment/deploy/deploy-from-registry.sh {sha_q} {env_q}"
-        deploy_label = "registry deploy"
+        if use_migrations and flags["migrations"]:
+            deploy_body = (
+                "chmod +x deployment/run-migrate-and-deploy-staging.sh && "
+                f"bash deployment/run-migrate-and-deploy-staging.sh {sha_q} {env_q}"
+            )
+        else:
+            deploy_body = (
+                "chmod +x deployment/deploy/deploy-to-staging.sh deployment/verify/staging-smoke.sh && "
+                f"bash deployment/deploy/deploy-to-staging.sh {sha_q} {env_q} && "
+                "bash deployment/verify/staging-smoke.sh"
+            )
+        deploy_label = "staging deploy"
 
     remote_inner = rpx + pull_cmd + " && " + deploy_body
-    if flags["traccar_conf"] and not flags["image_build_required"]:
-        remote_inner += " && " + compose_restart_tail
 
     if args.dry_run:
         print("[dry-run] Remote (same as actual SSH):\n")
@@ -994,7 +1022,11 @@ def main() -> int:
     print("DEPLOYMENT COMPLETE")
     print("==============================\n")
 
-    v = post_deploy_verify_external(repo, skip=args.skip_post_verify)
+    auto_skip_post_verify = args.skip_post_verify
+    if target == "staging" and not os.environ.get("NUMZFLEET_POST_VERIFY_ORIGIN", "").strip():
+        auto_skip_post_verify = True
+
+    v = post_deploy_verify_external(repo, skip=auto_skip_post_verify)
     if v != 0:
         return v
     return 0

@@ -1,0 +1,17 @@
+# NumzLab overlay — merge after docker-compose.yml + docker-compose.erb.yml
+# Adds restart policies for persistent home-lab services.
+# Does not publish ports or change images.
+
+services:
+  backend:
+    restart: unless-stopped
+  db:
+    restart: unless-stopped
+  traccar:
+    restart: unless-stopped
+  traccar-mysql:
+    restart: unless-stopped
+  erb-api:
+    restart: unless-stopped
+  erb-worker:
+    restart: unless-stopped
