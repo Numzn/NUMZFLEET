@@ -1,9 +1,14 @@
 name: Build and push NumzFleet images
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: "Optional SHA to rebuild (break-glass/manual). Defaults to current ref SHA."
+        required: false
+        type: string
   push:
-    branches: [main]
+    branches: [develop]
     paths:
       - "traccar-fleet-system/frontend/**"
       - "fuel-api/**"
@@ -17,8 +22,20 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve target SHA
+        id: target
+        run: |
+          SHA_INPUT="${{ github.event.inputs.git_sha }}"
+          if [ -n "$SHA_INPUT" ]; then
+            echo "sha=$SHA_INPUT" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -29,19 +46,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Docker metadata
-        id: meta
-        run: echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-
       - name: Build and push frontend
         uses: docker/build-push-action@v6
         with:
           context: traccar-fleet-system/frontend
           file: traccar-fleet-system/frontend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-frontend:${{ github.sha }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-frontend:${{ steps.target.outputs.sha }}
           build-args: |
-            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'https://numz.site' }}
+            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'http://100.121.79.2:3003' }}
             VITE_TRACCAR_PREFIX=/traccar
             BUILD_REF=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha
@@ -53,7 +66,7 @@ jobs:
           context: fuel-api
           file: fuel-api/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-backend:${{ github.sha }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-backend:${{ steps.target.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -63,6 +76,6 @@ jobs:
           context: erb-fuel-monitor
           file: erb-fuel-monitor/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-erb:${{ github.sha }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-erb:${{ steps.target.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
