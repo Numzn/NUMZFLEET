@@ -188,6 +188,45 @@ def refresh_git_state_after_push(repo: Path, branch: str) -> None:
         pass
 
 
+def resolve_deploy_branch(
+    *,
+    target: str,
+    args_branch: str | None,
+    loaded_user: Path | None,
+    repo: Path,
+) -> str:
+    """Staging uses develop unless a staging env file set NUMZFLEET_BRANCH (not production auto_deploy.env)."""
+    default_branch = "develop" if target == "staging" else "main"
+    if args_branch:
+        return args_branch.strip()
+
+    staging_env_path = (repo / "deployment" / "scripts" / "auto_deploy.staging.env").resolve()
+    staging_env_loaded = loaded_user is not None and loaded_user.name == "auto_deploy.staging.env"
+    requested_staging = os.environ.get("NUMZFLEET_AUTO_DEPLOY_ENV_FILE", "").strip()
+
+    if target == "staging":
+        if not staging_env_loaded and (requested_staging or staging_env_path.exists()):
+            if not staging_env_path.is_file():
+                print(
+                    "[auto_deploy] WARNING: staging env file missing "
+                    f"({staging_env_path}). Copy auto_deploy.staging.env.example — "
+                    "until then, using develop and ignoring production NUMZFLEET_BRANCH.\n",
+                    file=sys.stderr,
+                )
+        env_branch = os.environ.get("NUMZFLEET_BRANCH", "").strip()
+        if staging_env_loaded:
+            return env_branch or default_branch
+        if env_branch and env_branch != default_branch:
+            print(
+                f"[auto_deploy] WARNING: ignoring NUMZFLEET_BRANCH={env_branch!r} for --target staging; "
+                f"using {default_branch}.\n",
+                file=sys.stderr,
+            )
+        return default_branch
+
+    return os.environ.get("NUMZFLEET_BRANCH", default_branch).strip() or default_branch
+
+
 def push_head_to_remote_branch(repo: Path, branch: str, *, dry_run: bool) -> None:
     """Push current HEAD to origin/<branch> then refresh local refs (VS Code sync)."""
     ref = f"HEAD:{branch}"
@@ -738,14 +777,27 @@ def main() -> int:
 
     _, user_env_path = load_auto_deploy_env_file(repo)
 
+    # Staging deploy must use auto_deploy.staging.env when present (RCC sets NUMZFLEET_AUTO_DEPLOY_ENV_FILE).
+    staging_env_path = (repo / "deployment" / "scripts" / "auto_deploy.staging.env").resolve()
+    if (args.target or "production").strip().lower() == "staging" and staging_env_path.is_file():
+        try:
+            _apply_env_text(staging_env_path.read_text(encoding="utf-8-sig"), only_if_empty=False)
+            user_env_path = staging_env_path
+        except OSError:
+            pass
+
     if args.ssh_identity_file:
         os.environ["NUMZFLEET_SSH_IDENTITY_FILE"] = str(Path(args.ssh_identity_file).expanduser())
 
     fix_legacy_opt_repo_path()
 
     target = (args.target or "production").strip().lower()
-    default_branch = "develop" if target == "staging" else "main"
-    branch = (args.branch or os.environ.get("NUMZFLEET_BRANCH") or default_branch).strip()
+    branch = resolve_deploy_branch(
+        target=target,
+        args_branch=args.branch,
+        loaded_user=user_env_path,
+        repo=repo,
+    )
     user = (args.ssh_user or os.environ.get("NUMZFLEET_SSH_USER") or "ubuntu").strip()
     host = (args.ssh_host or os.environ.get("NUMZFLEET_SSH_HOST") or "").strip()
     server_path = os.environ.get("NUMZFLEET_SERVER_REPO_PATH", REMOTE_REPO_DEFAULT).rstrip("/")
