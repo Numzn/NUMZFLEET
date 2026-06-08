@@ -13,6 +13,7 @@ import {
 import { sshExec } from './ssh.js';
 import { collectOverview } from './collector.js';
 import { getRegistryStatusForSha } from './dockerhub.js';
+import { getStagingDeploymentsForSha } from './github.js';
 
 const listeners = new Map();
 
@@ -223,22 +224,23 @@ export function buildVerifyJob(meta) {
       onStdout('[verify-manifests] All required manifests found\n');
 
       if (meta.includePromotionGate !== false) {
-        onStdout(`\n== Step 4: verify-staging-promotion.sh ==\n`);
-        code = await spawnProcess(
-          'bash',
-          ['deployment/verify/verify-staging-promotion.sh', sha, config.dockerhub.username],
-          {
-            cwd: config.repoRoot,
-            env: {
-              GITHUB_TOKEN: config.github.token,
-              GITHUB_REPOSITORY: config.github.repository,
-            },
-            onStdout,
-            onStderr,
-          },
-        );
+        onStdout(`\n== Step 4: verify-staging-promotion (${sha.slice(0, 7)}) ==\n`);
+        try {
+          const deployment = await getStagingDeploymentsForSha(sha);
+          if (!deployment) {
+            onStderr('[verify-staging-promotion] No successful staging deployment found for SHA\n');
+            return 1;
+          }
+          onStdout(
+            `[verify-staging-promotion] deployment id=${deployment.deploymentId} state=${deployment.state}\n`,
+          );
+          onStdout('[verify-staging-promotion] Promotion gate passed\n');
+        } catch (err) {
+          onStderr(`[verify-staging-promotion] ${err.message}\n`);
+          return 1;
+        }
       }
-      return code;
+      return 0;
     },
   };
 }
