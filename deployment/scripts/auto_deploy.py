@@ -132,13 +132,18 @@ def run_cmd(
     *,
     cwd: Path | None = None,
     check: bool = True,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     print("\n>>>", " ".join(shlex.quote(a) for a in argv), "\n", flush=True)
+    run_env = os.environ.copy()
+    if env:
+        run_env.update(env)
     return subprocess.run(
         argv,
         cwd=str(cwd) if cwd else None,
         text=True,
         check=check,
+        env=run_env,
     )
 
 
@@ -228,13 +233,40 @@ def resolve_deploy_branch(
     return os.environ.get("NUMZFLEET_BRANCH", default_branch).strip() or default_branch
 
 
+def git_push_argv(ref: str) -> list[str]:
+    """Push argv; when GITHUB_TOKEN is set, skip Windows Git Credential Manager account picker."""
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    argv = ["git"]
+    if token:
+        argv.extend(
+            [
+                "-c",
+                "credential.helper=",
+                "-c",
+                f"http.extraHeader=Authorization: Bearer {token}",
+            ]
+        )
+    argv.extend(["push", "origin", ref])
+    return argv
+
+
 def push_head_to_remote_branch(repo: Path, branch: str, *, dry_run: bool) -> None:
     """Push current HEAD to origin/<branch> then refresh local refs (VS Code sync)."""
     ref = f"HEAD:{branch}"
     if dry_run:
-        print("[dry-run] would: git push origin", ref)
+        if os.environ.get("GITHUB_TOKEN", "").strip():
+            print("[dry-run] would: git push (GITHUB_TOKEN bearer, no credential prompt) origin", ref)
+        else:
+            print(
+                "[dry-run] would: git push origin",
+                ref,
+                "(set GITHUB_TOKEN to skip Windows account picker)",
+            )
         return
-    run_cmd(["git", "push", "origin", ref], cwd=repo)
+    push_env: dict[str, str] | None = None
+    if os.environ.get("GITHUB_TOKEN", "").strip():
+        push_env = {"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "Never"}
+    run_cmd(git_push_argv(ref), cwd=repo, env=push_env)
     refresh_git_state_after_push(repo, branch)
 
 
@@ -608,6 +640,19 @@ def adjust_deploy_sha_for_registry_images(
     return deploy_sha
 
 
+def maybe_load_tokens_from_rcc(repo: Path) -> None:
+    """Use release-control-center/config/rcc.env for tokens not already in the environment."""
+    rcc = repo / "release-control-center" / "config" / "rcc.env"
+    if not rcc.is_file():
+        return
+    for key in ("GITHUB_TOKEN", "GITHUB_REPOSITORY", "DOCKERHUB_USERNAME", "DOCKERHUB_TOKEN"):
+        if os.environ.get(key, "").strip():
+            continue
+        val = read_env_file_key(rcc, key)
+        if val:
+            os.environ[key] = val
+
+
 def read_env_file_key(path: Path, key: str) -> str | None:
     if not path.is_file():
         return None
@@ -884,6 +929,8 @@ def main() -> int:
         except OSError:
             pass
 
+    maybe_load_tokens_from_rcc(repo)
+
     if args.ssh_identity_file:
         os.environ["NUMZFLEET_SSH_IDENTITY_FILE"] = str(Path(args.ssh_identity_file).expanduser())
 
@@ -1054,12 +1101,25 @@ def main() -> int:
     sha_q = shlex.quote(deploy_sha)
     rpx = remote_repo_prefix(sp)
 
+    def remote_dockerhub_env_prefix() -> str:
+        """Pass Hub credentials to NumzLab for docker login before compose pull (avoids rate limits)."""
+        user = os.environ.get("DOCKERHUB_USERNAME", "").strip()
+        token = os.environ.get("DOCKERHUB_TOKEN", "").strip()
+        if not user or not token:
+            return ""
+        return (
+            f"export DOCKERHUB_USERNAME={shlex.quote(user)} "
+            f"DOCKERHUB_TOKEN={shlex.quote(token)} && "
+        )
+
     pull_strategy = os.environ.get("NUMZFLEET_GIT_PULL_STRATEGY", "reset").strip().lower()
     if pull_strategy in ("merge", "pull", "rebase"):
         pull_cmd = f"git pull origin {shlex.quote(branch)}"
     else:
         # Deploy servers: discard tracked edits so pull never blocks (local compose tweaks, etc.).
         pull_cmd = f"git fetch origin {shlex.quote(branch)} && git reset --hard FETCH_HEAD"
+
+    hub_prefix = remote_dockerhub_env_prefix() if target == "staging" else ""
 
     if target == "production":
         deploy_body = (
@@ -1070,12 +1130,14 @@ def main() -> int:
     else:
         if use_migrations and flags["migrations"]:
             deploy_body = (
-                "chmod +x deployment/run-migrate-and-deploy-staging.sh && "
+                hub_prefix
+                + "chmod +x deployment/run-migrate-and-deploy-staging.sh && "
                 f"bash deployment/run-migrate-and-deploy-staging.sh {sha_q} {env_q}"
             )
         else:
             deploy_body = (
-                "chmod +x deployment/deploy/deploy-to-staging.sh deployment/verify/staging-smoke.sh && "
+                hub_prefix
+                + "chmod +x deployment/deploy/deploy-to-staging.sh deployment/verify/staging-smoke.sh && "
                 f"bash deployment/deploy/deploy-to-staging.sh {sha_q} {env_q} && "
                 "bash deployment/verify/staging-smoke.sh"
             )

@@ -43,6 +43,11 @@ esac
 : "${REGISTRY_PREFIX:?REGISTRY_PREFIX could not be resolved (set REGISTRY_PREFIX or DOCKERHUB_USERNAME/GHCR_OWNER)}"
 
 log "Deploy SHA=$SHA — pull only (no build). Registry prefix: $REGISTRY_PREFIX"
+if [[ -n "${DOCKERHUB_TOKEN:-}" ]]; then
+  : "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME required when DOCKERHUB_TOKEN is set}"
+  log "Docker Hub login (${DOCKERHUB_USERNAME}) before pull"
+  printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+fi
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
 
 log "Starting staging services (wait until healthchecks pass)"
