@@ -1,4 +1,4 @@
-import { Alert, FormControlLabel, Switch, Typography } from '@mui/material';
+import { Alert, FormControlLabel, Switch } from '@mui/material';
 
 export default function AlertsMonitoringModule({ form, patch, canSaveSpecs }) {
   return (
@@ -28,21 +28,6 @@ export default function AlertsMonitoringModule({ form, patch, canSaveSpecs }) {
         )}
         label="Speeding"
       />
-      <FormControlLabel
-        control={(
-          <Switch
-            checked={form.alGeo}
-            onChange={(e) => patch({ alGeo: e.target.checked })}
-            disabled={!canSaveSpecs}
-          />
-        )}
-        label="Geofence enter/exit in workspace alerts"
-      />
-      {canSaveSpecs && (
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: -0.5, mb: 1, ml: 4.5 }}>
-          Hides zone enter/exit in this vehicle&apos;s workspace alert list. Events are still recorded by the platform.
-        </Typography>
-      )}
       <FormControlLabel
         control={(
           <Switch

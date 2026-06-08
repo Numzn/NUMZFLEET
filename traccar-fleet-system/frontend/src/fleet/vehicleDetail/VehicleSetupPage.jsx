@@ -225,9 +225,9 @@ export default function VehicleSetupPage() {
       setReviewOpen(false);
       // save() hydrates form from PUT response; refresh drivers/zones only (avoids clobbering dirty toggles).
       await Promise.all([reloadLinked(), reloadLinkedGeofences()]);
-      const zoneOn = merged?.fleetConfig?.geofenceEnabled === true;
+      const notifyOn = merged?.fleetConfig?.alerts?.geofence !== false;
       showToast(
-        `Setup saved. Zone monitoring ${zoneOn ? 'on' : 'off'}.`,
+        `Setup saved. Geofence notifications ${notifyOn ? 'enabled' : 'disabled'}.`,
         'success',
       );
     } catch {

@@ -62,6 +62,7 @@ function formFromVehicle(vehicle, formDraft) {
     updateIntervalSec: fleet?.updateIntervalSec != null ? String(fleet.updateIntervalSec) : '10',
     geofenceEnabled: fleetBool(fleet?.geofenceEnabled, false),
     geofenceRadiusM: fleet?.geofenceRadiusM != null ? String(fleet.geofenceRadiusM) : '300',
+    alGeo: fleet?.alerts?.geofence !== false,
   };
 }
 
@@ -75,7 +76,7 @@ function fuelComplete(form, fuelType) {
 
 function computeZoneMonitoringReadiness({
   hasDevice,
-  monitorEnabled,
+  notificationsEnabled,
   linkedGeofences,
   linkedGeofencesLoading,
   linkedGeofencesError,
@@ -84,57 +85,51 @@ function computeZoneMonitoringReadiness({
     return {
       status: 'blocked',
       label: 'Requires device',
-      detail: 'Link a tracker to configure zone monitoring.',
+      detail: 'Link a tracker to assign zones and configure notifications.',
     };
   }
   if (linkedGeofencesLoading) {
     return {
       status: 'recommended',
-      label: 'Checking zone links',
-      detail: 'Verifying linked operational zones…',
+      label: 'Checking zone assignments',
+      detail: 'Verifying assigned zones…',
     };
   }
   if (linkedGeofencesError) {
     return {
       status: 'recommended',
       label: 'Could not verify zones',
-      detail: 'Open device connections to confirm zone links for this tracker.',
+      detail: 'Open Manage assignments to confirm assigned zones for this tracker.',
     };
   }
   const linkedCount = linkedGeofences?.length ?? 0;
   const hasLinks = linkedCount > 0;
-  if (hasLinks && monitorEnabled) {
-    const names = linkedGeofences
-      .map((g) => g?.name?.trim())
-      .filter(Boolean)
-      .slice(0, 3)
-      .join(', ');
-    return {
-      status: 'complete',
-      label: 'Zones linked · Monitoring on',
-      detail: names
-        ? `${linkedCount} zone${linkedCount === 1 ? '' : 's'}: ${names}${linkedCount > 3 ? '…' : ''}`
-        : `${linkedCount} operational zone${linkedCount === 1 ? '' : 's'} linked`,
-    };
-  }
-  if (hasLinks && !monitorEnabled) {
+  if (!hasLinks) {
     return {
       status: 'recommended',
-      label: 'Zones linked',
-      detail: `${linkedCount} zone${linkedCount === 1 ? '' : 's'} linked · Enable “Monitor linked zones”.`,
+      label: 'Not configured',
+      detail: 'Assign zones to this device under Manage assignments.',
     };
   }
-  if (!hasLinks && monitorEnabled) {
+  const names = linkedGeofences
+    .map((g) => g?.name?.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(', ');
+  const zonesDetail = names
+    ? `${linkedCount} zone${linkedCount === 1 ? '' : 's'}: ${names}${linkedCount > 3 ? '…' : ''}`
+    : `${linkedCount} assigned zone${linkedCount === 1 ? '' : 's'}`;
+  if (!notificationsEnabled) {
     return {
       status: 'recommended',
-      label: 'Monitoring enabled',
-      detail: 'No operational zones linked to this device yet.',
+      label: 'Zones assigned · Notifications off',
+      detail: `${zonesDetail} · Enable geofence notifications to alert managers on enter/exit.`,
     };
   }
   return {
-    status: 'recommended',
-    label: 'Zone monitoring not configured',
-    detail: 'Link operational zones and enable monitoring preference.',
+    status: 'complete',
+    label: 'Zones & boundaries active',
+    detail: zonesDetail,
   };
 }
 
@@ -245,7 +240,7 @@ export function computeVehicleSetupReadiness({
     id: SETUP_MODULE_IDS.geofence,
     ...computeZoneMonitoringReadiness({
       hasDevice,
-      monitorEnabled: form.geofenceEnabled === true,
+      notificationsEnabled: form.alGeo !== false,
       linkedGeofences,
       linkedGeofencesLoading,
       linkedGeofencesError,

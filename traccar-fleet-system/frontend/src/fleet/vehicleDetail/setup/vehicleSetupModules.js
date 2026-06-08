@@ -48,8 +48,8 @@ export const SETUP_MODULES = [
   },
   {
     id: SETUP_MODULE_IDS.geofence,
-    title: 'Zone monitoring',
-    subtitle: 'Operational preferences for linked zones',
+    title: 'Zones & Boundaries',
+    subtitle: 'Assigned zones and enter/exit notifications',
     icon: FenceIcon,
     optional: true,
   },

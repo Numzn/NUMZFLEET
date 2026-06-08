@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Collapse,
   FormControlLabel,
   Switch,
@@ -25,115 +26,127 @@ export default function ZoneMonitoringModule({
   linkedGeofences,
   linkedGeofencesLoading,
   linkedGeofencesError,
-  preferencesLoading = false,
 }) {
   const navigate = useNavigate();
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const names = linkedZoneNames(linkedGeofences);
   const linkedCount = names.length;
+  const zoneProtectionActive = linkedCount > 0;
+
+  if (!canSaveSpecs) {
+    return (
+      <Alert severity="info">
+        Link a tracker to assign zones and configure geofence notifications.
+      </Alert>
+    );
+  }
 
   return (
     <>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Zone boundaries and device links are managed under device connections. NUMZFLEET
-        stores how this vehicle operationally uses linked zones. Changes apply after Review
-        setup → Save setup.
-      </Alert>
-
-      {!canSaveSpecs && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Link a tracker to configure zone monitoring preferences.
-        </Alert>
-      )}
-
-      {preferencesLoading ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Loading preferences…
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          Status
         </Typography>
-      ) : (
-        <>
-          <FormControlLabel
-            control={(
-              <Switch
-                checked={form.geofenceEnabled}
-                onChange={(e) => patch({ geofenceEnabled: e.target.checked })}
-                disabled={!canSaveSpecs}
-              />
-            )}
-            label="Monitor linked zones"
-            sx={{ mb: 1, display: 'block' }}
+        {linkedGeofencesLoading ? (
+          <Chip size="small" variant="outlined" label="Checking…" />
+        ) : linkedGeofencesError ? (
+          <Chip size="small" color="warning" variant="outlined" label="Could not verify" />
+        ) : (
+          <Chip
+            size="small"
+            color={zoneProtectionActive ? 'success' : 'default'}
+            variant={zoneProtectionActive ? 'filled' : 'outlined'}
+            label={zoneProtectionActive ? 'Active' : 'Not Configured'}
           />
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2, ml: 4.5 }}>
-            Setup readiness only — does not create zones or generate enter/exit events.
-            Use Alerts module to control workspace visibility of zone events.
-          </Typography>
-        </>
-      )}
+        )}
+      </Box>
 
-      {canSaveSpecs && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-            Linked operational zones
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+          Linked zones
+        </Typography>
+        {linkedGeofencesLoading && (
+          <Typography variant="body2" color="text.secondary">
+            Checking zone assignments…
           </Typography>
-          {linkedGeofencesLoading && (
-            <Typography variant="body2" color="text.secondary">
-              Checking zone links…
-            </Typography>
-          )}
-          {!linkedGeofencesLoading && linkedGeofencesError && (
-            <Typography variant="body2" color="warning.main">
-              Could not verify zone links. Manage connections from device settings.
-            </Typography>
-          )}
-          {!linkedGeofencesLoading && !linkedGeofencesError && linkedCount === 0 && (
-            <>
-              <Typography variant="body2" color="text.secondary">
-                No zones linked to this device yet.
-              </Typography>
-              <Typography variant="caption" color="warning.main" display="block" sx={{ mt: 0.5 }}>
-                Enter/exit events require at least one linked zone and a real boundary crossing.
-              </Typography>
-            </>
-          )}
-          {!linkedGeofencesLoading && !linkedGeofencesError && linkedCount > 0 && (
-            <Typography variant="body2" fontWeight={600}>
-              {names.join(', ')}
-            </Typography>
-          )}
-          <Button
-            size="small"
-            variant="outlined"
-            sx={{ textTransform: 'none', mt: 1.5 }}
-            onClick={() => navigate(`/settings/device/${deviceId}/connections`)}
-          >
-            Manage zone connections
-          </Button>
-        </Box>
-      )}
+        )}
+        {!linkedGeofencesLoading && linkedGeofencesError && (
+          <Typography variant="body2" color="warning.main">
+            Could not verify zone assignments. Use Manage assignments to confirm.
+          </Typography>
+        )}
+        {!linkedGeofencesLoading && !linkedGeofencesError && linkedCount === 0 && (
+          <Typography variant="body2" color="text.secondary">
+            No zones assigned to this device. Enter/exit events require at least one assigned zone
+            and a real boundary crossing.
+          </Typography>
+        )}
+        {!linkedGeofencesLoading && !linkedGeofencesError && linkedCount > 0 && (
+          <Typography variant="body2" fontWeight={600}>
+            {linkedCount} assigned zone{linkedCount === 1 ? '' : 's'}: {names.join(', ')}
+          </Typography>
+        )}
+      </Box>
 
-      {canSaveSpecs && !preferencesLoading && (
-        <>
-          <Button
-            size="small"
-            onClick={() => setAdvancedOpen((o) => !o)}
-            sx={{ textTransform: 'none', mb: 1, px: 0 }}
-          >
-            {advancedOpen ? 'Hide advanced' : 'Advanced'}
-          </Button>
-          <Collapse in={advancedOpen}>
-            <TextField
-              label="Preferred zone radius (m) — advisory"
-              value={form.geofenceRadiusM}
-              onChange={(e) => patch({ geofenceRadiusM: e.target.value })}
-              fullWidth
-              size="small"
-              type="number"
-              disabled={!form.geofenceEnabled}
-              helperText="Does not create or resize zones. For future operational hints only."
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+          Notifications
+        </Typography>
+        <FormControlLabel
+          control={(
+            <Switch
+              checked={form.alGeo}
+              onChange={(e) => patch({ alGeo: e.target.checked })}
+              disabled={!canSaveSpecs}
             />
-          </Collapse>
-        </>
-      )}
+          )}
+          label="Geofence notifications"
+          sx={{ display: 'block' }}
+        />
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4.5 }}>
+          When enabled, managers receive alerts when a vehicle enters or exits assigned zones.
+          Also controls visibility in this vehicle&apos;s workspace alert list. Events are still
+          recorded by the platform.
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+        <Button
+          size="small"
+          variant="outlined"
+          sx={{ textTransform: 'none' }}
+          onClick={() => navigate('/geofences')}
+        >
+          Manage zones
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          sx={{ textTransform: 'none' }}
+          onClick={() => navigate(`/settings/device/${deviceId}/connections`)}
+        >
+          Manage assignments
+        </Button>
+      </Box>
+
+      <Button
+        size="small"
+        onClick={() => setAdvancedOpen((o) => !o)}
+        sx={{ textTransform: 'none', mb: 1, px: 0 }}
+      >
+        {advancedOpen ? 'Hide advanced (legacy)' : 'Advanced (legacy)'}
+      </Button>
+      <Collapse in={advancedOpen}>
+        <TextField
+          label="Preferred zone radius (m) — advisory"
+          value={form.geofenceRadiusM}
+          onChange={(e) => patch({ geofenceRadiusM: e.target.value })}
+          fullWidth
+          size="small"
+          type="number"
+          helperText="Legacy advisory value. Does not create or resize zones."
+        />
+      </Collapse>
     </>
   );
 }
