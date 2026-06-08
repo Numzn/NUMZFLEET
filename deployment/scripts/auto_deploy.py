@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import shlex
 import shutil
@@ -454,6 +455,91 @@ def last_commit_touching_ci_image_paths(repo: Path, ref: str = "HEAD") -> str | 
     return out or None
 
 
+def _commits_touching_ci_image_paths(repo: Path, ref: str = "HEAD") -> list[str]:
+    try:
+        return [
+            line.strip()
+            for line in get_output(
+                ["git", "log", ref, "--format=%H", "--", *CI_IMAGE_PATH_LOG_ARGS],
+                cwd=repo,
+            ).splitlines()
+            if line.strip()
+        ]
+    except subprocess.CalledProcessError:
+        return []
+
+
+def dockerhub_app_manifests_exist(sha: str) -> bool:
+    """True when all three app images exist in Docker Hub for this SHA."""
+    user = os.environ.get("DOCKERHUB_USERNAME", "numz14").strip()
+    token = os.environ.get("DOCKERHUB_TOKEN", "").strip()
+    if not token or not sha:
+        return False
+    try:
+        login_req = urllib.request.Request(
+            "https://hub.docker.com/v2/users/login/",
+            data=json.dumps({"username": user, "password": token}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(login_req, timeout=30) as resp:
+            jwt = json.loads(resp.read().decode()).get("token")
+        if not jwt:
+            return False
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, TimeoutError):
+        return False
+
+    for image in ("numzfleet-frontend", "numzfleet-backend", "numzfleet-erb"):
+        tag_url = f"https://hub.docker.com/v2/repositories/{user}/{image}/tags/{sha}/"
+        tag_req = urllib.request.Request(tag_url, headers={"Authorization": f"JWT {jwt}"})
+        try:
+            with urllib.request.urlopen(tag_req, timeout=30) as resp:
+                if resp.status != 200:
+                    return False
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
+            return False
+    return True
+
+
+def github_image_build_succeeded(sha: str) -> bool:
+    """True when 'Build and push NumzFleet images' completed successfully for this SHA."""
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    repo_slug = os.environ.get("GITHUB_REPOSITORY", "Numzn/NUMZFLEET").strip()
+    if not token or not sha:
+        return False
+    api = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
+    workflow_file = "build-push-numzfleet-images.yml"
+    url = f"{api}/repos/{repo_slug}/actions/workflows/{workflow_file}/runs?head_sha={sha}&per_page=5"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, TimeoutError):
+        return False
+    return any(run.get("conclusion") == "success" for run in data.get("workflow_runs") or [])
+
+
+def last_commit_with_built_registry_images(repo: Path, ref: str = "HEAD") -> str | None:
+    """
+    Newest ancestor on `ref` that has a successful CI image build (not merely touched image paths).
+    Falls back to path-only lookup only when GITHUB_TOKEN is unset.
+    """
+    candidates = _commits_touching_ci_image_paths(repo, ref)
+    if not candidates:
+        return None
+    for sha in candidates:
+        if github_image_build_succeeded(sha) or dockerhub_app_manifests_exist(sha):
+            return sha
+    return None
+
+
 def adjust_deploy_sha_for_registry_images(
     repo: Path,
     *,
@@ -477,16 +563,28 @@ def adjust_deploy_sha_for_registry_images(
     ):
         return deploy_sha
 
-    last_ci = last_commit_touching_ci_image_paths(repo)
+    last_ci = last_commit_with_built_registry_images(repo)
+    path_only = last_commit_touching_ci_image_paths(repo)
     if last_ci and last_ci != head_sha:
         print(
-            f"[auto_deploy] Using registry IMAGE_TAG from latest commit that touches CI image paths "
-            f"({last_ci[:12]}...), not HEAD ({head_sha[:12]}...), so docker pull matches existing images. "
+            f"[auto_deploy] Using registry IMAGE_TAG from latest commit with a successful CI image build "
+            f"({last_ci[:12]}...), not HEAD ({head_sha[:12]}...). "
             f"Server repo and scripts still update to HEAD.\n"
         )
         return last_ci
 
-    if not last_ci:
+    if path_only and path_only != head_sha and not last_ci:
+        print(
+            f"[auto_deploy] ERROR: Latest image-path commit ({path_only[:12]}...) has no successful "
+            "'Build and push NumzFleet images' run — images are not in Docker Hub yet.\n"
+            "Wait for CI on develop to succeed, or set NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag "
+            "to a SHA that already built (e.g. last green build on GitHub Actions).\n",
+            file=sys.stderr,
+        )
+        if not skip_deploy:
+            raise SystemExit(1)
+
+    if not path_only:
         print(
             "[auto_deploy] WARN: No commit on this branch touches frontend/fuel-api/erb/CI workflow paths; "
             "cannot auto-pick an image SHA. Run 'Build and push NumzFleet images' or set "

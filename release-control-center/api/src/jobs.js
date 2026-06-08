@@ -170,7 +170,13 @@ export function buildDeployStagingJob(body, meta) {
     run: ({ onStdout, onStderr }) =>
       spawnProcess('python', args, {
         cwd: config.repoRoot,
-        env: { NUMZFLEET_AUTO_DEPLOY_ENV_FILE: config.staging.autoDeployEnv },
+        env: {
+          NUMZFLEET_AUTO_DEPLOY_ENV_FILE: config.staging.autoDeployEnv,
+          GITHUB_TOKEN: config.github.token,
+          GITHUB_REPOSITORY: config.github.repository,
+          DOCKERHUB_USERNAME: config.dockerhub.username,
+          DOCKERHUB_TOKEN: config.dockerhub.token,
+        },
         onStdout,
         onStderr,
       }),
