@@ -26,6 +26,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -127,15 +128,31 @@ def load_auto_deploy_env_file(repo: Path) -> tuple[Path | None, Path | None]:
     return loaded_defaults, loaded_user
 
 
+def _argv_for_log(argv: list[str]) -> str:
+    safe: list[str] = []
+    for arg in argv:
+        if any(
+            needle in arg
+            for needle in ("x-access-token:", "Authorization:", "ghp_", "github_pat_", "gho_")
+        ):
+            safe.append("<redacted>")
+        else:
+            safe.append(shlex.quote(arg))
+    return " ".join(safe)
+
+
 def run_cmd(
     argv: list[str],
     *,
     cwd: Path | None = None,
     check: bool = True,
     env: dict[str, str] | None = None,
+    unset_env: tuple[str, ...] = (),
 ) -> subprocess.CompletedProcess[str]:
-    print("\n>>>", " ".join(shlex.quote(a) for a in argv), "\n", flush=True)
+    print("\n>>>", _argv_for_log(argv), "\n", flush=True)
     run_env = os.environ.copy()
+    for key in unset_env:
+        run_env.pop(key, None)
     if env:
         run_env.update(env)
     return subprocess.run(
@@ -233,29 +250,76 @@ def resolve_deploy_branch(
     return os.environ.get("NUMZFLEET_BRANCH", default_branch).strip() or default_branch
 
 
-def git_push_argv(ref: str) -> list[str]:
-    """Push argv; when GITHUB_TOKEN is set, skip Windows Git Credential Manager account picker."""
+def _askpass_env_keys() -> tuple[str, ...]:
+    return tuple(k for k in os.environ if "ASKPASS" in k.upper())
+
+
+def github_push_remote_url(repo: Path) -> str | None:
+    """
+    HTTPS push URL with embedded PAT (x-access-token).
+    GitHub git over HTTPS expects Basic auth, not Bearer — and this avoids Cursor askpass.
+    """
     token = os.environ.get("GITHUB_TOKEN", "").strip()
-    argv = ["git"]
-    if token:
-        argv.extend(
-            [
-                "-c",
-                "credential.helper=",
-                "-c",
-                f"http.extraHeader=Authorization: Bearer {token}",
-            ]
-        )
-    argv.extend(["push", "origin", ref])
-    return argv
+    if not token:
+        return None
+    try:
+        remote = get_output(["git", "remote", "get-url", "origin"], cwd=repo).strip()
+    except subprocess.CalledProcessError:
+        return None
+    if remote.startswith("git@"):
+        return None
+    if remote.startswith("https://"):
+        scheme, slug = "https", remote[len("https://") :]
+    elif remote.startswith("http://"):
+        scheme, slug = "http", remote[len("http://") :]
+    else:
+        return None
+    if "@" in slug:
+        slug = slug.split("@", 1)[1]
+    user = urllib.parse.quote("x-access-token", safe="")
+    secret = urllib.parse.quote(token, safe="")
+    return f"{scheme}://{user}:{secret}@{slug}"
+
+
+def assert_github_token_valid(token: str) -> None:
+    """Fail fast with a clear message when GITHUB_TOKEN is missing repo push scope or expired."""
+    req = urllib.request.Request(
+        "https://api.github.com/user",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "numzfleet-auto-deploy",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20):
+            return
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            print(
+                "[auto_deploy] GITHUB_TOKEN rejected (401). Update release-control-center/config/rcc.env "
+                "with a valid classic PAT (repo scope) or fine-grained token with Contents: Read and write.\n",
+                file=sys.stderr,
+            )
+            raise SystemExit(2) from e
+        raise
+
+
+def git_push_argv(repo: Path, ref: str) -> list[str]:
+    """Push argv; when GITHUB_TOKEN is set, use authed HTTPS URL (no Credential Manager / askpass)."""
+    auth_remote = github_push_remote_url(repo)
+    if auth_remote:
+        return ["git", "-c", "credential.helper=", "push", auth_remote, ref]
+    return ["git", "push", "origin", ref]
 
 
 def push_head_to_remote_branch(repo: Path, branch: str, *, dry_run: bool) -> None:
     """Push current HEAD to origin/<branch> then refresh local refs (VS Code sync)."""
     ref = f"HEAD:{branch}"
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
     if dry_run:
-        if os.environ.get("GITHUB_TOKEN", "").strip():
-            print("[dry-run] would: git push (GITHUB_TOKEN bearer, no credential prompt) origin", ref)
+        if token:
+            print("[dry-run] would: git push (GITHUB_TOKEN HTTPS, no credential prompt)", ref)
         else:
             print(
                 "[dry-run] would: git push origin",
@@ -263,10 +327,14 @@ def push_head_to_remote_branch(repo: Path, branch: str, *, dry_run: bool) -> Non
                 "(set GITHUB_TOKEN to skip Windows account picker)",
             )
         return
-    push_env: dict[str, str] | None = None
-    if os.environ.get("GITHUB_TOKEN", "").strip():
-        push_env = {"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "Never"}
-    run_cmd(git_push_argv(ref), cwd=repo, env=push_env)
+    if token:
+        assert_github_token_valid(token)
+    run_cmd(
+        git_push_argv(repo, ref),
+        cwd=repo,
+        env={"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "Never"},
+        unset_env=_askpass_env_keys(),
+    )
     refresh_git_state_after_push(repo, branch)
 
 
