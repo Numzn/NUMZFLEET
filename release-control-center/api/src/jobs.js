@@ -12,6 +12,7 @@ import {
 } from './db.js';
 import { sshExec } from './ssh.js';
 import { collectOverview } from './collector.js';
+import { getRegistryStatusForSha } from './dockerhub.js';
 
 const listeners = new Map();
 
@@ -208,13 +209,18 @@ export function buildVerifyJob(meta) {
         return 1;
       }
 
-      onStdout(`\n== Step 3: verify-docker-manifests.sh (${sha.slice(0, 7)}) ==\n`);
-      code = await spawnProcess(
-        'bash',
-        ['deployment/verify/verify-docker-manifests.sh', sha, config.dockerhub.username],
-        { cwd: config.repoRoot, onStdout, onStderr },
-      );
-      if (code !== 0) return code;
+      onStdout(`\n== Step 3: registry manifest check (${sha.slice(0, 7)}) ==\n`);
+      const registry = await getRegistryStatusForSha(sha);
+      for (const image of ['frontend', 'backend', 'erb']) {
+        const ok = registry.images[image];
+        const ref = `${config.dockerhub.username}/numzfleet-${image}:${sha}`;
+        onStdout(`[verify-manifests] ${ref} ${ok ? 'OK' : 'MISSING'}\n`);
+      }
+      if (!registry.complete) {
+        onStderr('[verify-manifests] One or more required manifests missing\n');
+        return 1;
+      }
+      onStdout('[verify-manifests] All required manifests found\n');
 
       if (meta.includePromotionGate !== false) {
         onStdout(`\n== Step 4: verify-staging-promotion.sh ==\n`);
