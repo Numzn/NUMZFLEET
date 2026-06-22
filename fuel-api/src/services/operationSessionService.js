@@ -35,7 +35,7 @@ import {
   maybePersistLock,
   effectiveOperationStatus,
 } from './operationLockHelper.js';
-import { planOperationVehicles, findOrCreateTodayOperation } from './operationDayService.js';
+import { planOperationVehicles, findOrCreateTodayOperation, ensureAssignedVehiclesSeededForDraft } from './operationDayService.js';
 import { createAdjustment } from './adjustmentService.js';
 
 /** Lazy-load avoids rare circular-init cases. */
@@ -94,18 +94,23 @@ export async function getOperationSessionDetails(user, sessionId, companyId = nu
   });
 
   assertCanAccessSession(session, user, companyId);
-  await maybePersistLock(session);
+  await ensureAssignedVehiclesSeededForDraft(user, session, { companyId });
+  const refreshed = await findByIdScoped(sessionId, companyId, {
+    include: [{ model: OperationSessionRefuel, as: 'refuels' }],
+    order: [[{ model: OperationSessionRefuel, as: 'refuels' }, 'sessionDate', 'DESC']],
+  });
+  await maybePersistLock(refreshed);
 
   const summary = await buildSessionSummaryWithStatus(sessionId);
-  const dto = await toSessionDto(session);
-  const { invoices, invoiceSummary, invoice } = await getInvoicesForSessionDetails(session);
+  const dto = await toSessionDto(refreshed);
+  const { invoices, invoiceSummary, invoice } = await getInvoicesForSessionDetails(refreshed);
 
   return {
     ...dto,
-    refuels: (session.refuels || []).map(toRefuelDto),
+    refuels: (refreshed.refuels || []).map(toRefuelDto),
     vehicleCount: summary.vehicleCount,
     statusCounts: summary.statusCounts,
-    fuelBreakdown: summarizeByFuelType(session.refuels || []),
+    fuelBreakdown: summarizeByFuelType(refreshed.refuels || []),
     invoices,
     invoiceSummary,
     invoice,

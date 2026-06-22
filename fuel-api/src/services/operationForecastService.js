@@ -9,6 +9,7 @@ import { getLatestErbPrice } from './fuelPriceService.js';
 import { getVehicleFuelStatistics } from './vehicleFuelStatisticsService.js';
 import { predictForVehicle } from '../intelligence/PredictionEngine.js';
 import { recordAuditEvent, AUDIT_EVENT_TYPES } from './auditEventService.js';
+import { ensureAssignedVehiclesSeededForDraft } from './operationDayService.js';
 import {
   assertCanAccessSession,
   refreshSessionTotals,
@@ -57,9 +58,13 @@ export async function getOperationForecast(user, sessionId) {
     include: [{ model: OperationSessionRefuel, as: 'refuels' }],
   });
   assertCanAccessSession(session, user);
-  await maybePersistLock(session);
+  await ensureAssignedVehiclesSeededForDraft(user, session, { companyId: session.companyId });
+  const seeded = await findSessionById(sessionId, {
+    include: [{ model: OperationSessionRefuel, as: 'refuels' }],
+  });
+  await maybePersistLock(seeded);
 
-  const forecast = await buildForecastForSession(session);
+  const forecast = await buildForecastForSession(seeded);
   await recordAuditEvent(session.id, AUDIT_EVENT_TYPES.FORECAST_GENERATED, user.id, {
     vehicleCount: forecast.vehicles.length,
   });

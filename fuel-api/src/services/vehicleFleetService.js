@@ -252,6 +252,28 @@ export async function deleteVehicle(id) {
   }
 }
 
+/** Traccar device ids with an active fleet assignment for the company (no Traccar HTTP). */
+export async function listAssignedDeviceIdsForCompany(companyId = DEFAULT_COMPANY_ID) {
+  const scopedCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const vehicles = await Vehicle.findAll({
+    where: { companyId: scopedCompanyId },
+    attributes: ['id'],
+  });
+  if (!vehicles.length) return [];
+
+  const vehicleIds = vehicles.map((v) => v.id);
+  const assignments = await DeviceAssignment.findAll({
+    where: { vehicleId: { [Op.in]: vehicleIds }, isActive: true },
+    attributes: ['deviceId'],
+  });
+
+  return [...new Set(
+    assignments
+      .map((a) => Number(a.deviceId))
+      .filter((id) => Number.isFinite(id) && id > 0),
+  )].sort((a, b) => a - b);
+}
+
 export async function listVehiclesMerged(companyId = DEFAULT_COMPANY_ID) {
   const vehicles = await Vehicle.findAll({
     where: { companyId },
