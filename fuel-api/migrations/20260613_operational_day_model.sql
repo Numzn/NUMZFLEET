@@ -1,13 +1,14 @@
 -- Operational day model: draft/approved/locked, calendarDate, audit tables.
 -- Data-safe for production: extends existing status enum in place (no DROP COLUMN/TYPE);
 -- reassigns refuels to the keeper session before removing duplicate session rows.
+--
+-- Enum labels must be committed before use (PostgreSQL rule) — extensions run outside BEGIN.
 
-BEGIN;
-
--- Extend legacy enum (active/closed remain defined but unused after backfill)
 ALTER TYPE enum_operation_sessions_status ADD VALUE IF NOT EXISTS 'draft';
 ALTER TYPE enum_operation_sessions_status ADD VALUE IF NOT EXISTS 'approved';
 ALTER TYPE enum_operation_sessions_status ADD VALUE IF NOT EXISTS 'locked';
+
+BEGIN;
 
 ALTER TABLE operation_sessions
   ADD COLUMN IF NOT EXISTS "calendarDate" DATE,
