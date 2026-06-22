@@ -36,6 +36,7 @@
     "socket.io-client": "^4.8.1",
     "stylis": "^4.3.6",
     "stylis-plugin-rtl": "^2.1.1",
+    "tesseract.js": "^7.0.0",
     "tss-react": "^4.9.19",
     "vite": "^7.3.0",
     "vite-plugin-pwa": "^1.2.0",

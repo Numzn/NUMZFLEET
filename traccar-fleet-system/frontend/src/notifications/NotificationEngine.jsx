@@ -52,7 +52,9 @@ const NotificationEngine = () => {
     autoRequestPermission: false,
   });
 
-  const { serviceWorkerReady, showTypedPushNotification } = useServiceWorker();
+  const { serviceWorkerReady, showTypedPushNotification } = useServiceWorker({
+    enabled: browserNotificationsEnabled,
+  });
 
   const handlers = useMemo(() => ({
     showToast,

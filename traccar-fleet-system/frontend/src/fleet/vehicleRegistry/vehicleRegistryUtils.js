@@ -1,10 +1,30 @@
 import { computeVehicleSetupReadiness } from '../vehicleDetail/setup/vehicleSetupReadiness.js';
+import { resolveVehicleDisplayFromFleetRow } from '../display/resolveVehicleDisplay.js';
 
-/** Display label for linked Traccar device on a fleet vehicle row. */
+/** Primary + secondary lines for registry vehicle column. */
+export function getVehicleRegistryLines(row) {
+  const display = resolveVehicleDisplayFromFleetRow(row);
+  return { primary: display.primary, secondary: display.secondary };
+}
+
+/** Single-line vehicle label (e.g. exports, dialogs). */
+export function getVehicleLabel(row) {
+  const { primary, secondary } = getVehicleRegistryLines(row);
+  if (secondary) {
+    return `${primary} (${secondary})`;
+  }
+  return primary;
+}
+
+/** Tracker assignment label — connection state lives in the Status column. */
+export function getTrackerLinkLabel(row) {
+  if (!row?.assignment?.deviceId) return 'Not assigned';
+  return 'Linked';
+}
+
+/** @deprecated use getTrackerLinkLabel */
 export function getDeviceLabel(row) {
-  if (row.device?.name) return row.device.name;
-  if (row.assignment?.deviceId != null) return `ID ${row.assignment.deviceId}`;
-  return null;
+  return getTrackerLinkLabel(row);
 }
 
 /** Chip props for registry setup column (client-side from list vehicle DTO). */

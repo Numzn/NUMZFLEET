@@ -21,6 +21,7 @@ import FuelRequestsManagementDashboard from './FuelRequestsManagementDashboard';
 import { errorsActions } from '../../store';
 import { fuelRequestsActions } from '../store/fuelRequests';
 import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
+import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 
 const useStyles = makeStyles()((theme) => ({
   paper: {
@@ -366,6 +367,7 @@ const FuelRequestsCard = () => {
   
   const devices = useSelector((state) => state.devices.items);
   const user = useSelector((state) => state.session.user);
+  const { getDisplayForDevice } = useVehicleDisplayContext();
   
   // State management
   const [searchQuery, setSearchQuery] = useState('');
@@ -434,10 +436,12 @@ const FuelRequestsCard = () => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((request) => {
-        const device = devices[request.deviceId];
-        const deviceName = device?.name || `Device ${request.deviceId}`;
+        const display = getDisplayForDevice(request.deviceId, devices[request.deviceId]);
+        const label = display.secondary
+          ? `${display.primary} ${display.secondary}`
+          : display.primary;
         return (
-          deviceName.toLowerCase().includes(query) ||
+          label.toLowerCase().includes(query) ||
           request.reason?.toLowerCase().includes(query) ||
           request.requestedAmount?.toString().includes(query)
         );
@@ -456,7 +460,7 @@ const FuelRequestsCard = () => {
 
     // Group by date
     return groupRequestsByDate(filtered);
-  }, [fuelRequests, searchQuery, statusFilter, vehicleFilter, devices]);
+  }, [fuelRequests, searchQuery, statusFilter, vehicleFilter, devices, getDisplayForDevice]);
 
   // Get unique vehicles for filter
   const availableVehicles = useMemo(() => {
@@ -466,11 +470,14 @@ const FuelRequestsCard = () => {
         vehicleIds.add(request.deviceId);
       }
     });
-    return Array.from(vehicleIds).map((id) => ({
-      id,
-      name: devices[id]?.name || `Device ${id}`,
-    }));
-  }, [fuelRequests, devices]);
+    return Array.from(vehicleIds).map((id) => {
+      const display = getDisplayForDevice(id, devices[id]);
+      return {
+        id,
+        name: display.secondary ? `${display.primary} (${display.secondary})` : display.primary,
+      };
+    });
+  }, [fuelRequests, devices, getDisplayForDevice]);
 
   // Toggle accordion section
   const handleAccordionChange = (section) => (event, isExpanded) => {
@@ -673,6 +680,7 @@ const FuelRequestsCard = () => {
   // Render request card
   const renderRequestCard = (request) => {
     const device = devices[request.deviceId];
+    const display = getDisplayForDevice(request.deviceId, device);
     const hasWarnings = request.validationWarnings && request.validationWarnings.length > 0;
     const isNew = new Date(request.requestTime) > new Date(Date.now() - 24 * 60 * 60 * 1000);
     
@@ -695,8 +703,13 @@ const FuelRequestsCard = () => {
           <Box className={classes.requestHeader}>
             <Box className={classes.requestTitle}>
               <Typography variant="h6" fontWeight={700}>
-                {device?.name || `Device ${request.deviceId}`}
+                {display.primary}
               </Typography>
+              {display.secondary ? (
+                <Typography variant="body2" color="text.secondary">
+                  {display.secondary}
+                </Typography>
+              ) : null}
               {getUrgencyChip(request.urgency)}
               {getStatusBadge(request.status)}
             </Box>

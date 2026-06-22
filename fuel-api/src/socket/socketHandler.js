@@ -37,6 +37,10 @@ export const initializeSocket = (io) => {
       if (user) {
         socket.data.userId = user.id || null;
         socket.data.administrator = !!user.administrator;
+      } else if (isDev && socket.handshake?.auth?.userId != null) {
+        const authUserId = Number(socket.handshake.auth.userId);
+        socket.data.userId = Number.isFinite(authUserId) ? authUserId : null;
+        socket.data.administrator = !!socket.handshake.auth.administrator;
       } else {
         socket.data.userId = null;
         socket.data.administrator = false;

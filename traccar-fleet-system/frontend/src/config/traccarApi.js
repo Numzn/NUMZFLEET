@@ -11,6 +11,8 @@
  * fuel-backed report subpaths are listed here.
  */
 export const FUEL_API_PREFIXES = [
+  '/api/auth',
+  '/api/fleet',
   '/api/fuel-requests',
   '/api/vehicle-specs',
   '/api/vehicles',

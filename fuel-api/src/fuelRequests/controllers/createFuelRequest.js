@@ -65,6 +65,7 @@ export const createFuelRequest = async (req, res) => {
       latitude: position?.latitude || null,
       longitude: position?.longitude || null,
       status: 'pending',
+      companyId: req.auth?.companyId || null,
       validationWarnings: validation.warnings,
       managerSuggestion: validation.suggestedAmount
     });

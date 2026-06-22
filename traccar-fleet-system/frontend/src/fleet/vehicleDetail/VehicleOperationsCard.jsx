@@ -23,7 +23,10 @@ import {
   vehicleImmobilizerPath,
   vehicleSetupPath,
 } from '../vehicleRegistry/vehicleRegistryUtils.js';
-import useFeatures from '../../common/util/useFeatures.js';
+import useFeatures from '../../common/util/useFeatures';
+import { resolveVehicleDisplayFromFleetRow } from '../display/resolveVehicleDisplay.js';
+import VehicleLocationLine from '../../common/components/VehicleLocationLine';
+import getOperationalIndicators from '../../main/fleet/vehicleOperationalIndicators.js';
 import { hasBlockingSetupIncomplete } from './setup/vehicleSetupReadiness.js';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import { WORKSPACE_COLORS } from './vehicleWorkspaceTokens.js';
@@ -48,9 +51,11 @@ export default function VehicleOperationsCard({
   fuel,
   telemetry,
   motionLabel,
+  motionDurationLabel,
   ignitionPhrase,
   livePosition,
   deviceId,
+  maintenanceDueSoonCount = 0,
 }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -62,20 +67,13 @@ export default function VehicleOperationsCard({
 
   const status = vehicle?.device?.status;
   const online = status === 'online';
-  const title = vehicle?.plateNumber?.trim() || vehicle?.name || vehicle?.device?.name || 'Vehicle';
-  const modelName = vehicle?.name || vehicle?.device?.name || '';
-  const fleetLabel = vehicle?.id != null ? `Fleet #${vehicle.id}` : '';
+  const display = resolveVehicleDisplayFromFleetRow(vehicle);
+  const title = display.primary;
+  const modelName = display.secondary || '';
 
   const driverName = linkedDrivers?.[0]?.name || null;
   const hasDevice = deviceId != null;
   const hasFix = Boolean(livePosition?.latitude && livePosition?.longitude);
-
-  const address = livePosition?.address?.trim?.() || '';
-  const lat = livePosition?.latitude;
-  const lon = livePosition?.longitude;
-  const coords =
-    lat != null && lon != null ? `${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}` : null;
-  const locationText = address || coords || 'Location unknown';
 
   const fixIso = telemetry?.fixTime || vehicle?.device?.lastUpdate;
   const relativeUpdated = fixIso ? dayjs(fixIso).fromNow() : '—';
@@ -87,11 +85,23 @@ export default function VehicleOperationsCard({
   const statusParts = [];
   if (online) {
     statusParts.push('ACTIVE');
-    if (motionLabel) statusParts.push(motionLabel);
+    if (motionLabel) {
+      statusParts.push(motionDurationLabel ? `${motionLabel} ${motionDurationLabel}` : motionLabel);
+    }
   } else {
     statusParts.push(status === 'offline' ? 'OFFLINE' : (status || 'UNKNOWN').toUpperCase());
   }
   if (ignitionPhrase && online) statusParts.push(ignitionPhrase);
+
+  // Stale-fix / overspeed / offline operational chips (shared with fleet list).
+  const operationalIndicators = getOperationalIndicators(vehicle?.device, livePosition)
+    .filter((ind) => ind.key !== 'offline');
+
+  const serviceSummary = vehicle?.serviceSummary;
+  const openServiceCount = Number(serviceSummary?.openCount) || 0;
+  const inProgressServiceCount = Number(serviceSummary?.inProgressCount) || 0;
+  const activeServiceCount = openServiceCount + inProgressServiceCount;
+  const lastServiceCompletedAt = serviceSummary?.lastCompletedAt;
 
   const openMap = () => {
     if (!hasDevice) return;
@@ -167,11 +177,6 @@ export default function VehicleOperationsCard({
                 {modelName}
               </Typography>
             )}
-            {fleetLabel && (
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: density.mobile ? '0.75rem' : '0.875rem' }}>
-                {fleetLabel}
-              </Typography>
-            )}
           </Box>
         </Box>
 
@@ -235,6 +240,42 @@ export default function VehicleOperationsCard({
         <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8125rem' }}>
           {statusParts.join(' · ')}
         </Typography>
+        {maintenanceDueSoonCount > 0 && (
+          <Chip
+            size="small"
+            color="warning"
+            variant="outlined"
+            label={maintenanceDueSoonCount > 1 ? `${maintenanceDueSoonCount} services due` : 'Service due'}
+            sx={{ height: 20, fontSize: '0.65rem' }}
+          />
+        )}
+        {activeServiceCount > 0 && (
+          <Chip
+            size="small"
+            color="info"
+            variant="outlined"
+            label={activeServiceCount > 1 ? `${activeServiceCount} service records open` : 'Service record open'}
+            sx={{ height: 20, fontSize: '0.65rem' }}
+          />
+        )}
+        {activeServiceCount === 0 && lastServiceCompletedAt && (
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Last service ${dayjs(lastServiceCompletedAt).fromNow()}`}
+            sx={{ height: 20, fontSize: '0.65rem' }}
+          />
+        )}
+        {operationalIndicators.map((ind) => (
+          <Chip
+            key={ind.key}
+            size="small"
+            color={ind.color}
+            variant="outlined"
+            label={ind.label}
+            sx={{ height: 20, fontSize: '0.65rem' }}
+          />
+        ))}
         {driverName && (
           <>
             <Typography variant="body2" color="text.secondary" sx={{ mx: 0.5 }}>
@@ -247,6 +288,16 @@ export default function VehicleOperationsCard({
               {driverName}
             </Typography>
           </>
+        )}
+        {maintenanceDueSoonCount > 0 && (
+          <Chip
+            size="small"
+            color="warning"
+            variant="outlined"
+            label={`Service due (${maintenanceDueSoonCount})`}
+            onClick={deviceId ? () => navigate(`/settings/maintenances?deviceId=${deviceId}`) : undefined}
+            sx={{ ml: 0.5, height: 22 }}
+          />
         )}
       </Box>
 
@@ -296,7 +347,11 @@ export default function VehicleOperationsCard({
           <LocationOnOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', mt: 0.25 }} />
           <Box>
             <Typography variant="body2" fontWeight={500}>
-              {locationText}
+              {hasFix ? (
+                <VehicleLocationLine position={livePosition} unknownText="Location unknown" />
+              ) : (
+                'Location unknown'
+              )}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Last updated: {relativeUpdated}

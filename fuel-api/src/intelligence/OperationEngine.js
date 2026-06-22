@@ -20,10 +20,17 @@ export function parseVehicleIdsInput(vehicleIds) {
   return parsed;
 }
 
-export function assertSessionOpenForMutation(session) {
-  if (session.status === 'closed') {
-    const error = new Error('Session is closed');
-    error.statusCode = 400;
+export async function assertSessionOpenForMutation(session) {
+  if (session.status === 'locked') {
+    const error = new Error('Operation is locked');
+    error.statusCode = 403;
+    throw error;
+  }
+  const { isOperationWritable } = await import('../services/operationLockHelper.js');
+  const writable = await isOperationWritable(session);
+  if (!writable) {
+    const error = new Error('Operation is locked');
+    error.statusCode = 403;
     throw error;
   }
 }

@@ -1,12 +1,16 @@
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
-import { Vehicle, DeviceAssignment, VehicleSpec } from '../models/index.js';
+import { Vehicle, DeviceAssignment, VehicleSpec, DEFAULT_COMPANY_ID } from '../models/index.js';
 import {
   getTraccarDevice,
   getTraccarDevicesByIds,
+  getAllTraccarDevicesWithAttributes,
   getTraccarLatestPositionsByDeviceIds,
   upsertTraccarDeviceAttribute,
+  updateTraccarDeviceName,
 } from '../config/traccar.js';
+import { resolveVehicleDisplayFromModels } from '../utils/resolveVehicleDisplay.js';
+import { ensureDeviceInCompany } from './companyProvisioningService.js';
 import { emitDomainEvent } from '../events/eventBus.js';
 import { EVENT_NAMES } from '../events/eventNames.js';
 import { normalizePositionTelemetry } from '../utils/normalizeTelemetry.js';
@@ -16,6 +20,7 @@ import {
   mergeFleetConfigFromBody,
 } from '../utils/fleetConfigUtils.js';
 import { updateVehicleSpec } from './vehicleSpecService.js';
+import { summarizeForVehicle } from '../repositories/serviceRecordRepository.js';
 
 /**
  * v1 merged vehicle DTO — single shape for list and get-by-id.
@@ -124,7 +129,32 @@ async function loadMergeMapsForDeviceIds(deviceIds) {
   return { deviceMap, positionMap, specMap };
 }
 
-export async function createVehicle({ name, plateNumber }) {
+async function syncVehicleDeviceLabels(vehicle, deviceId) {
+  const display = resolveVehicleDisplayFromModels(vehicle);
+  await upsertTraccarDeviceAttribute(deviceId, 'vehicleName', display.primary);
+  if (vehicle.plateNumber) {
+    await upsertTraccarDeviceAttribute(deviceId, 'plateNumber', vehicle.plateNumber);
+  }
+  await upsertTraccarDeviceAttribute(deviceId, 'fleetVehicleId', String(vehicle.id));
+  await updateTraccarDeviceName(deviceId, display.primary);
+}
+
+export async function assertVehicleInTenant(vehicleId, companyId = DEFAULT_COMPANY_ID) {
+  const vehicle = await Vehicle.findByPk(vehicleId);
+  if (!vehicle) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (companyId && vehicle.companyId && vehicle.companyId !== companyId) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return vehicle;
+}
+
+export async function createVehicle({ name, plateNumber, companyId }) {
   const trimmed = (name || '').trim();
   if (!trimmed) {
     const err = new Error('name is required');
@@ -136,9 +166,12 @@ export async function createVehicle({ name, plateNumber }) {
     : null;
 
   // Duplicate check: same name (case-insensitive) or same plate
+  const scopedCompanyId = companyId || DEFAULT_COMPANY_ID;
   const orConditions = [{ name: trimmed }];
   if (plate) orConditions.push({ plateNumber: plate });
-  const existing = await Vehicle.findOne({ where: { [Op.or]: orConditions } });
+  const existing = await Vehicle.findOne({
+    where: { companyId: scopedCompanyId, [Op.or]: orConditions },
+  });
   if (existing) {
     const field = existing.name.toLowerCase() === trimmed.toLowerCase() ? 'name' : 'plate number';
     const err = new Error(`A vehicle with that ${field} already exists`);
@@ -146,7 +179,11 @@ export async function createVehicle({ name, plateNumber }) {
     throw err;
   }
 
-  return Vehicle.create({ name: trimmed, plateNumber: plate });
+  return Vehicle.create({
+    name: trimmed,
+    plateNumber: plate,
+    companyId: companyId || DEFAULT_COMPANY_ID,
+  });
 }
 
 export async function updateVehicle(id, { name, plateNumber }) {
@@ -215,8 +252,11 @@ export async function deleteVehicle(id) {
   }
 }
 
-export async function listVehiclesMerged() {
-  const vehicles = await Vehicle.findAll({ order: [['name', 'ASC']] });
+export async function listVehiclesMerged(companyId = DEFAULT_COMPANY_ID) {
+  const vehicles = await Vehicle.findAll({
+    where: { companyId },
+    order: [['name', 'ASC']],
+  });
   const vehicleIds = vehicles.map((v) => v.id);
   const assignments = vehicleIds.length
     ? await DeviceAssignment.findAll({
@@ -232,9 +272,10 @@ export async function listVehiclesMerged() {
   );
 }
 
-export async function getVehicleMerged(id) {
+export async function getVehicleMerged(id, companyId = null) {
   const vehicle = await Vehicle.findByPk(id);
   if (!vehicle) return null;
+  if (companyId && vehicle.companyId && vehicle.companyId !== companyId) return null;
 
   const assignment = await DeviceAssignment.findOne({
     where: { vehicleId: id, isActive: true },
@@ -242,7 +283,27 @@ export async function getVehicleMerged(id) {
   const deviceIds = assignment ? [Number(assignment.deviceId)] : [];
   const { deviceMap, positionMap, specMap } = await loadMergeMapsForDeviceIds(deviceIds);
 
-  return toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap);
+  const merged = toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap);
+  const effectiveCompanyId = companyId || vehicle.companyId || DEFAULT_COMPANY_ID;
+  merged.serviceSummary = await summarizeForVehicle(id, effectiveCompanyId);
+  return merged;
+}
+
+export async function listDeviceAssignments(vehicleId, companyId = null) {
+  const vehicle = await Vehicle.findByPk(vehicleId);
+  if (!vehicle) return null;
+  if (companyId && vehicle.companyId && vehicle.companyId !== companyId) return null;
+  const rows = await DeviceAssignment.findAll({
+    where: { vehicleId: String(vehicleId) },
+    order: [['assignedAt', 'DESC']],
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    deviceId: Number(r.deviceId),
+    assignedAt: r.assignedAt?.toISOString?.() || r.assignedAt,
+    unassignedAt: r.unassignedAt?.toISOString?.() || r.unassignedAt,
+    isActive: r.isActive,
+  }));
 }
 
 /**
@@ -297,6 +358,13 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
       { transaction: t },
     );
   });
+
+  try {
+    await syncVehicleDeviceLabels(vehicle, did);
+    await ensureDeviceInCompany(vehicle.companyId || DEFAULT_COMPANY_ID, did, vid);
+  } catch (err) {
+    console.error('[vehicleFleet] label sync after assign failed:', err?.message || err);
+  }
 
   emitDomainEvent(EVENT_NAMES.VEHICLE_ASSIGNED, {
     vehicleId: Number(vid),
@@ -389,8 +457,9 @@ export async function updateVehicleMergedConfig(vehicleId, body = {}) {
 }
 
 /**
- * Backfills Traccar device label attributes from active assignments.
- * Safe to run at startup to reconcile labels for assignments created before label-sync existed.
+ * Backfills Traccar device label attributes from active assignments and clears
+ * stale fleetVehicleId values left on devices after vehicle delete or DB restore.
+ * Safe to run at startup.
  */
 export async function reconcileDeviceAssignmentLabels() {
   const activeAssignments = await DeviceAssignment.findAll({
@@ -398,16 +467,18 @@ export async function reconcileDeviceAssignmentLabels() {
     attributes: ['vehicleId', 'deviceId'],
   });
 
-  if (!activeAssignments.length) {
-    return { total: 0, synced: 0, failed: 0 };
-  }
+  const expectedFleetVehicleIdByDevice = new Map(
+    activeAssignments.map((a) => [Number(a.deviceId), String(a.vehicleId)]),
+  );
 
   const vehicleIds = [...new Set(activeAssignments.map((a) => String(a.vehicleId)))];
-  const vehicles = await Vehicle.findAll({
-    where: { id: { [Op.in]: vehicleIds } },
-    attributes: ['id', 'name'],
-  });
-  const vehicleNameById = new Map(vehicles.map((v) => [String(v.id), v.name]));
+  const vehicles = vehicleIds.length
+    ? await Vehicle.findAll({
+        where: { id: { [Op.in]: vehicleIds } },
+        attributes: ['id', 'name', 'plateNumber'],
+      })
+    : [];
+  const vehicleById = new Map(vehicles.map((v) => [String(v.id), v]));
 
   let synced = 0;
   let failed = 0;
@@ -415,24 +486,50 @@ export async function reconcileDeviceAssignmentLabels() {
   for (const assignment of activeAssignments) {
     const deviceId = Number(assignment.deviceId);
     const vehicleId = String(assignment.vehicleId);
-    const vehicleName = vehicleNameById.get(vehicleId);
-    if (!Number.isFinite(deviceId) || !vehicleName) {
+    const vehicle = vehicleById.get(vehicleId);
+    if (!Number.isFinite(deviceId) || !vehicle) {
       failed += 1;
       continue;
     }
 
     try {
-      await upsertTraccarDeviceAttribute(deviceId, 'vehicleName', vehicleName);
-      await upsertTraccarDeviceAttribute(deviceId, 'fleetVehicleId', Number(vehicleId));
+      await syncVehicleDeviceLabels(vehicle, deviceId);
       synced += 1;
     } catch {
       failed += 1;
     }
   }
 
+  let cleared = 0;
+  try {
+    const traccarDevices = await getAllTraccarDevicesWithAttributes();
+    for (const device of traccarDevices) {
+      const deviceId = Number(device.id);
+      if (!Number.isFinite(deviceId)) continue;
+
+      const attrs = parseTraccarAttributesRaw(device.attributes);
+      const stored = attrs.fleetVehicleId != null && String(attrs.fleetVehicleId).trim() !== ''
+        ? String(attrs.fleetVehicleId)
+        : null;
+      if (!stored) continue;
+
+      const expected = expectedFleetVehicleIdByDevice.get(deviceId) ?? null;
+      if (expected === stored) continue;
+
+      await upsertTraccarDeviceAttribute(deviceId, 'fleetVehicleId', null);
+      if (!expected) {
+        await upsertTraccarDeviceAttribute(deviceId, 'vehicleName', null);
+      }
+      cleared += 1;
+    }
+  } catch (err) {
+    console.warn('[vehicle-label-reconcile] stale attribute cleanup skipped:', err?.message || err);
+  }
+
   return {
     total: activeAssignments.length,
     synced,
     failed,
+    cleared,
   };
 }

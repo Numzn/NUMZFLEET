@@ -17,6 +17,12 @@ export default (sequelize) => {
         type: DataTypes.STRING(64),
         allowNull: true,
       },
+      companyId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        field: 'company_id',
+        references: { model: 'companies', key: 'id' },
+      },
     },
     {
       tableName: 'vehicles',

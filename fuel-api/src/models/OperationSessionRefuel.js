@@ -17,6 +17,12 @@ export default (sequelize) => {
       allowNull: false,
       comment: 'Traccar user who created this record',
     },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'company_id',
+      references: { model: 'companies', key: 'id' },
+    },
     vehicleId: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -60,6 +66,11 @@ export default (sequelize) => {
       type: DataTypes.DOUBLE,
       allowNull: true,
     },
+    fuelTypeSnapshot: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+      comment: 'Normalized fuel type (diesel/petrol) captured at plan time',
+    },
     estimatedCost: {
       type: DataTypes.DOUBLE,
       allowNull: true,
@@ -91,6 +102,35 @@ export default (sequelize) => {
     },
     currentMileage: {
       type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    mileageSource: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+    },
+    capturedBy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    capturedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    arrivedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    skippedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Set when a planned vehicle is skipped for the day',
+    },
+    skippedBy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    skipReason: {
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     attendant: {

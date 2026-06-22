@@ -189,6 +189,19 @@ export const getTraccarDevice = async (deviceId) => {
 };
 
 /**
+ * Update Traccar device display name (tc_devices.name).
+ */
+export const updateTraccarDeviceName = async (deviceId, name) => {
+  if (deviceId == null || !String(name || '').trim()) return false;
+  const pool = getTraccarPool();
+  await pool.execute(
+    'UPDATE tc_devices SET name = ? WHERE id = ?',
+    [String(name).trim(), Number(deviceId)],
+  );
+  return true;
+};
+
+/**
  * Upsert one attribute key on tc_devices.attributes JSON.
  * If value is null/undefined/empty, the key is removed.
  */
@@ -372,6 +385,19 @@ export const getTraccarCommandResultsSince = async (deviceId, since, limit = 10)
 /**
  * Get device attributes (fuel level, etc.)
  */
+/**
+ * All Traccar devices with raw attributes JSON (for label reconciliation).
+ * @returns {Promise<Array<{ id: number, attributes: string|object|null }>>}
+ */
+export const getAllTraccarDevicesWithAttributes = async () => {
+  const pool = getTraccarPool();
+  const [rows] = await pool.execute('SELECT id, attributes FROM tc_devices');
+  return rows.map((row) => ({
+    id: Number(row.id),
+    attributes: row.attributes ?? null,
+  }));
+};
+
 export const getDeviceAttributes = async (deviceId) => {
   try {
     const position = await getTraccarPosition(deviceId);
@@ -405,6 +431,7 @@ export default {
   upsertTraccarDeviceAttribute,
   getTraccarPosition,
   getTraccarDevicesByIds,
+  getAllTraccarDevicesWithAttributes,
   getTraccarLatestPositionsByDeviceIds,
   getTraccarCommandResultsSince,
   getDeviceAttributes,

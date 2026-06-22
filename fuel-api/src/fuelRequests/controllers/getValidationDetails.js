@@ -1,4 +1,4 @@
-import { FuelRequest } from '../../models/index.js';
+import { findFuelRequestScoped } from '../scopeFuelRequest.js';
 import { getTraccarPosition } from '../../config/traccar.js';
 import { getVehicleSpec } from '../../services/vehicleSpecService.js';
 import { validateFuelRequest } from '../services/fuelValidationService.js';
@@ -10,7 +10,7 @@ export const getValidationDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const request = await FuelRequest.findByPk(id);
+    const request = await findFuelRequestScoped(req, id);
 
     if (!request) {
       return res.status(404).json({ error: 'Fuel request not found' });

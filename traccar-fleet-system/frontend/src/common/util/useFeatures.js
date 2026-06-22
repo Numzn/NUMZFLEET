@@ -28,6 +28,13 @@ const featureSelector = createSelector(
     const disableComputedAttributes = get(server, user, 'ui.disableComputedAttributes');
     const disableCalendars = get(server, user, 'ui.disableCalendars');
 
+    // NUMZFLEET feature: legacy driver fuel requests. Defaults ON for backward
+    // compatibility; only disabled when an admin explicitly sets it to false.
+    const rawFuelRequests = server?.attributes?.['numz.enableFuelRequests'];
+    const enableFuelRequests = rawFuelRequests === undefined || rawFuelRequests === null
+      ? true
+      : Boolean(rawFuelRequests);
+
     return {
       disableSavedCommands,
       disableAttributes,
@@ -37,8 +44,11 @@ const featureSelector = createSelector(
       disableEvents,
       disableComputedAttributes,
       disableCalendars,
+      enableFuelRequests,
     };
   },
 );
 
-export default () => useSelector(featureSelector);
+export default function useFeatures() {
+  return useSelector(featureSelector);
+}

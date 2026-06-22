@@ -16,6 +16,7 @@ import Loader from './common/components/Loader';
 import fetchOrThrow from './common/util/fetchOrThrow';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import CommandPalette from './common/components/CommandPalette';
+import { VehicleDisplayRegistryProvider } from './fleet/display/VehicleDisplayRegistryContext';
 
 const useStyles = makeStyles()(() => ({
   page: {
@@ -89,9 +90,11 @@ const App = () => {
       <UpdateController />
       <PWAInstallPrompt />
       <CommandPalette />
-      <div className={classes.page}>
-        <Outlet />
-      </div>
+      <VehicleDisplayRegistryProvider>
+        <div className={classes.page}>
+          <Outlet />
+        </div>
+      </VehicleDisplayRegistryProvider>
     </>
   );
 };

@@ -29,6 +29,7 @@ import MapScale from '../map/MapScale';
 import SelectField from '../common/components/SelectField';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import exportExcel from '../common/util/exportExcel';
+import useReportDeviceLabel from './common/useReportDeviceLabel';
 import AddressValue from '../common/components/AddressValue';
 
 const columnsArray = [
@@ -69,6 +70,7 @@ const EventReportPage = () => {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [position, setPosition] = useState(null);
+  const { primaryForDevice } = useReportDeviceLabel();
 
   useEffect(() => {
     if (!eventTypes.length) {
@@ -127,7 +129,7 @@ const EventReportPage = () => {
   const onExport = useCatch(async () => {
     const sheets = new Map();
     items.forEach((item) => {
-      const deviceName = devices[item.deviceId].name;
+      const deviceName = primaryForDevice(item.deviceId);
       if (!sheets.has(deviceName)) {
         sheets.set(deviceName, []);
       }
@@ -160,7 +162,7 @@ const EventReportPage = () => {
     const value = item[key];
     switch (key) {
       case 'deviceId':
-        return devices[value].name;
+        return primaryForDevice(value);
       case 'eventTime':
         return formatTime(value, 'seconds');
       case 'type':
@@ -281,7 +283,7 @@ const EventReportPage = () => {
                       </IconButton>
                     ))) || ''}
                   </TableCell>
-                  <TableCell>{devices[item.deviceId].name}</TableCell>
+                  <TableCell>{primaryForDevice(item.deviceId)}</TableCell>
                   {columns.map((key) => (
                     <TableCell key={key}>
                       {formatValue(item, key)}

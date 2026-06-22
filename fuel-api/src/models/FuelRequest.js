@@ -17,6 +17,12 @@ export default (sequelize) => {
       allowNull: false,
       comment: 'Traccar user ID (driver)'
     },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'company_id',
+      references: { model: 'companies', key: 'id' },
+    },
     currentFuelLevel: {
       type: DataTypes.DOUBLE,
       comment: 'Current fuel level percentage or liters'

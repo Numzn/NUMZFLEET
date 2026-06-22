@@ -27,6 +27,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CloseIcon from '@mui/icons-material/Close';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 
 const MAX_RESULTS = 12;
 
@@ -35,6 +36,7 @@ const MAX_RESULTS = 12;
  */
 const CommandPalette = () => {
   const navigate = useNavigate();
+  const { getDisplayForDevice } = useVehicleDisplayContext();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const inputRef = useRef(null);
@@ -70,14 +72,15 @@ const CommandPalette = () => {
     const out = [];
 
     Object.values(devices).forEach((device) => {
-      const name = device.name?.toLowerCase() ?? '';
+      const display = getDisplayForDevice(device.id, device);
+      const name = display.primary?.toLowerCase() ?? '';
       const uid = device.uniqueId?.toLowerCase() ?? '';
       if (name.includes(q) || uid.includes(q)) {
         out.push({
           key: `device-${device.id}`,
           icon: <DirectionsCarIcon />,
-          title: device.name || device.uniqueId || `Device ${device.id}`,
-          subtitle: device.uniqueId || 'Vehicle',
+          title: display.primary,
+          subtitle: display.secondary || device.uniqueId || 'Vehicle',
           action: () => navigate('/map'),
         });
       }
@@ -108,7 +111,7 @@ const CommandPalette = () => {
     });
 
     return out.slice(0, MAX_RESULTS);
-  }, [devices, drivers, groups, navigate, query]);
+  }, [devices, drivers, getDisplayForDevice, groups, navigate, query]);
 
   const handlePick = useCallback((item) => {
     item.action();

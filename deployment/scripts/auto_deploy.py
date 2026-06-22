@@ -975,7 +975,12 @@ def main() -> int:
         "--promoted-sha",
         metavar="SHA",
         default=None,
-        help="Production-only: deploy this staging-validated SHA (40 chars).",
+        help="Production v3 promote: staging-validated SHA (40 chars). Omit for direct OCI deploy (git → CI → pull).",
+    )
+    parser.add_argument(
+        "--direct-production",
+        action="store_true",
+        help="Production: skip staging promotion gate; SSH run-migrate-and-deploy or deploy-from-registry (default when --promoted-sha omitted).",
     )
     args = parser.parse_args()
 
@@ -1033,8 +1038,14 @@ def main() -> int:
         )
         return 2
 
+    prod_mode = ""
+    if target == "production":
+        promoted_sha_preview = (args.promoted_sha or "").strip()
+        direct_preview = args.direct_production or _env_bool("NUMZFLEET_DIRECT_PRODUCTION", False) or not promoted_sha_preview
+        prod_mode = " DIRECT" if direct_preview else " PROMOTE"
+
     print("\n==============================")
-    print(f"NUMZFLEET AUTO DEPLOY ({target.upper()})")
+    print(f"NUMZFLEET AUTO DEPLOY ({target.upper()}{prod_mode})")
     print("==============================\n")
 
     if args.dry_run:
@@ -1099,14 +1110,21 @@ def main() -> int:
     image_tag_source = (args.deploy_image_tag or os.environ.get("NUMZFLEET_DEPLOY_IMAGE_TAG") or "").strip()
     deploy_sha = sha
     promoted_sha = (args.promoted_sha or "").strip()
-    if target == "production":
-        if not promoted_sha:
-            print("[auto_deploy] --promoted-sha is required for --target production.", file=sys.stderr)
-            return 2
+    direct_production = target == "production" and (
+        args.direct_production
+        or _env_bool("NUMZFLEET_DIRECT_PRODUCTION", False)
+        or not promoted_sha
+    )
+    if target == "production" and promoted_sha:
         if len(promoted_sha) != 40:
             print("[auto_deploy] --promoted-sha must be a full 40-char SHA.", file=sys.stderr)
             return 2
         deploy_sha = promoted_sha
+    elif target == "production" and direct_production:
+        print(
+            "[auto_deploy] Direct production: git → registry pull on OCI "
+            "(no staging promotion gate). Use --promoted-sha for v3 promote flow.\n"
+        )
     if image_tag_source:
         try:
             deploy_sha = get_output(["git", "rev-parse", image_tag_source], cwd=repo)
@@ -1129,6 +1147,14 @@ def main() -> int:
     for k in ("frontend", "backend", "erb", "workflow", "migrations", "traccar_conf", "image_build_required"):
         print(f"  {k}: {flags[k]}")
     print()
+
+    if direct_production and flags["image_build_required"] and branch == "main":
+        print(
+            "[auto_deploy] NOTE: CI image builds trigger on push to develop, not main. "
+            "Push to develop, set NUMZFLEET_BRANCH=develop, or run:\n"
+            "  gh workflow run build-push-numzfleet-images.yml -f git_sha=<sha>\n",
+            file=sys.stderr,
+        )
 
     if args.skip_deploy:
         print("==============================")
@@ -1153,7 +1179,7 @@ def main() -> int:
         print("No image rebuild required from path filters (config-only or unrelated paths).")
         print("Registry deploy still pins images to this commit SHA.\n")
 
-    if target == "staging":
+    if target == "staging" or (target == "production" and direct_production):
         deploy_sha = adjust_deploy_sha_for_registry_images(
             repo,
             head_sha=sha,
@@ -1189,7 +1215,19 @@ def main() -> int:
 
     hub_prefix = remote_dockerhub_env_prefix() if target == "staging" else ""
 
-    if target == "production":
+    if target == "production" and direct_production:
+        if use_migrations and flags["migrations"]:
+            deploy_body = (
+                "chmod +x deployment/run-migrate-and-deploy.sh && "
+                f"bash deployment/run-migrate-and-deploy.sh {sha_q} {env_q}"
+            )
+        else:
+            deploy_body = (
+                "chmod +x deployment/deploy/deploy-from-registry.sh && "
+                f"bash deployment/deploy/deploy-from-registry.sh {sha_q} {env_q}"
+            )
+        deploy_label = "direct production deploy"
+    elif target == "production":
         deploy_body = (
             "chmod +x deployment/deploy/promote-to-production.sh && "
             f"bash deployment/deploy/promote-to-production.sh {sha_q} {env_q}"

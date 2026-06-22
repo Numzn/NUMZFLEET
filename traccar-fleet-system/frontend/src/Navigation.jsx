@@ -1,5 +1,5 @@
 import {
-  Route, Routes,
+  Navigate, Route, Routes,
   useSearchParams,
 } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -50,6 +50,7 @@ import CommandGroupPage from './settings/CommandGroupPage';
 import App from './App';
 import ChangeServerPage from './login/ChangeServerPage';
 import DevicesPage from './settings/DevicesPage';
+import TechnicianRoute from './common/components/TechnicianRoute';
 import ScheduledPage from './reports/ScheduledPage';
 import DeviceConnectionsPage from './settings/DeviceConnectionsPage';
 import GroupConnectionsPage from './settings/GroupConnectionsPage';
@@ -64,17 +65,23 @@ import { useLocalization } from './common/components/LocalizationProvider';
 import fetchOrThrow from './common/util/fetchOrThrow';
 import { traccarPath, traccarFetch } from './config/traccarApi.js';
 import AuditPage from './reports/AuditPage';
+import FuelOperationsReportPage from './reports/FuelOperationsReportPage';
 import ToastNotificationTest from './test/ToastNotificationTest';
-import FuelRequestsPage from './fuelRequests/FuelRequestsPage';
+import FuelRequestsRouteGuard from './fuelRequests/FuelRequestsRouteGuard';
 import VehiclesPage from './fleet/VehiclesPage';
 import VehicleDetailPage from './fleet/vehicleDetail/VehicleDetailPage';
 import VehicleSetupPage from './fleet/vehicleDetail/VehicleSetupPage';
 import VehicleImmobilizerPage from './fleet/vehicleDetail/VehicleImmobilizerPage';
-import OperationSessionsPage from './operationSessions/OperationSessionsPage';
+import OperationSessionsHistoryPage from './operationSessions/HistoryPage';
+import FuelOperationsLayout from './operationSessions/FuelOperationsLayout';
+import TodayOperationPage from './operationSessions/TodayOperationPage';
 import CreateSessionPage from './operationSessions/CreateSessionPage';
 import PlanningPage from './operationSessions/PlanningPage';
+import ForecastPage from './operationSessions/ForecastPage';
 import OperationRunPage from './operationSessions/OperationRunPage';
-import OperationSessionsHistoryPage from './operationSessions/HistoryPage';
+import FuelVehiclesRoute, { RunRedirect } from './operationSessions/FuelVehiclesRoute';
+import SmartInvoicesPage from './operationSessions/SmartInvoicesPage';
+import ReviewClosePage from './operationSessions/ReviewClosePage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -134,16 +141,24 @@ const Navigation = () => {
         <Route element={<UnifiedShell />}>
           <Route index element={<DashboardPage />} />
           <Route path="map" element={<LiveMapPage />} />
-          <Route path="fuel-requests" element={<FuelRequestsPage />} />
+          <Route path="fuel-requests" element={<FuelRequestsRouteGuard />} />
           <Route path="fleet/vehicles/:vehicleId/setup" element={<VehicleSetupPage />} />
           <Route path="fleet/vehicles/:vehicleId/immobilizer" element={<VehicleImmobilizerPage />} />
           <Route path="fleet/vehicles/:vehicleId" element={<VehicleDetailPage />} />
           <Route path="fleet/vehicles" element={<VehiclesPage />} />
-          <Route path="fleet/operation-sessions" element={<OperationSessionsPage />} />
+          <Route path="fleet/operation-sessions" element={<FuelOperationsLayout />}>
+            <Route index element={<TodayOperationPage />} />
+            <Route path="prepare" element={<ForecastPage />} />
+            <Route path="fuel" element={<FuelVehiclesRoute />} />
+            <Route path="fuel/:sessionId" element={<OperationRunPage />} />
+            <Route path="invoices" element={<SmartInvoicesPage />} />
+            <Route path="review" element={<ReviewClosePage />} />
+            <Route path="history" element={<OperationSessionsHistoryPage />} />
+            <Route path="forecast" element={<Navigate to="/fleet/operation-sessions/prepare" replace />} />
+            <Route path="run/:sessionId" element={<RunRedirect />} />
+          </Route>
           <Route path="fleet/operation-sessions/create" element={<CreateSessionPage />} />
           <Route path="fleet/operation-sessions/plan" element={<PlanningPage />} />
-          <Route path="fleet/operation-sessions/run/:sessionId" element={<OperationRunPage />} />
-          <Route path="fleet/operation-sessions/history" element={<OperationSessionsHistoryPage />} />
 
           <Route path="position/:id" element={<PositionPage />} />
           <Route path="network/:positionId" element={<NetworkPage />} />
@@ -165,12 +180,12 @@ const Navigation = () => {
           <Route path="attributes" element={<ComputedAttributesPage />} />
           <Route path="attribute/:id" element={<ComputedAttributePage />} />
           <Route path="attribute" element={<ComputedAttributePage />} />
-          <Route path="devices" element={<DevicesPage />} />
-          <Route path="device/:id/connections" element={<DeviceConnectionsPage />} />
-          <Route path="device/:id/command" element={<CommandDevicePage />} />
-          <Route path="device/:id/share" element={<SharePage />} />
-          <Route path="device/:id" element={<DevicePage />} />
-          <Route path="device" element={<DevicePage />} />
+          <Route path="devices" element={<TechnicianRoute><DevicesPage /></TechnicianRoute>} />
+          <Route path="device/:id/connections" element={<TechnicianRoute><DeviceConnectionsPage /></TechnicianRoute>} />
+          <Route path="device/:id/command" element={<TechnicianRoute><CommandDevicePage /></TechnicianRoute>} />
+          <Route path="device/:id/share" element={<TechnicianRoute><SharePage /></TechnicianRoute>} />
+          <Route path="device/:id" element={<TechnicianRoute><DevicePage /></TechnicianRoute>} />
+          <Route path="device" element={<TechnicianRoute><DevicePage /></TechnicianRoute>} />
           <Route path="drivers" element={<DriversPage />} />
           <Route path="driver/:id" element={<DriverPage />} />
           <Route path="driver" element={<DriverPage />} />
@@ -206,6 +221,7 @@ const Navigation = () => {
             <Route path="scheduled" element={<ScheduledPage />} />
             <Route path="statistics" element={<StatisticsPage />} />
             <Route path="audit" element={<AuditPage />} />
+            <Route path="fuel-operations" element={<FuelOperationsReportPage />} />
             <Route path="logs" element={<LogsPage />} />
           </Route>
         </Route>

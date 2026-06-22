@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
+import { lookupVehicleDisplay } from '../../fleet/display/resolveVehicleDisplay.js';
 
 /**
  * Fetch live validation data from the fuel-api when the dialog opens.
@@ -38,7 +38,7 @@ export const useFuelApprovalLiveData = ({ open, request, userId }) => {
 /**
  * Derive display values from the combination of request, device, position, and live validation data.
  */
-export const useFuelApprovalDerivedData = ({ request, device, latestPosition, validationData, approvedAmount }) => {
+export const useFuelApprovalDerivedData = ({ request, device, latestPosition, validationData, approvedAmount, vehicleDisplayRegistry }) => {
   return useMemo(() => {
     if (!request) {
       return {
@@ -50,7 +50,10 @@ export const useFuelApprovalDerivedData = ({ request, device, latestPosition, va
     }
 
     // Device / driver names
-    const deviceName = device?.name || request.deviceName || `Device ${request.deviceId}`;
+    const display = lookupVehicleDisplay(vehicleDisplayRegistry, request.deviceId, device);
+    const deviceName = display.secondary
+      ? `${display.primary} (${display.secondary})`
+      : display.primary;
     const driverName = request.driverName || request.driver || 'Unknown Driver';
 
     // Tank capacity: validation -> request snapshot -> device attribute -> null
@@ -106,5 +109,5 @@ export const useFuelApprovalDerivedData = ({ request, device, latestPosition, va
       safeApprovedAmount,
       approvedExceedsMax,
     };
-  }, [request, device, latestPosition, validationData, approvedAmount]);
+  }, [request, device, latestPosition, validationData, approvedAmount, vehicleDisplayRegistry]);
 };

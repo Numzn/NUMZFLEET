@@ -81,15 +81,22 @@ export default (sequelize) => {
       tenantId: {
         type: DataTypes.UUID,
         allowNull: true,
-        field: 'tenant_id',
+        field: 'company_id',
+      },
+      createdAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        field: 'created_at',
+      },
+      updatedAt: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        field: 'updated_at',
       },
     },
     {
       tableName: 'notifications',
-      underscored: true,
       timestamps: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
     },
   );
 

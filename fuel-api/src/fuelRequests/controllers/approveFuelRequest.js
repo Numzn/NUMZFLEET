@@ -1,4 +1,4 @@
-import { FuelRequest } from '../../models/index.js';
+import { findFuelRequestScoped } from '../scopeFuelRequest.js';
 import { emitDomainEvent } from '../../events/eventBus.js';
 import { EVENT_NAMES } from '../../events/eventNames.js';
 import { captureApprovalPriceSnapshot } from '../../services/fuelPriceSnapshotService.js';
@@ -11,7 +11,7 @@ export const approveFuelRequest = async (req, res) => {
     const { id } = req.params;
     const { notes, approvedAmount } = req.body;
 
-    const request = await FuelRequest.findByPk(id);
+    const request = await findFuelRequestScoped(req, id);
 
     if (!request) {
       console.error('❌ Fuel request not found:', id);

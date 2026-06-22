@@ -5,26 +5,47 @@ import VehicleModel from './Vehicle.js';
 import DeviceAssignmentModel from './DeviceAssignment.js';
 import OperationSessionModel from './OperationSession.js';
 import OperationSessionRefuelModel from './OperationSessionRefuel.js';
+import OperationAuditEventModel from './OperationAuditEvent.js';
+import OperationAdjustmentModel from './OperationAdjustment.js';
+import OperationUnlockModel from './OperationUnlock.js';
+import OperationSessionInvoiceModel from './OperationSessionInvoice.js';
 import UserNotificationModel from './UserNotification.js';
 import VehicleImmobilizationIntentModel from './VehicleImmobilizationIntent.js';
+import CompanyModel, { DEFAULT_COMPANY_ID } from './Company.js';
+import NumzUserModel from './NumzUser.js';
+import CompanyDeviceModel from './CompanyDevice.js';
+import ServiceRecordModel from './ServiceRecord.js';
 
-// Initialize models
 const FuelRequest = FuelRequestModel(sequelize);
 const VehicleSpec = VehicleSpecModel(sequelize);
 const Vehicle = VehicleModel(sequelize);
 const DeviceAssignment = DeviceAssignmentModel(sequelize);
 const OperationSession = OperationSessionModel(sequelize);
 const OperationSessionRefuel = OperationSessionRefuelModel(sequelize);
+const OperationAuditEvent = OperationAuditEventModel(sequelize);
+const OperationAdjustment = OperationAdjustmentModel(sequelize);
+const OperationUnlock = OperationUnlockModel(sequelize);
+const OperationSessionInvoice = OperationSessionInvoiceModel(sequelize);
 const UserNotification = UserNotificationModel(sequelize);
 const VehicleImmobilizationIntent = VehicleImmobilizationIntentModel(sequelize);
+const Company = CompanyModel(sequelize);
+const NumzUser = NumzUserModel(sequelize);
+const CompanyDevice = CompanyDeviceModel(sequelize);
+const ServiceRecord = ServiceRecordModel(sequelize);
 
-// Define associations
+Company.hasMany(Vehicle, { foreignKey: 'companyId' });
+Vehicle.belongsTo(Company, { foreignKey: 'companyId' });
+Company.hasMany(NumzUser, { foreignKey: 'companyId' });
+NumzUser.belongsTo(Company, { foreignKey: 'companyId' });
+Company.hasMany(CompanyDevice, { foreignKey: 'companyId' });
+CompanyDevice.belongsTo(Company, { foreignKey: 'companyId' });
+
 Vehicle.hasMany(DeviceAssignment, { foreignKey: 'vehicleId' });
 DeviceAssignment.belongsTo(Vehicle, { foreignKey: 'vehicleId' });
 Vehicle.hasMany(VehicleImmobilizationIntent, { foreignKey: 'vehicleId', as: 'immobilizationIntents' });
 VehicleImmobilizationIntent.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
-// VehicleSpec belongs to device (via deviceId)
-// FuelRequest belongs to device (via deviceId)
+Vehicle.hasMany(ServiceRecord, { foreignKey: 'fleetVehicleId', as: 'serviceRecords' });
+ServiceRecord.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
 OperationSession.hasMany(OperationSessionRefuel, {
   foreignKey: 'sessionId',
   as: 'refuels',
@@ -34,20 +55,41 @@ OperationSessionRefuel.belongsTo(OperationSession, {
   foreignKey: 'sessionId',
   as: 'session',
 });
+OperationSession.hasMany(OperationAuditEvent, {
+  foreignKey: 'operationId',
+  as: 'auditEvents',
+  onDelete: 'CASCADE',
+});
+OperationAuditEvent.belongsTo(OperationSession, { foreignKey: 'operationId', as: 'operation' });
+OperationSession.hasMany(OperationAdjustment, {
+  foreignKey: 'operationId',
+  as: 'adjustments',
+  onDelete: 'CASCADE',
+});
+OperationAdjustment.belongsTo(OperationSession, { foreignKey: 'operationId', as: 'operation' });
+OperationSession.hasMany(OperationUnlock, {
+  foreignKey: 'operationId',
+  as: 'unlocks',
+  onDelete: 'CASCADE',
+});
+OperationUnlock.belongsTo(OperationSession, { foreignKey: 'operationId', as: 'operation' });
+OperationSession.hasMany(OperationSessionInvoice, {
+  foreignKey: 'operationId',
+  as: 'invoices',
+  onDelete: 'CASCADE',
+});
+OperationSessionInvoice.belongsTo(OperationSession, { foreignKey: 'operationId', as: 'operation' });
 
-// Sync database (create tables if they don't exist)
 export const syncDatabase = async (force = false) => {
   try {
     const isDev = process.env.NODE_ENV === 'development';
-    
+
     if (isDev) {
       console.log('🔄 Starting database sync...');
     }
-    
-    // Test connection first
+
     await sequelize.authenticate();
-    
-    // Handle force mode
+
     if (force) {
       if (isDev) {
         console.log('⚠️ Force mode: Dropping and recreating all tables');
@@ -58,8 +100,7 @@ export const syncDatabase = async (force = false) => {
       }
       return true;
     }
-    
-    // Try sync without alter first (safer, creates tables if they don't exist)
+
     try {
       await sequelize.sync({ alter: false });
       if (isDev) {
@@ -67,67 +108,58 @@ export const syncDatabase = async (force = false) => {
       }
       return true;
     } catch (syncError) {
-      // If tables don't exist, use alter: true
-      if (syncError.name === 'SequelizeDatabaseError' || 
-          syncError.message?.includes('does not exist') ||
-          syncError.original?.code === '42P01') {
+      if (syncError.name === 'SequelizeDatabaseError'
+          || syncError.message?.includes('does not exist')
+          || syncError.original?.code === '42P01') {
         if (isDev) {
           console.log('ℹ️ Tables missing, creating them...');
         }
         await sequelize.sync({ alter: true });
-    if (isDev) {
-      console.log('✅ Database synchronized successfully');
-    }
-    return true;
-      }
-      
-      // For ENUM errors, log warning but continue (tables exist and are functional)
-      const isEnumError = syncError.message?.includes('ENUM') || 
-                          syncError.message?.includes('enum') ||
-                          syncError.sql?.includes('ALTER TYPE') ||
-                          syncError.original?.code === '42601' ||
-                          syncError.original?.message?.includes('ALTER TYPE');
-      
-      if (isEnumError) {
-        console.warn('⚠️ ENUM modification skipped (this is normal if ENUM values haven\'t changed):', syncError.message);
-        // Continue - tables exist and are functional
+        if (isDev) {
+          console.log('✅ Database synchronized successfully');
+        }
         return true;
       }
-      
-      // Re-throw other errors
+
+      const isEnumError = syncError.message?.includes('ENUM')
+        || syncError.message?.includes('enum')
+        || syncError.sql?.includes('ALTER TYPE')
+        || syncError.original?.code === '42601'
+        || syncError.original?.message?.includes('ALTER TYPE');
+
+      if (isEnumError) {
+        console.warn('⚠️ ENUM modification skipped (this is normal if ENUM values haven\'t changed):', syncError.message);
+        return true;
+      }
+
       throw syncError;
     }
   } catch (error) {
     console.error('❌ Database sync failed:', error.message);
-    
-    // Handle specific ENUM errors gracefully
-    const isEnumError = error.message?.includes('ENUM') || 
-                        error.message?.includes('enum') || 
-                        error.sql?.includes('ALTER TYPE') || 
-                        error.original?.code === '42601' ||
-                        error.original?.message?.includes('ALTER TYPE');
-    
+
+    const isEnumError = error.message?.includes('ENUM')
+      || error.message?.includes('enum')
+      || error.sql?.includes('ALTER TYPE')
+      || error.original?.code === '42601'
+      || error.original?.message?.includes('ALTER TYPE');
+
     if (isEnumError) {
       console.warn('⚠️ ENUM modification error (tables are functional, continuing):', error.message);
-      // Return true - tables exist and work, just ENUM modification failed
       return true;
     }
-    
-    // Don't crash the app for sync errors
+
     if (process.env.NODE_ENV === 'production') {
       console.log('⚠️ Continuing without database sync...');
       return false;
-    } else {
-      // In development, provide more details
-      console.error('Error details:', {
-        name: error.name,
-        parent: error.parent?.message,
-        original: error.original?.message,
-        sql: error.sql
-      });
-      // Return false instead of throwing to allow server to continue
-      return false;
     }
+
+    console.error('Error details:', {
+      name: error.name,
+      parent: error.parent?.message,
+      original: error.original?.message,
+      sql: error.sql,
+    });
+    return false;
   }
 };
 
@@ -138,10 +170,16 @@ export {
   DeviceAssignment,
   OperationSession,
   OperationSessionRefuel,
+  OperationAuditEvent,
+  OperationAdjustment,
+  OperationUnlock,
+  OperationSessionInvoice,
   UserNotification,
   VehicleImmobilizationIntent,
+  Company,
+  NumzUser,
+  CompanyDevice,
+  ServiceRecord,
+  DEFAULT_COMPANY_ID,
 };
 export default sequelize;
-
-
-

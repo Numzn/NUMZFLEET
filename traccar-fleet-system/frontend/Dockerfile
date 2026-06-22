@@ -10,8 +10,10 @@ ARG BUILD_REF=local
 # Baked into the SPA for production (override in CI with build-args if the public URL changes).
 ARG VITE_API_BASE_URL=https://numz.site
 ARG VITE_TRACCAR_PREFIX=/traccar
+ARG VITE_FLEET_COMMAND_SHEET=1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_TRACCAR_PREFIX=$VITE_TRACCAR_PREFIX
+ENV VITE_FLEET_COMMAND_SHEET=$VITE_FLEET_COMMAND_SHEET
 RUN echo "build:${BUILD_REF}" && npm run build
 
 FROM nginx:alpine

@@ -5,6 +5,7 @@ import {
   getIntentHistory,
   getCapabilitiesForDevice,
 } from '../services/immobilizationIntentService.js';
+import { assertVehicleInTenant } from '../services/vehicleFleetService.js';
 import { isTraccarCommandApiConfigured } from '../services/traccarCommandService.js';
 import { DeviceAssignment } from '../models/index.js';
 import { dbErrorMessage } from '../utils/dbErrorMessage.js';
@@ -19,6 +20,7 @@ async function resolveDeviceIdForVehicle(vehicleId) {
 export const getCapabilities = async (req, res) => {
   try {
     const { vehicleId } = req.params;
+    await assertVehicleInTenant(vehicleId, req.auth?.companyId);
     const deviceId = await resolveDeviceIdForVehicle(vehicleId);
     if (deviceId == null) {
       return res.json({
@@ -42,6 +44,7 @@ export const getCapabilities = async (req, res) => {
 
 export const getActive = async (req, res) => {
   try {
+    await assertVehicleInTenant(req.params.vehicleId, req.auth?.companyId);
     const intent = await getActiveIntent(req.params.vehicleId);
     return res.json({ intent });
   } catch (error) {
@@ -54,6 +57,7 @@ export const getActive = async (req, res) => {
 
 export const listHistory = async (req, res) => {
   try {
+    await assertVehicleInTenant(req.params.vehicleId, req.auth?.companyId);
     const limit = req.query.limit != null ? parseInt(req.query.limit, 10) : 20;
     const intents = await getIntentHistory(req.params.vehicleId, limit);
     return res.json({ intents });
@@ -67,6 +71,7 @@ export const listHistory = async (req, res) => {
 
 export const create = async (req, res) => {
   try {
+    await assertVehicleInTenant(req.params.vehicleId, req.auth?.companyId);
     const { action } = req.body || {};
     if (action !== 'immobilize' && action !== 'mobilize') {
       return res.status(400).json({ error: 'action must be immobilize or mobilize' });
@@ -85,6 +90,7 @@ export const create = async (req, res) => {
 
 export const cancel = async (req, res) => {
   try {
+    await assertVehicleInTenant(req.params.vehicleId, req.auth?.companyId);
     const intent = await cancelIntent(req.params.intentId, req.user);
     if (intent.vehicleId !== req.params.vehicleId) {
       return res.status(404).json({ error: 'Intent not found for this vehicle' });

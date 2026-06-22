@@ -60,7 +60,6 @@ function formFromVehicle(vehicle, formDraft) {
     lPer100km:
       eff != null && Number(eff) > 0 ? String(Math.round((100 / Number(eff)) * 10) / 10) : '',
     updateIntervalSec: fleet?.updateIntervalSec != null ? String(fleet.updateIntervalSec) : '10',
-    geofenceEnabled: fleetBool(fleet?.geofenceEnabled, false),
     geofenceRadiusM: fleet?.geofenceRadiusM != null ? String(fleet.geofenceRadiusM) : '300',
     alGeo: fleet?.alerts?.geofence !== false,
   };
@@ -272,11 +271,17 @@ export function computeVehicleSetupReadiness({
       detail: 'Link a tracker to configure alert preferences.',
     });
   } else {
+    const alertParts = [];
+    if (form.alLow !== false) alertParts.push('low fuel');
+    if (form.alSpeed !== false) alertParts.push('speeding');
+    if (form.alCut) alertParts.push('engine cut');
     modules.push({
       id: SETUP_MODULE_IDS.alerts,
-      status: 'optional',
-      label: 'Alert preferences',
-      detail: 'Defaults apply; adjust switches below as needed.',
+      status: 'complete',
+      label: 'Alert preferences set',
+      detail: alertParts.length
+        ? `Monitoring: ${alertParts.join(', ')}. Geofence alerts are under Zones & Boundaries.`
+        : 'All optional alerts off. Geofence alerts are under Zones & Boundaries.',
     });
   }
 

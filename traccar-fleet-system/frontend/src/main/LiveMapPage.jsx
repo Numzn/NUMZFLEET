@@ -8,20 +8,20 @@ import { useTheme } from '@mui/material/styles';
 import { devicesActions, fleetInteractionActions } from '../store';
 import { selectAllNotifications } from '../store/notifications/notificationSelectors.js';
 import usePersistedState from '../common/util/usePersistedState';
-import { useManager } from '../common/util/permissions';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
 import MapDevicePopup from './components/MapDevicePopup';
-import { fetchVehicles } from '../fleet/vehiclesApi.js';
+import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
 import { useLiveMapChrome } from './fleet/LiveMapChromeContext';
+import FleetCommandSheet from './fleet/FleetCommandSheet';
+import { isFleetCommandSheetEnabled, setFleetSheetHeightCssVar } from './fleet/fleetSheetConstants';
+import useDriverPhonesByDeviceId from './fleet/mobile/useDriverPhonesByDeviceId';
 
 const LiveMapPage = () => {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const dispatch = useDispatch();
   const { setLiveMapChrome } = useLiveMapChrome();
-  const manager = useManager();
-  const user = useSelector((state) => state.session.user);
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
   const positions = useSelector((state) => state.session.positions);
   const devices = useSelector((state) => state.devices.items);
@@ -30,10 +30,11 @@ const LiveMapPage = () => {
   const fleetWorkspaceMode = useSelector((state) => state.fleetInteraction.fleetWorkspaceMode);
   const searchQuery = useSelector((state) => state.fleetInteraction.searchQuery);
   const allNotifications = useSelector(selectAllNotifications);
+  const sheetCommandEnabled = isFleetCommandSheetEnabled() && !desktop;
 
   const [filteredPositions, setFilteredPositions] = useState([]);
   const [filteredDevices, setFilteredDevices] = useState([]);
-  const [deviceFleetVehicleIdByDeviceId, setDeviceFleetVehicleIdByDeviceId] = useState({});
+  const { fleetVehicleIdByDeviceId: deviceFleetVehicleIdByDeviceId } = useVehicleDisplayContext();
   const selectedPosition = useMemo(
     () => (selectedDeviceId != null ? positions[selectedDeviceId] : undefined),
     [positions, selectedDeviceId],
@@ -121,32 +122,6 @@ const LiveMapPage = () => {
     alertDeviceIds,
   );
 
-  useEffect(() => {
-    if (!manager || !user) {
-      setDeviceFleetVehicleIdByDeviceId({});
-      return undefined;
-    }
-    let cancelled = false;
-    fetchVehicles(user)
-      .then((rows) => {
-        if (cancelled || !Array.isArray(rows)) return;
-        const m = {};
-        rows.forEach((row) => {
-          const deviceId = row.assignment?.deviceId;
-          if (deviceId != null) {
-            m[Number(deviceId)] = row.id;
-          }
-        });
-        setDeviceFleetVehicleIdByDeviceId(m);
-      })
-      .catch(() => {
-        if (!cancelled) setDeviceFleetVehicleIdByDeviceId({});
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [manager, user]);
-
   const handleClosePopup = useCallback(() => {
     dispatch(devicesActions.selectId(null));
   }, [dispatch]);
@@ -207,8 +182,15 @@ const LiveMapPage = () => {
 
   useLayoutEffect(() => {
     setLiveMapChrome({ sidebarFleetProps });
-    return () => setLiveMapChrome(null);
+    return () => {
+      setLiveMapChrome(null);
+      setFleetSheetHeightCssVar(0);
+    };
   }, [setLiveMapChrome, sidebarFleetProps]);
+
+  const { phoneByDeviceId } = useDriverPhonesByDeviceId(
+    sheetCommandEnabled ? filteredDevices : [],
+  );
 
   const mapColumn = (
     <Box sx={{ position: 'relative', flex: 1, minHeight: 0, width: '100%' }}>
@@ -216,6 +198,15 @@ const LiveMapPage = () => {
         filteredPositions={filteredPositions}
         selectedPosition={selectedPosition}
       />
+      {sheetCommandEnabled && (
+        <FleetCommandSheet
+          deviceStats={deviceStats}
+          devices={filteredDevices}
+          positions={positions}
+          deviceFleetVehicleIdByDeviceId={deviceFleetVehicleIdByDeviceId}
+          phoneByDeviceId={phoneByDeviceId}
+        />
+      )}
       {!desktop && selectedDeviceId && selectedPosition && devices[selectedDeviceId] && (
         <MapDevicePopup
           device={devices[selectedDeviceId]}

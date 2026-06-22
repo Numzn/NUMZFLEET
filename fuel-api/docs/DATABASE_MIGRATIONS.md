@@ -2,6 +2,39 @@
 
 This service uses SQL migration files under `fuel-api/migrations/` and Sequelize `sync` on startup when PostgreSQL is reachable.
 
+## Apply all migrations (local Docker — recommended)
+
+With the stack up (`docker compose up -d db` or full `.\rebuild-stack.ps1`):
+
+```powershell
+.\fuel-api\scripts\apply-fuel-migrations.ps1
+```
+
+This runs every migration in deploy order (idempotent). Production/staging use the same list in `deployment/run-migrate-and-deploy.sh`.
+
+## If you see `column "company_id" does not exist`
+
+Fleet vehicles and other fuel-api routes scope data by `company_id`. That column comes from **`20260616_multi_tenant_foundation.sql`**.
+
+**Fix:** run the full migration script above, or only:
+
+```powershell
+docker cp fuel-api/migrations/20260616_multi_tenant_foundation.sql numzfleet-db-1:/tmp/m.sql
+docker exec numzfleet-db-1 psql -U numztrak -d numztrak_fuel -v ON_ERROR_STOP=1 -f /tmp/m.sql
+```
+
+(Adjust container name if yours differs — `docker ps` and set `$env:POSTGRES_CONTAINER`.)
+
+Verify:
+
+```powershell
+docker exec numzfleet-db-1 psql -U numztrak -d numztrak_fuel -c "\d vehicles"
+```
+
+Expect a `company_id` UUID column. Existing rows are backfilled to the default company `00000000-0000-0000-0000-000000000001`.
+
+See also: [ACCOUNTS_AND_TENANCY.md](./ACCOUNTS_AND_TENANCY.md).
+
 ## If you see `relation "operation_sessions" does not exist`
 
 The production database never had these tables (common if the API once started **degraded** while Traccar MySQL was down: older code skipped Postgres `sync` entirely). **Fix:** create tables, then restart the backend.
@@ -46,6 +79,16 @@ psql "postgresql://numztrak:<password>@<host>:5432/numztrak_fuel" -f "C:\Users\N
 ## Why these migrations are safe to re-run
 
 `20260503_create_operation_sessions_tables.sql` uses `IF NOT EXISTS` for tables and indexes. `20260427_daily_intelligent_refueling.sql` uses `IF NOT EXISTS` for new columns and indexes where applicable, so repeated execution is idempotent for those objects.
+
+## Fuel Operations Phase 1
+
+`20260620_fuel_operations_phase1.sql` adds the Fuel Day station name and per-fuel-type ERB price snapshots (`stationName`, `approvedDieselPrice`, `approvedPetrolPrice` on `operation_sessions`), a `fuelTypeSnapshot` column on `operation_session_refuels`, the `operation_session_invoices` reconciliation table, and verified-odometer baseline columns on `vehicle_specs` (`verifiedOdometerKm`, `verifiedOdometerAt`, `verifiedOdometerSource`, `verifiedTraccarDistance`). It is idempotent and included in the apply scripts and deploy migration list.
+
+## Fueling Day multi-invoice + arrived
+
+`20260621_fueling_day_multi_invoice_arrived.sql` lets a single Fuel Day carry several Smart Invoices: it removes the 1:1 unique index/constraint on `operation_session_invoices."operationId"` and replaces it with a plain lookup index, and it adds `operation_session_refuels."arrivedAt"` so a vehicle can be marked as arrived at the pump before fuel is recorded. It is idempotent and included in the apply scripts and deploy migration list.
+
+Note: the deploy safety guard (`forbidden_sql_check` in `deployment/run-migrate-and-deploy*.sh`) blocks destructive statements (`TRUNCATE` and `DROP TABLE/DATABASE/SCHEMA/COLUMN/TYPE`) but permits non-destructive `DROP INDEX` / `DROP CONSTRAINT`, which this migration relies on.
 
 ## Notification inbox (PR1)
 

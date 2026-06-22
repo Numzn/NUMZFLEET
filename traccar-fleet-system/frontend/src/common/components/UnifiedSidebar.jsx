@@ -41,7 +41,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from './UserMenuDropdown';
 import usePersistedState from '../util/usePersistedState';
-import { useAdministrator, useManager, useRestriction } from '../util/permissions';
+import { useAdministrator, useManager, useRestriction, useTechnician } from '../util/permissions';
 import useFeatures from '../util/useFeatures';
 import LogoImage from '../../login/LogoImage';
 import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
@@ -205,6 +205,7 @@ const UnifiedSidebar = ({
 
   const readonly = useRestriction('readonly');
   const admin = useAdministrator();
+  const technician = useTechnician();
   const manager = useManager();
   const features = useFeatures();
   const userId = useSelector((state) => state.session.user.id);
@@ -285,6 +286,14 @@ const UnifiedSidebar = ({
           path: '/settings/commands',
           icon: SendIcon,
           activeMatch: (path) => path.startsWith('/settings/command'),
+        });
+      }
+      if (technician) {
+        out.push({
+          title: t('deviceTitle'),
+          path: '/settings/devices',
+          icon: BuildIcon,
+          activeMatch: (path) => path.startsWith('/settings/device'),
         });
       }
     }
@@ -372,10 +381,13 @@ const UnifiedSidebar = ({
           show: !readonly,
           badge: pendingFuelCount > 0 ? pendingFuelCount : undefined,
           children: [
-            { title: 'Requests', path: '/fuel-requests' },
-            { title: 'Sessions', path: '/fleet/operation-sessions' },
-            { title: 'New session', path: '/fleet/operation-sessions/create' },
-          ],
+            {
+              title: 'Fueling Day',
+              path: '/fleet/operation-sessions',
+              activeMatch: (path) => path.startsWith('/fleet/operation-sessions'),
+            },
+            { title: 'Driver requests', path: '/fuel-requests', show: features.enableFuelRequests },
+          ].filter((c) => c.show !== false),
         },
       ].filter((i) => i.show !== false),
     },
@@ -385,6 +397,7 @@ const UnifiedSidebar = ({
       items: [
         { title: 'Analytics', path: '/reports/statistics', icon: InsightsOutlinedIcon },
         { title: 'Reports', path: '/reports/summary', icon: BarChartOutlinedIcon },
+        { title: 'Fuel reports', path: '/reports/fuel-operations', icon: LocalGasStationOutlinedIcon },
       ],
     },
     {
@@ -454,6 +467,7 @@ const UnifiedSidebar = ({
     const tooltip = buildTooltip(item);
 
     const go = () => {
+      if (item.disabled) return;
       if (item.external && item.href) {
         window.open(item.href, '_blank', 'noopener,noreferrer');
         onNavigate?.();
@@ -462,11 +476,16 @@ const UnifiedSidebar = ({
       handleGo(item.path);
     };
 
+    const tooltipTitle = item.disabled && item.disabledTooltip
+      ? item.disabledTooltip
+      : tooltip;
+
     const button = (
       <ListItemButton
         key={`${keyPrefix}${item.title}`}
         className={`${classes.menuItem} ${dense ? classes.subMenuItem : ''} ${active ? classes.menuItemActive : ''}`}
         onClick={go}
+        disabled={item.disabled}
         sx={{
           justifyContent: collapsed ? 'center' : 'flex-start',
           px: collapsed ? 1 : undefined,
@@ -490,9 +509,9 @@ const UnifiedSidebar = ({
     return (
       <Tooltip
         key={`${keyPrefix}${item.title}-tt`}
-        title={tooltip}
+        title={tooltipTitle}
         placement="right"
-        disableHoverListener={!collapsed}
+        disableHoverListener={!collapsed && !item.disabled}
       >
         <Box>
           {button}

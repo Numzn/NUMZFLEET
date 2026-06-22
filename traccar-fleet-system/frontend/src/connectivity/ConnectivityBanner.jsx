@@ -42,12 +42,17 @@ function ConnectivityStrip({ kind, label }) {
   );
 }
 
-function readBottomNavInsetPx() {
+function readBottomChromeInsetPx() {
   if (typeof document === 'undefined') return 0;
   try {
-    const raw = getComputedStyle(document.documentElement).getPropertyValue('--app-bottomnav-height');
-    const n = parseFloat(String(raw).trim());
-    return Number.isFinite(n) ? n : 0;
+    const styles = getComputedStyle(document.documentElement);
+    const navRaw = styles.getPropertyValue('--app-bottomnav-height');
+    const sheetRaw = styles.getPropertyValue('--fleet-sheet-height');
+    const nav = parseFloat(String(navRaw).trim());
+    const sheet = parseFloat(String(sheetRaw).trim());
+    const navPx = Number.isFinite(nav) ? nav : 0;
+    const sheetPx = Number.isFinite(sheet) ? sheet : 0;
+    return Math.max(navPx, sheetPx);
   } catch {
     return 0;
   }
@@ -65,16 +70,18 @@ const ConnectivityBanner = () => {
   const wasDownRef = useRef(false);
 
   useLayoutEffect(() => {
-    setBottomNavInset(readBottomNavInsetPx());
+    setBottomNavInset(readBottomChromeInsetPx());
   }, [pathname]);
 
   useLayoutEffect(() => {
-    const sync = () => setBottomNavInset(readBottomNavInsetPx());
+    const sync = () => setBottomNavInset(readBottomChromeInsetPx());
     window.addEventListener('resize', sync);
+    window.addEventListener('fleet-sheet-height', sync);
     const vv = window.visualViewport;
     vv?.addEventListener('resize', sync);
     return () => {
       window.removeEventListener('resize', sync);
+      window.removeEventListener('fleet-sheet-height', sync);
       vv?.removeEventListener('resize', sync);
     };
   }, []);

@@ -81,11 +81,11 @@ export async function persistFuelSocketEvent({ kind, request, change, actorUserI
 }
 
 export async function listForRequestUser(req) {
-  return repo.listNotificationsForUser(req.user.id, req.query || {});
+  return repo.listNotificationsForUser(req.user.id, req.query || {}, req.auth?.companyId);
 }
 
 export async function syncForRequestUser(req) {
-  return repo.syncNotificationsForUser(req.user.id, req.query || {});
+  return repo.syncNotificationsForUser(req.user.id, req.query || {}, req.auth?.companyId);
 }
 
 export async function markRead(req) {

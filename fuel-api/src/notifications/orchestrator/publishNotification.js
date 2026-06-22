@@ -1,5 +1,6 @@
 import * as repo from '../../modules/notifications/notificationRepository.js';
 import { CHANNELS } from '../contracts/notificationContract.js';
+import { DEFAULT_COMPANY_ID } from '../../models/index.js';
 import { resolveAudience } from './audienceResolver.js';
 import { dispatchNotificationChannels } from '../dispatcher/notificationDispatcher.js';
 import { createNotification } from '../canonicalNotification.js';
@@ -40,6 +41,7 @@ export async function publishNotification(spec, ctx = {}) {
     metadata,
     read: false,
     archived: false,
+    tenantId: spec.companyId || metadata?.companyId || DEFAULT_COMPANY_ID,
     clientDedupKey: `${userId}:${clientDedupKey}`,
   }));
 

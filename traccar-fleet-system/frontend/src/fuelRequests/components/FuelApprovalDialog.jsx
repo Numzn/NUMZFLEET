@@ -11,6 +11,7 @@ import { errorsActions } from '../../store';
 import { useFuelApprovalDialogStyles } from './FuelApprovalDialog.styles';
 import { DecisionHeader, LiveDataCard, RecommendationCard, ApprovalAmountSection, NotesSection, ValidationAlerts } from './FuelApprovalDialog.sections';
 import { useFuelApprovalLiveData, useFuelApprovalDerivedData } from './FuelApprovalDialog.data';
+import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 
 const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => {
   const { classes } = useFuelApprovalDialogStyles();
@@ -30,6 +31,7 @@ const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => 
     setValidationData,
     setValidationError,
   } = useFuelApprovalLiveData({ open, request, userId: user?.id });
+  const { byDeviceId } = useVehicleDisplayContext();
 
   const derived = useFuelApprovalDerivedData({
     request,
@@ -37,6 +39,7 @@ const FuelApprovalDialog = ({ open, onClose, request, onApprove, onReject }) => 
     latestPosition,
     validationData,
     approvedAmount,
+    vehicleDisplayRegistry: byDeviceId,
   });
 
   useEffect(() => {

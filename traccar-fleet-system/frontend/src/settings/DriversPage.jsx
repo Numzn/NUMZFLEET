@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { traccarPath } from '../config/traccarApi.js';
 
 import {
@@ -17,6 +18,9 @@ const DriversPage = () => {
   const { classes } = useSettingsStyles();
   const t = useTranslation();
 
+  const devices = useSelector((state) => state.devices.items);
+  const positions = useSelector((state) => state.session.positions);
+
   const [timestamp, setTimestamp] = useState(Date.now());
   const [items, setItems] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -32,6 +36,19 @@ const DriversPage = () => {
     }
   }, [timestamp]);
 
+  // Map a driver's uniqueId → the vehicle currently reporting it (Traccar tags
+  // the live position with `attributes.driverUniqueId`).
+  const vehicleByDriverUniqueId = useMemo(() => {
+    const map = {};
+    Object.values(positions || {}).forEach((position) => {
+      const driverUniqueId = position?.attributes?.driverUniqueId;
+      if (driverUniqueId == null) return;
+      const device = devices?.[position.deviceId];
+      if (device) map[String(driverUniqueId)] = device.name || device.uniqueId || `#${device.id}`;
+    });
+    return map;
+  }, [devices, positions]);
+
   return (
     <>
       <SearchHeader keyword={searchKeyword} setKeyword={setSearchKeyword} />
@@ -40,6 +57,8 @@ const DriversPage = () => {
           <TableRow>
             <TableCell>{t('sharedName')}</TableCell>
             <TableCell>{t('deviceIdentifier')}</TableCell>
+            <TableCell>Phone</TableCell>
+            <TableCell>Current vehicle</TableCell>
             <TableCell className={classes.columnAction} />
           </TableRow>
         </TableHead>
@@ -48,11 +67,13 @@ const DriversPage = () => {
             <TableRow key={item.id}>
               <TableCell>{item.name}</TableCell>
               <TableCell>{item.uniqueId}</TableCell>
+              <TableCell>{item.attributes?.phone || '—'}</TableCell>
+              <TableCell>{vehicleByDriverUniqueId[String(item.uniqueId)] || '—'}</TableCell>
               <TableCell className={classes.columnAction} padding="none">
                 <CollectionActions itemId={item.id} editPath="/settings/driver" endpoint="drivers" setTimestamp={setTimestamp} />
               </TableCell>
             </TableRow>
-          )) : (<TableShimmer columns={3} endAction />)}
+          )) : (<TableShimmer columns={5} endAction />)}
         </TableBody>
       </Table>
       <CollectionFab editPath="/settings/driver" />

@@ -21,6 +21,10 @@ import {
   FLEET_SIDEBAR_RAIL_WIDTH_PX,
   FLEET_SIDEBAR_WIDTH_PX,
 } from './fleet/fleetLayoutConstants';
+import {
+  getSheetHeightPx,
+  isFleetCommandSheetEnabled,
+} from './fleet/fleetSheetConstants';
 
 const MainMap = ({ filteredPositions, selectedPosition }) => {
   const theme = useTheme();
@@ -28,10 +32,14 @@ const MainMap = ({ filteredPositions, selectedPosition }) => {
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const sidebarCollapsed = useSelector((s) => s.fleetInteraction.sidebarCollapsed);
   const hoveredDeviceId = useSelector((s) => s.fleetInteraction.hoveredDeviceId);
+  const sheetLevel = useSelector((s) => s.fleetInteraction.sheetLevel);
 
   const sidebarInsetPx = desktop
     ? (sidebarCollapsed ? FLEET_SIDEBAR_RAIL_WIDTH_PX : FLEET_SIDEBAR_WIDTH_PX)
     : 0;
+
+  const sheetEnabled = isFleetCommandSheetEnabled() && !desktop;
+  const sheetInsetPx = sheetEnabled ? getSheetHeightPx(sheetLevel) : 0;
 
   const onMarkerClick = useCallback((_, deviceId) => {
     dispatch(devicesActions.selectId(deviceId));
@@ -50,7 +58,7 @@ const MainMap = ({ filteredPositions, selectedPosition }) => {
   return (
     <MapErrorBoundary>
       <MapView>
-        <MapChromePadding sidebarInset={sidebarInsetPx} />
+        <MapChromePadding sidebarInset={sidebarInsetPx} sheetInsetPx={sheetInsetPx} />
         <MapOverlay />
         <MapGeofence />
         <MapAccuracy positions={filteredPositions} />

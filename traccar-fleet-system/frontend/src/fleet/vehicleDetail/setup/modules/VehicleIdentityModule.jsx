@@ -4,6 +4,7 @@ import {
   MenuItem,
   Select,
   TextField,
+  Typography,
 } from '@mui/material';
 import { VEHICLE_TYPES } from '../../vehicleDetailSections.js';
 
@@ -34,7 +35,6 @@ export default function VehicleIdentityModule({ form, patch, canSaveSpecs }) {
           label="Vehicle type"
           value={form.vehicleType}
           onChange={(e) => patch({ vehicleType: e.target.value })}
-          disabled={!canSaveSpecs}
         >
           {VEHICLE_TYPES.map((o) => (
             <MenuItem key={o.value} value={o.value}>
@@ -42,6 +42,11 @@ export default function VehicleIdentityModule({ form, patch, canSaveSpecs }) {
             </MenuItem>
           ))}
         </Select>
+        {!canSaveSpecs && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+            You can choose a type now; it is saved when a tracker is linked.
+          </Typography>
+        )}
       </FormControl>
     </>
   );

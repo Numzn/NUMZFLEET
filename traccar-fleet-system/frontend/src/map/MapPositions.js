@@ -8,6 +8,7 @@ import { mapIconKey } from './core/preloadImages';
 import { useAttributePreference } from '../common/util/preferences';
 import { useCatchCallback } from '../reactHelper';
 import { findFonts } from './core/mapUtil';
+import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
 
 const MapPositions = ({ positions, onMapClick, onMarkerClick, showStatus, selectedPosition, titleField }) => {
   const id = useId();
@@ -23,13 +24,15 @@ const MapPositions = ({ positions, onMapClick, onMarkerClick, showStatus, select
 
   const devices = useSelector((state) => state.devices.items);
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
+  const { getDisplayForDevice } = useVehicleDisplayContext();
 
   const mapCluster = useAttributePreference('mapCluster', true);
   const directionType = useAttributePreference('mapDirection', 'selected');
 
   const createFeature = (devices, position, selectedPositionId) => {
     const device = devices[position.deviceId];
-    const displayName = device?.attributes?.vehicleName || device?.name || `Device ${position.deviceId}`;
+    const display = getDisplayForDevice(position.deviceId, device);
+    const displayName = display.primary;
     let showDirection;
     switch (directionType) {
       case 'none':

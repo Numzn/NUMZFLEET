@@ -7,8 +7,9 @@ import {
 
 export { summarizeTotalsFromRefuels } from '../intelligence/AggregationEngine.js';
 
-export async function calculateSessionTotals(sessionId) {
-  const refuels = await listBySessionId(sessionId);
+export async function calculateSessionTotals(sessionId, transaction) {
+  const options = transaction ? { transaction } : {};
+  const refuels = await listBySessionId(sessionId, options);
   return summarizeTotalsFromRefuels(refuels);
 }
 

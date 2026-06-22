@@ -70,14 +70,14 @@ forbidden_sql_check() {
       close $fh;
       s/--[^\n]*//g;
       s/\/\*.*?\*\///gs;
-      if (/\bDROP\b/i || /\bTRUNCATE\b/i) {
-        print STDERR "[migrate-deploy-staging] ERROR: forbidden SQL token in $fn\n";
+      if (/\bDROP\s+(TABLE|DATABASE|SCHEMA|COLUMN|TYPE)\b/i || /\bTRUNCATE\b/i) {
+        print STDERR "[migrate-deploy-staging] ERROR: forbidden destructive SQL in $fn\n";
         exit 1;
       }
       exit 0;
     ' -- "$f" || return 1
   else
-    if grep -vE '^[[:space:]]*--' "$f" | grep -vE '^[[:space:]]*$' | grep -qiE '(^|[^a-zA-Z_])(DROP|TRUNCATE)([^a-zA-Z_]|$)'; then
+    if grep -vE '^[[:space:]]*--' "$f" | grep -vE '^[[:space:]]*$' | grep -qiE '(^|[^a-zA-Z_])(DROP[[:space:]]+(TABLE|DATABASE|SCHEMA|COLUMN|TYPE)|TRUNCATE)([^a-zA-Z_]|$)'; then
       return 1
     fi
   fi
@@ -100,6 +100,12 @@ run_migrations() {
     "$MIGRATIONS_DIR/20260522_notifications_dedup_and_bridge.sql"
     "$MIGRATIONS_DIR/20260520_vehicle_immobilization_intents.sql"
     "$MIGRATIONS_DIR/20260521_immobilization_execution_integrity.sql"
+    "$MIGRATIONS_DIR/20260613_operational_day_model.sql"
+    "$MIGRATIONS_DIR/20260616_multi_tenant_foundation.sql"
+    "$MIGRATIONS_DIR/20260619_service_records.sql"
+    "$MIGRATIONS_DIR/20260620_fuel_operations_phase1.sql"
+    "$MIGRATIONS_DIR/20260621_fueling_day_multi_invoice_arrived.sql"
+    "$MIGRATIONS_DIR/20260622_invoice_attachment_url.sql"
   )
   local f
   for f in "${files[@]}"; do

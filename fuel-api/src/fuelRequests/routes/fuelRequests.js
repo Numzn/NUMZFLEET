@@ -11,6 +11,7 @@ import {
 } from '../controllers/index.js';
 import { authenticate } from '../../middleware/auth.js';
 import { requireAuth, requireManager } from '../../middleware/authGates.js';
+import { attachTenantContext } from '../../middleware/tenantContext.js';
 
 const router = express.Router();
 
@@ -21,6 +22,7 @@ router.get('/health', (req, res) => {
 
 // All routes require authentication
 router.use(authenticate);
+router.use(attachTenantContext);
 
 // List fuel requests (filtered by role automatically)
 router.get('/', requireAuth, listFuelRequests);

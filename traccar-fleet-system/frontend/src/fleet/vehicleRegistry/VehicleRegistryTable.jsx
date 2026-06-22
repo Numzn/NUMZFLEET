@@ -16,9 +16,10 @@ import {
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LinkIcon from '@mui/icons-material/Link';
 import {
-  getDeviceLabel,
+  getTrackerLinkLabel,
   getSetupChipProps,
   getStatusChipProps,
+  getVehicleRegistryLines,
 } from './vehicleRegistryUtils';
 
 const tableSx = {
@@ -41,7 +42,7 @@ const VehicleRegistryTable = ({
       <TableHead>
         <TableRow>
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Vehicle</TableCell>
-          <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Device</TableCell>
+          <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Tracker</TableCell>
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Status</TableCell>
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Setup</TableCell>
           <TableCell align="right" sx={{ fontWeight: 600, py: 1.25 }}>Actions</TableCell>
@@ -60,19 +61,22 @@ const VehicleRegistryTable = ({
           rows.map((row) => {
             const statusChip = getStatusChipProps(row);
             const setupChip = getSetupChipProps(row);
+            const { primary, secondary } = getVehicleRegistryLines(row);
             return (
               <TableRow key={row.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
                 <TableCell sx={{ py: 1.25, maxWidth: 220 }}>
                   <Typography variant="body2" fontWeight={700} noWrap>
-                    {row.name}
+                    {primary}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'var(--color-text-secondary)' }} noWrap>
-                    {row.plateNumber || 'No plate'}
-                  </Typography>
+                  {secondary ? (
+                    <Typography variant="caption" sx={{ color: 'var(--color-text-secondary)' }} noWrap>
+                      {secondary}
+                    </Typography>
+                  ) : null}
                 </TableCell>
                 <TableCell sx={{ py: 1.25 }}>
                   <Typography variant="body2" noWrap>
-                    {getDeviceLabel(row) || '—'}
+                    {getTrackerLinkLabel(row)}
                   </Typography>
                 </TableCell>
                 <TableCell sx={{ py: 1.25 }}>

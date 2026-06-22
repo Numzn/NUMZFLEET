@@ -5,6 +5,7 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import WarningIcon from '@mui/icons-material/Warning';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import ModernKPICard from './ModernKPICard';
+import { isPendingFuelStatus } from '../../fuelRequests/fuelRequestStatus';
 
 // Removed useStyles - using ModernKPICard instead
 
@@ -54,10 +55,7 @@ const KPICards = ({ devices, positions }) => {
   // Calculate fuel statistics from live request data
   const fuelStats = useMemo(() => {
     const requests = Object.values(fuelRequests);
-    const pendingRequests = requests.filter((request) => {
-      const status = request.status?.toLowerCase?.() || '';
-      return status === 'pending' || status === 'submitted' || status === 'awaiting_approval';
-    }).length;
+    const pendingRequests = requests.filter((request) => isPendingFuelStatus(request.status)).length;
 
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();

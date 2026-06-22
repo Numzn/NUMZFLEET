@@ -19,6 +19,26 @@ export function resolveFuelTypeKey(rawFuelType) {
   return map[key] ?? DEFAULT_FUEL_TYPE;
 }
 
+/**
+ * Resolve per-litre ERB prices for the given fuel types (defaults to diesel +
+ * petrol). Returns a plain map keyed by the normalized fuel type with a
+ * `priceFor(rawFuelType)` helper that falls back to diesel.
+ */
+export async function getErbPriceMap(fuelTypes = ['diesel', 'petrol']) {
+  const keys = [...new Set(fuelTypes.map((t) => resolveFuelTypeKey(t)))];
+  const entries = await Promise.all(
+    keys.map(async (key) => [key, (await getLatestErbPrice(key)).pricePerLitre ?? null]),
+  );
+  const map = Object.fromEntries(entries);
+  return {
+    prices: map,
+    priceFor(rawFuelType) {
+      const key = resolveFuelTypeKey(rawFuelType);
+      return map[key] ?? map.diesel ?? null;
+    },
+  };
+}
+
 export async function getLatestErbPrice(fuelType) {
   const resolved = resolveFuelTypeKey(fuelType);
   const cached = priceCache.get(resolved);

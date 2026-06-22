@@ -29,6 +29,7 @@ import scheduleReport from './common/scheduleReport';
 import MapScale from '../map/MapScale';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import exportExcel from '../common/util/exportExcel';
+import useReportDeviceLabel from './common/useReportDeviceLabel';
 import { traccarPath } from '../config/traccarApi.js';
 
 const columnsArray = [
@@ -57,6 +58,7 @@ const StopReportPage = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const { primaryForDevice } = useReportDeviceLabel();
 
   const onShow = useCatch(async ({ deviceIds, groupIds, from, to }) => {
     const query = new URLSearchParams({ from, to });
@@ -76,7 +78,7 @@ const StopReportPage = () => {
   const onExport = useCatch(async () => {
     const sheets = new Map();
     items.forEach((item) => {
-      const deviceName = devices[item.deviceId].name;
+      const deviceName = primaryForDevice(item.deviceId);
       if (!sheets.has(deviceName)) {
         sheets.set(deviceName, []);
       }
@@ -104,7 +106,7 @@ const StopReportPage = () => {
     const value = item[key];
     switch (key) {
       case 'deviceId':
-        return devices[value].name;
+        return primaryForDevice(value);
       case 'startTime':
       case 'endTime':
         return formatTime(value, 'minutes');
@@ -171,7 +173,7 @@ const StopReportPage = () => {
                       </IconButton>
                     )}
                   </TableCell>
-                  <TableCell>{devices[item.deviceId].name}</TableCell>
+                  <TableCell>{primaryForDevice(item.deviceId)}</TableCell>
                   {columns.map((key) => (
                     <TableCell key={key}>
                       {formatValue(item, key)}

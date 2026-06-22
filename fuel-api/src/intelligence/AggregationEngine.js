@@ -38,6 +38,31 @@ export function withVarianceCost(totals) {
   };
 }
 
+/**
+ * Split planned/actual litres and actual cost by fuel type. Rows without a
+ * `fuelTypeSnapshot` fall back to diesel so historical data still aggregates.
+ */
+export function summarizeByFuelType(refuels = []) {
+  const empty = () => ({ plannedL: 0, actualL: 0, cost: 0 });
+  const out = { diesel: empty(), petrol: empty() };
+
+  for (const row of refuels) {
+    const key = row.fuelTypeSnapshot === 'petrol' ? 'petrol' : 'diesel';
+    const bucket = out[key];
+    bucket.plannedL += plannedOrEstimatedFuel(row);
+    bucket.actualL += toNumber(row.actualFuelLitres ?? row.fuelAmount);
+    bucket.cost += toNumber(row.actualCost ?? row.fuelCost);
+  }
+
+  for (const key of Object.keys(out)) {
+    out[key].plannedL = Number(out[key].plannedL.toFixed(2));
+    out[key].actualL = Number(out[key].actualL.toFixed(2));
+    out[key].cost = Number(out[key].cost.toFixed(2));
+  }
+
+  return out;
+}
+
 export function buildStatusCounts(refuels = []) {
   return refuels.reduce((acc, row) => {
     const key = row.status || 'normal';

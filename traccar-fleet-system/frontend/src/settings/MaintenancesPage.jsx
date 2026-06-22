@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { traccarPath } from '../config/traccarApi.js';
 
 import dayjs from 'dayjs';
 import {
-  Table, TableRow, TableCell, TableHead, TableBody,
+  Table, TableRow, TableCell, TableHead, TableBody, Chip, Box,
 } from '@mui/material';
 import { useEffectAsync } from '../reactHelper';
 import usePositionAttributes from '../common/attributes/usePositionAttributes';
@@ -23,6 +24,9 @@ const MaintenacesPage = () => {
 
   const positionAttributes = usePositionAttributes(t);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deviceId = searchParams.get('deviceId');
+
   const [timestamp, setTimestamp] = useState(Date.now());
   const [items, setItems] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -33,12 +37,23 @@ const MaintenacesPage = () => {
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow(traccarPath('/api/maintenance'));
+      // Traccar links maintenances to devices via permissions; ?deviceId= scopes
+      // the list to the schedules attached to a single vehicle.
+      const path = deviceId
+        ? `/api/maintenance?deviceId=${encodeURIComponent(deviceId)}`
+        : '/api/maintenance';
+      const response = await fetchOrThrow(traccarPath(path));
       setItems(await response.json());
     } finally {
       setLoading(false);
     }
-  }, [timestamp]);
+  }, [timestamp, deviceId]);
+
+  const clearDeviceFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('deviceId');
+    setSearchParams(next, { replace: true });
+  };
 
   const convertAttribute = (key, start, value) => {
     const attribute = positionAttributes[key];
@@ -67,6 +82,17 @@ const MaintenacesPage = () => {
   return (
     <>
       <SearchHeader keyword={searchKeyword} setKeyword={setSearchKeyword} />
+      {deviceId ? (
+        <Box sx={{ px: 2, py: 1 }}>
+          <Chip
+            size="small"
+            color="primary"
+            variant="outlined"
+            label="Filtered to one vehicle"
+            onDelete={clearDeviceFilter}
+          />
+        </Box>
+      ) : null}
       <Table className={classes.table}>
         <TableHead>
           <TableRow>

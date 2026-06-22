@@ -13,6 +13,7 @@ import { useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import DirectionsCarFilledOutlinedIcon from '@mui/icons-material/DirectionsCarFilledOutlined';
 import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
@@ -21,6 +22,10 @@ import KPICards from './components/KPICards';
 import ErbPricesCard from './components/ErbPricesCard';
 import useFilter from '../main/useFilter';
 import usePersistedState from '../common/util/usePersistedState';
+import { fuelApiAuthHeaders } from '../config/fuelApiAuth.js';
+import useTodayOperation from '../operationSessions/hooks/useTodayOperation';
+import { deriveFuelingDayStatus, FUELING_DAY_STATUS_LABEL, isRefuelComplete } from '../operationSessions/utils/operationDayUtils.js';
+import { isPendingFuelStatus } from '../fuelRequests/fuelRequestStatus';
 
 const DashboardPage = () => {
   const theme = useTheme();
@@ -30,9 +35,12 @@ const DashboardPage = () => {
   const positions = useSelector((state) => state.session.positions);
   const events = useSelector((state) => state.events.items);
   const fuelRequests = useSelector((state) => state.fuelRequests?.items || {});
+  const user = useSelector((state) => state.session.user);
+  const [commandCenter, setCommandCenter] = useState(null);
   const [filteredPositions, setFilteredPositions] = useState([]);
   const [filteredDevices, setFilteredDevices] = useState([]);
 
+  const { todayOperation, todayDetails } = useTodayOperation();
   const [keyword] = useState('');
   const [filter] = usePersistedState('filter', {
     statuses: [],
@@ -42,6 +50,21 @@ const DashboardPage = () => {
   const [filterMap] = usePersistedState('filterMap', false);
 
   useFilter(keyword, filter, filterSort, filterMap, positions, setFilteredDevices, setFilteredPositions);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    let cancelled = false;
+    fetch('/api/fleet/command-center', {
+      headers: fuelApiAuthHeaders(user),
+      credentials: 'include',
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setCommandCenter(data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user]);
 
   useEffect(() => {
     const h = (location.hash || '').replace(/^#/, '');
@@ -61,19 +84,28 @@ const DashboardPage = () => {
     const urgentAlerts = Object.values(events).filter((event) => (
       event.type === 'alarm' || event.type === 'panic'
     )).length;
-    const pendingFuelRequests = Object.values(fuelRequests).filter((request) => {
-      const status = request.status?.toLowerCase?.() || '';
-      return status === 'pending' || status === 'submitted' || status === 'awaiting_approval';
-    }).length;
+    const pendingFuelRequests = Object.values(fuelRequests)
+      .filter((request) => isPendingFuelStatus(request.status)).length;
 
     return {
-      totalFleet: filteredDevices.length,
-      onlineCount,
-      offlineCount: Math.max(filteredDevices.length - onlineCount, 0),
+      totalFleet: commandCenter?.registeredVehicles ?? filteredDevices.length,
+      onlineCount: commandCenter?.trackersOnline ?? onlineCount,
+      offlineCount: Math.max((commandCenter?.trackersTotal ?? filteredDevices.length) - (commandCenter?.trackersOnline ?? onlineCount), 0),
       urgentAlerts,
-      pendingFuelRequests,
+      pendingFuelRequests: commandCenter?.pendingFuelRequests ?? pendingFuelRequests,
+      activeOperations: commandCenter?.activeOperations ?? 0,
     };
-  }, [events, filteredDevices, filteredPositions, fuelRequests]);
+  }, [events, filteredDevices, filteredPositions, fuelRequests, commandCenter]);
+
+  const todayOpSummary = useMemo(() => {
+    if (!todayOperation?.id) return 'None today';
+    const displayStatus = deriveFuelingDayStatus({ operation: todayOperation, details: todayDetails });
+    const refuels = todayDetails?.refuels || [];
+    const total = refuels.length;
+    const done = refuels.filter(isRefuelComplete).length;
+    const label = FUELING_DAY_STATUS_LABEL[displayStatus] || 'Planning';
+    return total > 0 ? `${label} ${done}/${total}` : label;
+  }, [todayOperation, todayDetails]);
 
   const quickStats = [
     {
@@ -89,6 +121,12 @@ const DashboardPage = () => {
       icon: <LocalGasStationOutlinedIcon sx={{ fontSize: '1rem' }} />,
     },
     {
+      label: 'Fueling Day',
+      value: todayOpSummary,
+      tone: '#86efac',
+      icon: <PlayCircleOutlineIcon sx={{ fontSize: '1rem' }} />,
+    },
+    {
       label: 'Urgent alerts',
       value: `${dashboardSummary.urgentAlerts}`,
       tone: '#fda4af',
@@ -97,6 +135,41 @@ const DashboardPage = () => {
   ];
 
   const handleFuelQueueJump = () => navigate('/fuel-requests');
+
+  const exceptionCards = useMemo(() => {
+    const cards = [];
+    if (dashboardSummary.offlineCount > 0) {
+      cards.push({
+        key: 'offline',
+        label: 'Trackers offline',
+        value: dashboardSummary.offlineCount,
+        tone: '#fbbf24',
+        icon: <DirectionsCarFilledOutlinedIcon sx={{ fontSize: '1.1rem' }} />,
+        onClick: () => navigate('/map'),
+      });
+    }
+    if (dashboardSummary.urgentAlerts > 0) {
+      cards.push({
+        key: 'alerts',
+        label: 'Urgent alerts',
+        value: dashboardSummary.urgentAlerts,
+        tone: '#fda4af',
+        icon: <WarningAmberRoundedIcon sx={{ fontSize: '1.1rem' }} />,
+        onClick: () => navigate('/map'),
+      });
+    }
+    if (dashboardSummary.pendingFuelRequests > 0) {
+      cards.push({
+        key: 'fuel',
+        label: 'Fuel approvals waiting',
+        value: dashboardSummary.pendingFuelRequests,
+        tone: '#67e8f9',
+        icon: <LocalGasStationOutlinedIcon sx={{ fontSize: '1.1rem' }} />,
+        onClick: handleFuelQueueJump,
+      });
+    }
+    return cards;
+  }, [dashboardSummary, navigate]);
 
   return (
       <Box sx={{
@@ -343,6 +416,30 @@ const DashboardPage = () => {
                 >
                   Jump to fuel queue
                 </Button>
+
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={() => navigate('/fleet/operation-sessions')}
+                  startIcon={<PlayCircleOutlineIcon />}
+                  sx={{
+                    justifyContent: 'flex-start',
+                    px: { xs: 1, sm: 1.35 },
+                    py: { xs: 0.8, sm: 1 },
+                    borderRadius: { xs: '12px', sm: '12px' },
+                    fontWeight: 700,
+                    fontSize: { xs: '0.85rem', sm: '0.95rem' },
+                    color: '#f8fdff',
+                    borderColor: 'rgba(255, 255, 255, 0.16)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                    '&:hover': {
+                      borderColor: 'rgba(255, 255, 255, 0.24)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    },
+                  }}
+                >
+                  Today&apos;s Fueling Day
+                </Button>
               </Stack>
               <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }}>
                 <Button
@@ -371,7 +468,7 @@ const DashboardPage = () => {
                 <Button
                   fullWidth
                   variant="outlined"
-                  onClick={() => navigate('/settings/devices')}
+                  onClick={() => navigate('/fleet/vehicles')}
                   startIcon={<DirectionsCarFilledOutlinedIcon />}
                   sx={{
                     justifyContent: 'flex-start',
@@ -395,6 +492,79 @@ const DashboardPage = () => {
             </Stack>
           </Stack>
         </Box>
+
+        {/* Exception cards — only surface when something needs attention */}
+        {exceptionCards.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: '0.72rem',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'text.secondary',
+                mb: 1,
+              }}
+            >
+              Needs attention
+            </Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
+                gap: { xs: 1, sm: 1.5 },
+              }}
+            >
+              {exceptionCards.map((card) => (
+                <Box
+                  key={card.key}
+                  role="button"
+                  tabIndex={0}
+                  onClick={card.onClick}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 1.25,
+                    py: 1,
+                    borderRadius: '14px',
+                    cursor: 'pointer',
+                    border: `1px solid ${alpha(card.tone, 0.3)}`,
+                    backgroundColor: alpha(card.tone, 0.08),
+                    transition: 'background-color 120ms ease',
+                    '&:hover': { backgroundColor: alpha(card.tone, 0.16) },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 34,
+                      height: 34,
+                      display: 'grid',
+                      placeItems: 'center',
+                      borderRadius: '10px',
+                      color: card.tone,
+                      backgroundColor: alpha(card.tone, 0.16),
+                      flexShrink: 0,
+                    }}
+                  >
+                    {card.icon}
+                  </Box>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 800, lineHeight: 1.1, fontSize: '1.05rem' }}>
+                      {card.value}
+                    </Typography>
+                    <Typography
+                      noWrap
+                      sx={{ color: 'text.secondary', fontSize: '0.7rem', lineHeight: 1.15 }}
+                    >
+                      {card.label}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
 
         {/* Fleet KPI cards */}
         <Box sx={{ mb: 4 }}>

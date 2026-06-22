@@ -13,10 +13,13 @@ import { initializeAuth, authenticate } from './middleware/auth.js';
 import { requireAuth } from './middleware/authGates.js';
 import { suggestVehicles } from './controllers/operationSessionController.js';
 import { syncDatabase } from './models/index.js';
-import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
+import authRouter from './routes/auth.js';
+import fleetRouter from './routes/fleet.js';
 import vehicleSpecsRouter from './routes/vehicleSpecs.js';
 import vehiclesRouter from './routes/vehicles.js';
 import operationSessionsRouter from './routes/operationSessions.js';
+import serviceRecordsRouter from './routes/serviceRecords.js';
+import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
 import reportsRouter from './reports/routes/reports.js';
 import notificationsRouter from './modules/notifications/routes.js';
 import { initializeSocket } from './socket/socketHandler.js';
@@ -25,11 +28,14 @@ import { setNotificationIo } from './notifications/notificationContext.js';
 import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.js';
 import { startImmobilizationEvaluatorScheduler } from './jobs/immobilizationEvaluatorScheduler.js';
 import { startTrackingNotificationBridgeScheduler } from './jobs/trackingNotificationBridgeScheduler.js';
+import { startOperationLockNotificationScheduler } from './jobs/operationLockNotificationScheduler.js';
 import {
   reconcileStuckExecuting,
   shouldReconcileOnStartup,
 } from './immobilization/executionRecovery.js';
-import { reconcileDeviceAssignmentLabels } from './services/vehicleFleetService.js';
+import { reconcileDeviceAssignmentLabels, assertVehicleInTenant } from './services/vehicleFleetService.js';
+import { ensureCompanyTraccarGroup } from './services/companyProvisioningService.js';
+import { DEFAULT_COMPANY_ID } from './models/index.js';
 import {
   ensurePublicLoginInsightFromErb,
   getPublicLoginInsight,
@@ -69,10 +75,14 @@ const httpServer = createServer(app);
 const LOCAL_VITE_ORIGINS = [
   'http://localhost:3002',
   'http://127.0.0.1:3002',
-  'http://localhost:5174',
-  'http://127.0.0.1:5174',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+  'http://localhost:5175',
+  'http://127.0.0.1:5175',
+  'http://localhost:5176',
+  'http://127.0.0.1:5176',
 ];
 
 // CORS configuration - support multiple origins for mobile apps
@@ -387,6 +397,8 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // API Routes
+app.use('/api/auth', authRouter);
+app.use('/api/fleet', fleetRouter);
 app.use('/api/fuel-requests', fuelRequestsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
@@ -394,6 +406,7 @@ app.use('/api/vehicles', vehiclesRouter);
 // Nested path registered on app first so it is never missed if an older router snapshot omits it.
 app.get('/api/operation-sessions/suggestions/vehicles', authenticate, requireAuth, suggestVehicles);
 app.use('/api/operation-sessions', operationSessionsRouter);
+app.use('/api/service-records', serviceRecordsRouter);
 app.use('/api/reports', reportsRouter);
 
 // Root endpoint
@@ -440,6 +453,7 @@ try {
 let stopErbLoginInsightScheduler = () => {};
 let stopImmobilizationEvaluatorScheduler = () => {};
 let stopTrackingNotificationBridgeScheduler = () => {};
+let stopOperationLockNotificationScheduler = () => {};
 
 async function runImmobilizationStartupReconcile() {
   if (!shouldReconcileOnStartup()) return;
@@ -556,6 +570,7 @@ const startServer = async () => {
         stopImmobilizationEvaluatorScheduler = startImmobilizationEvaluatorScheduler();
         stopTrackingNotificationBridgeScheduler = startTrackingNotificationBridgeScheduler(io);
       });
+      stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
     });
     
     return; // Exit early (sync already attempted if Postgres was reachable)
@@ -587,6 +602,7 @@ const startServer = async () => {
       stopImmobilizationEvaluatorScheduler = startImmobilizationEvaluatorScheduler();
       stopTrackingNotificationBridgeScheduler = startTrackingNotificationBridgeScheduler(io);
     });
+    stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
     reconcileDeviceAssignmentLabels()
       .then((stats) => {
         if (process.env.NODE_ENV === 'development') {
@@ -595,6 +611,13 @@ const startServer = async () => {
       })
       .catch((error) => {
         console.warn('[vehicle-label-reconcile] skipped:', error?.message || error);
+      });
+    ensureCompanyTraccarGroup(DEFAULT_COMPANY_ID)
+      .then(() => {
+        if (isDev) console.log('[company-provision] default company Traccar group ready');
+      })
+      .catch((error) => {
+        console.warn('[company-provision] skipped:', error?.message || error);
       });
   });
 };
@@ -609,6 +632,7 @@ process.on('SIGTERM', () => {
   stopErbLoginInsightScheduler();
   stopImmobilizationEvaluatorScheduler();
   stopTrackingNotificationBridgeScheduler();
+  stopOperationLockNotificationScheduler();
   httpServer.close(() => {
     if (isDev) {
       console.log('✅ Server closed');

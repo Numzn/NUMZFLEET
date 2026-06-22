@@ -67,4 +67,8 @@ export default (t) => useMemo(() => ({
     name: t('serverDisableShare'),
     type: 'boolean',
   },
+  'numz.enableFuelRequests': {
+    name: 'Enable driver fuel requests',
+    type: 'boolean',
+  },
 }), [t]);

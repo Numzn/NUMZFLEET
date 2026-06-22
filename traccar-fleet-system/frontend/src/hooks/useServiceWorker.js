@@ -4,15 +4,20 @@ import { useState, useEffect, useCallback } from 'react';
  * Hook for managing Service Worker and PWA push notifications
  * Provides service worker registration and push notification capabilities
  */
-export const useServiceWorker = () => {
+export const useServiceWorker = (options = {}) => {
+  const { enabled = true } = options;
   const [serviceWorkerReady, setServiceWorkerReady] = useState(false);
   const [registration, setRegistration] = useState(null);
   const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
-    // In Vite dev (HMR), we intentionally do not register a service worker.
-    // Otherwise `/sw.js` is served as `index.html` and triggers MIME type errors.
-    if (import.meta?.env?.DEV) {
+    if (!enabled) {
+      return;
+    }
+
+    // VitePWA emits `/sw.js` only in production builds. In dev/preview without
+    // a built worker, the path falls through to HTML and registration fails.
+    if (!import.meta.env.PROD) {
       return;
     }
 
@@ -48,6 +53,10 @@ export const useServiceWorker = () => {
           });
         })
         .catch((error) => {
+          const message = error?.message || '';
+          if (message.includes('MIME type') || message.includes('404')) {
+            return;
+          }
           console.error('❌ [ServiceWorker] Service Worker registration failed:', error);
         });
 
@@ -59,7 +68,7 @@ export const useServiceWorker = () => {
       console.warn('⚠️ [ServiceWorker] Service Workers are not supported');
       setIsSupported(false);
     }
-  }, []);
+  }, [enabled]);
 
   /**
    * Show a push notification via service worker

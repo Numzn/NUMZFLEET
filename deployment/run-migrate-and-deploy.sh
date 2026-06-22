@@ -64,7 +64,9 @@ mask_database_url() {
   echo "$u" | sed -E 's#(postgresql://[^:/@]+:)[^@]+#\1***#; s#(postgres://[^:/@]+:)[^@]+#\1***#'
 }
 
-# Strip SQL comments (-- line, /* block */) then reject DROP / TRUNCATE as standalone tokens.
+# Strip SQL comments (-- line, /* block */) then reject destructive statements.
+# Blocks TRUNCATE and DROP of data-bearing objects (TABLE/DATABASE/SCHEMA/COLUMN/TYPE).
+# Allows non-destructive schema evolution: DROP INDEX and DROP CONSTRAINT.
 forbidden_sql_check() {
   local f="$1"
   [[ -f "$f" ]] || fail "Migration file not found: $f"
@@ -77,16 +79,16 @@ forbidden_sql_check() {
       close $fh;
       s/--[^\n]*//g;
       s/\/\*.*?\*\///gs;
-      if (/\bDROP\b/i || /\bTRUNCATE\b/i) {
-        print STDERR "[migrate-deploy] ERROR: forbidden SQL token (DROP or TRUNCATE) after comment strip: $fn\n";
+      if (/\bDROP\s+(TABLE|DATABASE|SCHEMA|COLUMN|TYPE)\b/i || /\bTRUNCATE\b/i) {
+        print STDERR "[migrate-deploy] ERROR: forbidden destructive SQL (DROP TABLE/DATABASE/SCHEMA/COLUMN/TYPE or TRUNCATE) after comment strip: $fn\n";
         exit 1;
       }
       exit 0;
     ' -- "$f" || return 1
   else
     # Fallback: line-based (lines starting with -- ignored); less precise than perl.
-    if grep -vE '^[[:space:]]*--' "$f" | grep -vE '^[[:space:]]*$' | grep -qiE '(^|[^a-zA-Z_])(DROP|TRUNCATE)([^a-zA-Z_]|$)'; then
-      printf '[migrate-deploy] ERROR: forbidden SQL token (DROP or TRUNCATE) detected in %s\n' "$f" >&2
+    if grep -vE '^[[:space:]]*--' "$f" | grep -vE '^[[:space:]]*$' | grep -qiE '(^|[^a-zA-Z_])(DROP[[:space:]]+(TABLE|DATABASE|SCHEMA|COLUMN|TYPE)|TRUNCATE)([^a-zA-Z_]|$)'; then
+      printf '[migrate-deploy] ERROR: forbidden destructive SQL (DROP TABLE/DATABASE/SCHEMA/COLUMN/TYPE or TRUNCATE) detected in %s\n' "$f" >&2
       printf '[migrate-deploy] Install perl for stricter comment-aware scanning.\n' >&2
       return 1
     fi
@@ -153,6 +155,12 @@ run_migrations() {
     "$MIGRATIONS_DIR/20260522_notifications_dedup_and_bridge.sql"
     "$MIGRATIONS_DIR/20260520_vehicle_immobilization_intents.sql"
     "$MIGRATIONS_DIR/20260521_immobilization_execution_integrity.sql"
+    "$MIGRATIONS_DIR/20260613_operational_day_model.sql"
+    "$MIGRATIONS_DIR/20260616_multi_tenant_foundation.sql"
+    "$MIGRATIONS_DIR/20260619_service_records.sql"
+    "$MIGRATIONS_DIR/20260620_fuel_operations_phase1.sql"
+    "$MIGRATIONS_DIR/20260621_fueling_day_multi_invoice_arrived.sql"
+    "$MIGRATIONS_DIR/20260622_invoice_attachment_url.sql"
   )
   local f
   for f in "${files[@]}"; do

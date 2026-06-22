@@ -35,23 +35,41 @@ function matchesFilters(n, filters) {
   return true;
 }
 
-/** @param {import('redux').UnknownAction} state @param {object} [filters] */
+/**
+ * Factory — call once per component instance (inside useMemo) so each
+ * instance gets its own memoization cache.
+ */
+export const makeSelectNotificationsWithFilters = () => createSelector(
+  [selectAllNotifications, (_, filters) => filters],
+  (all, filters) => {
+    if (!filters) return all;
+    return all.filter((n) => matchesFilters(n, filters));
+  },
+);
+
+export const makeSelectGroupedByDayBucket = () => createSelector(
+  [selectAllNotifications, (_, filters) => filters],
+  (all, filters) => {
+    const list = filters ? all.filter((n) => matchesFilters(n, filters)) : all;
+    const groups = {};
+    list.forEach((n) => {
+      const d = (n.timestamp || '').slice(0, 10) || 'unknown';
+      if (!groups[d]) groups[d] = [];
+      groups[d].push(n);
+    });
+    return groups;
+  },
+);
+
+/** Legacy non-memoized helpers kept for any one-off call sites outside hooks. */
 export function selectNotificationsWithFilters(state, filters) {
   const all = selectAllNotifications(state);
   if (!filters) return all;
   return all.filter((n) => matchesFilters(n, filters));
 }
 
-/** @param {import('redux').UnknownAction} state @param {object} [filters] */
 export function selectGroupedByDayBucket(state, filters) {
-  const list = selectNotificationsWithFilters(state, filters);
-  const groups = {};
-  list.forEach((n) => {
-    const d = (n.timestamp || '').slice(0, 10) || 'unknown';
-    if (!groups[d]) groups[d] = [];
-    groups[d].push(n);
-  });
-  return groups;
+  return makeSelectGroupedByDayBucket()(state, filters);
 }
 
 export const selectGroupedByCategory = createSelector(

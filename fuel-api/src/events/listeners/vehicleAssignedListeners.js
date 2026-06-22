@@ -20,7 +20,7 @@ const registerTraccarSyncListener = () => {
         }
 
         await upsertTraccarDeviceAttribute(Number(deviceId), 'vehicleName', vehicleName);
-        await upsertTraccarDeviceAttribute(Number(deviceId), 'fleetVehicleId', Number(vehicleId));
+        await upsertTraccarDeviceAttribute(Number(deviceId), 'fleetVehicleId', String(vehicleId));
       },
     ),
   );

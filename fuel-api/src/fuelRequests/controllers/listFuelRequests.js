@@ -1,4 +1,4 @@
-import { FuelRequest } from '../../models/index.js';
+import { FuelRequest, DEFAULT_COMPANY_ID } from '../../models/index.js';
 
 /**
  * List fuel requests (filtered by role)
@@ -13,7 +13,7 @@ export const listFuelRequests = async (req, res) => {
 
     const { status, deviceId } = req.query;
 
-    const where = {};
+    const where = { companyId: req.auth?.companyId || DEFAULT_COMPANY_ID };
     
     // Drivers can only see their own requests
     // Managers/Administrators see all requests

@@ -6,6 +6,11 @@ import dimensions from '../../common/theme/dimensions';
 import { map } from '../core/MapView';
 import { usePrevious } from '../../reactHelper';
 import { useAttributePreference } from '../../common/util/preferences';
+import {
+  getSheetHeightPx,
+  isFleetCommandSheetEnabled,
+  SHEET_LEVEL,
+} from '../../main/fleet/fleetSheetConstants';
 
 const easeInOutCirc = (t) => (
   t < 0.5
@@ -25,6 +30,7 @@ const MapSelectedDevice = ({ mapReady }) => {
 
   const selectZoom = useAttributePreference('web.selectZoom', 10);
   const mapFollow = useAttributePreference('mapFollow', false);
+  const sheetLevel = useSelector((state) => state.fleetInteraction.sheetLevel);
 
   const position = useSelector((state) => state.session.positions[currentId]);
 
@@ -39,7 +45,10 @@ const MapSelectedDevice = ({ mapReady }) => {
 
     if ((isSelectionChange || isFollowUpdate) && position) {
       const isPremiumFocus = isSelectionChange;
-      const verticalNudge = desktop ? 56 : dimensions.popupMapOffset / 2;
+      let verticalNudge = desktop ? 56 : dimensions.popupMapOffset / 2;
+      if (!desktop && isFleetCommandSheetEnabled() && sheetLevel >= SHEET_LEVEL.OVERVIEW) {
+        verticalNudge += getSheetHeightPx(sheetLevel) / 2;
+      }
       map.easeTo({
         center: [position.longitude, position.latitude],
         zoom: Math.max(map.getZoom(), selectZoom),
@@ -49,7 +58,7 @@ const MapSelectedDevice = ({ mapReady }) => {
         essential: true,
       });
     }
-  }, [currentId, previousId, currentTime, previousTime, mapFollow, position, previousPosition, selectZoom, mapReady, desktop]);
+  }, [currentId, previousId, currentTime, previousTime, mapFollow, position, previousPosition, selectZoom, mapReady, desktop, sheetLevel]);
 
   return null;
 };

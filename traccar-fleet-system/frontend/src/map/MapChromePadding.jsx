@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { map } from './core/MapView';
+import { readFleetSheetHeightCssVarPx } from '../main/fleet/fleetSheetConstants';
 
 /** Space between fixed chrome and map control stacks (px). */
 const CHROME_GAP = 8;
@@ -9,7 +10,7 @@ const CHROME_GAP = 8;
  * Keeps the map canvas full-bleed under fixed top/bottom chrome while insetting
  * MapLibre's logical viewport (padding + control offsets) so controls and framing stay clear.
  */
-const MapChromePadding = ({ sidebarInset = 0 }) => {
+const MapChromePadding = ({ sidebarInset = 0, sheetInsetPx = 0 }) => {
   const theme = useTheme();
   const topSafeRef = useRef(null);
   const bottomSafeRef = useRef(null);
@@ -55,8 +56,8 @@ const MapChromePadding = ({ sidebarInset = 0 }) => {
   useEffect(() => {
     const container = map.getContainer();
     const topPad = safeTop + chromeTop;
-    // Bottom nav can be visible at any viewport width (--app-bottomnav-height from UnifiedShell / map route).
-    const bottomPad = safeBottom + chromeBottom;
+    const cssSheetInset = sheetInsetPx > 0 ? sheetInsetPx : readFleetSheetHeightCssVarPx();
+    const bottomPad = Math.max(safeBottom + chromeBottom, cssSheetInset);
     const left = theme.direction === 'rtl' ? 0 : sidebarInset;
     const right = theme.direction === 'rtl' ? sidebarInset : 0;
 
@@ -97,7 +98,7 @@ const MapChromePadding = ({ sidebarInset = 0 }) => {
       });
       map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 });
     };
-  }, [chromeBottom, chromeTop, sidebarInset, theme.direction, safeTop, safeBottom]);
+  }, [chromeBottom, chromeTop, sidebarInset, sheetInsetPx, theme.direction, safeTop, safeBottom]);
 
   return (
     <>

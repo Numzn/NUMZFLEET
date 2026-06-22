@@ -41,6 +41,22 @@ export async function updateVehicle(user, vehicleId, { name, plateNumber }) {
   return res.json();
 }
 
+export async function fetchVehicleOdometer(user, deviceId) {
+  const res = await fetchOrThrow(`/api/vehicle-specs/${encodeURIComponent(deviceId)}/odometer`, {
+    headers: fuelApiAuthHeaders(user),
+  });
+  return res.json();
+}
+
+export async function verifyVehicleOdometer(user, deviceId, { verifiedOdometerKm, source }) {
+  const res = await fetchOrThrow(`/api/vehicle-specs/${encodeURIComponent(deviceId)}/verify-odometer`, {
+    method: 'POST',
+    headers: fuelApiAuthHeaders(user),
+    body: JSON.stringify({ verifiedOdometerKm: Number(verifiedOdometerKm), source: source || 'audit' }),
+  });
+  return res.json();
+}
+
 /** Extract `{ error }` from fuel-api JSON bodies thrown by fetchOrThrow. */
 export function fuelApiErrorMessage(thrown, fallback = 'Request failed') {
   const raw = thrown?.message || '';
@@ -76,5 +92,37 @@ export async function updateVehicleConfig(user, vehicleId, body) {
     },
     body: JSON.stringify(body),
   });
+  return res.json();
+}
+
+export async function fetchVehicleServiceRecords(user, fleetVehicleId) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/service-records`,
+    { headers: fuelApiAuthHeaders(user) },
+  );
+  return res.json();
+}
+
+export async function createVehicleServiceRecord(user, fleetVehicleId, payload) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/service-records`,
+    {
+      method: 'POST',
+      headers: fuelApiAuthHeaders(user),
+      body: JSON.stringify(payload),
+    },
+  );
+  return res.json();
+}
+
+export async function updateVehicleServiceRecord(user, fleetVehicleId, recordId, payload) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/service-records/${encodeURIComponent(recordId)}`,
+    {
+      method: 'PATCH',
+      headers: fuelApiAuthHeaders(user),
+      body: JSON.stringify(payload),
+    },
+  );
   return res.json();
 }

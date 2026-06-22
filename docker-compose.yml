@@ -3,6 +3,8 @@ services:
     build:
       context: ./traccar-fleet-system/frontend
       dockerfile: Dockerfile
+      args:
+        VITE_FLEET_COMMAND_SHEET: "1"
     ports:
       - "3002:80"
     depends_on:
@@ -38,6 +40,7 @@ services:
       DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
       HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
       # TRACKING_NOTIFICATION_BRIDGE / TRACKING_BRIDGE_* — set in ./backend/.env (env_file)
+      INVOICE_UPLOAD_DIR: /app/data/invoice-attachments
     ports:
       - "3000:3000"
     depends_on:
@@ -59,6 +62,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 90s
+    volumes:
+      - invoice_attachments:/app/data/invoice-attachments
 
   db:
     image: postgres:15-alpine
@@ -121,3 +126,5 @@ volumes:
     name: numzfleet_postgres_data
   traccar_mysql_data:
     name: numzfleet_traccar_mysql_data
+  invoice_attachments:
+    name: numzfleet_invoice_attachments

@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { OperationSessionRefuel } from '../models/index.js';
 
 export async function bulkCreate(records, options = {}) {
@@ -31,6 +32,17 @@ export async function findLatestByVehicleId(vehicleId, options = {}) {
     where: { vehicleId: Number(vehicleId) },
     order: [['sessionDate', 'DESC'], ['id', 'DESC']],
     ...options,
+  });
+}
+
+export async function findCompletedRefuelsByVehicleId(vehicleId, limit = 20) {
+  return OperationSessionRefuel.findAll({
+    where: {
+      vehicleId: Number(vehicleId),
+      actualFuelLitres: { [Op.gt]: 0 },
+    },
+    order: [['sessionDate', 'DESC'], ['id', 'DESC']],
+    limit,
   });
 }
 

@@ -48,12 +48,15 @@ function toApi(row) {
   };
 }
 
-export async function listNotificationsForUser(userId, query) {
+export async function listNotificationsForUser(userId, query, companyId = null) {
   const limit = Math.min(Math.max(parseInt(query.limit, 10) || 40, 1), 100);
   const where = {
     userId,
     archived: false,
   };
+  if (companyId) {
+    where.tenantId = companyId;
+  }
   if (query.category) where.category = query.category;
   if (query.severity) where.severity = query.severity;
   if (query.read === 'true') where.read = true;
@@ -226,12 +229,15 @@ export async function markReadForUserByIdOrDedup(userId, idOrDedup) {
   return toApi(await row.reload());
 }
 
-export async function syncNotificationsForUser(userId, query = {}) {
+export async function syncNotificationsForUser(userId, query = {}, companyId = null) {
   const limit = Math.min(Math.max(parseInt(query.limit, 10) || 100, 1), 200);
   const where = {
     userId,
     archived: false,
   };
+  if (companyId) {
+    where.tenantId = companyId;
+  }
   const hasSince = query.since && !Number.isNaN(new Date(query.since).getTime());
   if (hasSince) {
     where.createdAt = { [Op.gte]: new Date(query.since) };

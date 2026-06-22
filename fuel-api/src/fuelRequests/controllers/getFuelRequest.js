@@ -1,4 +1,4 @@
-import { FuelRequest } from '../../models/index.js';
+import { findFuelRequestScoped } from '../scopeFuelRequest.js';
 
 /**
  * Get single fuel request by ID
@@ -14,7 +14,7 @@ export const getFuelRequest = async (req, res) => {
       });
     }
 
-    const request = await FuelRequest.findByPk(id);
+    const request = await findFuelRequestScoped(req, id);
 
     if (!request) {
       return res.status(404).json({ error: 'Fuel request not found' });

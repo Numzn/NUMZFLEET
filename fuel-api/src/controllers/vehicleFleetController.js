@@ -2,11 +2,17 @@ import {
   createVehicle as createVehicleService,
   listVehiclesMerged,
   getVehicleMerged,
+  listDeviceAssignments,
   assignDevice as assignDeviceService,
   updateVehicle as updateVehicleService,
   updateVehicleMergedConfig,
   deleteVehicle as deleteVehicleService,
 } from '../services/vehicleFleetService.js';
+import {
+  listServiceRecordsForVehicle,
+  createServiceRecord,
+  updateServiceRecord,
+} from '../services/serviceRecordService.js';
 import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
 /**
@@ -15,8 +21,12 @@ import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 export const createVehicle = async (req, res) => {
   try {
     const { name, plateNumber } = req.body || {};
-    const vehicle = await createVehicleService({ name, plateNumber });
-    const merged = await getVehicleMerged(vehicle.id);
+    const vehicle = await createVehicleService({
+      name,
+      plateNumber,
+      companyId: req.auth?.companyId,
+    });
+    const merged = await getVehicleMerged(vehicle.id, req.auth?.companyId);
     return res.status(201).json(merged);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -30,7 +40,7 @@ export const createVehicle = async (req, res) => {
  */
 export const listVehicles = async (req, res) => {
   try {
-    const rows = await listVehiclesMerged();
+    const rows = await listVehiclesMerged(req.auth?.companyId);
     return res.json(rows);
   } catch (error) {
     console.error('List vehicles error:', error);
@@ -45,7 +55,7 @@ export const listVehicles = async (req, res) => {
  */
 export const getVehicle = async (req, res) => {
   try {
-    const merged = await getVehicleMerged(req.params.id);
+    const merged = await getVehicleMerged(req.params.id, req.auth?.companyId);
     if (!merged) {
       return res.status(404).json({ error: 'Vehicle not found' });
     }
@@ -53,6 +63,19 @@ export const getVehicle = async (req, res) => {
   } catch (error) {
     console.error('Get vehicle error:', error);
     return res.status(500).json({ error: dbErrorMessage(error, 'Failed to fetch vehicle') });
+  }
+};
+
+export const getVehicleAssignments = async (req, res) => {
+  try {
+    const rows = await listDeviceAssignments(req.params.id, req.auth?.companyId);
+    if (!rows) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    return res.json(rows);
+  } catch (error) {
+    console.error('List vehicle assignments error:', error);
+    return res.status(500).json({ error: dbErrorMessage(error, 'Failed to list assignments') });
   }
 };
 
@@ -118,5 +141,48 @@ export const deleteVehicle = async (req, res) => {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Delete vehicle error:', error);
     return res.status(status).json({ error: dbErrorMessage(error, 'Failed to delete vehicle') });
+  }
+};
+
+export const listVehicleServiceRecords = async (req, res) => {
+  try {
+    const rows = await listServiceRecordsForVehicle(req.auth?.companyId, req.params.id);
+    return res.json(rows);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('List vehicle service records error:', error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to list service records') });
+  }
+};
+
+export const createVehicleServiceRecord = async (req, res) => {
+  try {
+    const created = await createServiceRecord(
+      req.user,
+      req.auth?.companyId,
+      req.params.id,
+      req.body || {},
+    );
+    return res.status(201).json(created);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Create vehicle service record error:', error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to create service record') });
+  }
+};
+
+export const updateVehicleServiceRecord = async (req, res) => {
+  try {
+    const updated = await updateServiceRecord(
+      req.auth?.companyId,
+      req.params.id,
+      req.params.recordId,
+      req.body || {},
+    );
+    return res.json(updated);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Update vehicle service record error:', error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to update service record') });
   }
 };

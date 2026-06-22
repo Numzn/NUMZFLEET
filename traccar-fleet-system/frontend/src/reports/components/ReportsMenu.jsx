@@ -10,6 +10,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import RouteIcon from '@mui/icons-material/Route';
 import EventRepeatIcon from '@mui/icons-material/EventRepeat';
 import NotesIcon from '@mui/icons-material/Notes';
+import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from '../../common/components/LocalizationProvider';
@@ -76,6 +77,12 @@ const ReportsMenu = () => {
           link={buildLink('/reports/summary')}
           icon={<FormatListBulletedIcon />}
           selected={location.pathname === '/reports/summary'}
+        />
+        <MenuItem
+          title="Fuel reports"
+          link="/reports/fuel-operations"
+          icon={<LocalGasStationOutlinedIcon />}
+          selected={location.pathname === '/reports/fuel-operations'}
         />
         <MenuItem
           title={t('reportChart')}

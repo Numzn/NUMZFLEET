@@ -3,9 +3,9 @@ import { useSelector } from 'react-redux';
 import { traccarPath } from '../../config/traccarApi.js';
 import fetchOrThrow from '../../common/util/fetchOrThrow.js';
 import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
-import { fetchVehicle, updateVehicleConfig as putVehicleConfig } from '../vehiclesApi.js';
+import { fetchVehicle, updateVehicleConfig as putVehicleConfig, fuelApiErrorMessage } from '../vehiclesApi.js';
 import { normalizePositionTelemetry } from './telemetryUtils.js';
-import { getIgnitionPhrase, getMotionLabel } from './vehicleMotionStatus.js';
+import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from './vehicleMotionStatus.js';
 import { isGeofenceEventType, resolveEventType } from './vehicleAlertUtils.js';
 
 const erbFuelKey = (fuelType) => {
@@ -87,7 +87,13 @@ export default function useVehicleData(vehicleId) {
       const v = await fetchVehicle(user, vehicleId);
       setVehicle(v);
     } catch (e) {
-      setError(e.message || 'Failed to load vehicle');
+      const msg = fuelApiErrorMessage(e, 'Failed to load vehicle');
+      if (/not found/i.test(msg)) {
+        setError('This vehicle no longer exists in your fleet.');
+        window.dispatchEvent(new CustomEvent('numz:fleet-vehicles-changed'));
+      } else {
+        setError(msg);
+      }
       setVehicle(null);
     } finally {
       setLoading(false);
@@ -265,6 +271,14 @@ export default function useVehicleData(vehicleId) {
     [vehicle?.device?.status, livePosition?.attributes],
   );
 
+  const motionDurationLabel = useMemo(
+    () =>
+      vehicle?.device?.status === 'online'
+        ? getMotionDurationLabel(deviceId, vehicle.device.status, livePosition?.speed)
+        : null,
+    [deviceId, vehicle?.device?.status, livePosition?.speed],
+  );
+
   const saveConfig = useCallback(
     async (body) => {
       if (!user || !vehicleId) throw new Error('Not ready');
@@ -291,6 +305,7 @@ export default function useVehicleData(vehicleId) {
     deviceId,
     groupName,
     motionLabel,
+    motionDurationLabel,
     ignitionPhrase,
   };
 }

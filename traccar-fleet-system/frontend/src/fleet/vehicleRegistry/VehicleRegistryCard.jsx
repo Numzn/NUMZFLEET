@@ -11,9 +11,10 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LinkIcon from '@mui/icons-material/Link';
 import { vehicleWorkspaceCardSx } from '../vehicleDetail/dashboardCardSx';
 import {
-  getDeviceLabel,
+  getTrackerLinkLabel,
   getSetupChipProps,
   getStatusChipProps,
+  getVehicleRegistryLines,
 } from './vehicleRegistryUtils';
 
 const VehicleRegistryCard = ({
@@ -22,7 +23,8 @@ const VehicleRegistryCard = ({
   onChangeDevice,
   onDelete,
 }) => {
-  const deviceLabel = getDeviceLabel(row);
+  const { primary, secondary } = getVehicleRegistryLines(row);
+  const trackerLabel = getTrackerLinkLabel(row);
   const statusChip = getStatusChipProps(row);
   const setupChip = getSetupChipProps(row);
 
@@ -46,15 +48,17 @@ const VehicleRegistryCard = ({
               sx={{ lineHeight: 1.3, color: 'var(--color-text-primary)' }}
               noWrap
             >
-              {row.name}
+              {primary}
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{ color: 'var(--color-text-secondary)', mt: 0.25 }}
-              noWrap
-            >
-              {row.plateNumber || 'No plate'}
-            </Typography>
+            {secondary ? (
+              <Typography
+                variant="body2"
+                sx={{ color: 'var(--color-text-secondary)', mt: 0.25 }}
+                noWrap
+              >
+                {secondary}
+              </Typography>
+            ) : null}
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-end' }}>
             {statusChip && (
@@ -77,10 +81,10 @@ const VehicleRegistryCard = ({
 
         <Box>
           <Typography variant="caption" sx={{ color: 'var(--color-text-secondary)', display: 'block' }}>
-            Device
+            Tracker
           </Typography>
           <Typography variant="body2" fontWeight={500} sx={{ mt: 0.25 }}>
-            {deviceLabel || '—'}
+            {trackerLabel}
           </Typography>
         </Box>
 

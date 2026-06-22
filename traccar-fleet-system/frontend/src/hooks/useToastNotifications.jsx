@@ -33,32 +33,36 @@ export const useToastNotifications = (options = {}) => {
   const [notifications, setNotifications] = useState([]);
   const [browserNotificationEnabled, setBrowserNotificationEnabled] = useState(false);
   
-  // Service Worker for PWA push notifications
+  // Service Worker for PWA push notifications (only when browser push is enabled)
   const {
     serviceWorkerReady,
     showTypedPushNotification,
     showFuelRequestNotification,
-  } = useServiceWorker();
+  } = useServiceWorker({ enabled: enableBrowserNotifications });
 
   // Check and request browser notification permission if enabled
   useEffect(() => {
-    if (enableBrowserNotifications && isBrowserNotificationSupported()) {
-      const permission = getNotificationPermission();
-      
-      if (permission === 'granted') {
-        setBrowserNotificationEnabled(true);
-      } else if (autoRequestPermission && permission === 'default') {
-        // Auto-request permission on mount
-        requestNotificationPermission().then((result) => {
-          if (result === 'granted') {
-            setBrowserNotificationEnabled(true);
-          } else {
-            console.warn('⚠️ [Notification] Permission denied or default');
-          }
-        });
-      }
-    } else {
-      console.warn('⚠️ [Notification] Notifications not supported or disabled');
+    if (!enableBrowserNotifications) {
+      return;
+    }
+
+    if (!isBrowserNotificationSupported()) {
+      console.warn('⚠️ [Notification] Browser notifications are not supported in this environment');
+      return;
+    }
+
+    const permission = getNotificationPermission();
+
+    if (permission === 'granted') {
+      setBrowserNotificationEnabled(true);
+    } else if (autoRequestPermission && permission === 'default') {
+      requestNotificationPermission().then((result) => {
+        if (result === 'granted') {
+          setBrowserNotificationEnabled(true);
+        } else {
+          console.warn('⚠️ [Notification] Permission denied or default');
+        }
+      });
     }
   }, [enableBrowserNotifications, autoRequestPermission]);
 

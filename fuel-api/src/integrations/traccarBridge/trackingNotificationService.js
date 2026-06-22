@@ -1,3 +1,4 @@
+import { enrichNotificationCopyWithVehicle } from '../../services/vehicleDisplayLookupService.js';
 import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
 import { CHANNELS } from '../../notifications/contracts/notificationContract.js';
 import {
@@ -46,7 +47,8 @@ export async function pollAndPersistTrackingNotifications(io) {
       });
       if (!audienceIds.length) continue;
 
-      const { title, message } = buildTraccarNotificationCopy(ev, policy);
+      const rawCopy = buildTraccarNotificationCopy(ev, policy);
+      const { title, message } = await enrichNotificationCopyWithVehicle(ev.deviceid, rawCopy);
 
       const result = await publishNotification({
         type: policy.notificationType,

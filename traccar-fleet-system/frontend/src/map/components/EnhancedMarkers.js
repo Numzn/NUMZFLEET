@@ -8,6 +8,7 @@ import { mapIconKey } from '../core/enhancedPreloadImages';
 import { useAttributePreference } from '../../common/util/preferences';
 import { useCatchCallback } from '../../reactHelper';
 import { findFonts } from '../core/mapUtil';
+import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 
 const LERP_DURATION = 1450;
 const STYLE_TRANSITION_MS = 480;
@@ -45,13 +46,17 @@ const EnhancedMarkers = ({
 
   const devices = useSelector((state) => state.devices.items);
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
+  const { getDisplayForDevice } = useVehicleDisplayContext();
 
   const mapCluster = useAttributePreference('mapCluster', true);
   const directionType = useAttributePreference('mapDirection', 'selected');
 
   const createFeature = (devices, position, selectedPositionId) => {
     const device = devices[position.deviceId];
-    const displayName = device?.attributes?.vehicleName || device?.name || `Device ${position.deviceId}`;
+    const display = getDisplayForDevice(position.deviceId, device);
+    const displayName = display.secondary
+      ? `${display.primary} (${display.secondary})`
+      : display.primary;
     const isOnline = device?.status === 'online';
     const isMoving = position.speed > 0;
     const isSelected = selectedPositionId === position.id;
@@ -347,7 +352,7 @@ const EnhancedMarkers = ({
           ],
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
-          'icon-offset': [0, ['interpolate', ['linear'], ['zoom'], 10, -0.92, 16, -1.06]],
+          'icon-offset': [0, -1],
           'icon-rotate': ['get', 'rotation'],
           'icon-rotation-alignment': 'map',
         },

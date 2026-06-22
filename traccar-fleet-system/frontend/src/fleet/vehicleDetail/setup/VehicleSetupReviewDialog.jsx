@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Dialog,
@@ -33,11 +34,23 @@ export default function VehicleSetupReviewDialog({
   saveError,
 }) {
   const moduleById = Object.fromEntries(readiness.modules.map((m) => [m.id, m]));
+  const { blockingIncomplete, attentionCount } = readiness;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Vehicle setup review</DialogTitle>
       <DialogContent>
+        {blockingIncomplete && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Required modules are still incomplete (name and device link). You can save partial
+            changes now, but this vehicle will not be ready for operations until those are done.
+          </Alert>
+        )}
+        {!blockingIncomplete && attentionCount > 0 && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Required setup is complete. Recommended items below can be finished later.
+          </Alert>
+        )}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Review setup before saving. Recommended items can be completed later.
         </Typography>

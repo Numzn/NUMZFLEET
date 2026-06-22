@@ -1,6 +1,7 @@
 import { VehicleSpec } from '../models/index.js';
 import { getDeviceAttributes } from '../config/traccar.js';
 import { syncFromTraccar, updateVehicleSpec } from '../services/vehicleSpecService.js';
+import { getComputedOdometer, setVerifiedOdometer } from '../services/odometerService.js';
 
 /**
  * List all vehicle specifications
@@ -60,10 +61,44 @@ export const updateVehicleSpecification = async (req, res) => {
       fuelType: fuelType || 'Petrol'
     });
 
-    res.json(spec);
+    if (req.body.verifiedOdometerKm != null && req.body.verifiedOdometerKm !== '') {
+      await setVerifiedOdometer(deviceId, req.body.verifiedOdometerKm, 'manual', req.user?.id);
+    }
+
+    const fresh = await VehicleSpec.findOne({ where: { deviceId: parseInt(deviceId) } });
+    res.json(fresh || spec);
   } catch (error) {
     console.error('Update vehicle spec error:', error);
-    res.status(500).json({ error: 'Failed to update vehicle specification' });
+    res.status(error.statusCode || 500).json({ error: 'Failed to update vehicle specification' });
+  }
+};
+
+/**
+ * Get the computed odometer (verified baseline + Traccar delta) for a device.
+ */
+export const getOdometer = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const result = await getComputedOdometer(deviceId);
+    res.json(result);
+  } catch (error) {
+    console.error('Get odometer error:', error);
+    res.status(error.statusCode || 500).json({ error: 'Failed to get odometer' });
+  }
+};
+
+/**
+ * Set a verified odometer baseline from a trusted reading (Manager only).
+ */
+export const verifyOdometer = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { verifiedOdometerKm, source } = req.body || {};
+    const spec = await setVerifiedOdometer(deviceId, verifiedOdometerKm, source || 'audit', req.user?.id);
+    res.json(spec);
+  } catch (error) {
+    console.error('Verify odometer error:', error);
+    res.status(error.statusCode || 500).json({ error: 'Failed to set verified odometer' });
   }
 };
 

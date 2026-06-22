@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Accordion,
@@ -7,201 +7,49 @@ import {
   AccordionSummary,
   Alert,
   Box,
-  Button,
-  Chip,
-  Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  CircularProgress,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
+import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
 import {
-  RUNTIME_CONTAINER_PY,
-  RUNTIME_STACK_GAP_TIGHT,
-} from '../common/styles/runtimeDensity';
-import DriverValue from '../common/components/DriverValue';
-import {
-  closeOperationSession,
   fetchOperationSessionDetails,
-  submitSessionRefuelUpdates,
+  recordOperationRefuel,
+  markRefuelArrived,
+  skipOperationVehicle,
 } from './api/operationSessionsApi';
-
-function formatK(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return '—';
-  return `K ${v.toFixed(0)}`;
-}
-
-function formatL(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return '—';
-  return `${v.toFixed(1)} L`;
-}
-
-function formatPricePerL(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return '—';
-  return `K ${v.toFixed(2)}/L`;
-}
-
-function isPendingRow(r) {
-  return r.actualFuelLitres == null || Number(r.actualFuelLitres) <= 0;
-}
-
-function varianceTone(planned, actual) {
-  const p = Number(planned);
-  const a = Number(actual);
-  if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(a)) return 'default';
-  const pct = Math.abs(((a - p) / p) * 100);
-  if (pct < 5) return 'success';
-  if (pct < 10) return 'warning';
-  return 'error';
-}
-
-const PendingRefuelCard = ({
-  refuel,
-  device,
-  disabled,
-  onDone,
-}) => {
-  const [litres, setLitres] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [localError, setLocalError] = useState('');
-
-  const planned = refuel.plannedFuelLitres != null ? Number(refuel.plannedFuelLitres) : (refuel.estimatedFuelLitres != null ? Number(refuel.estimatedFuelLitres) : null);
-  const price = refuel.erbPricePerLitre != null ? Number(refuel.erbPricePerLitre) : null;
-  const parsed = Number(litres);
-  const hasDraft = Number.isFinite(parsed) && parsed > 0;
-  const diff = hasDraft && planned != null && Number.isFinite(planned) ? parsed - planned : null;
-  const estCost = hasDraft && price != null ? parsed * price : null;
-
-  const driverId = device?.attributes?.driverUniqueId;
-
-  const handleDone = async () => {
-    if (!hasDraft) {
-      setLocalError('Enter litres dispensed.');
-      return;
-    }
-    setLocalError('');
-    setSaving(true);
-    try {
-      await onDone({ refuelId: refuel.id, actualFuelLitres: parsed });
-      setLitres('');
-    } catch (e) {
-      setLocalError(e.message || 'Save failed');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Box
-      sx={{
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: 2,
-        p: 1.25,
-        bgcolor: 'var(--surface-card)',
-      }}
-    >
-      <Stack spacing={1}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-          <Box>
-            <Typography variant="subtitle1" fontWeight={800} component="div">
-              {device?.name || `Vehicle ${refuel.vehicleId}`}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Driver:
-              {' '}
-              {driverId ? <DriverValue driverUniqueId={driverId} /> : '—'}
-            </Typography>
-          </Box>
-          <Chip size="small" label="Pending" color="warning" variant="outlined" />
-        </Box>
-
-        <Typography variant="body2">
-          Planned:
-          {' '}
-          <strong>{planned != null && Number.isFinite(planned) ? `${planned} L` : '—'}</strong>
-        </Typography>
-
-        <TextField
-          label="Actual litres"
-          type="number"
-          fullWidth
-          size="medium"
-          value={litres}
-          onChange={(e) => setLitres(e.target.value)}
-          disabled={disabled || saving}
-          inputProps={{ min: 0.01, step: 0.1 }}
-        />
-
-        {hasDraft && diff != null && (
-          <Typography variant="body2">
-            Difference:
-            {' '}
-            <Chip
-              size="small"
-              label={`${diff >= 0 ? '+' : ''}${diff.toFixed(1)} L`}
-              color={varianceTone(planned, parsed)}
-            />
-          </Typography>
-        )}
-
-        {hasDraft && estCost != null && (
-          <Typography variant="body2" color="text.secondary">
-            Est. cost:
-            {' '}
-            <strong>{formatK(estCost)}</strong>
-            {' '}
-            @
-            {' '}
-            {formatPricePerL(price)}
-          </Typography>
-        )}
-
-        {localError && <Alert severity="error">{localError}</Alert>}
-
-        <Button
-          variant="contained"
-          size="medium"
-          fullWidth
-          onClick={handleDone}
-          disabled={disabled || saving}
-        >
-          {saving ? 'Saving…' : 'Done'}
-        </Button>
-      </Stack>
-    </Box>
-  );
-};
+import { isRefuelComplete, isRefuelSkipped, summarizeRefuelBuckets } from './utils/operationDayUtils.js';
+import PendingRefuelCard from './components/PendingRefuelCard.jsx';
+import CompletedRefuelCard from './components/CompletedRefuelCard.jsx';
+import OperationVehicleRow from './components/OperationVehicleRow.jsx';
+import OperationRunHeader from './components/OperationRunHeader.jsx';
 
 const OperationRunPage = () => {
-  const navigate = useNavigate();
   const { sessionId } = useParams();
   const user = useSelector((state) => state.session.user);
   const devicesItems = useSelector((state) => state.devices.items || {});
 
   const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [closing, setClosing] = useState(false);
-  const [closeOpen, setCloseOpen] = useState(false);
-  const [closeError, setCloseError] = useState('');
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [skippedOpen, setSkippedOpen] = useState(false);
 
   const loadSession = useCallback(async () => {
-    if (!sessionId || !user) return;
+    if (!sessionId || !user) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
       const details = await fetchOperationSessionDetails(user, sessionId);
       setSession(details);
       setError('');
     } catch (requestError) {
-      setError(requestError.message || 'Failed to load session');
+      setError(fuelApiErrorMessage(requestError, 'Failed to load session'));
+    } finally {
+      setLoading(false);
     }
   }, [sessionId, user]);
 
@@ -209,231 +57,180 @@ const OperationRunPage = () => {
     loadSession();
   }, [loadSession]);
 
-  const isClosed = session?.status === 'closed';
+  const effectiveStatus = session?.effectiveStatus || session?.status;
+  const isReadOnly = session?.isWritable === false || String(effectiveStatus).toLowerCase() === 'locked';
+  const canRecord = session?.canRecordFuel && !isReadOnly;
   const refuels = session?.refuels || [];
 
-  const pending = useMemo(() => refuels.filter(isPendingRow), [refuels]);
-  const completed = useMemo(() => refuels.filter((r) => !isPendingRow(r)), [refuels]);
-
-  const vehicleTotal = refuels.length;
-  const completedCount = completed.length;
-  const pendingCount = pending.length;
-
-  const plannedTotalL = useMemo(
-    () => refuels.reduce((acc, r) => {
-      const p = r.plannedFuelLitres != null ? Number(r.plannedFuelLitres) : null;
-      if (p != null && Number.isFinite(p) && p > 0) return acc + p;
-      const e = r.estimatedFuelLitres != null ? Number(r.estimatedFuelLitres) : 0;
-      return acc + (Number.isFinite(e) ? e : 0);
-    }, 0),
+  const active = useMemo(
+    () => refuels.filter((r) => !isRefuelComplete(r) && !isRefuelSkipped(r)),
     [refuels],
   );
+  const waiting = useMemo(() => active.filter((r) => r.arrivedAt == null), [active]);
+  const atPump = useMemo(() => active.filter((r) => r.arrivedAt != null), [active]);
+  const completed = useMemo(() => refuels.filter(isRefuelComplete), [refuels]);
+  const skipped = useMemo(() => refuels.filter(isRefuelSkipped), [refuels]);
+  const buckets = useMemo(() => summarizeRefuelBuckets(refuels), [refuels]);
 
-  const actualTotalL = Number(session?.totalActualFuel ?? 0);
-  const varianceL = actualTotalL - plannedTotalL;
+  const lockBanner = useMemo(() => {
+    if (!session?.locksAt) return null;
+    const locksAt = new Date(session.locksAt);
+    if (Number.isNaN(locksAt.getTime())) return null;
+    const ms = locksAt.getTime() - Date.now();
+    if (isReadOnly) {
+      return 'This Fueling Day is closed. Refuel lines are read-only.';
+    }
+    if (ms > 0 && ms <= 30 * 60 * 1000) {
+      return `Today's Fueling Day locks at ${locksAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+    }
+    return null;
+  }, [session?.locksAt, isReadOnly]);
 
-  const submitRefuel = async (update) => {
-    await submitSessionRefuelUpdates(user, sessionId, [update]);
+  const previousMileageByVehicle = useMemo(() => {
+    const map = {};
+    for (const r of completed) {
+      if (r.currentMileage != null) map[r.vehicleId] = Number(r.currentMileage);
+    }
+    return map;
+  }, [completed]);
+
+  const submitRefuel = async (payload) => {
+    await recordOperationRefuel(user, sessionId, payload);
     await loadSession();
   };
 
-  const closeSession = async () => {
-    setClosing(true);
-    setCloseError('');
-    try {
-      await closeOperationSession(user, sessionId);
-      setCloseOpen(false);
-      await loadSession();
-    } catch (requestError) {
-      setCloseError(requestError.message || 'Failed to close session');
-    } finally {
-      setClosing(false);
-    }
+  const submitArrived = async (refuelId) => {
+    await markRefuelArrived(user, sessionId, { refuelId });
+    await loadSession();
+  };
+
+  const submitSkip = async (refuelId, reason) => {
+    await skipOperationVehicle(user, sessionId, { refuelId, reason });
+    await loadSession();
   };
 
   return (
     <>
-      <Container maxWidth="sm" disableGutters sx={{ px: { xs: 1.25, sm: 2 }, py: RUNTIME_CONTAINER_PY }}>
-        <FleetWorkspaceShell>
-          <Box
-            sx={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 10,
-              bgcolor: 'var(--surface-workspace)',
-              pt: 0.75,
-              pb: 0.75,
-              mb: 0.75,
-              borderBottom: 1,
-              borderColor: 'divider',
-            }}
-          >
-            <Stack spacing={0.4}>
-              <Typography variant="subtitle2" fontWeight={800}>
-                {session?.name || `Session ${sessionId}`}
-              </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1}>
-                <Chip size="small" label={`${completedCount}/${vehicleTotal} done`} />
-                <Chip size="small" variant="outlined" label={`Pending ${pendingCount}`} />
-              </Stack>
-              <Stack direction="row" flexWrap="wrap" gap={2}>
-                <Typography variant="body2">
-                  Dispensed:
-                  {' '}
-                  <strong>{formatL(session?.totalActualFuel)}</strong>
-                </Typography>
-                <Typography variant="body2">
-                  Cost:
-                  {' '}
-                  <strong>{formatK(session?.totalActualCost)}</strong>
-                </Typography>
-              </Stack>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Button size="small" variant="outlined" onClick={() => navigate('/fleet/operation-sessions')}>
-                  Hub
-                </Button>
-                {!isClosed && (
-                  <Button size="small" color="warning" variant="contained" onClick={() => setCloseOpen(true)}>
-                    Close session
-                  </Button>
-                )}
-                {isClosed && <Chip label="Closed" color="default" size="small" />}
-              </Stack>
-            </Stack>
-          </Box>
+      <OperationRunHeader
+        session={session}
+        sessionId={sessionId}
+        buckets={buckets}
+      />
 
-          {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
 
-          {!session && !error && (
-            <Typography>Loading…</Typography>
+      {lockBanner && (
+        <Alert severity={isReadOnly ? 'info' : 'warning'} sx={{ mb: 1 }}>
+          {lockBanner}
+        </Alert>
+      )}
+
+      {!canRecord && !isReadOnly && session?.status === 'draft' && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          Start the Fueling Day from Prepare before recording refuels.
+        </Alert>
+      )}
+
+      {loading && (
+        <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {!loading && session && (
+        <Stack spacing={1.5}>
+          {active.length === 0 && (
+            <Alert severity="success">Every planned vehicle has been fueled or skipped.</Alert>
           )}
 
-          {session && (
-            <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
-              <Typography variant="subtitle2" fontWeight={800}>Pending refuel</Typography>
-              {pending.length === 0 && (
-                <Alert severity="success">All vehicles in this session are completed.</Alert>
-              )}
-              <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
-                {pending.map((refuel) => (
+          {atPump.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                At pump
+                <Typography component="span" variant="body2" color="text.secondary" fontWeight={400} sx={{ ml: 1 }}>
+                  ({atPump.length})
+                </Typography>
+              </Typography>
+              <Stack spacing={1.25}>
+                {atPump.map((refuel) => (
                   <PendingRefuelCard
                     key={refuel.id}
                     refuel={refuel}
                     device={devicesItems[refuel.vehicleId]}
-                    disabled={isClosed}
+                    disabled={!canRecord}
+                    previousMileage={previousMileageByVehicle[refuel.vehicleId]}
                     onDone={submitRefuel}
+                    onArrived={submitArrived}
+                    onSkip={canRecord ? submitSkip : undefined}
                   />
                 ))}
               </Stack>
-
-              <Accordion expanded={completedOpen} onChange={() => setCompletedOpen(!completedOpen)}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography fontWeight={600}>
-                    Completed refuels (
-                    {completed.length}
-                    )
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Stack spacing={0.75}>
-                    {completed.length === 0 && (
-                      <Typography variant="body2" color="text.secondary">None yet.</Typography>
-                    )}
-                    {completed.map((r) => {
-                      const dev = devicesItems[r.vehicleId];
-                      const pl = r.plannedFuelLitres != null ? Number(r.plannedFuelLitres) : null;
-                      const act = Number(r.actualFuelLitres);
-                      const varL = pl != null && Number.isFinite(pl) ? act - pl : null;
-                      return (
-                        <Box
-                          key={r.id}
-                          sx={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            alignItems: 'center',
-                            gap: 1,
-                            py: 1,
-                            borderBottom: 1,
-                            borderColor: 'divider',
-                          }}
-                        >
-                          <Typography variant="body2" fontWeight={600}>
-                            ✓
-                            {' '}
-                            {dev?.name || r.vehicleId}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {formatL(r.actualFuelLitres)}
-                            {' · '}
-                            {formatK(r.actualCost)}
-                            {varL != null && Number.isFinite(varL) && (
-                              <>
-                                {' · '}
-                                <Chip
-                                  size="small"
-                                  label={`${varL >= 0 ? '+' : ''}${varL.toFixed(1)} L`}
-                                  color={varianceTone(pl, act)}
-                                />
-                              </>
-                            )}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-            </Stack>
+            </Box>
           )}
-        </FleetWorkspaceShell>
-      </Container>
 
-      <Dialog open={closeOpen} onClose={() => !closing && setCloseOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Close session?</DialogTitle>
-        <DialogContent>
-          {closeError && <Alert severity="error" sx={{ mb: 1 }}>{closeError}</Alert>}
-          <Stack spacing={0.5}>
-            <Typography variant="body2">
-              <strong>Planned total:</strong>
-              {' '}
-              {formatL(plannedTotalL)}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Actual total:</strong>
-              {' '}
-              {formatL(actualTotalL)}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Variance:</strong>
-              {' '}
-              {varianceL >= 0 ? '+' : ''}
-              {varianceL.toFixed(1)}
-              {' '}
-              L
-            </Typography>
-            <Typography variant="body2">
-              <strong>Vehicles fueled:</strong>
-              {' '}
-              {completedCount}
-              {' '}
-              /
-              {' '}
-              {vehicleTotal}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Total cost:</strong>
-              {' '}
-              {formatK(session?.totalActualCost)}
-            </Typography>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCloseOpen(false)} disabled={closing}>Cancel</Button>
-          <Button color="warning" variant="contained" onClick={closeSession} disabled={closing}>
-            {closing ? 'Closing…' : 'Confirm close'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          {waiting.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                Waiting
+                <Typography component="span" variant="body2" color="text.secondary" fontWeight={400} sx={{ ml: 1 }}>
+                  ({waiting.length})
+                </Typography>
+              </Typography>
+              <Stack spacing={1.25}>
+                {waiting.map((refuel) => (
+                  <PendingRefuelCard
+                    key={refuel.id}
+                    refuel={refuel}
+                    device={devicesItems[refuel.vehicleId]}
+                    disabled={!canRecord}
+                    previousMileage={previousMileageByVehicle[refuel.vehicleId]}
+                    onDone={submitRefuel}
+                    onArrived={submitArrived}
+                    onSkip={canRecord ? submitSkip : undefined}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          <Accordion expanded={completedOpen} onChange={() => setCompletedOpen(!completedOpen)}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={600}>
+                Completed (
+                {completed.length}
+                )
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Stack spacing={0.75}>
+                {completed.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">None yet.</Typography>
+                )}
+                {completed.map((r) => (
+                  <CompletedRefuelCard key={r.id} refuel={r} />
+                ))}
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
+
+          {skipped.length > 0 && (
+            <Accordion expanded={skippedOpen} onChange={() => setSkippedOpen(!skippedOpen)}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography fontWeight={600}>
+                  Skipped (
+                  {skipped.length}
+                  )
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 0 }}>
+                {skipped.map((r) => (
+                  <OperationVehicleRow key={r.id} refuel={r} linkTarget="fuel" />
+                ))}
+              </AccordionDetails>
+            </Accordion>
+          )}
+        </Stack>
+      )}
     </>
   );
 };

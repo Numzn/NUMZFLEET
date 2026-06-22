@@ -12,8 +12,32 @@ export default (sequelize) => {
       allowNull: false,
       comment: 'Traccar user ID of session owner',
     },
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'company_id',
+      references: { model: 'companies', key: 'id' },
+    },
+    calendarDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+    },
+    reference: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+      comment: 'Human-friendly Fuel Day reference, e.g. FD-20260621-001',
+    },
+    fleetTimezone: {
+      type: DataTypes.STRING(64),
+      allowNull: false,
+      defaultValue: 'Africa/Lusaka',
+    },
     name: {
       type: DataTypes.STRING(120),
+      allowNull: true,
+    },
+    stationName: {
+      type: DataTypes.STRING(160),
       allowNull: true,
     },
     sessionDate: {
@@ -26,9 +50,46 @@ export default (sequelize) => {
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM('active', 'closed'),
+      type: DataTypes.ENUM('draft', 'approved', 'locked'),
       allowNull: false,
-      defaultValue: 'active',
+      defaultValue: 'draft',
+    },
+    approvedBy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    approvedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    approvedFuelPrice: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    approvedDieselPrice: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    approvedPetrolPrice: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    approvedBudget: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    approvedLitres: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    approvalVarianceExists: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    lockedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     totalEstimatedFuel: {
       type: DataTypes.DOUBLE,
@@ -64,8 +125,9 @@ export default (sequelize) => {
     timestamps: true,
     indexes: [
       { fields: ['userId'] },
-      { fields: ['sessionDate'] },
+      { fields: ['calendarDate'] },
       { fields: ['status'] },
+      { unique: true, fields: ['userId', 'calendarDate'] },
     ],
   });
 

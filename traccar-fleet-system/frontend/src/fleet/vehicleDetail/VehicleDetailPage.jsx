@@ -5,11 +5,8 @@ import FleetWorkspaceShell from '../../common/components/FleetWorkspaceShell';
 import { useManager } from '../../common/util/permissions';
 import useVehicleData from './useVehicleData';
 import { useLinkedGeofences } from './useLinkedGeofences.js';
-import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 import VehicleWorkspaceSkeleton from './VehicleWorkspaceSkeleton.jsx';
-import VehicleOperationsCard from './VehicleOperationsCard.jsx';
-import OperationsSection from './OperationsSection.jsx';
-import DiagnosticsSection from './DiagnosticsSection.jsx';
+import VehicleWorkspaceTabs from './VehicleWorkspaceTabs.jsx';
 
 const useStyles = makeStyles()(() => ({
   container: {
@@ -42,49 +39,9 @@ function VehicleWorkspaceError({ error, onRetry }) {
   );
 }
 
-function VehicleWorkspaceBody({
-  vehicle,
-  telemetry,
-  fuel,
-  erb,
-  alerts,
-  geofenceAlertsHidden,
-  geofenceAlertsSuppressed,
-  linkedZoneCount,
-  linkedZonesLoading,
-  livePosition,
-  deviceId,
-  motionLabel,
-  ignitionPhrase,
-  fleetVehicleId,
-}) {
-  const { sectionGap } = useVehicleWorkspaceDensity();
-
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: sectionGap, pb: 2 }}>
-      <VehicleOperationsCard
-        vehicle={vehicle}
-        fuel={fuel}
-        telemetry={telemetry}
-        motionLabel={motionLabel}
-        ignitionPhrase={ignitionPhrase}
-        livePosition={livePosition}
-        deviceId={deviceId}
-      />
-      <OperationsSection
-        alerts={alerts}
-        deviceId={deviceId}
-        fleetVehicleId={fleetVehicleId ?? vehicle?.id}
-        fuel={fuel}
-        erb={erb}
-        geofenceAlertsHidden={geofenceAlertsHidden}
-        geofenceAlertsSuppressed={geofenceAlertsSuppressed}
-        linkedZoneCount={linkedZoneCount}
-        linkedZonesLoading={linkedZonesLoading}
-      />
-      <DiagnosticsSection telemetry={telemetry} />
-    </Box>
-  );
+function VehicleWorkspaceBody(props) {
+  const { refresh, ...rest } = props;
+  return <VehicleWorkspaceTabs {...rest} onRefreshVehicle={refresh} />;
 }
 
 export default function VehicleDetailPage() {
@@ -106,6 +63,7 @@ export default function VehicleDetailPage() {
     livePosition,
     deviceId,
     motionLabel,
+    motionDurationLabel,
     ignitionPhrase,
   } = useVehicleData(vehicleId);
 
@@ -152,8 +110,10 @@ export default function VehicleDetailPage() {
             livePosition={livePosition}
             deviceId={deviceId}
             motionLabel={motionLabel}
+            motionDurationLabel={motionDurationLabel}
             ignitionPhrase={ignitionPhrase}
             fleetVehicleId={vehicle?.id ?? vehicleId}
+            refresh={refresh}
           />
         )}
 

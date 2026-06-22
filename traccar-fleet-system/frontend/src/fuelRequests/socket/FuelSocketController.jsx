@@ -9,6 +9,7 @@ import { notificationsActions } from '../../store/notifications/notificationsSli
 import { normalizeNotificationCreated } from '../../notifications/adapters/normalizeNotificationCreated.js';
 import { isUnifiedNotificationsEnabled } from '../../notifications/notificationFeatureFlags.js';
 import { requestNotificationSync } from '../../notifications/NotificationSyncController.jsx';
+import useFeatures from '../../common/util/useFeatures';
 
 const SOCKET_STATE = Object.freeze({
   CONNECTED: 'CONNECTED',
@@ -18,11 +19,40 @@ const SOCKET_STATE = Object.freeze({
   PAUSED: 'PAUSED',
 });
 
+const MAX_CONNECT_FAILURES_BEFORE_PAUSE = 5;
+const SOCKET_RECONNECT_ATTEMPTS = 20;
+
+/** Remote NumzLab dev: polling-only + no remembered WS upgrade reduces proxy/Tailscale flake. */
+const isRemoteFuelDev = () => Boolean(
+  import.meta.env.VITE_FUEL_API_URL || import.meta.env.VITE_FUEL_API_BASE_URL,
+);
+
+const buildSocketOptions = (user) => ({
+  transports: isRemoteFuelDev() ? ['polling'] : ['polling', 'websocket'],
+  timeout: 20000,
+  forceNew: true,
+  path: '/socket.io',
+  reconnection: true,
+  reconnectionDelay: 2000,
+  reconnectionDelayMax: 30000,
+  randomizationFactor: 0.5,
+  reconnectionAttempts: SOCKET_RECONNECT_ATTEMPTS,
+  withCredentials: true,
+  upgrade: true,
+  rememberUpgrade: !isRemoteFuelDev(),
+  autoConnect: true,
+  auth: {
+    userId: user?.id,
+    administrator: user?.administrator,
+  },
+});
+
 const FuelSocketController = () => {
   const dispatch = useDispatch();
   const authenticated = useSelector((state) => !!state.session.user);
   const user = useSelector((state) => state.session.user);
   const unified = useSelector(isUnifiedNotificationsEnabled);
+  const { enableFuelRequests } = useFeatures();
 
   const browserNotificationsEnabled = user?.attributes?.browserNotificationsEnabled !== false;
 
@@ -90,45 +120,54 @@ const FuelSocketController = () => {
 
     let socket = socketRef.current;
 
+    const pauseSocket = (sock, reason) => {
+      if (!sock) return;
+      try {
+        if (sock.io?.opts) sock.io.opts.reconnection = false;
+        sock.disconnect();
+      } catch (err) {
+        diag.warn('fuel_socket_pause_failed', { error: String(err && err.message) });
+      }
+      setState(SOCKET_STATE.OFFLINE, reason);
+    };
+
+    const resumeSocket = (sock, reason) => {
+      if (!sock) return;
+      failureStreakRef.current = 0;
+      try {
+        if (sock.io?.opts) sock.io.opts.reconnection = true;
+        sock.auth = {
+          userId: userRef.current?.id,
+          administrator: userRef.current?.administrator,
+        };
+        if (!sock.connected) sock.connect();
+      } catch (err) {
+        diag.warn('fuel_socket_resume_failed', { error: String(err && err.message) });
+      }
+      setState(SOCKET_STATE.RECONNECTING, reason);
+    };
+
     if (!socket || (!socket.connected && !socket.active)) {
       if (socket) {
         socket.removeAllListeners();
         socket.disconnect();
       }
 
-      socket = io(fuelApiUrl, {
-        transports: ['polling', 'websocket'],
-        timeout: 20000,
-        forceNew: false,
-        path: '/socket.io',
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 10000,
-        randomizationFactor: 0.5,
-        reconnectionAttempts: Infinity,
-        withCredentials: true,
-        upgrade: true,
-        rememberUpgrade: true,
-        autoConnect: true,
-        auth: {
-          userId: user?.id,
-          administrator: user?.administrator,
-        },
-      });
+      socket = io(fuelApiUrl, buildSocketOptions(user));
 
       socketRef.current = socket;
       setState(SOCKET_STATE.RECONNECTING, 'init');
+    } else if (socket.auth) {
+      socket.auth.userId = user?.id;
+      socket.auth.administrator = user?.administrator;
     }
 
     const initialSnap = ConnectivityService.getSnapshot();
-    if (!initialSnap.isBrowserOnline) {
-      try {
-        if (socket.io && socket.io.opts) socket.io.opts.reconnection = false;
-        socket.disconnect();
-      } catch (err) {
-        diag.warn('fuel_socket_pause_failed', { error: String(err && err.message) });
-      }
-      setState(SOCKET_STATE.OFFLINE, 'browser_offline');
+    if (!initialSnap.isBrowserOnline || !initialSnap.backendReachable) {
+      pauseSocket(
+        socket,
+        !initialSnap.isBrowserOnline ? 'browser_offline' : 'backend_unreachable',
+      );
     }
 
     const showSmartNotification = (request, change, eventType) => {
@@ -222,47 +261,52 @@ const FuelSocketController = () => {
     socket.off('fuel-request-created');
     socket.off('fuel-request-updated');
 
-    socket.on('fuel-request-created', (data) => {
-      const request = data.request || data;
-      const change = data.change;
+    // Legacy driver fuel requests can be disabled by an admin; when off, skip
+    // these listeners to avoid noise. Other channels (notifications,
+    // immobilization, ERB prices) stay active.
+    if (enableFuelRequests) {
+      socket.on('fuel-request-created', (data) => {
+        const request = data.request || data;
+        const change = data.change;
 
-      dispatchRef.current(fuelRequestsActions.update([request]));
+        dispatchRef.current(fuelRequestsActions.update([request]));
 
-      if (unified) {
-        return;
-      }
-
-      if (userRef.current?.administrator) {
-        showSmartNotification(request, change, 'fuel-request-created');
-      }
-    });
-
-    socket.on('fuel-request-updated', (data) => {
-      const request = data.request || data;
-      const change = data.change;
-
-      if (!change) {
-        diag.log('fuel_event_no_change', { id: request?.id });
-      }
-
-      dispatchRef.current(fuelRequestsActions.update([request]));
-
-      if (unified) {
-        return;
-      }
-
-      if (change) {
-        showSmartNotification(request, change, 'fuel-request-updated');
-      } else if (!userRef.current?.administrator && request.userId === userRef.current?.id) {
-        if (showToastRef.current) {
-          showToastRef.current('Your fuel request was updated', 'info', undefined, { skipPush: true });
+        if (unified) {
+          return;
         }
-      }
-    });
+
+        if (userRef.current?.administrator) {
+          showSmartNotification(request, change, 'fuel-request-created');
+        }
+      });
+
+      socket.on('fuel-request-updated', (data) => {
+        const request = data.request || data;
+        const change = data.change;
+
+        if (!change) {
+          diag.log('fuel_event_no_change', { id: request?.id });
+        }
+
+        dispatchRef.current(fuelRequestsActions.update([request]));
+
+        if (unified) {
+          return;
+        }
+
+        if (change) {
+          showSmartNotification(request, change, 'fuel-request-updated');
+        } else if (!userRef.current?.administrator && request.userId === userRef.current?.id) {
+          if (showToastRef.current) {
+            showToastRef.current('Your fuel request was updated', 'info', undefined, { skipPush: true });
+          }
+        }
+      });
+    }
 
     socket.off('vehicle-assignment-updated');
     socket.on('vehicle-assignment-updated', () => {
-      /* unified bell: notification.created only */
+      window.dispatchEvent(new CustomEvent('numz:fleet-vehicles-changed'));
     });
 
     socket.off('erbPricesUpdated');
@@ -322,36 +366,38 @@ const FuelSocketController = () => {
       });
       ConnectivityService.notifyFailure(error);
 
-      if (failureStreakRef.current >= 3 && stateRef.current !== SOCKET_STATE.OFFLINE) {
+      const snap = ConnectivityService.getSnapshot();
+      if (
+        failureStreakRef.current >= MAX_CONNECT_FAILURES_BEFORE_PAUSE
+        || !snap.backendReachable
+      ) {
+        pauseSocket(socketRef.current, 'too_many_errors');
         setState(SOCKET_STATE.FAILED, 'too_many_errors');
+      } else if (failureStreakRef.current >= 3 && stateRef.current !== SOCKET_STATE.OFFLINE) {
+        setState(SOCKET_STATE.FAILED, 'transport_errors');
       }
     });
 
     const unsubscribeConnectivity = ConnectivityService.subscribe((snap) => {
       if (!socketRef.current) return;
       const sock = socketRef.current;
+      const shouldPause = !snap.isBrowserOnline || !snap.backendReachable;
 
-      if (!snap.isBrowserOnline) {
+      if (shouldPause) {
         if (stateRef.current !== SOCKET_STATE.OFFLINE) {
-          try {
-            if (sock.io && sock.io.opts) sock.io.opts.reconnection = false;
-            sock.disconnect();
-          } catch (err) {
-            diag.warn('fuel_socket_pause_failed', { error: String(err && err.message) });
-          }
-          setState(SOCKET_STATE.OFFLINE, 'connectivity_offline');
+          pauseSocket(
+            sock,
+            !snap.isBrowserOnline ? 'connectivity_offline' : 'backend_unreachable',
+          );
         }
         return;
       }
 
-      if (stateRef.current === SOCKET_STATE.OFFLINE) {
-        try {
-          if (sock.io && sock.io.opts) sock.io.opts.reconnection = true;
-          if (!sock.connected) sock.connect();
-        } catch (err) {
-          diag.warn('fuel_socket_resume_failed', { error: String(err && err.message) });
-        }
-        setState(SOCKET_STATE.RECONNECTING, 'connectivity_online');
+      if (
+        stateRef.current === SOCKET_STATE.OFFLINE
+        || stateRef.current === SOCKET_STATE.FAILED
+      ) {
+        resumeSocket(sock, 'connectivity_online');
       }
     });
 
@@ -371,7 +417,7 @@ const FuelSocketController = () => {
       shownNotificationsRef.current.clear();
       failureStreakRef.current = 0;
     };
-  }, [authenticated, user?.id, unified]);
+  }, [authenticated, user?.id, unified, enableFuelRequests]);
 
   if (unified) {
     return null;

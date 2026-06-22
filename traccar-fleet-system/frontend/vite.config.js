@@ -40,6 +40,13 @@ export default defineConfig(({ mode }) => {
     console.log(`   API Base: ${apiBaseUrl}`);
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
+  } else if (isLocalDev) {
+    // Docker on localhost + Vite HMR (`npm run start:local`). Must win over REMOTE_* in .env.
+    traccarUrl = 'http://localhost:8082';
+    fuelApiUrl = 'http://localhost:3000';
+    console.log('🔧 [Vite] Running in LOCAL development mode');
+    console.log(`   Traccar: ${traccarUrl}`);
+    console.log(`   Fuel API: ${fuelApiUrl}`);
   } else if (remoteApiBaseUrl) {
     // Local frontend + hosted Traccar: fuel-api usually runs on Docker localhost:3000, not on the remote host.
     const fuelUsesRemote = env.VITE_FUEL_PROXY_USE_REMOTE === 'true';
@@ -59,13 +66,6 @@ export default defineConfig(({ mode }) => {
             : ' (default localhost:3000)'
       }`
     );
-  } else if (isLocalDev) {
-    // Local development
-    traccarUrl = 'http://localhost:8082';
-    fuelApiUrl = 'http://localhost:3000';
-    console.log('🔧 [Vite] Running in LOCAL development mode');
-    console.log(`   Traccar: ${traccarUrl}`);
-    console.log(`   Fuel API: ${fuelApiUrl}`);
   } else {
     // Vite runs on the host; root Compose maps traccar:8082 and backend (fuel-api):3000 to localhost.
     // Set VITE_PROXY_INTERNAL_DOCKER=true only if the dev server runs inside the Compose network.
@@ -93,6 +93,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: devServerPort,
+      // Fail fast when the port is taken — avoids a second Vite on :5175 that shares the same proxy target and amplifies Socket.IO reconnect storms.
+      strictPort: !isProd,
       host: '0.0.0.0',
       ...(useCustomHmr
         ? {
@@ -217,6 +219,28 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      '/api/auth': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: { '*': 'localhost' },
+      },
+      '/api/fleet': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: { '*': 'localhost' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
       '/api/notifications': {
         target: fuelApiUrl,
         changeOrigin: true,
@@ -263,6 +287,12 @@ export default defineConfig(({ mode }) => {
       },
       // Fuel API: public login insight (must be before catch-all /api → Traccar)
       '/api/public': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+      },
+      // fuel-api health (must be before catch-all /api → Traccar). Setup save uses /api/vehicles on fuel-api.
+      '/api/health': {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,

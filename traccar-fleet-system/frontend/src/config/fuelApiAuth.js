@@ -22,3 +22,15 @@ export function fuelApiAuthHeaders(user) {
   }
   return headers;
 }
+
+/** Multipart upload — do not set Content-Type; the browser adds the boundary. */
+export function fuelApiMultipartHeaders(user) {
+  const headers = {};
+  const sendUserIdOff =
+    String(import.meta.env.VITE_FUEL_SEND_USER_ID || '').toLowerCase() === 'false';
+  const uid = resolveTraccarUserId(user);
+  if (!sendUserIdOff && uid != null) {
+    headers['x-user-id'] = String(uid);
+  }
+  return headers;
+}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { fuelApiErrorMessage } from '../../vehiclesApi.js';
 
 export const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'CNG'];
 
@@ -11,7 +12,6 @@ const defaultForm = () => ({
   lowFuelThresholdPct: '15',
   lPer100km: '',
   updateIntervalSec: '10',
-  geofenceEnabled: false,
   geofenceRadiusM: '300',
   alLow: true,
   alSpeed: true,
@@ -47,7 +47,6 @@ export function buildFormFromVehicle(vehicle) {
     lPer100km:
       eff != null && Number(eff) > 0 ? String(Math.round((100 / Number(eff)) * 10) / 10) : '',
     updateIntervalSec: fleet?.updateIntervalSec != null ? String(fleet.updateIntervalSec) : '10',
-    geofenceEnabled: fleetBool(fleet?.geofenceEnabled, false),
     geofenceRadiusM: fleet?.geofenceRadiusM != null ? String(fleet.geofenceRadiusM) : '300',
     alLow: fleet?.alerts?.lowFuel !== false,
     alSpeed: fleet?.alerts?.speeding !== false,
@@ -108,7 +107,7 @@ export default function useVehicleSetupForm(vehicle) {
         fuelConsumptionLPer100km: form.lPer100km === '' ? null : Number(form.lPer100km),
         lowFuelThresholdPct: form.lowFuelThresholdPct === '' ? null : Number(form.lowFuelThresholdPct),
         updateIntervalSec: form.updateIntervalSec === '' ? null : Number(form.updateIntervalSec),
-        geofenceEnabled: form.geofenceEnabled,
+        geofenceEnabled: form.alGeo !== false,
         geofenceRadiusM: form.geofenceRadiusM === '' ? null : Number(form.geofenceRadiusM),
         alerts: {
           lowFuel: form.alLow,
@@ -139,7 +138,10 @@ export default function useVehicleSetupForm(vehicle) {
         }
         return merged;
       } catch (e) {
-        const msg = e.message || 'Save failed';
+        const msg = fuelApiErrorMessage(
+          e,
+          'Save failed — check NumzLab connection (Fuel API) and try again.',
+        );
         setErr(msg);
         throw e;
       } finally {

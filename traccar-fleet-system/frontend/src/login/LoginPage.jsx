@@ -80,13 +80,22 @@ const LoginPage = () => {
     event.preventDefault();
     setFailed(false);
     try {
-      const query = `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
-      const response = await traccarFetch('/api/session', {
+      let response = await fetch('/api/auth/login', {
         method: 'POST',
-        body: new URLSearchParams(code.length ? `${query}&code=${code}` : query),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, code: code || undefined }),
       });
+      if (response.status === 404 || response.status === 502) {
+        const query = `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
+        response = await traccarFetch('/api/session', {
+          method: 'POST',
+          body: new URLSearchParams(code.length ? `${query}&code=${code}` : query),
+        });
+      }
       if (response.ok) {
-        const user = await response.json();
+        const payload = await response.json();
+        const user = payload.user || payload;
         generateLoginToken();
         dispatch(sessionActions.updateUser(user));
         const target = window.sessionStorage.getItem('postLogin') || '/';

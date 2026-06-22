@@ -278,6 +278,33 @@ const ServerPage = () => {
                 />
               </AccordionDetails>
             </Accordion>
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle1">
+                  NUMZFLEET Fuel
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails className={classes.details}>
+                <FormGroup>
+                  <FormControlLabel
+                    control={(
+                      <Checkbox
+                        checked={item.attributes?.['numz.enableFuelRequests'] !== false}
+                        onChange={(event) => setItem({
+                          ...item,
+                          attributes: { ...item.attributes, 'numz.enableFuelRequests': event.target.checked },
+                        })}
+                      />
+                    )}
+                    label="Enable driver fuel requests"
+                  />
+                </FormGroup>
+                <Typography variant="caption" color="text.secondary">
+                  Turns the legacy Driver requests workflow on or off across the app.
+                  Daily fuel operations stay available either way.
+                </Typography>
+              </AccordionDetails>
+            </Accordion>
             <EditAttributesAccordion
               attributes={item.attributes}
               setAttributes={(attributes) => setItem({ ...item, attributes })}

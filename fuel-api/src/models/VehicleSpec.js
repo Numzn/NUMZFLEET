@@ -31,6 +31,26 @@ export default (sequelize) => {
       defaultValue: 'Petrol',
       comment: 'Fuel type (Petrol, Diesel, etc.)'
     },
+    verifiedOdometerKm: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'Last trusted odometer reading (km)'
+    },
+    verifiedOdometerAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'When the verified odometer was captured'
+    },
+    verifiedOdometerSource: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+      comment: 'onboarding / service / audit / manual'
+    },
+    verifiedTraccarDistance: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'Traccar totalDistance snapshot at verification (for delta math)'
+    },
     lastUpdated: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

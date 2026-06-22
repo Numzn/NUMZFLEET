@@ -65,9 +65,9 @@ export default function DeviceTelemetryModule({
           </Button>
         </Box>
       )}
-      {vehicleId && !canSaveSpecs && (
+      {!canSaveSpecs && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Open Fleet vehicles to assign device ID {vehicleId ? '' : ''} to this vehicle.
+          Open Fleet vehicles to assign a tracker to this vehicle.
         </Typography>
       )}
     </>

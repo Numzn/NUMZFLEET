@@ -19,6 +19,7 @@ import MapRouteCoordinates from '../map/MapRouteCoordinates';
 import MapScale from '../map/MapScale';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import { traccarPath } from '../config/traccarApi.js';
+import useReportDeviceLabel from './common/useReportDeviceLabel';
 
 const CombinedReportPage = () => {
   const { classes } = useReportStyles();
@@ -28,6 +29,7 @@ const CombinedReportPage = () => {
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { primaryForDevice } = useReportDeviceLabel();
 
   const itemsCoordinates = useMemo(() => items.flatMap((item) => item.route), [items]);
 
@@ -61,7 +63,7 @@ const CombinedReportPage = () => {
               {items.map((item) => (
                 <MapRouteCoordinates
                   key={item.deviceId}
-                  name={devices[item.deviceId].name}
+                  name={primaryForDevice(item.deviceId)}
                   coordinates={item.route}
                   deviceId={item.deviceId}
                 />
@@ -87,7 +89,7 @@ const CombinedReportPage = () => {
             <TableBody>
               {!loading ? items.flatMap((item) => item.events.map((event, index) => (
                 <TableRow key={event.id}>
-                  <TableCell>{index ? '' : devices[item.deviceId].name}</TableCell>
+                  <TableCell>{index ? '' : primaryForDevice(item.deviceId)}</TableCell>
                   <TableCell>{formatTime(event.eventTime, 'seconds')}</TableCell>
                   <TableCell>{t(prefixString('event', event.type))}</TableCell>
                 </TableRow>

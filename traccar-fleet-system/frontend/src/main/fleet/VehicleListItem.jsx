@@ -11,7 +11,9 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { devicesActions } from '../../store';
 import DeviceQuickActions from './DeviceQuickActions';
-import { getIgnitionPhrase, getMotionLabel } from '../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from '../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
+import VehicleLocationLine from '../../common/components/VehicleLocationLine';
 
 dayjs.extend(relativeTime);
 
@@ -55,20 +57,26 @@ const VehicleListItem = ({
 }) => {
   const theme = useTheme();
   const dispatch = useDispatch();
+  const { getDisplayForDevice } = useVehicleDisplayContext();
+  const display = getDisplayForDevice(device.id, device);
 
   const speedKmh = position ? Math.round(Number(position.speed || 0) * 1.852) : null;
   const motionDotColor = device.status !== 'online'
     ? theme.palette.error.main
     : (position && Number(position.speed) > 0 ? theme.palette.success.main : theme.palette.warning.main);
 
-  let motionLabel = getMotionLabel(device.status, position?.speed);
+  const motionLabel = getMotionLabel(device.status, position?.speed);
+  const motionDuration = device.status === 'online'
+    ? getMotionDurationLabel(device.id, device.status, position?.speed)
+    : null;
+  const motionDisplay = motionDuration ? `${motionLabel} ${motionDuration}` : motionLabel;
 
   const fixRel = position?.fixTime ? dayjs(position.fixTime).fromNow() : null;
 
   const rawDist = position?.attributes?.distance ?? device.attributes?.distance;
   const todayDistInsight = formatDistanceTodayInsight(rawDist);
 
-  const address = position?.address?.trim?.() || '';
+  const hasFix = position?.latitude != null && position?.longitude != null;
   const ign = device.status === 'online' ? getIgnitionPhrase(position?.attributes) : null;
 
   const telemetryParts = [];
@@ -139,20 +147,35 @@ const VehicleListItem = ({
           <Box sx={{ flex: 1, minWidth: 0, display: 'flex', gap: 0.75 }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 0.75, minWidth: 0 }}>
-                <Typography
-                  variant="body2"
-                  noWrap
-                  sx={{
-                    flex: 1,
-                    minWidth: 0,
-                    fontWeight: 800,
-                    fontSize: '0.8125rem',
-                    lineHeight: 1.2,
-                    color: 'text.primary',
-                  }}
-                >
-                  {device.name}
-                </Typography>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography
+                    variant="body2"
+                    noWrap
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: '0.8125rem',
+                      lineHeight: 1.2,
+                      color: 'text.primary',
+                    }}
+                  >
+                    {display.primary}
+                  </Typography>
+                  {display.secondary ? (
+                    <Typography
+                      variant="caption"
+                      noWrap
+                      sx={{
+                        display: 'block',
+                        fontSize: '0.62rem',
+                        lineHeight: 1.2,
+                        color: 'text.secondary',
+                        opacity: theme.palette.mode === 'dark' ? 0.72 : 0.78,
+                      }}
+                    >
+                      {display.secondary}
+                    </Typography>
+                  ) : null}
+                </Box>
                 <Typography
                   variant="caption"
                   noWrap
@@ -165,7 +188,7 @@ const VehicleListItem = ({
                     opacity: theme.palette.mode === 'dark' ? 0.72 : 0.78,
                   }}
                 >
-                  {motionLabel}
+                  {motionDisplay}
                 </Typography>
               </Box>
               <Typography
@@ -183,11 +206,11 @@ const VehicleListItem = ({
               >
                 {telemetryLine || '—'}
               </Typography>
-              {address ? (
+              {hasFix ? (
                 <Typography
+                  component="div"
                   variant="caption"
                   noWrap
-                  title={address}
                   sx={{
                     display: 'block',
                     mt: 0.08,
@@ -197,7 +220,7 @@ const VehicleListItem = ({
                     opacity: 0.75,
                   }}
                 >
-                  {address}
+                  <VehicleLocationLine position={position} showCoordsFallback={false} />
                 </Typography>
               ) : null}
             </Box>

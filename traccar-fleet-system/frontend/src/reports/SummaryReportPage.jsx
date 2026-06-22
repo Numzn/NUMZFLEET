@@ -19,7 +19,7 @@ import useReportStyles from './common/useReportStyles';
 import TableShimmer from '../common/components/TableShimmer';
 import scheduleReport from './common/scheduleReport';
 import fetchOrThrow from '../common/util/fetchOrThrow';
-import exportExcel from '../common/util/exportExcel';
+import useReportDeviceLabel from './common/useReportDeviceLabel';
 
 const columnsArray = [
   ['startTime', 'reportStartDate'],
@@ -53,6 +53,7 @@ const SummaryReportPage = () => {
   const daily = searchParams.get('daily') === 'true';
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { primaryForDevice } = useReportDeviceLabel();
 
   const onShow = useCatch(async ({ deviceIds, groupIds, from, to }) => {
     const query = new URLSearchParams({ from, to, daily });
@@ -73,7 +74,7 @@ const SummaryReportPage = () => {
     const rows = [];
     const deviceHeader = t('sharedDevice');
     items.forEach((item) => {
-      const row = { [deviceHeader]: devices[item.deviceId].name };
+      const row = { [deviceHeader]: primaryForDevice(item.deviceId) };
       columns.forEach((key) => {
         const header = t(columnsMap.get(key));
         row[header] = formatValue(item, key);
@@ -100,7 +101,7 @@ const SummaryReportPage = () => {
     const value = item[key];
     switch (key) {
       case 'deviceId':
-        return devices[value].name;
+        return primaryForDevice(value);
       case 'startTime':
         return formatTime(value, 'date');
       case 'startOdometer':
@@ -151,7 +152,7 @@ const SummaryReportPage = () => {
         <TableBody>
           {!loading ? items.map((item) => (
             <TableRow key={(`${item.deviceId}_${Date.parse(item.startTime)}`)}>
-              <TableCell>{devices[item.deviceId].name}</TableCell>
+              <TableCell>{primaryForDevice(item.deviceId)}</TableCell>
               {columns.map((key) => (
                 <TableCell key={key}>
                   {formatValue(item, key)}

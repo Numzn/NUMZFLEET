@@ -19,6 +19,12 @@ export default (sequelize) => {
         allowNull: false,
         field: 'deviceId',
       },
+      companyId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        field: 'company_id',
+        references: { model: 'companies', key: 'id' },
+      },
       action: {
         type: DataTypes.ENUM('immobilize', 'mobilize'),
         allowNull: false,

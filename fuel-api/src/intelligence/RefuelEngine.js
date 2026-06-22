@@ -112,6 +112,7 @@ export function buildPrefillRefuelRow({
   pricePerLitre,
   sessionDate,
   plannedFuelLitres = null,
+  fuelTypeSnapshot = null,
 }) {
   const {
     hasValidCapacity,
@@ -155,6 +156,7 @@ export function buildPrefillRefuelRow({
     variancePercent: null,
     status,
     erbPricePerLitre: pricePerLitre,
+    fuelTypeSnapshot,
     estimatedCost,
     actualCost: null,
     tankLevelStart: levelFrac,

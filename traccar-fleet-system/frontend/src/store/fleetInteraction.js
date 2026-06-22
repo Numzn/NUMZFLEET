@@ -1,4 +1,9 @@
 import { createSlice } from '@reduxjs/toolkit';
+import {
+  SHEET_LEVEL,
+  SHEET_MAX_LEVEL_SPRINT1,
+  clampSheetLevel,
+} from '../main/fleet/fleetSheetConstants.js';
 
 /**
  * Fleet operations UI state (sidebar, drawer, hover sync).
@@ -18,6 +23,11 @@ const { reducer, actions } = createSlice({
     listScrollTargetDeviceId: null,
     /** Operational workspace shell (future: alerts, trips, …) */
     fleetWorkspaceMode: 'live',
+    /**
+     * Mobile Fleet Command bottom sheet depth (snap derived from level).
+     * 0 = closed, 1 = overview, 2 = list, 3 = command (2–3 reserved after Sprint 1).
+     */
+    sheetLevel: SHEET_LEVEL.LIST,
   },
   reducers: {
     setHoveredDeviceId(state, action) {
@@ -50,8 +60,19 @@ const { reducer, actions } = createSlice({
     clearListScrollTarget(state) {
       state.listScrollTargetDeviceId = null;
     },
+    setSheetLevel(state, action) {
+      state.sheetLevel = clampSheetLevel(action.payload);
+    },
+    expandSheet(state) {
+      state.sheetLevel = clampSheetLevel(state.sheetLevel + 1);
+    },
+    collapseSheet(state) {
+      state.sheetLevel = clampSheetLevel(state.sheetLevel - 1);
+    },
   },
 });
+
+export { SHEET_MAX_LEVEL_SPRINT1, SHEET_LEVEL };
 
 export { actions as fleetInteractionActions };
 export { reducer as fleetInteractionReducer };

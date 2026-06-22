@@ -56,6 +56,7 @@ jobs:
           build-args: |
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'http://100.121.79.2:3003' }}
             VITE_TRACCAR_PREFIX=/traccar
+            VITE_FLEET_COMMAND_SHEET=1
             BUILD_REF=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

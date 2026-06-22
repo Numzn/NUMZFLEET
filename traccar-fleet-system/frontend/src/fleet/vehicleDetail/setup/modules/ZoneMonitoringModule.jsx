@@ -106,7 +106,8 @@ export default function ZoneMonitoringModule({
         <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4.5 }}>
           When enabled, managers receive alerts when a vehicle enters or exits assigned zones.
           Also controls visibility in this vehicle&apos;s workspace alert list. Events are still
-          recorded by the platform.
+          recorded by the platform. Low fuel, speeding, and engine-cut alerts are under{' '}
+          <strong>Alerts &amp; Monitoring</strong> below.
         </Typography>
       </Box>
 

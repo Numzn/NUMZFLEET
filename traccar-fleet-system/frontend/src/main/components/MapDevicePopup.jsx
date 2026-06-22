@@ -6,18 +6,12 @@ import {
   Paper,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
 import { map } from '../../map/core/MapView';
 import DeviceQuickActions from '../fleet/DeviceQuickActions';
-
-function deviceIcon(device, sx) {
-  const c = (device.category || device.attributes?.deviceType)?.toLowerCase?.();
-  if (c === 'truck' || c === 'van') return <LocalShippingIcon sx={sx} />;
-  if (c === 'motorcycle' || c === 'bike') return <TwoWheelerIcon sx={sx} />;
-  return <DirectionsCarIcon sx={sx} />;
-}
+import fleetDeviceIcon from '../fleet/fleetDeviceIcon.jsx';
+import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
+import { getMotionDurationLabel, getMotionLabel } from '../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import VehicleLocationLine from '../../common/components/VehicleLocationLine';
 
 /**
  * Lightweight anchored popup — mobile fallback; actions shared with fleet sidebar.
@@ -29,6 +23,8 @@ const MapDevicePopup = ({
   onClose,
 }) => {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const { getDisplayForDevice } = useVehicleDisplayContext();
+  const display = getDisplayForDevice(device?.id, device);
 
   useEffect(() => {
     if (!position?.longitude || !position?.latitude || !map || !map.loaded?.()) return undefined;
@@ -57,6 +53,15 @@ const MapDevicePopup = ({
   if (!device || !position || device.id == null) return null;
 
   const speedKmh = Math.round((position.speed || 0) * 1.852);
+  const motionLabel = getMotionLabel(device.status, position.speed);
+  const motionDuration = device.status === 'online'
+    ? getMotionDurationLabel(device.id, device.status, position.speed)
+    : null;
+  const statusLine = [
+    `${speedKmh} km/h`,
+    motionDuration ? `${motionLabel} ${motionDuration}` : motionLabel,
+  ].join(' · ');
+  const hasFix = position.latitude != null && position.longitude != null;
 
   return (
     <Paper
@@ -77,19 +82,31 @@ const MapDevicePopup = ({
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
         <Box sx={{ pt: 0.15 }}>
-          {deviceIcon(device, { fontSize: '1.1rem', color: 'primary.main' })}
+          {fleetDeviceIcon(device, { fontSize: '1.1rem', color: 'primary.main' })}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="subtitle2" fontWeight={800} noWrap>
-            {device.name}
+            {display.primary}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {speedKmh}
-            {' '}
-            km/h ·
-            {' '}
-            {device.status === 'online' ? 'Online' : 'Offline'}
+          {display.secondary ? (
+            <Typography variant="caption" color="text.secondary" noWrap display="block">
+              {display.secondary}
+            </Typography>
+          ) : null}
+          <Typography variant="caption" color="text.secondary" display="block">
+            {statusLine}
           </Typography>
+          {hasFix ? (
+            <Typography
+              component="div"
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              sx={{ display: 'block', mt: 0.25 }}
+            >
+              <VehicleLocationLine position={position} />
+            </Typography>
+          ) : null}
         </Box>
         <IconButton size="small" onClick={onClose} sx={{ mt: -0.5 }} aria-label="Close">
           <CloseIcon fontSize="small" />

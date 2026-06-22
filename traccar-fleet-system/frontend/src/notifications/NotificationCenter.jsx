@@ -14,11 +14,12 @@ import {
   CircularProgress,
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   selectUnreadCount,
-  selectNotificationsWithFilters,
-  selectGroupedByDayBucket,
+  makeSelectNotificationsWithFilters,
+  makeSelectGroupedByDayBucket,
 } from '../store/notifications/notificationSelectors.js';
 import { notificationsActions } from '../store/notifications/notificationsSlice.js';
 import { isNotificationPersistenceSyncEnabled } from './notificationFeatureFlags.js';
@@ -40,6 +41,7 @@ const defaultFilters = () => ({
 
 const NotificationCenter = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
   const [filters, setFilters] = useState(defaultFilters);
   const [loading, setLoading] = useState(false);
@@ -48,18 +50,21 @@ const NotificationCenter = () => {
   const persistence = useSelector(isNotificationPersistenceSyncEnabled);
   const user = useSelector((s) => s.session.user);
   const unread = useSelector(selectUnreadCount);
-  const filtered = useSelector((s) => selectNotificationsWithFilters(s, {
+
+  // Stable reference — only changes when filter field values change.
+  const filterArgs = useMemo(() => ({
     category: filters.category || undefined,
     severity: filters.severity || undefined,
     read: filters.read === 'all' ? undefined : filters.read,
     archived: filters.archived,
-  }));
-  const grouped = useSelector((s) => selectGroupedByDayBucket(s, {
-    category: filters.category || undefined,
-    severity: filters.severity || undefined,
-    read: filters.read === 'all' ? undefined : filters.read,
-    archived: filters.archived,
-  }));
+  }), [filters.category, filters.severity, filters.read, filters.archived]);
+
+  // Per-instance memoized selectors so each component gets its own cache.
+  const selectFiltered = useMemo(() => makeSelectNotificationsWithFilters(), []);
+  const selectGrouped = useMemo(() => makeSelectGroupedByDayBucket(), []);
+
+  const filtered = useSelector((s) => selectFiltered(s, filterArgs));
+  const grouped = useSelector((s) => selectGrouped(s, filterArgs));
 
   const sortedDays = useMemo(() => Object.keys(grouped).sort((a, b) => b.localeCompare(a)), [grouped]);
 
@@ -137,6 +142,14 @@ const NotificationCenter = () => {
         console.warn(e);
       }
     }
+  };
+
+  const onOpenNotification = (n) => {
+    const deepLink = n?.metadata?.deepLink;
+    if (!deepLink) return;
+    if (!n.read) onMarkRead(n.id, n);
+    handleClose();
+    navigate(deepLink);
   };
 
   const onAcknowledge = async (id) => {
@@ -244,7 +257,15 @@ const NotificationCenter = () => {
                   <ListItemButton
                     key={n.id}
                     alignItems="flex-start"
-                    sx={{ borderRadius: 1, mb: 0.5, flexDirection: 'column', alignItems: 'stretch' }}
+                    disableRipple={!n.metadata?.deepLink}
+                    onClick={n.metadata?.deepLink ? () => onOpenNotification(n) : undefined}
+                    sx={{
+                      borderRadius: 1,
+                      mb: 0.5,
+                      flexDirection: 'column',
+                      alignItems: 'stretch',
+                      cursor: n.metadata?.deepLink ? 'pointer' : 'default',
+                    }}
                   >
                     <ListItemText
                       primaryTypographyProps={{ variant: 'subtitle2', fontWeight: 600 }}
@@ -253,10 +274,26 @@ const NotificationCenter = () => {
                     />
                     <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
                       {!n.read && (
-                        <Button size="small" onClick={() => onMarkRead(n.id, n)}>Read</Button>
+                        <Button
+                          size="small"
+                          onClick={(e) => { e.stopPropagation(); onMarkRead(n.id, n); }}
+                        >
+                          Read
+                        </Button>
                       )}
-                      <Button size="small" onClick={() => onAcknowledge(n.id)}>Acknowledge</Button>
-                      <Button size="small" color="inherit" onClick={() => onArchive(n.id)}>Archive</Button>
+                      <Button
+                        size="small"
+                        onClick={(e) => { e.stopPropagation(); onAcknowledge(n.id); }}
+                      >
+                        Acknowledge
+                      </Button>
+                      <Button
+                        size="small"
+                        color="inherit"
+                        onClick={(e) => { e.stopPropagation(); onArchive(n.id); }}
+                      >
+                        Archive
+                      </Button>
                     </Box>
                   </ListItemButton>
                 ))}

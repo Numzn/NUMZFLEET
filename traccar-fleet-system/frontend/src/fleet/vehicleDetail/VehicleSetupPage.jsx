@@ -7,7 +7,6 @@ import {
   Button,
   Container,
   LinearProgress,
-  Paper,
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -39,26 +38,20 @@ import { useToastNotifications } from '../../hooks/useToastNotifications.jsx';
 const useStyles = makeStyles()((theme) => ({
   container: {
     padding: theme.spacing(2),
-    paddingBottom: theme.spacing(12),
-  },
-  stickyFooter: {
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: theme.zIndex.appBar,
-    borderTop: '1px solid',
-    borderColor: 'divider',
-    bgcolor: 'background.paper',
-    py: 1.5,
-    px: 2,
+    paddingBottom: theme.spacing(3),
   },
 }));
 
 function renderModuleContent(moduleId, props) {
   switch (moduleId) {
     case 'identity':
-      return <VehicleIdentityModule form={props.form} patch={props.patch} canSaveSpecs={props.canSaveSpecs} />;
+      return (
+        <VehicleIdentityModule
+          form={props.form}
+          patch={props.patch}
+          canSaveSpecs={props.canSaveSpecs}
+        />
+      );
     case 'device':
       return (
         <DeviceTelemetryModule
@@ -79,7 +72,7 @@ function renderModuleContent(moduleId, props) {
         />
       );
     case 'fuel':
-      return <FuelSetupModule form={props.form} patch={props.patch} canSaveSpecs={props.canSaveSpecs} />;
+      return <FuelSetupModule form={props.form} patch={props.patch} canSaveSpecs={props.canSaveSpecs} deviceId={props.deviceId} />;
     case 'geofence':
       return (
         <ZoneMonitoringModule
@@ -317,24 +310,15 @@ export default function VehicleSetupPage() {
                 {renderModuleContent(mod.id, moduleProps)}
               </VehicleSetupModuleCard>
             ))}
-          </Box>
-        )}
 
-        {!loading && !error && !vehicle && (
-          <Alert severity="warning">Vehicle not found or access denied.</Alert>
-        )}
-
-        {vehicle && (
-          <Paper className={classes.stickyFooter} elevation={3}>
             <Box
               sx={{
-                maxWidth: 900,
-                mx: 'auto',
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: 1,
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                pt: 1,
               }}
             >
               {dirty && !saving ? (
@@ -345,25 +329,29 @@ export default function VehicleSetupPage() {
                 <Box />
               )}
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-              <Button
-                variant="text"
-                onClick={() => navigateIfClean(detailPath)}
-                sx={{ textTransform: 'none' }}
-              >
-                Back to workspace
-              </Button>
-              <Button
-                variant={dirty ? 'outlined' : 'contained'}
-                color={dirty ? 'warning' : 'primary'}
-                onClick={() => setReviewOpen(true)}
-                disabled={saving}
-                sx={{ textTransform: 'none', fontWeight: 600 }}
-              >
-                Review setup
-              </Button>
+                <Button
+                  variant="text"
+                  onClick={() => navigateIfClean(detailPath)}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Back to workspace
+                </Button>
+                <Button
+                  variant={dirty ? 'outlined' : 'contained'}
+                  color={dirty ? 'warning' : 'primary'}
+                  onClick={() => setReviewOpen(true)}
+                  disabled={saving}
+                  sx={{ textTransform: 'none', fontWeight: 600 }}
+                >
+                  Review setup
+                </Button>
               </Box>
             </Box>
-          </Paper>
+          </Box>
+        )}
+
+        {!loading && !error && !vehicle && (
+          <Alert severity="warning">Vehicle not found or access denied.</Alert>
         )}
 
         <ToastNotification />

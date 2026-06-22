@@ -1,4 +1,4 @@
-import { FuelRequest } from '../../models/index.js';
+import { findFuelRequestScoped } from '../scopeFuelRequest.js';
 import { emitDomainEvent } from '../../events/eventBus.js';
 import { EVENT_NAMES } from '../../events/eventNames.js';
 
@@ -9,7 +9,7 @@ export const fulfillFuelRequest = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const request = await FuelRequest.findByPk(id);
+    const request = await findFuelRequestScoped(req, id);
 
     if (!request) {
       console.error('❌ Fuel request not found:', id);
