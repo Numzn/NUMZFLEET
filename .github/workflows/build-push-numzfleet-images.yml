@@ -8,7 +8,7 @@ on:
         required: false
         type: string
   push:
-    branches: [develop]
+    branches: [develop, main]
     paths:
       - "traccar-fleet-system/frontend/**"
       - "fuel-api/**"
