@@ -162,6 +162,7 @@ run_migrations() {
     "$MIGRATIONS_DIR/20260621_fueling_day_multi_invoice_arrived.sql"
     "$MIGRATIONS_DIR/20260622_invoice_attachment_url.sql"
     "$MIGRATIONS_DIR/20260623_fueling_day_reference_and_skip.sql"
+    "$MIGRATIONS_DIR/20260624_service_records_fleet_vehicle.sql"
   )
   local f
   for f in "${files[@]}"; do
