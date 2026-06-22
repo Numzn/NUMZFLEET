@@ -52,7 +52,7 @@ BEGIN
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'service_records' AND column_name = 'vehicleId'
   ) THEN
-    ALTER TABLE service_records DROP COLUMN "vehicleId";
+    ALTER TABLE service_records RENAME COLUMN "vehicleId" TO "_deprecated_vehicleId";
   END IF;
 END $$;
 

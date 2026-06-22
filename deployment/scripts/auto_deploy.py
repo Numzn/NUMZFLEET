@@ -1216,7 +1216,7 @@ def main() -> int:
     hub_prefix = remote_dockerhub_env_prefix() if target == "staging" else ""
 
     if target == "production" and direct_production:
-        if use_migrations and flags["migrations"]:
+        if use_migrations:
             deploy_body = (
                 "chmod +x deployment/run-migrate-and-deploy.sh && "
                 f"bash deployment/run-migrate-and-deploy.sh {sha_q} {env_q}"
