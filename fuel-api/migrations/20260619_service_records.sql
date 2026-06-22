@@ -21,8 +21,18 @@ CREATE TABLE IF NOT EXISTS service_records (
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_service_records_company_vehicle
-  ON service_records ("companyId", "vehicleId");
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'service_records'
+      AND column_name = 'vehicleId'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_service_records_company_vehicle
+      ON service_records ("companyId", "vehicleId");
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_service_records_status
   ON service_records (status);
