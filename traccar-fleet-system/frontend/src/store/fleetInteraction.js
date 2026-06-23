@@ -27,7 +27,7 @@ const { reducer, actions } = createSlice({
      * Mobile Fleet Command bottom sheet depth (snap derived from level).
      * 0 = closed, 1 = overview, 2 = list, 3 = command (2–3 reserved after Sprint 1).
      */
-    sheetLevel: SHEET_LEVEL.LIST,
+    sheetLevel: SHEET_LEVEL.CLOSED,
   },
   reducers: {
     setHoveredDeviceId(state, action) {

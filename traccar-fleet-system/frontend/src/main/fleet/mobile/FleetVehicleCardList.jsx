@@ -2,13 +2,17 @@ import { useEffect, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { devicesActions, fleetInteractionActions } from '../../../store';
-import FleetVehicleCard from './FleetVehicleCard';
+import { SHEET_LEVEL } from '../fleetSheetConstants';
+import FleetVehicleListRow from './FleetVehicleListRow';
+import FleetVehicleVirtualList from './FleetVehicleVirtualList';
+
+const VIRTUAL_LIST_THRESHOLD = 50;
 
 const FleetVehicleCardList = ({
   devices = [],
   positions = {},
-  deviceFleetVehicleIdByDeviceId = {},
-  phoneByDeviceId = {},
+  virtualized = false,
+  listHeight = 0,
 }) => {
   const dispatch = useDispatch();
   const selectedId = useSelector((s) => s.devices.selectedId);
@@ -26,6 +30,12 @@ const FleetVehicleCardList = ({
     if (el) itemRefs.current[id] = el;
   };
 
+  const handleSelect = (id) => {
+    dispatch(devicesActions.selectId(id));
+    dispatch(fleetInteractionActions.setSheetLevel(SHEET_LEVEL.OVERVIEW));
+    dispatch(fleetInteractionActions.requestListScrollToDevice(id));
+  };
+
   if (!devices.length) {
     return (
       <Typography
@@ -38,20 +48,27 @@ const FleetVehicleCardList = ({
     );
   }
 
+  if (virtualized && devices.length >= VIRTUAL_LIST_THRESHOLD && listHeight > 0) {
+    return (
+      <FleetVehicleVirtualList
+        devices={devices}
+        positions={positions}
+        selectedId={selectedId}
+        listHeight={listHeight}
+        onSelect={handleSelect}
+      />
+    );
+  }
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', px: 'var(--space-3)', py: 'var(--space-2)' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
       {devices.map((device) => (
         <Box key={device.id} ref={setRef(device.id)}>
-          <FleetVehicleCard
+          <FleetVehicleListRow
             device={device}
             position={positions[device.id]}
             selected={selectedId === device.id}
-            fleetVehicleId={deviceFleetVehicleIdByDeviceId[Number(device.id)]}
-            phone={phoneByDeviceId[device.id] || device.contact || device.phone || null}
-            onSelect={(id) => {
-              dispatch(devicesActions.selectId(id));
-              dispatch(fleetInteractionActions.setMobileDrawerOpen(false));
-            }}
+            onSelect={handleSelect}
           />
         </Box>
       ))}

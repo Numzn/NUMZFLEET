@@ -10,10 +10,10 @@ import { selectAllNotifications } from '../store/notifications/notificationSelec
 import usePersistedState from '../common/util/usePersistedState';
 import useFilter from './useFilter';
 import MainMap from './MainMap';
-import MapDevicePopup from './components/MapDevicePopup';
 import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
 import { useLiveMapChrome } from './fleet/LiveMapChromeContext';
 import FleetCommandSheet from './fleet/FleetCommandSheet';
+import VehicleContextCard from './fleet/mobile/VehicleContextCard';
 import { isFleetCommandSheetEnabled, setFleetSheetHeightCssVar } from './fleet/fleetSheetConstants';
 import useDriverPhonesByDeviceId from './fleet/mobile/useDriverPhonesByDeviceId';
 
@@ -35,6 +35,7 @@ const LiveMapPage = () => {
   const [filteredPositions, setFilteredPositions] = useState([]);
   const [filteredDevices, setFilteredDevices] = useState([]);
   const { fleetVehicleIdByDeviceId: deviceFleetVehicleIdByDeviceId } = useVehicleDisplayContext();
+  const selectedDevice = selectedDeviceId != null ? devices[selectedDeviceId] : undefined;
   const selectedPosition = useMemo(
     () => (selectedDeviceId != null ? positions[selectedDeviceId] : undefined),
     [positions, selectedDeviceId],
@@ -122,7 +123,7 @@ const LiveMapPage = () => {
     alertDeviceIds,
   );
 
-  const handleClosePopup = useCallback(() => {
+  const handleCloseSelection = useCallback(() => {
     dispatch(devicesActions.selectId(null));
   }, [dispatch]);
 
@@ -189,8 +190,12 @@ const LiveMapPage = () => {
   }, [setLiveMapChrome, sidebarFleetProps]);
 
   const { phoneByDeviceId } = useDriverPhonesByDeviceId(
-    sheetCommandEnabled ? filteredDevices : [],
+    sheetCommandEnabled && selectedDevice ? [selectedDevice] : [],
   );
+
+  const selectedPhone = selectedDeviceId != null
+    ? phoneByDeviceId[selectedDeviceId] ?? selectedDevice?.contact ?? selectedDevice?.phone ?? null
+    : null;
 
   const mapColumn = (
     <Box sx={{ position: 'relative', flex: 1, minHeight: 0, width: '100%' }}>
@@ -200,19 +205,17 @@ const LiveMapPage = () => {
       />
       {sheetCommandEnabled && (
         <FleetCommandSheet
-          deviceStats={deviceStats}
           devices={filteredDevices}
           positions={positions}
-          deviceFleetVehicleIdByDeviceId={deviceFleetVehicleIdByDeviceId}
-          phoneByDeviceId={phoneByDeviceId}
         />
       )}
-      {!desktop && selectedDeviceId && selectedPosition && devices[selectedDeviceId] && (
-        <MapDevicePopup
-          device={devices[selectedDeviceId]}
+      {sheetCommandEnabled && selectedDeviceId && selectedPosition && selectedDevice && (
+        <VehicleContextCard
+          device={selectedDevice}
           position={selectedPosition}
           fleetVehicleId={deviceFleetVehicleIdByDeviceId[Number(selectedDeviceId)]}
-          onClose={handleClosePopup}
+          phone={selectedPhone}
+          onClose={handleCloseSelection}
         />
       )}
     </Box>

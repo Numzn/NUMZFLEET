@@ -49,6 +49,9 @@ const MapSelectedDevice = ({ mapReady }) => {
       if (!desktop && isFleetCommandSheetEnabled() && sheetLevel >= SHEET_LEVEL.OVERVIEW) {
         verticalNudge += getSheetHeightPx(sheetLevel) / 2;
       }
+      if (!desktop && currentId) {
+        verticalNudge += 72;
+      }
       map.easeTo({
         center: [position.longitude, position.latitude],
         zoom: Math.max(map.getZoom(), selectZoom),

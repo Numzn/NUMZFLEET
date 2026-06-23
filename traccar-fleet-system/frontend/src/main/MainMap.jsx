@@ -24,6 +24,7 @@ import {
 import {
   getSheetHeightPx,
   isFleetCommandSheetEnabled,
+  SHEET_LEVEL,
 } from './fleet/fleetSheetConstants';
 
 const MainMap = ({ filteredPositions, selectedPosition }) => {
@@ -43,8 +44,11 @@ const MainMap = ({ filteredPositions, selectedPosition }) => {
 
   const onMarkerClick = useCallback((_, deviceId) => {
     dispatch(devicesActions.selectId(deviceId));
+    if (sheetEnabled) {
+      dispatch(fleetInteractionActions.setSheetLevel(SHEET_LEVEL.OVERVIEW));
+    }
     dispatch(fleetInteractionActions.requestListScrollToDevice(deviceId));
-  }, [dispatch]);
+  }, [dispatch, sheetEnabled]);
 
   const onHoverDeviceChange = useCallback((deviceId) => {
     dispatch(fleetInteractionActions.setHoveredDeviceId(deviceId));

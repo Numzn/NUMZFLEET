@@ -92,7 +92,6 @@ function UnifiedShellContent() {
   const isFullscreen = workspaceType === 'fullscreen';
   const { chrome } = useLiveMapChrome();
   const fleetSidebarCollapsed = useSelector((s) => s.fleetInteraction.sidebarCollapsed);
-  const mobileFleetDrawerOpen = useSelector((s) => s.fleetInteraction.mobileDrawerOpen);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [appNavOpen, setAppNavOpen] = useState(false);
@@ -112,10 +111,6 @@ function UnifiedShellContent() {
     dispatch(fleetInteractionActions.setSidebarCollapsed(next));
     savePersistedState('fleetSidebarCollapsed', next);
   }, [dispatch, fleetSidebarCollapsed]);
-
-  const handleOpenMobileFleetDrawer = useCallback(() => {
-    dispatch(fleetInteractionActions.setMobileDrawerOpen(true));
-  }, [dispatch]);
 
   const appDrawerWidth = desktop
     ? (collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED)
@@ -193,8 +188,6 @@ function UnifiedShellContent() {
         operationalPresence={sidebarFleetProps.operationalPresence}
         showAppNavMenuButton={!desktop}
         onOpenAppNavMenu={() => setAppNavOpen(true)}
-        showMobileFleetDrawerButton={!desktop}
-        onOpenMobileFleetDrawer={handleOpenMobileFleetDrawer}
       />
     );
   };
@@ -217,31 +210,6 @@ function UnifiedShellContent() {
           }}
         >
           {renderAppSidebar()}
-        </Drawer>
-      )}
-
-      {isLive && !desktop && sidebarFleetProps && (
-        <Drawer
-          anchor="left"
-          open={mobileFleetDrawerOpen}
-          onClose={() => dispatch(fleetInteractionActions.setMobileDrawerOpen(false))}
-          className={classes.drawer}
-          ModalProps={{ keepMounted: true }}
-          PaperProps={{
-            sx: {
-              width: `min(88vw, ${FLEET_SIDEBAR_WIDTH_PX}px)`,
-              boxSizing: 'border-box',
-              bgcolor: 'var(--surface-card)',
-            },
-          }}
-        >
-          <FleetSidebar
-            {...sidebarFleetProps}
-            collapsed={false}
-            variant="mobile"
-            hideHeader
-            hideOperationalPills
-          />
         </Drawer>
       )}
 

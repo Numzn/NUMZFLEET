@@ -1,11 +1,8 @@
 /** CSS variable published by FleetCommandSheet for map chrome + connectivity banner. */
 export const CSS_VAR_FLEET_SHEET_HEIGHT = '--fleet-sheet-height';
 
-/** Collapsed sheet — drag handle only. */
-export const SHEET_HEIGHT_CLOSED_PX = 40;
-
-/** Level 1 overview peek height — fits the 3 status summary tiles. */
-export const SHEET_HEIGHT_OVERVIEW_PX = 168;
+/** Collapsed sheet — handle + vehicle count. */
+export const SHEET_HEIGHT_CLOSED_PX = 56;
 
 /** Sprint 1 caps interactive sheet at overview. */
 export const SHEET_MAX_LEVEL_SPRINT1 = 1;
@@ -13,8 +10,8 @@ export const SHEET_MAX_LEVEL_SPRINT1 = 1;
 /** Sprint 2 unlocks the vehicle-list level. */
 export const SHEET_MAX_LEVEL = 2;
 
-/** Fallback list height when viewport height is unknown. */
-export const SHEET_HEIGHT_LIST_PX = 420;
+/** Fallback full-sheet height when viewport height is unknown. */
+export const SHEET_HEIGHT_LIST_PX = 480;
 
 export const SHEET_LEVEL = Object.freeze({
   CLOSED: 0,
@@ -24,7 +21,7 @@ export const SHEET_LEVEL = Object.freeze({
 });
 
 /**
- * Sprint 1 sheet is on by default (mobile layout still gates rendering).
+ * Mobile tracking sheet is on by default.
  * Set VITE_FLEET_COMMAND_SHEET=0 to disable.
  */
 export const isFleetCommandSheetEnabled = () => {
@@ -35,8 +32,8 @@ export const isFleetCommandSheetEnabled = () => {
 };
 
 /**
- * @param {number} sheetLevel 0–3
- * @param {number} [viewportHeight] unused in Sprint 1 (reserved for vh-based levels)
+ * @param {number} sheetLevel 0–2
+ * @param {number} [viewportHeight]
  * @returns {number} pixel height for map inset + sheet layout
  */
 export function getSheetHeightPx(sheetLevel, viewportHeight = 0) {
@@ -45,25 +42,29 @@ export function getSheetHeightPx(sheetLevel, viewportHeight = 0) {
     return SHEET_HEIGHT_CLOSED_PX;
   }
   if (level === 1) {
-    return SHEET_HEIGHT_OVERVIEW_PX;
+    // Half expanded — compact vehicle list (~40vh)
+    if (viewportHeight > 0) {
+      return Math.max(220, Math.round(viewportHeight * 0.4));
+    }
+    return 280;
   }
-  // LIST level — roughly two-thirds of the viewport, bounded for usability.
+  // Full expanded — searchable list (~80vh, capped)
   if (viewportHeight > 0) {
-    return Math.max(280, Math.min(560, Math.round(viewportHeight * 0.62)));
+    return Math.max(320, Math.min(Math.round(viewportHeight * 0.8), 560));
   }
   return SHEET_HEIGHT_LIST_PX;
 }
 
 export function clampSheetLevelForSprint1(level) {
   const n = Number(level);
-  if (!Number.isFinite(n)) return SHEET_LEVEL.OVERVIEW;
+  if (!Number.isFinite(n)) return SHEET_LEVEL.CLOSED;
   return Math.max(SHEET_LEVEL.CLOSED, Math.min(SHEET_MAX_LEVEL_SPRINT1, Math.round(n)));
 }
 
-/** Clamp to the currently shippable range (Sprint 2: CLOSED…LIST). */
+/** Clamp to the currently shippable range (CLOSED…LIST). */
 export function clampSheetLevel(level) {
   const n = Number(level);
-  if (!Number.isFinite(n)) return SHEET_LEVEL.OVERVIEW;
+  if (!Number.isFinite(n)) return SHEET_LEVEL.CLOSED;
   return Math.max(SHEET_LEVEL.CLOSED, Math.min(SHEET_MAX_LEVEL, Math.round(n)));
 }
 

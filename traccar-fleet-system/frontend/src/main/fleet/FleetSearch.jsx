@@ -3,7 +3,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useDispatch, useSelector } from 'react-redux';
 import { fleetInteractionActions } from '../../store';
 
-const FleetSearch = ({ sx: sxProp = {}, compact = false }) => {
+const FleetSearch = ({ sx: sxProp = {}, compact = false, placeholder = 'Search fleet…' }) => {
   const dispatch = useDispatch();
   const q = useSelector((s) => s.fleetInteraction.searchQuery);
 
@@ -13,7 +13,7 @@ const FleetSearch = ({ sx: sxProp = {}, compact = false }) => {
     <TextField
       size="small"
       fullWidth
-      placeholder="Search fleet…"
+      placeholder={placeholder}
       value={q}
       onChange={(e) => dispatch(fleetInteractionActions.setFleetSearchQuery(e.target.value))}
       InputProps={{

@@ -7,7 +7,6 @@ import {
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
-import ListAltIcon from '@mui/icons-material/ListAlt';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -158,12 +157,10 @@ const LiveMapTopBar = ({
   },
   showAppNavMenuButton = false,
   onOpenAppNavMenu,
-  showMobileFleetDrawerButton = false,
-  onOpenMobileFleetDrawer,
 }) => {
   const navigate = useNavigate();
   const socketConnected = useSelector((state) => !!state.session.socket);
-  const compactIdentity = !desktop && showAppNavMenuButton && showMobileFleetDrawerButton;
+  const compactIdentity = !desktop && showAppNavMenuButton;
 
   return (
     <Box
@@ -205,22 +202,6 @@ const LiveMapTopBar = ({
             </IconButton>
           </Tooltip>
         )}
-        {showMobileFleetDrawerButton && (
-          <Tooltip title="Fleet list">
-            <IconButton
-              size="small"
-              onClick={() => onOpenMobileFleetDrawer?.()}
-              aria-label="Open fleet list"
-              sx={{
-                color: 'var(--text-on-surface-secondary)',
-                '&:hover': { bgcolor: 'var(--surface-card-hover)' },
-              }}
-            >
-              <ListAltIcon sx={{ fontSize: '1.15rem' }} />
-            </IconButton>
-          </Tooltip>
-        )}
-
         {(!desktop || !fleetCollapsed) && (
           <FleetLiveIdentity socketConnected={socketConnected} compact={compactIdentity} />
         )}
