@@ -14,7 +14,11 @@ import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistr
 import { useLiveMapChrome } from './fleet/LiveMapChromeContext';
 import FleetCommandSheet from './fleet/FleetCommandSheet';
 import VehicleContextCard from './fleet/mobile/VehicleContextCard';
-import { isFleetCommandSheetEnabled, setFleetSheetHeightCssVar } from './fleet/fleetSheetConstants';
+import {
+  getSheetHeightPx,
+  isFleetCommandSheetEnabled,
+  setFleetSheetHeightCssVar,
+} from './fleet/fleetSheetConstants';
 import useDriverPhonesByDeviceId from './fleet/mobile/useDriverPhonesByDeviceId';
 
 const LiveMapPage = () => {
@@ -31,6 +35,11 @@ const LiveMapPage = () => {
   const searchQuery = useSelector((state) => state.fleetInteraction.searchQuery);
   const allNotifications = useSelector(selectAllNotifications);
   const sheetCommandEnabled = isFleetCommandSheetEnabled() && !desktop;
+  const sheetLevel = useSelector((state) => state.fleetInteraction.sheetLevel);
+  const sheetHeightPx = useMemo(
+    () => (sheetCommandEnabled ? getSheetHeightPx(sheetLevel) : 0),
+    [sheetCommandEnabled, sheetLevel],
+  );
 
   const [filteredPositions, setFilteredPositions] = useState([]);
   const [filteredDevices, setFilteredDevices] = useState([]);
@@ -209,12 +218,13 @@ const LiveMapPage = () => {
           positions={positions}
         />
       )}
-      {sheetCommandEnabled && selectedDeviceId && selectedPosition && selectedDevice && (
+      {sheetCommandEnabled && selectedDeviceId != null && selectedDevice && (
         <VehicleContextCard
           device={selectedDevice}
           position={selectedPosition}
           fleetVehicleId={deviceFleetVehicleIdByDeviceId[Number(selectedDeviceId)]}
           phone={selectedPhone}
+          sheetHeightPx={sheetHeightPx}
           onClose={handleCloseSelection}
         />
       )}

@@ -165,6 +165,24 @@ const EnhancedMarkers = ({
       return;
     }
 
+    const pointCount = Number(hit.properties.point_count) || 0;
+    const currentZoom = map.getZoom();
+    const atExpansionLimit = zoom <= currentZoom + 0.25;
+
+    if (onMarkerClick && (pointCount <= 8 || atExpansionLimit)) {
+      try {
+        const leaves = await source.getClusterLeaves(hit.properties.cluster_id, Math.min(pointCount, 10), 0);
+        const first = leaves?.[0];
+        const leafDeviceId = first?.properties?.deviceId;
+        if (leafDeviceId != null) {
+          onMarkerClick(first.properties.id, leafDeviceId);
+          return;
+        }
+      } catch {
+        /* fall through to zoom */
+      }
+    }
+
     map.easeTo({
       center: hit.geometry.coordinates,
       zoom,
@@ -172,7 +190,7 @@ const EnhancedMarkers = ({
       easing: easeOutCubic,
       essential: true,
     });
-  }, [clusters, id]);
+  }, [clusters, id, onMarkerClick]);
 
   useEffect(() => {
     // Add sources

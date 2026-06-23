@@ -32,7 +32,8 @@ const FleetVehicleCardList = ({
 
   const handleSelect = (id) => {
     dispatch(devicesActions.selectId(id));
-    dispatch(fleetInteractionActions.setSheetLevel(SHEET_LEVEL.OVERVIEW));
+    // Collapse sheet so the context card is visible above the map (not buried in an expanded list).
+    dispatch(fleetInteractionActions.setSheetLevel(SHEET_LEVEL.CLOSED));
     dispatch(fleetInteractionActions.requestListScrollToDevice(id));
   };
 

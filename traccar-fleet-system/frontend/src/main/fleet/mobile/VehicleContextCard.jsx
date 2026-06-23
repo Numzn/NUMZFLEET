@@ -24,12 +24,13 @@ const VehicleContextCard = ({
   position,
   fleetVehicleId,
   phone,
+  sheetHeightPx = 0,
   onClose,
 }) => {
   const { getDisplayForDevice } = useVehicleDisplayContext();
   const display = getDisplayForDevice(device?.id, device);
 
-  if (!device || !position) return null;
+  if (!device) return null;
 
   const key = statusKey(device, position);
   const tint = STATUS_TINT[key];
@@ -38,27 +39,30 @@ const VehicleContextCard = ({
     ? getMotionDurationLabel(device.id, device.status, position?.speed)
     : null;
   const statusText = motionDuration ? `${motionLabel} • ${motionDuration}` : motionLabel;
-  const gpsStale = getGpsStaleWarning(position?.fixTime);
-  const todayDistance = formatTodayDistanceLabel(resolveTodayDistanceRaw(position, device));
-  const hasFix = position.latitude != null && position.longitude != null;
+  const gpsStale = position ? getGpsStaleWarning(position?.fixTime) : null;
+  const todayDistance = position
+    ? formatTodayDistanceLabel(resolveTodayDistanceRaw(position, device))
+    : null;
+  const hasFix = position?.latitude != null && position?.longitude != null;
 
   return (
     <Paper
-      elevation={6}
-      role="region"
+      elevation={8}
+      role="dialog"
       aria-label="Selected vehicle"
       sx={{
-        position: 'absolute',
+        position: 'fixed',
         left: 12,
         right: 12,
-        bottom: 'calc(var(--fleet-sheet-height, 0px) + 8px)',
-        zIndex: 1001,
+        bottom: `calc(${Math.max(0, sheetHeightPx)}px + env(safe-area-inset-bottom, 0px) + 8px)`,
+        zIndex: 1200,
         borderRadius: 2,
         border: '1px solid',
         borderColor: 'var(--surface-border)',
         bgcolor: 'var(--surface-card)',
         p: 1.5,
         pointerEvents: 'auto',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>

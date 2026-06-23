@@ -45,7 +45,7 @@ const MainMap = ({ filteredPositions, selectedPosition }) => {
   const onMarkerClick = useCallback((_, deviceId) => {
     dispatch(devicesActions.selectId(deviceId));
     if (sheetEnabled) {
-      dispatch(fleetInteractionActions.setSheetLevel(SHEET_LEVEL.OVERVIEW));
+      dispatch(fleetInteractionActions.setSheetLevel(SHEET_LEVEL.CLOSED));
     }
     dispatch(fleetInteractionActions.requestListScrollToDevice(deviceId));
   }, [dispatch, sheetEnabled]);
