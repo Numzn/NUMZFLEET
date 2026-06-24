@@ -16,6 +16,11 @@ import useVehicleFuelRequests from './hooks/useVehicleFuelRequests.js';
 import useVehicleOperationContext from './hooks/useVehicleOperationContext.js';
 import useTodayOperationRefuel from './hooks/useTodayOperationRefuel.js';
 import { formatLitres } from '../../operationSessions/utils/formatters.js';
+import {
+  formatFuelPerformanceDistance,
+  formatFuelPerformanceLitres,
+  resolveFuelEfficiencyDisplay,
+} from './fuelEfficiencyDisplay.js';
 
 const formatDate = (t) => {
   if (!t) return '—';
@@ -30,6 +35,8 @@ export default function VehicleFuelColumn({
   deviceId,
   fuel,
   erb,
+  fuelPerformance,
+  fuelPerformanceLoading = false,
 }) {
   const navigate = useNavigate();
   const { pendingCount, lastApproved } = useVehicleFuelRequests(deviceId);
@@ -48,15 +55,12 @@ export default function VehicleFuelColumn({
   const defaultExpanded = hasPending || hasHistory;
   const [expanded, setExpanded] = useState(defaultExpanded);
 
-  const efficiencyLabel = useMemo(() => {
-    if (fuel?.fuelEfficiencyKmL != null && fuel.fuelEfficiencyKmL > 0) {
-      return `${fuel.fuelEfficiencyKmL.toFixed(1)} km/L`;
-    }
-    if (fuel?.lPer100km != null) {
-      return `${fuel.lPer100km} L/100km`;
-    }
-    return '—';
-  }, [fuel]);
+  const efficiencyDisplay = useMemo(
+    () => resolveFuelEfficiencyDisplay(fuelPerformance, fuel?.fuelEfficiencyKmL),
+    [fuelPerformance, fuel],
+  );
+
+  const performanceMeasured = fuelPerformance?.measured === true;
 
   return (
     <Box sx={[vehicleWorkspaceCardSx, { height: 'auto' }]}>
@@ -219,12 +223,45 @@ export default function VehicleFuelColumn({
             )}
           </SubCard>
 
-          <SubCard title="FUEL EFFICIENCY">
-            <Typography variant="metricValue" textAlign="center">
-              {efficiencyLabel}
-            </Typography>
+          <SubCard title="FUEL PERFORMANCE">
+            {fuelPerformanceLoading && (
+              <Typography variant="body2" color="text.secondary">Loading…</Typography>
+            )}
+            {!fuelPerformanceLoading && performanceMeasured && (
+              <>
+                <PerformanceRow
+                  label="Distance travelled"
+                  value={formatFuelPerformanceDistance(fuelPerformance.totalDistanceKm)}
+                />
+                <PerformanceRow
+                  label="Fuel purchased"
+                  value={formatFuelPerformanceLitres(fuelPerformance.totalFuelLitres)}
+                />
+                <Typography variant="metricValue" textAlign="center" sx={{ mt: 1.5 }}>
+                  {efficiencyDisplay.label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block" textAlign="center">
+                  {efficiencyDisplay.sub}
+                  {fuelPerformance.intervalCount > 0
+                    ? ` · ${fuelPerformance.intervalCount} refill interval${fuelPerformance.intervalCount === 1 ? '' : 's'}`
+                    : ''}
+                </Typography>
+              </>
+            )}
+            {!fuelPerformanceLoading && !performanceMeasured && (
+              <>
+                <Typography variant="metricValue" textAlign="center">
+                  {efficiencyDisplay.label}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mt: 1 }}>
+                  {efficiencyDisplay.source === 'spec'
+                    ? 'Using configured spec. Record at least two refuels with odometer readings to measure performance.'
+                    : 'Not enough refill history yet. Complete fuel days with odometer readings to calculate km/L.'}
+                </Typography>
+              </>
+            )}
             {erb?.pricePerL != null && (
-              <Typography variant="caption" color="text.secondary" display="block" textAlign="center" sx={{ mt: 0.5 }}>
+              <Typography variant="caption" color="text.secondary" display="block" textAlign="center" sx={{ mt: 1 }}>
                 ERB {erb.pricePerL.toFixed(2)} ZMW/L
               </Typography>
             )}
@@ -241,6 +278,15 @@ export default function VehicleFuelColumn({
           </Button>
         </AccordionDetails>
       </Accordion>
+    </Box>
+  );
+}
+
+function PerformanceRow({ label, value }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mt: 1 }}>
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" fontWeight={600}>{value}</Typography>
     </Box>
   );
 }

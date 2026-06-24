@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Box, Button, Tab, Tabs, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { useTechnician } from '../../common/util/permissions';
+import { useManager, useTechnician } from '../../common/util/permissions';
 import VehicleOperationsCard from './VehicleOperationsCard.jsx';
-import OperationsSection from './OperationsSection.jsx';
 import VehicleFuelColumn from './VehicleFuelColumn.jsx';
 import VehicleAlertsColumn from './VehicleAlertsColumn.jsx';
 import DiagnosticsSection from './DiagnosticsSection.jsx';
@@ -14,7 +13,9 @@ import VehicleServiceHistory from './VehicleServiceHistory.jsx';
 import VehicleMaintenanceCard from './VehicleMaintenanceCard.jsx';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 import useVehicleMaintenance from './hooks/useVehicleMaintenance.js';
+import useVehicleServiceHistory from './hooks/useVehicleServiceHistory.js';
 import useLastRefill from './hooks/useLastRefill.js';
+import useVehicleFuelPerformance from './hooks/useVehicleFuelPerformance.js';
 
 const TAB_OVERVIEW = 'overview';
 const TAB_DRIVER = 'driver';
@@ -44,14 +45,23 @@ export default function VehicleWorkspaceTabs(props) {
   } = props;
 
   const technician = useTechnician();
+  const canManage = useManager();
   const navigate = useNavigate();
   const { sectionGap } = useVehicleWorkspaceDensity();
   const [tab, setTab] = useState(TAB_OVERVIEW);
   const { lastRefill } = useLastRefill(deviceId);
+  const fuelPerformanceHook = useVehicleFuelPerformance(vehicle?.id);
   const lastRefillMileageKm = lastRefill?.refuel?.currentMileage != null
     ? Number(lastRefill.refuel.currentMileage)
     : null;
   const maintenance = useVehicleMaintenance(deviceId, livePosition, lastRefillMileageKm);
+  const serviceHistory = useVehicleServiceHistory(vehicle?.id);
+
+  const handleMaintenanceCompleted = async () => {
+    maintenance.reload();
+    await serviceHistory.reload();
+    await onRefreshVehicle?.();
+  };
 
   return (
     <Box>
@@ -75,6 +85,8 @@ export default function VehicleWorkspaceTabs(props) {
           <VehicleOperationsCard
             vehicle={vehicle}
             fuel={fuel}
+            fuelPerformance={fuelPerformanceHook.fuelPerformance}
+            fuelPerformanceLoading={fuelPerformanceHook.loading}
             telemetry={telemetry}
             motionLabel={motionLabel}
             motionDurationLabel={motionDurationLabel}
@@ -103,6 +115,8 @@ export default function VehicleWorkspaceTabs(props) {
               deviceId={deviceId}
               fuel={fuel}
               erb={erb}
+              fuelPerformance={fuelPerformanceHook.fuelPerformance}
+              fuelPerformanceLoading={fuelPerformanceHook.loading}
             />
           </Box>
         )}
@@ -131,6 +145,9 @@ export default function VehicleWorkspaceTabs(props) {
                   items={maintenance.items}
                   loading={maintenance.loading}
                   deviceId={deviceId}
+                  fleetVehicleId={vehicle?.id}
+                  canManage={canManage}
+                  onCompleted={handleMaintenanceCompleted}
                 />
               </Box>
             )}
@@ -160,7 +177,13 @@ export default function VehicleWorkspaceTabs(props) {
               </Typography>
               <VehicleAssignmentHistory vehicleId={vehicle?.id} />
             </Box>
-            <VehicleServiceHistory fleetVehicleId={vehicle?.id} />
+            <VehicleServiceHistory
+              fleetVehicleId={vehicle?.id}
+              records={serviceHistory.records}
+              loading={serviceHistory.loading}
+              error={serviceHistory.error}
+              reload={serviceHistory.reload}
+            />
           </Box>
         )}
 

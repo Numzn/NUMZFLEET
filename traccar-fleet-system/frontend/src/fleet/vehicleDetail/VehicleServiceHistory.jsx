@@ -236,10 +236,22 @@ function LogServiceDialog({ open, onClose, fleetVehicleId, user, onCreated }) {
   );
 }
 
-export default function VehicleServiceHistory({ fleetVehicleId }) {
+export default function VehicleServiceHistory({
+  fleetVehicleId,
+  records: recordsProp,
+  loading: loadingProp,
+  error: errorProp,
+  reload: reloadProp,
+}) {
   const user = useSelector((state) => state.session.user);
   const canManage = useManager();
-  const { records, loading, error, reload } = useVehicleServiceHistory(fleetVehicleId);
+  const internal = useVehicleServiceHistory(
+    recordsProp !== undefined ? null : fleetVehicleId,
+  );
+  const records = recordsProp !== undefined ? recordsProp : internal.records;
+  const loading = loadingProp !== undefined ? loadingProp : internal.loading;
+  const error = errorProp !== undefined ? errorProp : internal.error;
+  const reload = reloadProp ?? internal.reload;
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (loading) {

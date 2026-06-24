@@ -8,7 +8,7 @@ import FleetVehicleVirtualList from './FleetVehicleVirtualList';
 
 const VIRTUAL_LIST_THRESHOLD = 50;
 
-const FleetVehicleCardList = ({
+const FleetVehicleList = ({
   devices = [],
   positions = {},
   virtualized = false,
@@ -77,4 +77,4 @@ const FleetVehicleCardList = ({
   );
 };
 
-export default FleetVehicleCardList;
+export default FleetVehicleList;

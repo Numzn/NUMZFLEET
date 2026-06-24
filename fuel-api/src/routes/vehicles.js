@@ -19,6 +19,7 @@ import {
   listVehicleServiceRecords,
   createVehicleServiceRecord,
   updateVehicleServiceRecord,
+  getVehicleFuelStatistics,
 } from '../controllers/vehicleFleetController.js';
 import {
   getCapabilities,
@@ -57,6 +58,7 @@ router.post(
 );
 
 router.get('/:id/assignments', requireAuth, requireManager, getVehicleAssignments);
+router.get('/:id/fuel-statistics', requireAuth, requireManager, getVehicleFuelStatistics);
 router.get('/:id/service-records', requireAuth, requireManager, listVehicleServiceRecords);
 router.post('/:id/service-records', requireAuth, requireManager, createVehicleServiceRecord);
 router.patch('/:id/service-records/:recordId', requireAuth, requireManager, updateVehicleServiceRecord);

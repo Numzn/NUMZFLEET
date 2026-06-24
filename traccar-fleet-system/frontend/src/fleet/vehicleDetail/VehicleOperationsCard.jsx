@@ -30,6 +30,7 @@ import getOperationalIndicators from '../../main/fleet/vehicleOperationalIndicat
 import { hasBlockingSetupIncomplete } from './setup/vehicleSetupReadiness.js';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import { WORKSPACE_COLORS } from './vehicleWorkspaceTokens.js';
+import { resolveFuelEfficiencyDisplay } from './fuelEfficiencyDisplay.js';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 import { useLinkedDrivers } from './useVehicleDriver.js';
 
@@ -49,6 +50,8 @@ function plateInitials(plate, name) {
 export default function VehicleOperationsCard({
   vehicle,
   fuel,
+  fuelPerformance,
+  fuelPerformanceLoading = false,
   telemetry,
   motionLabel,
   motionDurationLabel,
@@ -81,6 +84,12 @@ export default function VehicleOperationsCard({
   const speed = telemetry?.speedKph;
   const fuelPct = fuel?.levelPct != null ? Math.round(Math.max(0, Math.min(100, fuel.levelPct))) : null;
   const fuelType = vehicle?.vehicleSpec?.fuelType || '—';
+  const efficiencyDisplay = resolveFuelEfficiencyDisplay(fuelPerformance, fuel?.fuelEfficiencyKmL);
+  const efficiencySub = [
+    efficiencyDisplay.sub,
+    fuelPct != null ? `${fuelPct}% fuel` : null,
+    fuelType !== '—' ? fuelType : null,
+  ].filter(Boolean).join(' · ');
 
   const statusParts = [];
   if (online) {
@@ -316,12 +325,11 @@ export default function VehicleOperationsCard({
           density={density}
         />
         <MetricTile
-          label={density.metricLabelShort ? 'FUEL' : 'FUEL'}
-          value={fuelPct != null ? `${fuelPct}%` : '—'}
+          label={density.metricLabelShort ? 'EFF' : 'FUEL EFF'}
+          value={fuelPerformanceLoading ? '…' : efficiencyDisplay.label}
           unit={null}
           density={density}
-          fuelBar={fuelPct}
-          sub={`${fuelType}${fuel?.rangeKm != null ? ` · ~${fuel.rangeKm} km range` : ''}`}
+          sub={fuelPerformanceLoading ? null : efficiencySub}
         />
         <MetricTile
           label={density.metricLabelShort ? 'ODO' : 'ODOMETER'}

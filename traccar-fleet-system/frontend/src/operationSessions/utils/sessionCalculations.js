@@ -30,7 +30,7 @@ export const calculateSessionTotals = (sessionRecords = [], vehiclesById = {}) =
   };
 };
 
-const calculateVehicleEfficiencyFromMileage = (records = []) => {
+const calculateVehicleEfficiencyFromMileage = (records = [], { unit = 'L/100km' } = {}) => {
   if (records.length < 2) {
     return null;
   }
@@ -43,7 +43,7 @@ const calculateVehicleEfficiencyFromMileage = (records = []) => {
     const previous = sorted[i - 1];
     const current = sorted[i];
     const distance = toNumber(current.currentMileage) - toNumber(previous.currentMileage);
-    const fuel = toNumber(current.fuelAmount);
+    const fuel = toNumber(current.actualFuelLitres ?? current.fuelAmount);
 
     if (distance > 0 && fuel > 0) {
       totalDistance += distance;
@@ -55,8 +55,13 @@ const calculateVehicleEfficiencyFromMileage = (records = []) => {
     return null;
   }
 
+  if (unit === 'km/L') {
+    return totalDistance / totalFuel;
+  }
   return (totalFuel / totalDistance) * 100;
 };
+
+export { calculateVehicleEfficiencyFromMileage };
 
 export const calculateFleetEfficiency = (fuelRecords = []) => {
   if (!Array.isArray(fuelRecords) || fuelRecords.length === 0) {

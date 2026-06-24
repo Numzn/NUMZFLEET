@@ -1,9 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useEffectAsync } from '../../../reactHelper';
 import { traccarPath } from '../../../config/traccarApi.js';
 import fetchOrThrow from '../../../common/util/fetchOrThrow';
 
 const DUE_SOON_RATIO = 0.1;
+
+function withActionableFlags(computed) {
+  const isActionable = !computed.unknown
+    && computed.remaining != null
+    && (computed.dueSoon || computed.remaining <= 0);
+  const isOverdue = !computed.unknown
+    && computed.remaining != null
+    && computed.remaining <= 0;
+  return { ...computed, isActionable, isOverdue };
+}
 
 /**
  * Next-due math for a Traccar maintenance schedule.
@@ -24,19 +34,16 @@ function computeDue(m, position, odometerFallbackMeters) {
       nextDue = start + cycles * period;
     }
     const remaining = nextDue - now;
-    return {
+    return withActionableFlags({
       ...m,
       isTime,
       nextDue,
       remaining,
       dueSoon: period > 0 && remaining <= period * DUE_SOON_RATIO,
       unknown: false,
-    };
+    });
   }
 
-  // Prefer the live Traccar accumulator; fall back to the latest operation
-  // refuel odometer (bridges fuel-ops mileage into maintenance when telemetry
-  // lacks the accumulator). Only `totalDistance` is comparable to refuel km.
   const positionValue = Number(position?.attributes?.[m.type]);
   const current = Number.isFinite(positionValue)
     ? positionValue
@@ -44,14 +51,14 @@ function computeDue(m, position, odometerFallbackMeters) {
       ? Number(odometerFallbackMeters)
       : NaN);
   if (!Number.isFinite(current) || period <= 0) {
-    return {
+    return withActionableFlags({
       ...m,
       isTime,
       current: Number.isFinite(current) ? current : null,
       remaining: null,
       dueSoon: false,
       unknown: true,
-    };
+    });
   }
 
   let nextDue;
@@ -62,7 +69,7 @@ function computeDue(m, position, odometerFallbackMeters) {
     nextDue = start + cycles * period;
   }
   const remaining = nextDue - current;
-  return {
+  return withActionableFlags({
     ...m,
     isTime,
     current,
@@ -70,7 +77,7 @@ function computeDue(m, position, odometerFallbackMeters) {
     remaining,
     dueSoon: remaining <= period * DUE_SOON_RATIO,
     unknown: false,
-  };
+  });
 }
 
 /**
@@ -81,6 +88,11 @@ export default function useVehicleMaintenance(deviceId, position, odometerFallba
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const reload = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   useEffectAsync(async () => {
     if (!deviceId) {
@@ -100,7 +112,7 @@ export default function useVehicleMaintenance(deviceId, position, odometerFallba
     } finally {
       setLoading(false);
     }
-  }, [deviceId]);
+  }, [deviceId, refreshKey]);
 
   const odometerFallbackMeters = Number.isFinite(Number(odometerFallbackKm))
     ? Number(odometerFallbackKm) * 1000
@@ -111,12 +123,13 @@ export default function useVehicleMaintenance(deviceId, position, odometerFallba
     [items, position, odometerFallbackMeters],
   );
 
-  const dueSoonCount = computed.filter((c) => c.dueSoon).length;
+  const dueSoonCount = computed.filter((c) => c.isActionable).length;
 
   return {
     items: computed,
     loading,
     error,
     dueSoonCount,
+    reload,
   };
 }

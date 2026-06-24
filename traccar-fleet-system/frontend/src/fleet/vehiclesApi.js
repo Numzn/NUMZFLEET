@@ -83,6 +83,14 @@ export async function fetchVehicle(user, vehicleId) {
   return res.json();
 }
 
+export async function fetchVehicleFuelStatistics(user, fleetVehicleId) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/fuel-statistics`,
+    { headers: fuelApiAuthHeaders(user) },
+  );
+  return res.json();
+}
+
 export async function updateVehicleConfig(user, vehicleId, body) {
   const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}/config`, {
     method: 'PUT',

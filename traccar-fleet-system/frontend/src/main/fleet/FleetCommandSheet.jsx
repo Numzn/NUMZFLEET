@@ -6,7 +6,7 @@ import { useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import { fleetInteractionActions } from '../../store';
 import FleetSearch from './FleetSearch';
-import FleetVehicleCardList from './mobile/FleetVehicleCardList';
+import FleetVehicleList from './mobile/FleetVehicleList';
 import {
   SHEET_LEVEL,
   SHEET_MAX_LEVEL,
@@ -170,7 +170,7 @@ const FleetCommandSheet = ({
               borderColor: 'var(--surface-border)',
             }}
           >
-            <FleetVehicleCardList
+            <FleetVehicleList
               devices={devices}
               positions={positions}
               virtualized={isFull}

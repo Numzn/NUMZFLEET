@@ -2,15 +2,14 @@ import { Box, ListItemButton, Typography } from '@mui/material';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useVehicleDisplayContext } from '../../../fleet/display/VehicleDisplayRegistryContext';
-import { getMotionDurationLabel, getMotionLabel } from '../../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import {
+  getMotionDurationLabel,
+  getMotionLabel,
+  getVehicleStatusKey,
+} from '../../../fleet/vehicleDetail/vehicleMotionStatus.js';
 import { STATUS_TINT } from './fleetMobileCardSx';
 
 dayjs.extend(relativeTime);
-
-function statusKey(device, position) {
-  if (device.status !== 'online') return 'offline';
-  return position && Number(position.speed) > 0 ? 'moving' : 'idle';
-}
 
 const FleetVehicleListRow = ({
   device,
@@ -21,7 +20,7 @@ const FleetVehicleListRow = ({
   const { getDisplayForDevice } = useVehicleDisplayContext();
   const display = getDisplayForDevice(device.id, device);
 
-  const key = statusKey(device, position);
+  const key = getVehicleStatusKey(device, position);
   const tint = STATUS_TINT[key];
 
   const motionLabel = getMotionLabel(device.status, position?.speed);

@@ -1,4 +1,5 @@
 import { findCompletedRefuelsByVehicleId } from '../repositories/operationSessionRefuelRepository.js';
+import { calculateTankToTankEfficiency, DEFAULT_WINDOW_DAYS } from '../utils/fuelEfficiencyUtils.js';
 
 function daysBetween(a, b) {
   const ms = Math.abs(new Date(b).getTime() - new Date(a).getTime());
@@ -28,8 +29,11 @@ function computeTrend(recentAvg, priorAvg) {
 /**
  * History-based vehicle fuel profile (no tank balance).
  */
-export async function getVehicleFuelStatistics(vehicleId) {
-  const rows = await findCompletedRefuelsByVehicleId(vehicleId, 24);
+export async function getVehicleFuelStatistics(vehicleId, options = {}) {
+  const windowDays = options.windowDays ?? DEFAULT_WINDOW_DAYS;
+  const rows = await findCompletedRefuelsByVehicleId(vehicleId, 48);
+  const emptyFuelPerformance = calculateTankToTankEfficiency([], { windowDays });
+
   if (!rows.length) {
     return {
       vehicleId: Number(vehicleId),
@@ -42,6 +46,7 @@ export async function getVehicleFuelStatistics(vehicleId) {
       fuelTrend: 'stable',
       confidenceScore: 0,
       sampleCount: 0,
+      fuelPerformance: emptyFuelPerformance,
     };
   }
 
@@ -77,6 +82,8 @@ export async function getVehicleFuelStatistics(vehicleId) {
   let confidenceScore = Math.min(100, Math.round(sampleCount * 18 - cv * 30));
   confidenceScore = Math.max(0, confidenceScore);
 
+  const fuelPerformance = calculateTankToTankEfficiency(rows, { windowDays });
+
   return {
     vehicleId: Number(vehicleId),
     lastRefillDate: last.sessionDate || last.createdAt,
@@ -88,5 +95,6 @@ export async function getVehicleFuelStatistics(vehicleId) {
     fuelTrend,
     confidenceScore,
     sampleCount,
+    fuelPerformance,
   };
 }

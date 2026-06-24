@@ -7,17 +7,16 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import { useVehicleDisplayContext } from '../../../fleet/display/VehicleDisplayRegistryContext';
-import { getMotionDurationLabel, getMotionLabel } from '../../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import {
+  getMotionDurationLabel,
+  getMotionLabel,
+  getVehicleStatusKey,
+} from '../../../fleet/vehicleDetail/vehicleMotionStatus.js';
 import VehicleLocationLine from '../../../common/components/VehicleLocationLine';
 import DeviceQuickActions from '../DeviceQuickActions';
 import { getGpsStaleWarning } from './gpsStaleWarning';
 import { formatTodayDistanceLabel, resolveTodayDistanceRaw } from './vehicleTodayDistance';
 import { STATUS_TINT } from './fleetMobileCardSx';
-
-function statusKey(device, position) {
-  if (device.status !== 'online') return 'offline';
-  return position && Number(position.speed) > 0 ? 'moving' : 'idle';
-}
 
 const VehicleContextCard = ({
   device,
@@ -32,7 +31,7 @@ const VehicleContextCard = ({
 
   if (!device) return null;
 
-  const key = statusKey(device, position);
+  const key = getVehicleStatusKey(device, position);
   const tint = STATUS_TINT[key];
   const motionLabel = getMotionLabel(device.status, position?.speed);
   const motionDuration = device.status === 'online'

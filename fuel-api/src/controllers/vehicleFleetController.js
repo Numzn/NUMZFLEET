@@ -13,6 +13,8 @@ import {
   createServiceRecord,
   updateServiceRecord,
 } from '../services/serviceRecordService.js';
+import { getVehicleFuelStatistics as computeVehicleFuelStatistics } from '../services/vehicleFuelStatisticsService.js';
+import { calculateTankToTankEfficiency, DEFAULT_WINDOW_DAYS } from '../utils/fuelEfficiencyUtils.js';
 import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
 /**
@@ -141,6 +143,44 @@ export const deleteVehicle = async (req, res) => {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Delete vehicle error:', error);
     return res.status(status).json({ error: dbErrorMessage(error, 'Failed to delete vehicle') });
+  }
+};
+
+export const getVehicleFuelStatistics = async (req, res) => {
+  try {
+    const merged = await getVehicleMerged(req.params.id, req.auth?.companyId);
+    if (!merged) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+
+    const deviceId = merged.device?.id ?? merged.deviceId ?? null;
+    if (deviceId == null || !Number.isFinite(Number(deviceId))) {
+      return res.json({
+        fleetVehicleId: merged.id,
+        deviceId: null,
+        vehicleId: null,
+        lastRefillDate: null,
+        lastRefillLitres: null,
+        lastRefillMileage: null,
+        averageRefillLitres: null,
+        averageKmBetweenRefills: null,
+        averageDaysBetweenRefills: null,
+        fuelTrend: 'stable',
+        confidenceScore: 0,
+        sampleCount: 0,
+        fuelPerformance: calculateTankToTankEfficiency([], { windowDays: DEFAULT_WINDOW_DAYS }),
+      });
+    }
+
+    const stats = await computeVehicleFuelStatistics(Number(deviceId));
+    return res.json({
+      fleetVehicleId: merged.id,
+      deviceId: Number(deviceId),
+      ...stats,
+    });
+  } catch (error) {
+    console.error('Get vehicle fuel statistics error:', error);
+    return res.status(500).json({ error: dbErrorMessage(error, 'Failed to fetch fuel statistics') });
   }
 };
 

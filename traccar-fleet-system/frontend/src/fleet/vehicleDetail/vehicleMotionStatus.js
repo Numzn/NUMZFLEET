@@ -1,5 +1,11 @@
 import { normalizePositionTelemetry } from './telemetryUtils.js';
 
+/** Status tint key for fleet mobile UI (moving / idle / offline). */
+export function getVehicleStatusKey(device, position) {
+  if (device.status !== 'online') return 'offline';
+  return position && Number(position.speed) > 0 ? 'moving' : 'idle';
+}
+
 /** Motion label from device connectivity + live speed (Traccar speed in knots). */
 export function getMotionLabel(deviceStatus, positionSpeed) {
   if (deviceStatus !== 'online') return 'Offline';
