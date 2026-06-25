@@ -1,3 +1,36 @@
+# NUMZFLEET V2 — NumzLab-first development
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full workflow.
+
+## Quick start (NumzLab)
+
+```bash
+cd /srv/projects/numzfleet
+git checkout develop
+./scripts/dev
+./scripts/verify
+```
+
+## Branches
+
+| Branch | Environment | CI |
+|--------|-------------|-----|
+| `develop` | NumzLab (hot reload) | Lint/test only |
+| `main` | OCI production | Build → Docker Hub → deploy |
+
+## Repository layout
+
+```text
+/srv/projects/numzfleet
+├── fuel-api/              # Backend API
+├── traccar-fleet-system/  # Frontend (Vite)
+├── erb-fuel-monitor/      # ERB price scraper
+├── deployment/
+│   ├── compose/
+│   │   └── docker-compose.dev.yml
+
+---
+
 # NumzTrak Fleet Management System
 
 A comprehensive fleet management and GPS tracking system built on Traccar, featuring real-time vehicle tracking, fuel management, and advanced fleet analytics.

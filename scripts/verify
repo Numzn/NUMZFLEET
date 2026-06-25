@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Health check NUMZFLEET dev stack (direct ports + gateway vhosts).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TS_IP="${TAILSCALE_IP:-100.121.79.2}"
+fail=0
+
+check() {
+  local label="$1" code="$2"
+  if [[ "$code" == "200" || "$code" == "301" || "$code" == "302" ]]; then
+    echo "OK  $label → $code"
+  else
+    echo "FAIL $label → $code"
+    fail=1
+  fi
+}
+
+host_code() {
+  curl -sf -o /dev/null -w '%{http_code}' -H "Host: $1" "http://127.0.0.1${2:-/}" 2>/dev/null || echo 000
+}
+
+port_code() {
+  curl -sf -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || echo 000
+}
+
+echo "=== NUMZFLEET dev containers ==="
+if docker ps --format '{{.Names}}' | grep -q numzfleet-dev-frontend; then
+  echo "OK  dev stack running"
+else
+  echo "FAIL numzfleet-dev-frontend not running"
+  fail=1
+fi
+
+echo ""
+echo "=== Direct ports ==="
+check "UI :3003" "$(port_code http://127.0.0.1:3003/)"
+check "API /health :3000" "$(port_code http://127.0.0.1:3000/health)"
+check "Traccar :8082" "$(port_code http://127.0.0.1:8082/)"
+
+echo ""
+echo "=== Gateway (*.numzlab @ :80) ==="
+check "fleet.numzlab" "$(host_code fleet.numzlab /)"
+check "api.fleet.numzlab /health" "$(host_code api.fleet.numzlab /health)"
+check "track.fleet.numzlab" "$(host_code track.fleet.numzlab /)"
+
+echo ""
+echo "=== Tailscale IP ==="
+check "UI ${TS_IP}:3003" "$(port_code "http://${TS_IP}:3003/")"
+check "API ${TS_IP}:3000/health" "$(port_code "http://${TS_IP}:3000/health")"
+
+if [[ "$fail" -eq 0 ]]; then
+  echo "=== NUMZFLEET VERIFY PASS ==="
+else
+  echo "=== NUMZFLEET VERIFY FAIL ==="
+  exit 1
+fi

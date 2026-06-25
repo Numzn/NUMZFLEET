@@ -1,0 +1,205 @@
+# NumzLab development stack — hot reload for frontend and backend.
+# Usage: ./scripts/dev  (from repo root)
+#
+# Stops any running staging stack on the same ports first.
+# Reuses staging data volumes so existing DB/Traccar data is preserved.
+
+name: numzfleet-dev
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: numzfleet-dev-db
+    restart: unless-stopped
+    env_file:
+      - ../../backend/.env
+    environment:
+      POSTGRES_DB: numztrak_fuel
+      POSTGRES_USER: numztrak
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U numztrak -d numztrak_fuel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  traccar-mysql:
+    image: mysql:8.0
+    container_name: numzfleet-dev-traccar-mysql
+    restart: unless-stopped
+    env_file:
+      - ../../backend/.env
+    volumes:
+      - traccar_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+
+  traccar:
+    image: traccar/traccar:latest
+    container_name: numzfleet-dev-traccar
+    restart: unless-stopped
+    depends_on:
+      traccar-mysql:
+        condition: service_healthy
+    environment:
+      TRACCAR_DATABASE_URL: jdbc:mysql://traccar-mysql:3306/traccar?useSSL=false&allowPublicKeyRetrieval=true
+      TRACCAR_DATABASE_USER: traccar
+    volumes:
+      - ../../backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "if command -v wget >/dev/null 2>&1; then wget -qO- http://localhost:8082/ >/dev/null; elif command -v nc >/dev/null 2>&1; then nc -z localhost 8082; else exit 1; fi",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  erb-worker:
+    build:
+      context: ../../erb-fuel-monitor
+      dockerfile: Dockerfile
+    container_name: numzfleet-dev-erb-worker
+    restart: unless-stopped
+    command: ["python", "erb_scraper_final.py", "--mode", "schedule"]
+    env_file:
+      - ../../backend/.env
+    environment:
+      ERB_STARTUP_REFRESH: ${ERB_STARTUP_REFRESH:-true}
+      EMAIL_ENABLED: ${ERB_EMAIL_ENABLED:-false}
+    volumes:
+      - erb_data:/app/data
+
+  erb-api:
+    build:
+      context: ../../erb-fuel-monitor
+      dockerfile: Dockerfile
+    container_name: numzfleet-dev-erb-api
+    restart: unless-stopped
+    command: ["python", "-m", "uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    env_file:
+      - ../../backend/.env
+    environment:
+      PORT: 8000
+      API_ALLOWED_ORIGINS: ${ERB_API_ALLOWED_ORIGINS:-http://fleet.numzlab,http://100.121.79.2:3003}
+    depends_on:
+      erb-worker:
+        condition: service_started
+    volumes:
+      - ../../erb-fuel-monitor:/app
+      - erb_data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  backend:
+    image: node:20-alpine
+    container_name: numzfleet-dev-fuel-api
+    restart: unless-stopped
+    working_dir: /app
+    env_file:
+      - ../../backend/.env
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://numztrak:${POSTGRES_PASSWORD}@db:5432/numztrak_fuel
+      TRACCAR_MYSQL_HOST: traccar-mysql
+      TRACCAR_MYSQL_PORT: 3306
+      TRACCAR_MYSQL_DATABASE: traccar
+      TRACCAR_MYSQL_USER: traccar
+      TRACCAR_SERVER_URL: http://traccar:8082
+      TRACCAR_API_URL: http://traccar:8082
+      ERB_API_BASE_URL: http://erb-api:8000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://fleet.numzlab,http://100.121.79.2:3003,http://localhost:5174}
+      AUTH_STRATEGY: ${AUTH_STRATEGY:-hybrid}
+      TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
+      DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
+      HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
+      INVOICE_UPLOAD_DIR: /app/data/invoice-attachments
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../fuel-api:/app
+      - backend_node_modules:/app/node_modules
+      - invoice_attachments:/app/data/invoice-attachments
+    command: sh -c "test -d node_modules/.bin || npm ci; npm run dev"
+    depends_on:
+      db:
+        condition: service_healthy
+      traccar-mysql:
+        condition: service_healthy
+      traccar:
+        condition: service_healthy
+      erb-api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  frontend:
+    image: node:20-alpine
+    container_name: numzfleet-dev-frontend
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      VITE_DEV_SERVER_PORT: ${VITE_DEV_SERVER_PORT:-5174}
+      VITE_FUEL_API_URL: http://backend:3000
+      VITE_TRACCAR_URL: http://traccar:8082
+      VITE_TRACCAR_PREFIX: /traccar
+      VITE_FLEET_COMMAND_SHEET: "1"
+    ports:
+      # Map host :3003 (gateway target) to Vite :5174 inside container
+      - "3003:5174"
+    volumes:
+      - ../../traccar-fleet-system/frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "test -d node_modules/.bin || npm ci; npm run dev -- --port 5174 --host 0.0.0.0"
+    depends_on:
+      backend:
+        condition: service_healthy
+      traccar:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    name: numzfleet_staging_postgres_data
+    external: true
+  traccar_mysql_data:
+    name: numzfleet_staging_traccar_mysql_data
+    external: true
+  erb_data:
+    name: numzfleet_staging_erb_data
+    external: true
+  backend_node_modules:
+  frontend_node_modules:
+  invoice_attachments:
+    name: numzfleet_invoice_attachments
+    external: true

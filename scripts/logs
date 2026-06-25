@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Follow logs from the NUMZFLEET development stack.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+COMPOSE="${ROOT}/deployment/compose/docker-compose.dev.yml"
+ENV_FILE="${ROOT}/deployment/.env.dev"
+
+cd "${ROOT}"
+set -a
+# shellcheck disable=SC1091
+source "${ROOT}/backend/.env" 2>/dev/null || true
+set +a
+docker compose -f "${COMPOSE}" --env-file "${ENV_FILE}" logs -f "$@"

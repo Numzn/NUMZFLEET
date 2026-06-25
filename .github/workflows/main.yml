@@ -1,26 +1,34 @@
-name: Build and push NumzFleet images
+name: Production deploy
+
+# Only path to OCI: push to main builds images, pushes Docker Hub, deploys production.
 
 on:
-  workflow_dispatch:
-    inputs:
-      git_sha:
-        description: "Optional SHA to rebuild (break-glass/manual). Defaults to current ref SHA."
-        required: false
-        type: string
   push:
-    branches: [develop, main]
+    branches: [main]
     paths:
       - "traccar-fleet-system/frontend/**"
       - "fuel-api/**"
       - "erb-fuel-monitor/**"
-      - ".github/workflows/build-push-numzfleet-images.yml"
+      - "deployment/**"
+      - ".github/workflows/main.yml"
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: "Optional SHA to deploy (break-glass). Defaults to current ref."
+        required: false
+        type: string
 
 permissions:
   contents: read
 
+env:
+  OCI_REPO_PATH: /home/ubuntu/NUMZFLEET
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.target.outputs.sha }}
     steps:
       - name: Resolve target SHA
         id: target
@@ -54,7 +62,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-frontend:${{ steps.target.outputs.sha }}
           build-args: |
-            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'http://100.121.79.2:3003' }}
+            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'https://numz.site' }}
             VITE_TRACCAR_PREFIX=/traccar
             VITE_FLEET_COMMAND_SHEET=1
             BUILD_REF=${{ github.run_id }}-${{ github.run_attempt }}
@@ -80,3 +88,43 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/numzfleet-erb:${{ steps.target.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-oci:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.build-and-push.outputs.sha }}
+
+      - name: Verify image manifests exist
+        run: |
+          chmod +x deployment/verify/verify-docker-manifests.sh
+          deployment/verify/verify-docker-manifests.sh "${{ needs.build-and-push.outputs.sha }}" "${{ secrets.DOCKERHUB_USERNAME }}"
+
+      - name: Setup SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.OCI_SSH_KEY }}" > ~/.ssh/id_oci
+          chmod 600 ~/.ssh/id_oci
+          ssh-keyscan -H "${{ secrets.OCI_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to OCI
+        env:
+          PROMOTED_SHA: ${{ needs.build-and-push.outputs.sha }}
+        run: |
+          ssh -i ~/.ssh/id_oci "${{ secrets.OCI_SSH_USER }}@${{ secrets.OCI_SSH_HOST }}" \
+            "set -euo pipefail; \
+             cd '${OCI_REPO_PATH}'; \
+             git fetch origin --tags; \
+             git checkout '${PROMOTED_SHA}'; \
+             SKIP_PROMOTION_GATE=1 bash deployment/deploy/promote-to-production.sh '${PROMOTED_SHA}' deployment/.env; \
+             bash deployment/backup/baseline-backup.sh '${PROMOTED_SHA}'"
+
+      - name: Verify production health
+        run: |
+          curl -fsS --max-time 30 "https://numz.site/health"
+          curl -fsS --max-time 30 "https://numz.site/api/health"

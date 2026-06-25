@@ -4,3 +4,4 @@
 # Registry deploy scripts state (server or laptop)
 deploy/.last_deploy
 deploy/.deploy_history
+deployment/.env.dev

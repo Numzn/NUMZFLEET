@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Backup NUMZFLEET dev databases before major changes.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+BACKUP_ROOT="/srv/backups/databases/numzfleet"
+PG_DIR="${BACKUP_ROOT}/postgres"
+MYSQL_DIR="${BACKUP_ROOT}/traccar"
+
+mkdir -p "${PG_DIR}" "${MYSQL_DIR}"
+
+echo "==> Postgres (fuel-api)"
+if docker ps --format '{{.Names}}' | grep -q '^numzfleet-dev-db$'; then
+  docker exec numzfleet-dev-db pg_dump -U numztrak -d numztrak_fuel -Fc \
+    > "${PG_DIR}/numztrak_fuel_${STAMP}.dump"
+  echo "Saved ${PG_DIR}/numztrak_fuel_${STAMP}.dump"
+elif docker ps --format '{{.Names}}' | grep -q '^numzfleet-staging-db$'; then
+  docker exec numzfleet-staging-db pg_dump -U numztrak -d numztrak_fuel -Fc \
+    > "${PG_DIR}/numztrak_fuel_${STAMP}.dump"
+  echo "Saved ${PG_DIR}/numztrak_fuel_${STAMP}.dump (from staging container)"
+else
+  echo "WARN: no dev or staging Postgres container running" >&2
+fi
+
+echo "==> Traccar MySQL"
+if docker ps --format '{{.Names}}' | grep -q '^numzfleet-dev-traccar-mysql$'; then
+  docker exec numzfleet-dev-traccar-mysql mysqldump -u traccar traccar \
+    | gzip > "${MYSQL_DIR}/traccar_${STAMP}.sql.gz"
+  echo "Saved ${MYSQL_DIR}/traccar_${STAMP}.sql.gz"
+elif docker ps --format '{{.Names}}' | grep -q '^numzfleet-staging-traccar-mysql$'; then
+  docker exec numzfleet-staging-traccar-mysql mysqldump -u traccar traccar \
+    | gzip > "${MYSQL_DIR}/traccar_${STAMP}.sql.gz"
+  echo "Saved ${MYSQL_DIR}/traccar_${STAMP}.sql.gz (from staging container)"
+else
+  echo "WARN: no dev or staging Traccar MySQL container running" >&2
+fi
+
+echo "==> Backup complete (${STAMP})"
