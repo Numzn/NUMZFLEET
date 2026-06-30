@@ -57,11 +57,11 @@ export default function DeviceTelemetryModule({
           </Button>
           <Button
             size="small"
-            variant="outlined"
+            variant="text"
             sx={{ textTransform: 'none' }}
-            onClick={() => navigate(`/settings/maintenances`)}
+            onClick={() => navigate(deviceId ? `/settings/maintenances?deviceId=${deviceId}` : '/settings/maintenances')}
           >
-            Maintenance schedule
+            Advanced schedules (Settings)
           </Button>
         </Box>
       )}

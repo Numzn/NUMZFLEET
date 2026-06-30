@@ -28,16 +28,12 @@ fi
 set -a
 # shellcheck disable=SC1091
 source "${ROOT}/backend/.env"
+# NumzLab dev overrides (CORS, etc.) — after backend/.env so Tailscale origins win
+# shellcheck disable=SC1091
+source "${ENV_FILE}"
 set +a
 
-# Stop staging stack if running (same host ports).
-if docker ps --format '{{.Names}}' | grep -q '^numzfleet-staging-'; then
-  echo "Stopping staging stack (port conflict)..."
-  docker compose -f "${ROOT}/deployment/compose/docker-compose.staging.yml" \
-    --env-file "${ROOT}/deployment/.env.staging" down 2>/dev/null || true
-fi
-
-# Ensure data volumes exist (reuse staging data).
+# Ensure shared data volumes exist (historical name: numzfleet_staging_*).
 for vol in numzfleet_staging_postgres_data numzfleet_staging_traccar_mysql_data numzfleet_staging_erb_data numzfleet_invoice_attachments; do
   docker volume inspect "$vol" >/dev/null 2>&1 || docker volume create "$vol" >/dev/null
 done
@@ -46,6 +42,6 @@ echo "Starting NUMZFLEET dev stack..."
 docker compose -f "${COMPOSE}" --env-file "${ENV_FILE}" up -d --build
 
 echo ""
-echo "Dev stack starting. UI: http://fleet.numzlab or http://127.0.0.1:3003"
-echo "API: http://api.fleet.numzlab/health or http://127.0.0.1:3000/health"
+echo "Dev stack starting. UI: https://fleet.numzlab or http://127.0.0.1:3003"
+echo "API: https://api.fleet.numzlab/health or http://127.0.0.1:3000/health"
 echo "Logs: ./scripts/logs"

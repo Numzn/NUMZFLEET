@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# Staging deploy (NumzLab): pull prebuilt images by SHA, no local build.
+# RETIRED — staging is not used. See deployment/STAGING_RETIRED.md
+# Was: Staging deploy (NumzLab) — pull prebuilt images by SHA, no local build.
+echo "[deploy-staging] ERROR: Staging deploy is retired. See deployment/STAGING_RETIRED.md" >&2
+exit 1
+
+# --- legacy script below (not executed) ---
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -41,13 +41,35 @@ check "Traccar :8082" "$(port_code http://127.0.0.1:8082/)"
 echo ""
 echo "=== Gateway (*.numzlab @ :80) ==="
 check "fleet.numzlab" "$(host_code fleet.numzlab /)"
-check "api.fleet.numzlab /health" "$(host_code api.fleet.numzlab /health)"
+check "fleet.numzlab /api/health" "$(host_code fleet.numzlab /api/health)"
 check "track.fleet.numzlab" "$(host_code track.fleet.numzlab /)"
 
 echo ""
 echo "=== Tailscale IP ==="
 check "UI ${TS_IP}:3003" "$(port_code "http://${TS_IP}:3003/")"
 check "API ${TS_IP}:3000/health" "$(port_code "http://${TS_IP}:3000/health")"
+
+echo ""
+echo "=== Maintenance API (auth required) ==="
+maint_code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/fleet/maintenance/dashboard 2>/dev/null || echo 000)"
+if [[ "$maint_code" == "401" || "$maint_code" == "403" ]]; then
+  echo "OK  maintenance/dashboard → $maint_code (route registered, auth gate)"
+elif [[ "$maint_code" == "200" ]]; then
+  echo "OK  maintenance/dashboard → 200"
+else
+  echo "FAIL maintenance/dashboard → $maint_code"
+  fail=1
+fi
+
+echo ""
+echo "=== Vehicle Engine API (auth required) ==="
+engine_code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/vehicles/00000000-0000-0000-0000-000000000001/engine 2>/dev/null || echo 000)"
+if [[ "$engine_code" == "401" || "$engine_code" == "403" || "$engine_code" == "404" ]]; then
+  echo "OK  vehicles/:id/engine → $engine_code (route registered)"
+else
+  echo "FAIL vehicles/:id/engine → $engine_code"
+  fail=1
+fi
 
 if [[ "$fail" -eq 0 ]]; then
   echo "=== NUMZFLEET VERIFY PASS ==="

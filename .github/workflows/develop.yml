@@ -29,6 +29,20 @@ jobs:
           npm ci
           npm test
 
+  migration-manifest-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate MIGRATION_ORDER matches migration files
+        run: |
+          set -euo pipefail
+          # shellcheck source=deployment/utils/fuel-migrations-lib.sh
+          source deployment/utils/fuel-migrations-lib.sh
+          load_migration_files_from_order
+          echo "OK: ${#MIGRATION_FILES[@]} migrations in MIGRATION_ORDER"
+
   frontend-build-check:
     runs-on: ubuntu-latest
     steps:

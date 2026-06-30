@@ -71,30 +71,13 @@ const isDev = process.env.NODE_ENV === 'development';
 const app = express();
 const httpServer = createServer(app);
 
-/** Browsers send these when Vite (or similar) runs on the host and fuel-api is in Docker. */
-const LOCAL_VITE_ORIGINS = [
-  'http://localhost:3002',
-  'http://127.0.0.1:3002',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5174',
-  'http://localhost:5175',
-  'http://127.0.0.1:5175',
-  'http://localhost:5176',
-  'http://127.0.0.1:5176',
-];
+/** Used only when CORS_ORIGIN is unset (e.g. ad-hoc local node without compose env). */
+const DEFAULT_CORS_ORIGIN = 'http://localhost:5174';
 
-// CORS configuration - support multiple origins for mobile apps
+// CORS — comma-separated list in CORS_ORIGIN (deployment/.env.dev, staging/prod env, compose).
 const getCorsOrigin = () => {
-  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5174';
-  let origins = corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
-  // Union local SPA dev origins so Socket.IO + REST from Vite are not rejected when CORS_ORIGIN is prod-only.
-  if (process.env.CORS_STRICT !== 'true') {
-    for (const o of LOCAL_VITE_ORIGINS) {
-      if (!origins.includes(o)) origins.push(o);
-    }
-  }
+  const corsOrigin = process.env.CORS_ORIGIN || DEFAULT_CORS_ORIGIN;
+  const origins = corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
 
   // If '*' is in the list, allow all origins (development only)
   if (origins.includes('*')) {
@@ -592,7 +575,7 @@ const startServer = async () => {
       console.log('\n✅ NumzTrak Fuel API is running!');
       console.log(`📡 HTTP Server: http://localhost:${PORT}`);
       console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
-      console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:5174'}`);
+      console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || DEFAULT_CORS_ORIGIN}`);
       console.log(`🗄️ PostgreSQL: Connected`);
       console.log(`🗄️ Traccar MySQL: Connected (read-only)`);
       console.log('\n🎯 Ready to accept fuel requests!\n');

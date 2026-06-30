@@ -52,8 +52,19 @@ services:
       TRACCAR_DATABASE_USER: traccar
     volumes:
       - ../../backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    # Raw GPS TCP ports must match backend/conf/traccar.xml (*.port). Not behind HTTP gateway.
     ports:
       - "8082:8082"
+      - "5055:5055"     # OsmAnd (HTTP)
+      - "5001:5001"     # gps103
+      - "5002:5002"     # tk103
+      - "5003:5003"     # gl200
+      - "5004:5004"     # gl100
+      - "5005:5005"     # t55
+      - "5006:5006"     # teltonika
+      - "5009:5009"     # meiligao
+      - "5013:5013"     # h02
+      - "5020:5020"     # gpsgate
     healthcheck:
       test:
         [
@@ -121,7 +132,8 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: postgresql://numztrak:${POSTGRES_PASSWORD}@db:5432/numztrak_fuel
+      # Do not set DATABASE_URL here — compose ${POSTGRES_PASSWORD} is empty unless
+      # scripts/dev sources backend/.env. fuel-api builds the URL from POSTGRES_PASSWORD (env_file).
       TRACCAR_MYSQL_HOST: traccar-mysql
       TRACCAR_MYSQL_PORT: 3306
       TRACCAR_MYSQL_DATABASE: traccar
@@ -129,7 +141,7 @@ services:
       TRACCAR_SERVER_URL: http://traccar:8082
       TRACCAR_API_URL: http://traccar:8082
       ERB_API_BASE_URL: http://erb-api:8000
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://fleet.numzlab,http://100.121.79.2:3003,http://localhost:5174}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://fleet.numzlab,https://fleet.numzlab,http://100.121.79.2:3003,http://localhost:3003,http://127.0.0.1:3003,http://localhost:5174}
       AUTH_STRATEGY: ${AUTH_STRATEGY:-hybrid}
       TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
       DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
@@ -175,6 +187,7 @@ services:
       VITE_TRACCAR_URL: http://traccar:8082
       VITE_TRACCAR_PREFIX: /traccar
       VITE_FLEET_COMMAND_SHEET: "1"
+      VITE_COOKIE_DOMAIN_REWRITE: "false"
     ports:
       # Map host :3003 (gateway target) to Vite :5174 inside container
       - "3003:5174"

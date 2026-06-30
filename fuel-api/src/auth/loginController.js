@@ -33,7 +33,11 @@ export async function loginWithTraccarBridge(req, res) {
 
     const responseText = await traccarRes.text();
     if (!traccarRes.ok) {
-      return res.status(traccarRes.status).send(responseText);
+      if (traccarRes.status === 401) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+      console.warn('[auth/login] Traccar session failed:', traccarRes.status, responseText.slice(0, 200));
+      return res.status(traccarRes.status).json({ error: 'Authentication failed' });
     }
 
     const setCookies = traccarRes.headers.getSetCookie?.() || [];

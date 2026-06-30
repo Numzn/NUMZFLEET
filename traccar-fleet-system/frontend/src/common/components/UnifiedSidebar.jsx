@@ -11,7 +11,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
@@ -36,6 +36,7 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import BuildIcon from '@mui/icons-material/Build';
+import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PeopleIcon from '@mui/icons-material/People';
 import NotificationCenter from '../../notifications/NotificationCenter';
@@ -46,6 +47,7 @@ import useFeatures from '../util/useFeatures';
 import LogoImage from '../../login/LogoImage';
 import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
 import { useTranslation } from './LocalizationProvider';
+import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -208,7 +210,26 @@ const UnifiedSidebar = ({
   const technician = useTechnician();
   const manager = useManager();
   const features = useFeatures();
-  const userId = useSelector((state) => state.session.user.id);
+  const user = useSelector((state) => state.session.user);
+  const userId = user?.id;
+  const [maintenanceBadge, setMaintenanceBadge] = useState(undefined);
+
+  useEffect(() => {
+    if (!user || !manager || readonly) return undefined;
+    let cancelled = false;
+    fetch('/api/fleet/maintenance/dashboard', {
+      headers: fuelApiAuthHeaders(user),
+      credentials: 'include',
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.kpis) return;
+        const count = (data.kpis.overdue || 0) + (data.kpis.dueToday || 0);
+        setMaintenanceBadge(count > 0 ? count : undefined);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user, manager, readonly]);
   const supportLink = useSelector((state) => state.session.server.attributes.support);
   const billingLink = useSelector((state) => state.session.user.attributes.billingLink);
 
@@ -272,9 +293,9 @@ const UnifiedSidebar = ({
           activeMatch: (path) => path.startsWith('/settings/attribute'),
         });
       }
-      if (!features.disableMaintenance) {
+      if (!features.disableMaintenance && admin) {
         out.push({
-          title: t('sharedMaintenance'),
+          title: 'Traccar schedules (advanced)',
           path: '/settings/maintenances',
           icon: BuildIcon,
           activeMatch: (path) => path.startsWith('/settings/maintenance'),
@@ -389,6 +410,15 @@ const UnifiedSidebar = ({
             { title: 'Driver requests', path: '/fuel-requests', show: features.enableFuelRequests },
           ].filter((c) => c.show !== false),
         },
+        {
+          key: 'maintenance',
+          title: 'Maintenance',
+          path: '/maintenance',
+          icon: BuildOutlinedIcon,
+          show: manager && !readonly,
+          badge: maintenanceBadge,
+          activeMatch: (path) => path.startsWith('/maintenance'),
+        },
       ].filter((i) => i.show !== false),
     },
     {
@@ -417,6 +447,7 @@ const UnifiedSidebar = ({
     features.disableDrivers,
     manager,
     pendingFuelCount,
+    maintenanceBadge,
     readonly,
     systemChildren,
   ]);

@@ -1,10 +1,14 @@
-import { SERVICE_RECORD_STATUSES } from '../models/ServiceRecord.js';
+import {
+  SERVICE_RECORD_STATUSES,
+  SERVICE_RECORD_PRIORITIES,
+} from '../models/ServiceRecord.js';
 import { DeviceAssignment } from '../models/index.js';
 import {
   listByCompany,
   findByIdForCompany,
   findByIdForVehicle,
   createRecord,
+  nextWorkOrderNumber,
 } from '../repositories/serviceRecordRepository.js';
 import { assertVehicleInTenant } from './vehicleFleetService.js';
 import { setVerifiedOdometer } from './odometerService.js';
@@ -30,26 +34,55 @@ function parseOptionalNumber(value, field) {
   return number;
 }
 
+/** UI-facing status: legacy open → scheduled */
+export function normalizeStatusForDto(status) {
+  if (status === 'open') return 'scheduled';
+  return status;
+}
+
 export function toServiceRecordDto(record) {
   if (!record) return null;
   const plain = record.toJSON ? record.toJSON() : record;
+  const actualCost = plain.actualCost != null
+    ? Number(plain.actualCost)
+    : (plain.cost != null ? Number(plain.cost) : null);
+
   return {
     id: plain.id,
     companyId: plain.companyId,
     fleetVehicleId: plain.fleetVehicleId,
     deviceId: plain.deviceId != null ? Number(plain.deviceId) : null,
     maintenanceId: plain.maintenanceId != null ? Number(plain.maintenanceId) : null,
+    workOrderNumber: plain.workOrderNumber || null,
     title: plain.title,
-    status: plain.status,
+    status: normalizeStatusForDto(plain.status),
+    priority: plain.priority || 'medium',
+    workshop: plain.workshop || plain.vendor || null,
+    assignee: plain.assignee || null,
     odometerKm: plain.odometerKm != null ? Number(plain.odometerKm) : null,
-    cost: plain.cost != null ? Number(plain.cost) : null,
+    cost: actualCost,
+    actualCost,
+    estimatedCost: plain.estimatedCost != null ? Number(plain.estimatedCost) : null,
+    labourCost: plain.labourCost != null ? Number(plain.labourCost) : null,
+    partsCost: plain.partsCost != null ? Number(plain.partsCost) : null,
+    otherCost: plain.otherCost != null ? Number(plain.otherCost) : null,
     vendor: plain.vendor || null,
     notes: plain.notes || null,
     dueAt: plain.dueAt ? new Date(plain.dueAt).toISOString() : null,
+    scheduledDueDate: plain.scheduledDueDate
+      ? new Date(plain.scheduledDueDate).toISOString()
+      : (plain.dueAt ? new Date(plain.dueAt).toISOString() : null),
     completedAt: plain.completedAt ? new Date(plain.completedAt).toISOString() : null,
     createdBy: plain.createdBy != null ? Number(plain.createdBy) : null,
     createdAt: plain.createdAt ? new Date(plain.createdAt).toISOString() : null,
     updatedAt: plain.updatedAt ? new Date(plain.updatedAt).toISOString() : null,
+    vehicle: plain.vehicle
+      ? {
+        id: plain.vehicle.id,
+        name: plain.vehicle.name,
+        plateNumber: plain.vehicle.plateNumber,
+      }
+      : null,
   };
 }
 
@@ -58,6 +91,12 @@ async function resolveActiveDeviceId(fleetVehicleId) {
     where: { vehicleId: String(fleetVehicleId), isActive: true },
   });
   return assignment ? Number(assignment.deviceId) : null;
+}
+
+function normalizeStatusForDb(status) {
+  const s = String(status);
+  if (s === 'scheduled') return 'open';
+  return s;
 }
 
 export async function listServiceRecords(companyId, filters = {}) {
@@ -82,18 +121,42 @@ export async function createServiceRecord(user, companyId, fleetVehicleId, paylo
     ? Number(payload.deviceId)
     : await resolveActiveDeviceId(fleetVehicleId);
 
+  const resolvedDeviceId = Number.isFinite(deviceId) && deviceId > 0 ? deviceId : null;
+
+  const priority = payload.priority ? String(payload.priority) : 'medium';
+  if (!SERVICE_RECORD_PRIORITIES.includes(priority)) {
+    throw badRequest(`priority must be one of: ${SERVICE_RECORD_PRIORITIES.join(', ')}`);
+  }
+
+  const workOrderNumber = await nextWorkOrderNumber(companyId);
+  const estimatedCost = parseOptionalNumber(payload.estimatedCost, 'estimatedCost');
+  const actualCost = parseOptionalNumber(payload.actualCost ?? payload.cost, 'actualCost');
+
   const record = await createRecord({
     companyId: String(companyId),
     fleetVehicleId: String(fleetVehicleId),
-    deviceId: Number.isFinite(deviceId) && deviceId > 0 ? deviceId : null,
+    deviceId: resolvedDeviceId,
+    deprecatedVehicleId: resolvedDeviceId,
     maintenanceId: payload.maintenanceId != null ? Number(payload.maintenanceId) : null,
+    workOrderNumber,
     title,
-    status: 'open',
+    status: payload.status ? normalizeStatusForDb(payload.status) : 'open',
+    priority,
+    workshop: payload.workshop ? String(payload.workshop).trim() : null,
+    assignee: payload.assignee ? String(payload.assignee).trim() : null,
     odometerKm: parseOptionalNumber(payload.odometerKm, 'odometerKm'),
-    cost: parseOptionalNumber(payload.cost, 'cost'),
-    vendor: payload.vendor ? String(payload.vendor).trim() : null,
+    cost: actualCost,
+    actualCost,
+    estimatedCost,
+    labourCost: parseOptionalNumber(payload.labourCost, 'labourCost'),
+    partsCost: parseOptionalNumber(payload.partsCost, 'partsCost'),
+    otherCost: parseOptionalNumber(payload.otherCost, 'otherCost'),
+    vendor: payload.vendor ? String(payload.vendor).trim() : (payload.workshop ? String(payload.workshop).trim() : null),
     notes: payload.notes ? String(payload.notes) : null,
-    dueAt: payload.dueAt ? new Date(payload.dueAt) : null,
+    dueAt: payload.dueAt || payload.scheduledDueDate ? new Date(payload.dueAt || payload.scheduledDueDate) : null,
+    scheduledDueDate: payload.scheduledDueDate || payload.dueAt
+      ? new Date(payload.scheduledDueDate || payload.dueAt)
+      : null,
     createdBy: user?.id ?? null,
   });
 
@@ -110,7 +173,7 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
 
   const patch = {};
   if (payload.status != null) {
-    const status = String(payload.status);
+    const status = normalizeStatusForDb(payload.status);
     if (!SERVICE_RECORD_STATUSES.includes(status)) {
       throw badRequest(`status must be one of: ${SERVICE_RECORD_STATUSES.join(', ')}`);
     }
@@ -122,11 +185,32 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
     if (!title) throw badRequest('title cannot be empty');
     patch.title = title;
   }
-  if ('cost' in payload) patch.cost = parseOptionalNumber(payload.cost, 'cost');
+  if (payload.priority != null) {
+    const priority = String(payload.priority);
+    if (!SERVICE_RECORD_PRIORITIES.includes(priority)) {
+      throw badRequest(`priority must be one of: ${SERVICE_RECORD_PRIORITIES.join(', ')}`);
+    }
+    patch.priority = priority;
+  }
+  if ('workshop' in payload) patch.workshop = payload.workshop ? String(payload.workshop).trim() : null;
+  if ('assignee' in payload) patch.assignee = payload.assignee ? String(payload.assignee).trim() : null;
+  if ('cost' in payload || 'actualCost' in payload) {
+    const actualCost = parseOptionalNumber(payload.actualCost ?? payload.cost, 'actualCost');
+    patch.actualCost = actualCost;
+    patch.cost = actualCost;
+  }
+  if ('estimatedCost' in payload) patch.estimatedCost = parseOptionalNumber(payload.estimatedCost, 'estimatedCost');
+  if ('labourCost' in payload) patch.labourCost = parseOptionalNumber(payload.labourCost, 'labourCost');
+  if ('partsCost' in payload) patch.partsCost = parseOptionalNumber(payload.partsCost, 'partsCost');
+  if ('otherCost' in payload) patch.otherCost = parseOptionalNumber(payload.otherCost, 'otherCost');
   if ('odometerKm' in payload) patch.odometerKm = parseOptionalNumber(payload.odometerKm, 'odometerKm');
   if ('vendor' in payload) patch.vendor = payload.vendor ? String(payload.vendor).trim() : null;
   if ('notes' in payload) patch.notes = payload.notes ? String(payload.notes) : null;
   if ('dueAt' in payload) patch.dueAt = payload.dueAt ? new Date(payload.dueAt) : null;
+  if ('scheduledDueDate' in payload) {
+    patch.scheduledDueDate = payload.scheduledDueDate ? new Date(payload.scheduledDueDate) : null;
+    if (payload.scheduledDueDate) patch.dueAt = new Date(payload.scheduledDueDate);
+  }
 
   await record.update(patch);
 
@@ -145,7 +229,6 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
   return toServiceRecordDto(record);
 }
 
-/** Back-compat global list/create without nested vehicle route. */
 export async function createServiceRecordLegacy(user, companyId, payload = {}) {
   const fleetVehicleId = payload.fleetVehicleId || payload.fleet_vehicle_id;
   if (!fleetVehicleId) {

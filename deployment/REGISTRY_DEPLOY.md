@@ -1,30 +1,46 @@
-# Release Pipeline v3: staging + production promotion
+# Release Pipeline — NumzLab dev → OCI production
 
-NUMZFLEET v3 uses immutable SHA-tagged images and promotion-based releases:
+**Staging is retired for now.** See [STAGING_RETIRED.md](STAGING_RETIRED.md).
+
+## Active flow
+
+1. **Develop** on NumzLab: `./scripts/dev` (hot reload).
+2. **Build/push** SHA-tagged images to Docker Hub.
+3. **Deploy production** from NumzLab:
+
+```bash
+python3 deployment/scripts/auto_deploy.py \
+  --target production \
+  --skip-git \
+  --deploy-image-tag <full-git-sha>
+```
+
+Or on OCI directly:
+
+```bash
+./deployment/run-migrate-and-deploy.sh <full-git-sha> deployment/.env
+```
+
+4. OCI is **pull-only** (`docker compose pull` + `up`) — never `docker compose build` on the server.
+
+Migrations: see [MIGRATIONS_AND_DEPLOY.md](MIGRATIONS_AND_DEPLOY.md).
+
+---
+
+## Historical: Release Pipeline v3 (staging + promotion)
+
+<details>
+<summary>Collapsed — staging path not in use</summary>
+
+NUMZFLEET v3 used immutable SHA-tagged images and promotion-based releases:
 
 - `develop` -> build images -> deploy to NumzLab staging
 - staging success -> manual approval -> promote exact SHA to OCI production
-- OCI remains pull-only (`docker compose pull` + `up`), never local build
-
-## v3 hard rules
-
-1. Docker Hub is the only artifact source.
-2. Production deploy uses an already-tested SHA from staging.
-3. Promotion never rebuilds images.
-4. `main` is a release pointer (fast-forward to promoted SHA).
-
-## Primary v3 commands
 
 Staging deploy wrapper:
 
 ```bash
 bash deployment/deploy/deploy-to-staging.sh <full-git-sha> deployment/.env.staging
-```
-
-Production promotion wrapper:
-
-```bash
-bash deployment/deploy/promote-to-production.sh <full-git-sha> deployment/.env
 ```
 
 Promotion gate check:
@@ -33,11 +49,9 @@ Promotion gate check:
 bash deployment/verify/verify-staging-promotion.sh <full-git-sha> numz14
 ```
 
+</details>
+
 ---
-
-## Legacy details (kept for reference)
-
-The sections below document the previous single-track production flow and remain as operational reference while v3 rollout is in progress.
 
 ## Images (Docker Hub)
 
@@ -115,6 +129,8 @@ This runs `docker compose pull` then `docker compose up -d` against `deployment/
 ### Migration + Deploy Flow
 
 Use this when a release includes **Postgres schema changes** under `fuel-api/migrations/`. It applies migrations **before** pulling images and restarting the stack, so the database matches the new backend.
+
+**See [MIGRATIONS_AND_DEPLOY.md](MIGRATIONS_AND_DEPLOY.md)** for the full truth table (which scripts run migrations vs images-only).
 
 ```bash
 chmod +x deployment/run-migrate-and-deploy.sh

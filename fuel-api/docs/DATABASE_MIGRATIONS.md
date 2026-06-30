@@ -1,6 +1,8 @@
 # Fuel API Database Migrations
 
-This service uses SQL migration files under `fuel-api/migrations/` and Sequelize `sync` on startup when PostgreSQL is reachable.
+SQL migrations live under `fuel-api/migrations/`. **Apply order is defined in `fuel-api/migrations/MIGRATION_ORDER`** (not alphabetical). Deploy scripts read that file only — see [deployment/MIGRATIONS_AND_DEPLOY.md](../../deployment/MIGRATIONS_AND_DEPLOY.md) for which deploy paths run migrations.
+
+Sequelize `sync` on startup does **not** replace these SQL files for production schema changes.
 
 ## Apply all migrations (local Docker — recommended)
 
@@ -10,7 +12,7 @@ With the stack up (`docker compose up -d db` or full `.\rebuild-stack.ps1`):
 .\fuel-api\scripts\apply-fuel-migrations.ps1
 ```
 
-This runs every migration in deploy order (idempotent). Production/staging use the same list in `deployment/run-migrate-and-deploy.sh`.
+This runs every migration in `MIGRATION_ORDER` (idempotent). Production/staging use the same list via `deployment/utils/fuel-migrations-lib.sh`.
 
 ## If you see `column "company_id" does not exist`
 

@@ -41,7 +41,7 @@ Pushes to `develop` do **not** deploy to production.
 | Service | URL |
 |---------|-----|
 | Fleet UI | http://fleet.numzlab or http://100.121.79.2:3003 |
-| Fuel API | http://api.fleet.numzlab/health or http://100.121.79.2:3000/health |
+| Fuel API | https://fleet.numzlab/api/health or http://100.121.79.2:3000/health |
 | Traccar | http://track.fleet.numzlab or http://100.121.79.2:8082 |
 
 Prerequisite: Tailscale Split DNS for domain `numzlab` → `100.121.79.2`.

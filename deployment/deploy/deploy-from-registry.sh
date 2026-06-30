@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Production deploy: pull prebuilt images only (no build on server).
+# Does NOT run Postgres migrations — use run-migrate-and-deploy.sh or full-production-deploy.sh.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

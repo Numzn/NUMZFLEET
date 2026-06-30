@@ -20,6 +20,12 @@ export default defineConfig(({ mode }) => {
   // Otherwise use `hmr: true` so the WebSocket uses the same port as the page (fixes e.g. page on :3003 but ws on :3002).
   const hmrExternal = String(env.VITE_HMR_EXTERNAL || '').trim();
   const useCustomHmr = Boolean(hmrExternal);
+  // In Compose dev (fleet.numzlab), do not rewrite Set-Cookie to localhost — breaks HTTPS gateway login.
+  const cookieDomainRewrite =
+    env.VITE_COOKIE_DOMAIN_REWRITE === 'false'
+    || String(env.VITE_FUEL_API_URL || '').includes('backend:')
+      ? false
+      : { '*': 'localhost' };
 
   // Detect environment mode
   const isLocalDev = env.LOCAL_DEV === 'true';
@@ -67,12 +73,18 @@ export default defineConfig(({ mode }) => {
       }`
     );
   } else {
-    // Vite runs on the host; root Compose maps traccar:8082 and backend (fuel-api):3000 to localhost.
-    // Set VITE_PROXY_INTERNAL_DOCKER=true only if the dev server runs inside the Compose network.
+    // Host dev: localhost ports. In Compose frontend container: use VITE_*_URL or VITE_PROXY_INTERNAL_DOCKER.
     const internalDocker = env.VITE_PROXY_INTERNAL_DOCKER === 'true';
-    traccarUrl = internalDocker ? 'http://traccar:8082' : 'http://localhost:8082';
-    fuelApiUrl = internalDocker ? 'http://backend:3000' : 'http://localhost:3000';
-    console.log(internalDocker ? '🐳 [Vite] Running in DOCKER (internal) proxy mode' : '🐳 [Vite] Running in DOCKER-style dev (localhost proxy targets)');
+    const defaultTraccar = internalDocker ? 'http://traccar:8082' : 'http://localhost:8082';
+    const defaultFuel = internalDocker ? 'http://backend:3000' : 'http://localhost:3000';
+    traccarUrl = String(env.VITE_TRACCAR_URL || '').trim() || defaultTraccar;
+    fuelApiUrl = explicitFuelApiUrl || defaultFuel;
+    const modeLabel = explicitFuelApiUrl || String(env.VITE_TRACCAR_URL || '').trim()
+      ? '🐳 [Vite] Running in DOCKER (env proxy targets)'
+      : internalDocker
+        ? '🐳 [Vite] Running in DOCKER (internal) proxy mode'
+        : '🐳 [Vite] Running in DOCKER-style dev (localhost proxy targets)';
+    console.log(modeLabel);
     console.log(`   Traccar: ${traccarUrl}`);
     console.log(`   Fuel API: ${fuelApiUrl}`);
   }
@@ -96,6 +108,10 @@ export default defineConfig(({ mode }) => {
       // Fail fast when the port is taken — avoids a second Vite on :5175 that shares the same proxy target and amplifies Socket.IO reconnect storms.
       strictPort: !isProd,
       host: '0.0.0.0',
+      // Dev: allow Tailscale Split DNS (*.numzlab) and gateway Host headers (fleet.numzlab).
+      allowedHosts: isProd
+        ? ['localhost', '127.0.0.1']
+        : true,
       ...(useCustomHmr
         ? {
             hmr: {
@@ -116,7 +132,7 @@ export default defineConfig(({ mode }) => {
         ws: true,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: { '*': 'localhost' },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -133,9 +149,7 @@ export default defineConfig(({ mode }) => {
         ws: true,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: {
-          '*': 'localhost'
-        },
+        cookieDomainRewrite,
         // Don't rewrite the path - Socket.IO needs the full path with query params
         rewrite: (path) => path,
         // Ensure this proxy handles both HTTP and WebSocket
@@ -184,9 +198,7 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: {
-          '*': 'localhost'
-        },
+        cookieDomainRewrite,
         configure: (proxy, options) => {
           const isDev = process.env.NODE_ENV === 'development';
           
@@ -223,13 +235,13 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: { '*': 'localhost' },
+        cookieDomainRewrite,
       },
       '/api/fleet': {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: { '*': 'localhost' },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -245,9 +257,7 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: {
-          '*': 'localhost'
-        },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -263,17 +273,13 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: {
-          '*': 'localhost'
-        },
+        cookieDomainRewrite,
       },
       '/api/vehicles': {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: {
-          '*': 'localhost'
-        },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -302,7 +308,7 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: { '*': 'localhost' },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -318,7 +324,7 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: { '*': 'localhost' },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -334,7 +340,7 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: { '*': 'localhost' },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -350,7 +356,7 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: { '*': 'localhost' },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -366,9 +372,7 @@ export default defineConfig(({ mode }) => {
         target: fuelApiUrl,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: {
-          '*': 'localhost'
-        },
+        cookieDomainRewrite,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) {
@@ -386,7 +390,7 @@ export default defineConfig(({ mode }) => {
         ws: true,
         changeOrigin: true,
         secure: false,
-        cookieDomainRewrite: { '*': 'localhost' },
+        cookieDomainRewrite,
         rewrite: (path) => path.replace(/^\/traccar/, '') || '/',
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {

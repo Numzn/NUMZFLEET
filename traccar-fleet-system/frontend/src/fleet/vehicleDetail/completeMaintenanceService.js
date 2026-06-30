@@ -83,7 +83,19 @@ export async function completeMaintenanceService(user, fleetVehicleId, maintenan
   };
 
   if (form.cost !== '' && form.cost != null) {
-    payload.cost = Number(form.cost);
+    const total = Number(form.cost);
+    payload.cost = total;
+    payload.actualCost = total;
+    if (form.labourCost != null && form.labourCost !== '') {
+      payload.labourCost = Number(form.labourCost);
+    } else {
+      payload.labourCost = Math.round(total * 0.3 * 100) / 100;
+    }
+    if (form.partsCost != null && form.partsCost !== '') {
+      payload.partsCost = Number(form.partsCost);
+    } else {
+      payload.partsCost = Math.round(total * 0.7 * 100) / 100;
+    }
   }
 
   if (isDistanceMaintenanceType(maintenanceItem.type) && form.odometerKm !== '' && form.odometerKm != null) {

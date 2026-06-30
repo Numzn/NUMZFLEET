@@ -40,7 +40,9 @@ function inferRuntimePrefix() {
     host === 'numz.site' ||
     host === 'www.numz.site' ||
     host === 'api.numz.site' ||
-    host === '129.151.163.95'
+    host === '129.151.163.95' ||
+    host.endsWith('.numzlab') ||
+    host === 'numzlab'
   ) {
     return '/traccar';
   }

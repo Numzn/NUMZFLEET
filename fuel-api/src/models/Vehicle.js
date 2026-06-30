@@ -23,6 +23,28 @@ export default (sequelize) => {
         field: 'company_id',
         references: { model: 'companies', key: 'id' },
       },
+      notes: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      make: {
+        type: DataTypes.STRING(80),
+        allowNull: true,
+      },
+      model: {
+        type: DataTypes.STRING(80),
+        allowNull: true,
+      },
+      photoFileId: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        field: 'photo_file_id',
+      },
+      homeBaseLabel: {
+        type: DataTypes.STRING(120),
+        allowNull: true,
+        field: 'home_base_label',
+      },
     },
     {
       tableName: 'vehicles',

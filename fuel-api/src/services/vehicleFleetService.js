@@ -21,6 +21,7 @@ import {
 } from '../utils/fleetConfigUtils.js';
 import { updateVehicleSpec } from './vehicleSpecService.js';
 import { summarizeForVehicle } from '../repositories/serviceRecordRepository.js';
+import { buildVehicleAttachmentPath } from '../middleware/vehicleUpload.js';
 
 /**
  * v1 merged vehicle DTO — single shape for list and get-by-id.
@@ -31,6 +32,11 @@ function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
     id: vehicle.id,
     name: vehicle.name,
     plateNumber: vehicle.plateNumber ?? null,
+    notes: vehicle.notes ?? null,
+    make: vehicle.make ?? null,
+    model: vehicle.model ?? null,
+    homeBaseLabel: vehicle.homeBaseLabel ?? null,
+    photoUrl: vehicle.photoFileId ? buildVehicleAttachmentPath(vehicle.photoFileId) : null,
   };
 
   if (!assignment) {
@@ -218,6 +224,40 @@ export async function updateVehicle(id, { name, plateNumber }) {
 
   await vehicle.update({ name: trimmed, plateNumber: plate });
   return getVehicleMerged(id);
+}
+
+export async function patchVehicleFields(id, fields = {}, companyId = null) {
+  const vehicle = await Vehicle.findByPk(id);
+  if (!vehicle) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (companyId && vehicle.companyId && vehicle.companyId !== companyId) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const patch = {};
+  if (fields.notes !== undefined) patch.notes = fields.notes != null ? String(fields.notes) : null;
+  if (fields.make !== undefined) patch.make = fields.make != null ? String(fields.make).trim() || null : null;
+  if (fields.model !== undefined) patch.model = fields.model != null ? String(fields.model).trim() || null : null;
+  if (fields.homeBaseLabel !== undefined) {
+    patch.homeBaseLabel = fields.homeBaseLabel != null ? String(fields.homeBaseLabel).trim() || null : null;
+  }
+  if (fields.photoFileId !== undefined) {
+    patch.photoFileId = fields.photoFileId != null ? String(fields.photoFileId) : null;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    const err = new Error('No valid fields to update');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  await vehicle.update(patch);
+  return getVehicleMerged(id, companyId || vehicle.companyId);
 }
 
 export async function deleteVehicle(id) {

@@ -5,9 +5,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="${2:-$ROOT_DIR/deployment/.env}"
+BACKEND_ENV="$ROOT_DIR/backend/.env"
+POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-numzfleet-prod-db}"
 PRE_DEPLOY_CHECK="$ROOT_DIR/deployment/verify/pre-deploy-check.sh"
 DEPLOY_SCRIPT="$ROOT_DIR/deployment/deploy/deploy-from-registry.sh"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://numz.site}"
+
+MIGRATE_LOG_PREFIX="[full-deploy]"
+# shellcheck source=deployment/utils/fuel-migrations-lib.sh
+source "$ROOT_DIR/deployment/utils/fuel-migrations-lib.sh"
 
 EXPECTED_CONTAINERS=(
   numzfleet-prod-db
@@ -141,6 +147,19 @@ main() {
   log "Selected SHA: $sha"
   log "VERIFY: pre-deploy checks"
   bash "$PRE_DEPLOY_CHECK" "$sha" "$ENV_FILE"
+
+  if [[ "${SKIP_MIGRATIONS:-0}" != "1" ]]; then
+    require_file "$BACKEND_ENV"
+    set -a
+    # shellcheck disable=SC1090,SC1091
+    source "$BACKEND_ENV"
+    set +a
+    log "MIGRATE: Postgres (all files in fuel-api/migrations/MIGRATION_ORDER)"
+    verify_migration_db
+    run_all_fuel_migrations
+  else
+    log "SKIP_MIGRATIONS=1 — skipping Postgres migrations"
+  fi
 
   log "DEPLOY: registry pull-only deployment"
   bash "$DEPLOY_SCRIPT" "$sha" "$ENV_FILE"

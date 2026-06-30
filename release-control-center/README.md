@@ -30,12 +30,14 @@ Log in with the `RCC_API_TOKEN` from `config/rcc.env`.
 
 ## Actions
 
-| Button | Command |
+**Staging is retired.** See `deployment/STAGING_RETIRED.md`.
+
+| Action | Command |
 |--------|---------|
-| Deploy to NumzLab | `python deployment/scripts/auto_deploy.py --target staging` |
-| Run Verification | SSH `numzlab-healthcheck.sh`, `staging-smoke.sh`, `verify-docker-manifests.sh`, `verify-staging-promotion.sh` |
-| Promote to Production | `auto_deploy.py --target production --promoted-sha <sha> --skip-git` |
-| Rollback Production | SSH OCI `deployment/deploy/rollback.sh` |
+| Dev on NumzLab | `./scripts/dev` |
+| Deploy production | `python deployment/scripts/auto_deploy.py --target production --skip-git --deploy-image-tag <sha>` |
+| Health check NumzLab | `./scripts/verify` or `./scripts/numzlab-healthcheck.sh` |
+| Rollback production | SSH OCI `deployment/deploy/rollback.sh` |
 
 ## Data sources (live)
 

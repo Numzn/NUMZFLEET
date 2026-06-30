@@ -82,6 +82,7 @@ import OperationRunPage from './operationSessions/OperationRunPage';
 import FuelVehiclesRoute, { RunRedirect } from './operationSessions/FuelVehiclesRoute';
 import SmartInvoicesPage from './operationSessions/SmartInvoicesPage';
 import ReviewClosePage from './operationSessions/ReviewClosePage';
+import MaintenanceDashboardPage from './maintenance/MaintenanceDashboardPage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -159,6 +160,7 @@ const Navigation = () => {
           </Route>
           <Route path="fleet/operation-sessions/create" element={<CreateSessionPage />} />
           <Route path="fleet/operation-sessions/plan" element={<PlanningPage />} />
+          <Route path="maintenance" element={<MaintenanceDashboardPage />} />
 
           <Route path="position/:id" element={<PositionPage />} />
           <Route path="network/:positionId" element={<NetworkPage />} />

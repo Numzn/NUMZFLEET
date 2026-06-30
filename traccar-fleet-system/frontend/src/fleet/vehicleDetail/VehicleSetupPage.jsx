@@ -18,6 +18,7 @@ import useVehicleData from './useVehicleData';
 import { useLinkedDrivers } from './useVehicleDriver.js';
 import { useLinkedGeofences } from './useLinkedGeofences.js';
 import { vehicleWorkspacePath } from '../vehicleRegistry/vehicleRegistryUtils.js';
+import { patchVehicleFields } from '../vehiclesApi.js';
 import { fetchImmobilizationCapabilities } from './immobilizationIntentsApi.js';
 import useVehicleSetupForm from './setup/useVehicleSetupForm.js';
 import useVehicleSetupReadiness from './setup/useVehicleSetupReadiness.js';
@@ -214,6 +215,11 @@ export default function VehicleSetupPage() {
 
   const handleConfirmSave = useCallback(async () => {
     try {
+      await patchVehicleFields(user, vehicleId, {
+        make: form.make?.trim() || null,
+        model: form.model?.trim() || null,
+        homeBaseLabel: form.homeBaseLabel?.trim() || null,
+      });
       const merged = await save(saveConfig);
       setReviewOpen(false);
       // save() hydrates form from PUT response; refresh drivers/zones only (avoids clobbering dirty toggles).
@@ -226,7 +232,7 @@ export default function VehicleSetupPage() {
     } catch {
       // err set in hook
     }
-  }, [save, saveConfig, reloadLinked, reloadLinkedGeofences, showToast]);
+  }, [save, saveConfig, reloadLinked, reloadLinkedGeofences, showToast, user, vehicleId, form.make, form.model, form.homeBaseLabel]);
 
   if (!manager) {
     return (

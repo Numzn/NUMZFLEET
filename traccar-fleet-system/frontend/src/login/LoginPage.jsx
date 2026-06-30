@@ -86,7 +86,7 @@ const LoginPage = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, code: code || undefined }),
       });
-      if (response.status === 404 || response.status === 502) {
+      if (response.status === 404 || response.status === 502 || response.status === 500 || response.status === 503) {
         const query = `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
         response = await traccarFetch('/api/session', {
           method: 'POST',

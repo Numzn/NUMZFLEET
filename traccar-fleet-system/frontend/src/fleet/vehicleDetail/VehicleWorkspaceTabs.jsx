@@ -1,28 +1,26 @@
 import { useState } from 'react';
-import { Box, Button, Tab, Tabs, Typography } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { useManager, useTechnician } from '../../common/util/permissions';
-import VehicleOperationsCard from './VehicleOperationsCard.jsx';
+import { Box, Tab, Tabs, Typography, Badge } from '@mui/material';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+import { useManager } from '../../common/util/permissions';
+import VehicleWorkspaceLayout from './VehicleWorkspaceLayout.jsx';
+import VehicleWorkspaceMobileNav from './VehicleWorkspaceMobileNav.jsx';
+import VehicleWorkspaceMoreSheet from './VehicleWorkspaceMoreSheet.jsx';
+import VehicleOverviewTab from './overview/VehicleOverviewTab.jsx';
 import VehicleFuelColumn from './VehicleFuelColumn.jsx';
 import VehicleAlertsColumn from './VehicleAlertsColumn.jsx';
-import DiagnosticsSection from './DiagnosticsSection.jsx';
-import DeviceTelemetryModule from './setup/modules/DeviceTelemetryModule.jsx';
-import DriverSetupModule from './setup/modules/DriverSetupModule.jsx';
-import VehicleAssignmentHistory from './VehicleAssignmentHistory.jsx';
+import VehicleMaintenanceTab from './VehicleMaintenanceTab.jsx';
 import VehicleServiceHistory from './VehicleServiceHistory.jsx';
-import VehicleMaintenanceCard from './VehicleMaintenanceCard.jsx';
+import FuelCard from './FuelCard.jsx';
+import ErbInsightCard from './ErbInsightCard.jsx';
+import VehicleDocumentsPanel from './VehicleDocumentsPanel.jsx';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
-import useVehicleMaintenance from './hooks/useVehicleMaintenance.js';
-import useVehicleServiceHistory from './hooks/useVehicleServiceHistory.js';
-import useLastRefill from './hooks/useLastRefill.js';
-import useVehicleFuelPerformance from './hooks/useVehicleFuelPerformance.js';
-
-const TAB_OVERVIEW = 'overview';
-const TAB_DRIVER = 'driver';
-const TAB_FUEL = 'fuel';
-const TAB_OPERATIONS = 'operations';
-const TAB_HARDWARE = 'hardware';
-const TAB_HISTORY = 'history';
+import useVehicleWorkspaceTab from './hooks/useVehicleWorkspaceTab.js';
+import {
+  VEHICLE_WORKSPACE_TABS,
+  VEHICLE_WORKSPACE_TAB_IDS,
+  getTabBadge,
+} from './vehicleWorkspaceTabRegistry.js';
 
 export default function VehicleWorkspaceTabs(props) {
   const {
@@ -37,99 +35,102 @@ export default function VehicleWorkspaceTabs(props) {
     linkedZonesLoading,
     livePosition,
     deviceId,
-    motionLabel,
-    motionDurationLabel,
-    ignitionPhrase,
+    linkedDrivers,
+    groupName,
     fleetVehicleId,
     onRefreshVehicle,
+    maintenance,
+    serviceHistory,
+    handleMaintenanceCompleted,
+    fuelPerformance,
+    fuelPerformanceLoading,
+    todayRefuel,
+    fuelRequests,
+    lastRefill,
+    todayTrips,
+    openServiceCount,
+    overviewMetrics,
+    overviewMetricsLoading,
+    vehicleEngine,
+    onSaveNotes,
+    notesSaving,
   } = props;
 
-  const technician = useTechnician();
   const canManage = useManager();
-  const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { sectionGap } = useVehicleWorkspaceDensity();
-  const [tab, setTab] = useState(TAB_OVERVIEW);
-  const { lastRefill } = useLastRefill(deviceId);
-  const fuelPerformanceHook = useVehicleFuelPerformance(vehicle?.id);
-  const lastRefillMileageKm = lastRefill?.refuel?.currentMileage != null
-    ? Number(lastRefill.refuel.currentMileage)
-    : null;
-  const maintenance = useVehicleMaintenance(deviceId, livePosition, lastRefillMileageKm);
-  const serviceHistory = useVehicleServiceHistory(vehicle?.id);
+  const { tab, setTab } = useVehicleWorkspaceTab();
+  const [moreOpen, setMoreOpen] = useState(false);
 
-  const handleMaintenanceCompleted = async () => {
-    maintenance.reload();
-    await serviceHistory.reload();
-    await onRefreshVehicle?.();
+  const badgeContext = {
+    dueSoonCount: maintenance.dueSoonCount,
+    openServiceCount,
+    alerts,
   };
 
-  return (
-    <Box>
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ mb: 1.5, borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label="Overview" value={TAB_OVERVIEW} />
-        <Tab label="Driver" value={TAB_DRIVER} />
-        <Tab label="Fuel" value={TAB_FUEL} />
-        <Tab label="Operations" value={TAB_OPERATIONS} />
-        {technician ? <Tab label="Tracking Hardware" value={TAB_HARDWARE} /> : null}
-        <Tab label="History" value={TAB_HISTORY} />
-      </Tabs>
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: sectionGap, pb: 2 }}>
-        {tab === TAB_OVERVIEW && (
-          <VehicleOperationsCard
+  const renderTabPanel = () => {
+    switch (tab) {
+      case VEHICLE_WORKSPACE_TAB_IDS.overview:
+        return (
+          <VehicleOverviewTab
             vehicle={vehicle}
+            telemetry={telemetry}
             fuel={fuel}
-            fuelPerformance={fuelPerformanceHook.fuelPerformance}
-            fuelPerformanceLoading={fuelPerformanceHook.loading}
-            telemetry={telemetry}
-            motionLabel={motionLabel}
-            motionDurationLabel={motionDurationLabel}
-            ignitionPhrase={ignitionPhrase}
+            fuelPerformance={fuelPerformance}
+            fuelPerformanceLoading={fuelPerformanceLoading}
+            maintenance={maintenance}
+            serviceHistory={serviceHistory}
+            alerts={alerts}
+            todayRefuel={todayRefuel}
+            fuelRequests={fuelRequests}
+            lastRefill={lastRefill}
+            todayTrips={todayTrips}
+            linkedDrivers={linkedDrivers}
             livePosition={livePosition}
-            deviceId={deviceId}
-            maintenanceDueSoonCount={maintenance.dueSoonCount}
+            overviewMetrics={overviewMetrics}
+            overviewMetricsLoading={overviewMetricsLoading}
+            vehicleEngine={vehicleEngine}
+            onSaveNotes={onSaveNotes}
+            notesSaving={notesSaving}
           />
-        )}
+        );
 
-        {tab === TAB_DRIVER && (
-          <DriverSetupModule
-            vehicle={vehicle}
+      case VEHICLE_WORKSPACE_TAB_IDS.maintenance:
+        return (
+          <VehicleMaintenanceTab
+            vehicleEngine={vehicleEngine}
+            maintenance={maintenance}
+            fleetVehicleId={vehicle?.id}
             deviceId={deviceId}
-            telemetry={telemetry}
-            onRefreshVehicle={onRefreshVehicle}
+            canManage={canManage}
+            onCompleted={handleMaintenanceCompleted}
           />
-        )}
+        );
 
-        {tab === TAB_FUEL && (
-          <Box>
-            <Typography variant="h2" sx={{ mb: 'var(--space-3)', color: 'var(--color-text-primary)' }}>
-              Fuel
-            </Typography>
-            <VehicleFuelColumn
-              deviceId={deviceId}
-              fuel={fuel}
-              erb={erb}
-              fuelPerformance={fuelPerformanceHook.fuelPerformance}
-              fuelPerformanceLoading={fuelPerformanceHook.loading}
-            />
-          </Box>
-        )}
+      case VEHICLE_WORKSPACE_TAB_IDS.repairs:
+        return (
+          <VehicleServiceHistory
+            fleetVehicleId={vehicle?.id}
+            records={serviceHistory.records}
+            loading={serviceHistory.loading}
+            error={serviceHistory.error}
+            reload={serviceHistory.reload}
+          />
+        );
 
-        {tab === TAB_OPERATIONS && (
+      case VEHICLE_WORKSPACE_TAB_IDS.documents:
+        return (
+          <VehicleDocumentsPanel fleetVehicleId={fleetVehicleId} />
+        );
+
+      case VEHICLE_WORKSPACE_TAB_IDS.alerts:
+        return (
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 'var(--space-3)' }}>
               <Typography variant="h2" sx={{ color: 'var(--color-text-primary)' }}>
-                Operations
+                Alerts
               </Typography>
-              <Button size="small" variant="outlined" onClick={() => navigate('/fleet/operation-sessions')}>
-                Today&apos;s operation
-              </Button>
             </Box>
             <VehicleAlertsColumn
               alerts={alerts}
@@ -139,58 +140,96 @@ export default function VehicleWorkspaceTabs(props) {
               linkedZoneCount={linkedZoneCount}
               linkedZonesLoading={linkedZonesLoading}
             />
-            {deviceId && (
-              <Box sx={{ mt: 2 }}>
-                <VehicleMaintenanceCard
-                  items={maintenance.items}
-                  loading={maintenance.loading}
-                  deviceId={deviceId}
-                  fleetVehicleId={vehicle?.id}
-                  canManage={canManage}
-                  onCompleted={handleMaintenanceCompleted}
-                />
-              </Box>
-            )}
           </Box>
-        )}
+        );
 
-        {tab === TAB_HARDWARE && technician && (
-          <Box>
-            <DeviceTelemetryModule
-              deviceId={deviceId}
-              form={{ updateIntervalSec: '' }}
-              patch={() => {}}
-              canSaveSpecs={false}
-              vehicleId={vehicle?.id}
-            />
-            <Box sx={{ mt: 2 }}>
-              <DiagnosticsSection telemetry={telemetry} />
-            </Box>
-          </Box>
-        )}
-
-        {tab === TAB_HISTORY && (
+      case VEHICLE_WORKSPACE_TAB_IDS.performance:
+        return (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: sectionGap }}>
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                Device assignments
-              </Typography>
-              <VehicleAssignmentHistory vehicleId={vehicle?.id} />
+            <Typography variant="h2" sx={{ color: 'var(--color-text-primary)' }}>
+              Performance
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+              <FuelCard fuel={fuel} />
+              <ErbInsightCard erb={erb} vehicleSpec={vehicle?.vehicleSpec} />
             </Box>
-            <VehicleServiceHistory
-              fleetVehicleId={vehicle?.id}
-              records={serviceHistory.records}
-              loading={serviceHistory.loading}
-              error={serviceHistory.error}
-              reload={serviceHistory.reload}
+            <VehicleFuelColumn
+              deviceId={deviceId}
+              fuel={fuel}
+              erb={erb}
+              fuelPerformance={fuelPerformance}
+              fuelPerformanceLoading={fuelPerformanceLoading}
             />
           </Box>
-        )}
+        );
 
-        {tab === TAB_OVERVIEW && technician && (
-          <DiagnosticsSection telemetry={telemetry} />
-        )}
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <VehicleWorkspaceLayout
+      vehicle={vehicle}
+      telemetry={telemetry}
+      fuel={fuel}
+      fuelPerformance={fuelPerformance}
+      fuelPerformanceLoading={fuelPerformanceLoading}
+      livePosition={livePosition}
+      deviceId={deviceId}
+      linkedDrivers={linkedDrivers}
+      groupName={groupName}
+      maintenanceItems={maintenance.items}
+      vehicleEngine={vehicleEngine}
+      onRefreshVehicle={onRefreshVehicle}
+      mobileNav={(
+        <>
+          <VehicleWorkspaceMobileNav
+            tab={tab}
+            onTabChange={setTab}
+            onMoreOpen={() => setMoreOpen(true)}
+            badgeContext={badgeContext}
+          />
+          <VehicleWorkspaceMoreSheet
+            open={moreOpen}
+            onClose={() => setMoreOpen(false)}
+            tab={tab}
+            onTabChange={setTab}
+            badgeContext={badgeContext}
+          />
+        </>
+      )}
+    >
+      {!isMobile && (
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ mb: 1.5, borderBottom: 1, borderColor: 'divider' }}
+        >
+          {VEHICLE_WORKSPACE_TABS.map((tabDef) => {
+            const badge = getTabBadge(tabDef.id, badgeContext);
+            return (
+              <Tab
+                key={tabDef.id}
+                label={(
+                  <Badge badgeContent={badge} color="error" max={99}>
+                    <Box component="span" sx={{ pr: badge ? 1.5 : 0 }}>
+                      {tabDef.label}
+                    </Box>
+                  </Badge>
+                )}
+                value={tabDef.id}
+              />
+            );
+          })}
+        </Tabs>
+      )}
+
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: sectionGap }}>
+        {renderTabPanel()}
       </Box>
-    </Box>
+    </VehicleWorkspaceLayout>
   );
 }

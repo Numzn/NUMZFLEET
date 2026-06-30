@@ -2,16 +2,23 @@ import { useLayoutEffect } from 'react';
 import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import Paper from '@mui/material/Paper';
-import SensorsIcon from '@mui/icons-material/Sensors';
-import RouteIcon from '@mui/icons-material/Route';
-import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
+import Badge from '@mui/material/Badge';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
-import { VEHICLE_WORKSPACE_TABS } from './vehicleWorkspaceTabs.js';
+import {
+  MOBILE_PRIMARY_TAB_IDS,
+  VEHICLE_WORKSPACE_TABS,
+  getTabBadge,
+} from './vehicleWorkspaceTabRegistry.js';
 
 const BOTTOM_NAV_HEIGHT_PX = 56;
+const MORE_NAV_VALUE = 'more';
 
-export default function VehicleWorkspaceMobileNav({ tabIndex, onTabChange }) {
+export default function VehicleWorkspaceMobileNav({
+  tab,
+  onTabChange,
+  onMoreOpen,
+  badgeContext,
+}) {
   useLayoutEffect(() => {
     document.documentElement.style.setProperty(
       '--app-bottomnav-height',
@@ -22,7 +29,17 @@ export default function VehicleWorkspaceMobileNav({ tabIndex, onTabChange }) {
     };
   }, []);
 
-  const icons = [SensorsIcon, RouteIcon, LocalGasStationIcon, HealthAndSafetyIcon, MoreHorizIcon];
+  const primaryTabs = MOBILE_PRIMARY_TAB_IDS.map((id) => VEHICLE_WORKSPACE_TABS.find((t) => t.id === id)).filter(Boolean);
+
+  const navValue = MOBILE_PRIMARY_TAB_IDS.includes(tab) ? tab : MORE_NAV_VALUE;
+
+  const handleChange = (_, next) => {
+    if (next === MORE_NAV_VALUE) {
+      onMoreOpen?.();
+      return;
+    }
+    onTabChange(next);
+  };
 
   return (
     <Paper
@@ -39,8 +56,8 @@ export default function VehicleWorkspaceMobileNav({ tabIndex, onTabChange }) {
       elevation={8}
     >
       <BottomNavigation
-        value={tabIndex}
-        onChange={(_, next) => onTabChange(next)}
+        value={navValue}
+        onChange={handleChange}
         showLabels
         sx={{
           height: BOTTOM_NAV_HEIGHT_PX,
@@ -50,17 +67,27 @@ export default function VehicleWorkspaceMobileNav({ tabIndex, onTabChange }) {
           },
         }}
       >
-        {VEHICLE_WORKSPACE_TABS.map((tab, i) => {
-          const Icon = icons[i];
+        {primaryTabs.map((tabDef) => {
+          const Icon = tabDef.icon;
+          const badge = getTabBadge(tabDef.id, badgeContext);
           return (
             <BottomNavigationAction
-              key={tab.id}
-              label={tab.label}
-              icon={<Icon />}
-              value={i}
+              key={tabDef.id}
+              label={tabDef.label}
+              value={tabDef.id}
+              icon={(
+                <Badge badgeContent={badge} color="error" max={99}>
+                  <Icon />
+                </Badge>
+              )}
             />
           );
         })}
+        <BottomNavigationAction
+          label="More"
+          value={MORE_NAV_VALUE}
+          icon={<MoreHorizIcon />}
+        />
       </BottomNavigation>
     </Paper>
   );

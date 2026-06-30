@@ -909,7 +909,7 @@ def main() -> int:
         "--target",
         choices=("staging", "production"),
         default="production",
-        help="Deploy target. staging=NumzLab flow, production=OCI flow (default: production).",
+        help="Deploy target. production=OCI (default). staging is retired — see deployment/STAGING_RETIRED.md.",
     )
     parser.add_argument("--skip-git", action="store_true", help="Do not add/commit/push; deploy current HEAD only.")
     parser.add_argument("--dry-run", action="store_true", help="Print what would run; no git or SSH.")
@@ -980,7 +980,7 @@ def main() -> int:
     parser.add_argument(
         "--direct-production",
         action="store_true",
-        help="Production: skip staging promotion gate; SSH run-migrate-and-deploy or deploy-from-registry (default when --promoted-sha omitted).",
+        help="Production: skip staging promotion gate; SSH run-migrate-and-deploy (default when --promoted-sha omitted).",
     )
     args = parser.parse_args()
 
@@ -993,15 +993,6 @@ def main() -> int:
 
     _, user_env_path = load_auto_deploy_env_file(repo)
 
-    # Staging deploy must use auto_deploy.staging.env when present (RCC sets NUMZFLEET_AUTO_DEPLOY_ENV_FILE).
-    staging_env_path = (repo / "deployment" / "scripts" / "auto_deploy.staging.env").resolve()
-    if (args.target or "production").strip().lower() == "staging" and staging_env_path.is_file():
-        try:
-            _apply_env_text(staging_env_path.read_text(encoding="utf-8-sig"), only_if_empty=False)
-            user_env_path = staging_env_path
-        except OSError:
-            pass
-
     maybe_load_tokens_from_rcc(repo)
 
     if args.ssh_identity_file:
@@ -1010,6 +1001,16 @@ def main() -> int:
     fix_legacy_opt_repo_path()
 
     target = (args.target or "production").strip().lower()
+    if target == "staging":
+        print(
+            "[auto_deploy] ERROR: --target staging is retired.\n"
+            "  Dev: ./scripts/dev on NumzLab\n"
+            "  Production: python3 deployment/scripts/auto_deploy.py --target production --skip-git --deploy-image-tag <sha>\n"
+            "  See deployment/STAGING_RETIRED.md\n",
+            file=sys.stderr,
+        )
+        return 2
+
     branch = resolve_deploy_branch(
         target=target,
         args_branch=args.branch,
@@ -1122,8 +1123,7 @@ def main() -> int:
         deploy_sha = promoted_sha
     elif target == "production" and direct_production:
         print(
-            "[auto_deploy] Direct production: git → registry pull on OCI "
-            "(no staging promotion gate). Use --promoted-sha for v3 promote flow.\n"
+            "[auto_deploy] Direct production: migrations (if enabled) → registry pull on OCI.\n"
         )
     if image_tag_source:
         try:
@@ -1234,7 +1234,7 @@ def main() -> int:
         )
         deploy_label = "promote to production"
     else:
-        if use_migrations and flags["migrations"]:
+        if use_migrations:
             deploy_body = (
                 hub_prefix
                 + "chmod +x deployment/run-migrate-and-deploy-staging.sh && "

@@ -28,6 +28,33 @@ export default function VehicleIdentityModule({ form, patch, canSaveSpecs }) {
         size="small"
         sx={{ mb: 2 }}
       />
+      <TextField
+        label="Make"
+        value={form.make}
+        onChange={(e) => patch({ make: e.target.value })}
+        fullWidth
+        size="small"
+        placeholder="e.g. Volvo"
+        sx={{ mb: 2 }}
+      />
+      <TextField
+        label="Model"
+        value={form.model}
+        onChange={(e) => patch({ model: e.target.value })}
+        fullWidth
+        size="small"
+        placeholder="e.g. FH16"
+        sx={{ mb: 2 }}
+      />
+      <TextField
+        label="Home base"
+        value={form.homeBaseLabel}
+        onChange={(e) => patch({ homeBaseLabel: e.target.value })}
+        fullWidth
+        size="small"
+        placeholder="e.g. Nairobi Yard"
+        sx={{ mb: 2 }}
+      />
       <FormControl fullWidth size="small">
         <InputLabel id="vt-label">Vehicle type</InputLabel>
         <Select

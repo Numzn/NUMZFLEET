@@ -1,6 +1,17 @@
 import { DataTypes } from 'sequelize';
 
-export const SERVICE_RECORD_STATUSES = ['open', 'in_progress', 'completed', 'cancelled'];
+export const SERVICE_RECORD_STATUSES = [
+  'open',
+  'scheduled',
+  'in_progress',
+  'awaiting_parts',
+  'completed',
+  'cancelled',
+];
+
+export const SERVICE_RECORD_ACTIVE_STATUSES = ['open', 'scheduled', 'in_progress', 'awaiting_parts'];
+
+export const SERVICE_RECORD_PRIORITIES = ['low', 'medium', 'high'];
 
 export default (sequelize) => {
   const ServiceRecord = sequelize.define('ServiceRecord', {
@@ -23,6 +34,12 @@ export default (sequelize) => {
       allowNull: true,
       comment: 'Traccar device id at time of service (for odometer anchor)',
     },
+    /** Legacy NOT NULL column — mirror deviceId on create until column is dropped. */
+    deprecatedVehicleId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: '_deprecated_vehicleId',
+    },
     maintenanceId: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -42,6 +59,47 @@ export default (sequelize) => {
     },
     cost: {
       type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    workOrderNumber: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+    },
+    priority: {
+      type: DataTypes.STRING(8),
+      allowNull: true,
+      defaultValue: 'medium',
+    },
+    workshop: {
+      type: DataTypes.STRING(160),
+      allowNull: true,
+    },
+    assignee: {
+      type: DataTypes.STRING(160),
+      allowNull: true,
+    },
+    estimatedCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    actualCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    labourCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    partsCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    otherCost: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    scheduledDueDate: {
+      type: DataTypes.DATE,
       allowNull: true,
     },
     vendor: {

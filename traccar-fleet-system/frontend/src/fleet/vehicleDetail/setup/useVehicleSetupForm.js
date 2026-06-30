@@ -6,6 +6,9 @@ export const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'CNG'];
 const defaultForm = () => ({
   name: '',
   plate: '',
+  make: '',
+  model: '',
+  homeBaseLabel: '',
   vehicleType: 'light_duty',
   fuelType: 'Diesel',
   tankCapacity: '',
@@ -38,6 +41,9 @@ export function buildFormFromVehicle(vehicle) {
   return {
     name: vehicle.name ?? '',
     plate: vehicle.plateNumber ?? '',
+    make: vehicle.make ?? '',
+    model: vehicle.model ?? '',
+    homeBaseLabel: vehicle.homeBaseLabel ?? '',
     vehicleType: fleet?.vehicleType ?? 'light_duty',
     fuelType: vehicle.vehicleSpec?.fuelType ?? 'Diesel',
     tankCapacity:

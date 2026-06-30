@@ -24,7 +24,7 @@ test('toServiceRecordDto maps fleet vehicle fields', () => {
   assert.equal(dto.fleetVehicleId, 'a7c8d9e0-1111-2222-3333-444455556666');
   assert.equal(dto.deviceId, 42);
   assert.equal(dto.title, 'Oil change');
-  assert.equal(dto.status, 'open');
+  assert.equal(dto.status, 'scheduled');
 });
 
 test('summarizeServiceRecordRows counts open and in-progress work', () => {

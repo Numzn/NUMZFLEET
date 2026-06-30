@@ -1,4 +1,5 @@
 # Apply all idempotent fuel-api SQL migrations in deploy order.
+# Canonical list: fuel-api/migrations/MIGRATION_ORDER (same as deployment/utils/run-fuel-migrations.sh).
 # Usage from repo root: .\fuel-api\scripts\apply-fuel-migrations.ps1
 # Optional: $env:POSTGRES_CONTAINER = 'numzfleet-db-1'
 $ErrorActionPreference = 'Stop'
@@ -12,34 +13,39 @@ $container = if ($env:POSTGRES_CONTAINER) { $env:POSTGRES_CONTAINER } else {
 $user = if ($env:POSTGRES_USER) { $env:POSTGRES_USER } else { 'numztrak' }
 $db = if ($env:POSTGRES_DB) { $env:POSTGRES_DB } else { 'numztrak_fuel' }
 
-$files = @(
-  'fuel-api\migrations\20260503_create_operation_sessions_tables.sql',
-  'fuel-api\migrations\20260427_daily_intelligent_refueling.sql',
-  'fuel-api\migrations\20260429_refuel_status_incomplete.sql',
-  'fuel-api\migrations\20260512_notifications.sql',
-  'fuel-api\migrations\20260522_notifications_dedup_and_bridge.sql',
-  'fuel-api\migrations\20260520_vehicle_immobilization_intents.sql',
-  'fuel-api\migrations\20260521_immobilization_execution_integrity.sql',
-  'fuel-api\migrations\20260613_operational_day_model.sql',
-  'fuel-api\migrations\20260616_multi_tenant_foundation.sql',
-  'fuel-api\migrations\20260619_service_records.sql',
-  'fuel-api\migrations\20260620_fuel_operations_phase1.sql',
-  'fuel-api\migrations\20260621_fueling_day_multi_invoice_arrived.sql',
-  'fuel-api\migrations\20260622_invoice_attachment_url.sql',
-  'fuel-api\migrations\20260623_fueling_day_reference_and_skip.sql',
-  'fuel-api\migrations\20260624_service_records_fleet_vehicle.sql'
-)
+$orderFile = Join-Path $RepoRoot 'fuel-api\migrations\MIGRATION_ORDER'
+if (-not (Test-Path $orderFile)) {
+  throw "Missing migration manifest: $orderFile"
+}
+
+$listed = @()
+Get-Content $orderFile | ForEach-Object {
+  $line = $_.Trim()
+  if (-not $line -or $line.StartsWith('#')) { return }
+  $listed += (Split-Path $line -Leaf)
+}
+
+if ($listed.Count -eq 0) {
+  throw "No migrations listed in $orderFile"
+}
+
+$onDisk = @(Get-ChildItem (Join-Path $RepoRoot 'fuel-api\migrations\*.sql') | ForEach-Object { $_.Name })
+foreach ($name in $onDisk) {
+  if ($listed -notcontains $name) {
+    throw "Untracked migration $name — add it to fuel-api/migrations/MIGRATION_ORDER"
+  }
+}
 
 Write-Host "Postgres container: $container"
 Write-Host "Database: $db (user: $user)"
+Write-Host "Applying $($listed.Count) migration(s) from MIGRATION_ORDER"
 Write-Host ''
 
-foreach ($rel in $files) {
-  $hostPath = Join-Path $RepoRoot $rel
+foreach ($leaf in $listed) {
+  $hostPath = Join-Path $RepoRoot "fuel-api\migrations\$leaf"
   if (-not (Test-Path $hostPath)) {
     throw ('Missing migration: ' + $hostPath)
   }
-  $leaf = Split-Path $rel -Leaf
   Write-Host ('Applying ' + $leaf + ' ...')
   docker cp $hostPath ($container + ':/tmp/migration.sql')
   docker exec $container psql -U $user -d $db -v ON_ERROR_STOP=1 -f /tmp/migration.sql

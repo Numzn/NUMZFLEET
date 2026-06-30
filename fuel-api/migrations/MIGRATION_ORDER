@@ -1,0 +1,26 @@
+# Canonical apply order for fuel-api Postgres migrations (one filename per line).
+# Every *.sql in this directory MUST be listed here. Deploy scripts read this file only.
+# Order is intentional (not strict alphabetical): baseline before incremental alters.
+#
+# After adding a new migration:
+#   1. Add fuel-api/migrations/YYYYMMDD_description.sql
+#   2. Append its filename below
+#   3. Run: bash deployment/utils/run-fuel-migrations.sh
+
+20260503_create_operation_sessions_tables.sql
+20260427_daily_intelligent_refueling.sql
+20260429_refuel_status_incomplete.sql
+20260512_notifications.sql
+20260522_notifications_dedup_and_bridge.sql
+20260520_vehicle_immobilization_intents.sql
+20260521_immobilization_execution_integrity.sql
+20260613_operational_day_model.sql
+20260616_multi_tenant_foundation.sql
+20260619_service_records.sql
+20260620_fuel_operations_phase1.sql
+20260621_fueling_day_multi_invoice_arrived.sql
+20260622_invoice_attachment_url.sql
+20260623_fueling_day_reference_and_skip.sql
+20260624_service_records_fleet_vehicle.sql
+20260626_vehicle_workspace_fields.sql
+20260626_maintenance_operations_phase1.sql

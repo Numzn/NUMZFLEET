@@ -1,12 +1,14 @@
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Alert, Box, Button, Container, Typography } from '@mui/material';
+import { useSelector } from 'react-redux';
 import { makeStyles } from 'tss-react/mui';
 import FleetWorkspaceShell from '../../common/components/FleetWorkspaceShell';
 import { useManager } from '../../common/util/permissions';
-import useVehicleData from './useVehicleData';
-import { useLinkedGeofences } from './useLinkedGeofences.js';
+import useVehicleWorkspaceData from './hooks/useVehicleWorkspaceData.js';
 import VehicleWorkspaceSkeleton from './VehicleWorkspaceSkeleton.jsx';
 import VehicleWorkspaceTabs from './VehicleWorkspaceTabs.jsx';
+import { patchVehicleFields } from '../vehiclesApi.js';
 
 const useStyles = makeStyles()(() => ({
   container: {
@@ -39,39 +41,26 @@ function VehicleWorkspaceError({ error, onRetry }) {
   );
 }
 
-function VehicleWorkspaceBody(props) {
-  const { refresh, ...rest } = props;
-  return <VehicleWorkspaceTabs {...rest} onRefreshVehicle={refresh} />;
-}
-
 export default function VehicleDetailPage() {
   const { classes } = useStyles();
   const { vehicleId } = useParams();
   const manager = useManager();
+  const user = useSelector((s) => s.session.user);
+  const [notesSaving, setNotesSaving] = useState(false);
 
-  const {
-    vehicle,
-    telemetry,
-    fuel,
-    erb,
-    alerts,
-    geofenceAlertsHidden,
-    geofenceAlertsSuppressed,
-    loading,
-    error,
-    refresh,
-    livePosition,
-    deviceId,
-    motionLabel,
-    motionDurationLabel,
-    ignitionPhrase,
-  } = useVehicleData(vehicleId);
+  const ws = useVehicleWorkspaceData(vehicleId);
+  const { refresh, fleetVehicleId: wsFleetId } = ws;
 
-  const {
-    linkedGeofences,
-    loading: linkedZonesLoading,
-  } = useLinkedGeofences(deviceId);
-  const linkedZoneCount = linkedGeofences?.length ?? 0;
+  const handleSaveNotes = useCallback(async (notes) => {
+    if (!user || !wsFleetId) return;
+    setNotesSaving(true);
+    try {
+      await patchVehicleFields(user, wsFleetId, { notes });
+      await refresh();
+    } finally {
+      setNotesSaving(false);
+    }
+  }, [user, wsFleetId, refresh]);
 
   if (!manager) {
     return (
@@ -83,9 +72,9 @@ export default function VehicleDetailPage() {
     );
   }
 
-  const showSkeleton = loading && !vehicle;
-  const showError = !loading && error && !vehicle;
-  const showBody = Boolean(vehicle);
+  const showSkeleton = ws.loading && !ws.vehicle;
+  const showError = !ws.loading && ws.error && !ws.vehicle;
+  const showBody = Boolean(ws.vehicle);
 
   return (
     <Box className={classes.container} sx={{ width: '100%', maxWidth: '100%' }}>
@@ -93,31 +82,45 @@ export default function VehicleDetailPage() {
         {showSkeleton && <VehicleWorkspaceSkeleton />}
 
         {showError && (
-          <VehicleWorkspaceError error={error} onRetry={refresh} />
+          <VehicleWorkspaceError error={ws.error} onRetry={ws.refresh} />
         )}
 
         {showBody && (
-          <VehicleWorkspaceBody
-            vehicle={vehicle}
-            telemetry={telemetry}
-            fuel={fuel}
-            erb={erb}
-            alerts={alerts}
-            geofenceAlertsHidden={geofenceAlertsHidden}
-            geofenceAlertsSuppressed={geofenceAlertsSuppressed}
-            linkedZoneCount={linkedZoneCount}
-            linkedZonesLoading={linkedZonesLoading}
-            livePosition={livePosition}
-            deviceId={deviceId}
-            motionLabel={motionLabel}
-            motionDurationLabel={motionDurationLabel}
-            ignitionPhrase={ignitionPhrase}
-            fleetVehicleId={vehicle?.id ?? vehicleId}
-            refresh={refresh}
+          <VehicleWorkspaceTabs
+            vehicle={ws.vehicle}
+            telemetry={ws.telemetry}
+            fuel={ws.fuel}
+            erb={ws.erb}
+            alerts={ws.alerts}
+            geofenceAlertsHidden={ws.geofenceAlertsHidden}
+            geofenceAlertsSuppressed={ws.geofenceAlertsSuppressed}
+            linkedZoneCount={ws.linkedZoneCount}
+            linkedZonesLoading={ws.linkedZonesLoading}
+            livePosition={ws.livePosition}
+            deviceId={ws.deviceId}
+            linkedDrivers={ws.linkedDrivers}
+            groupName={ws.groupName}
+            fleetVehicleId={ws.fleetVehicleId}
+            onRefreshVehicle={ws.refresh}
+            maintenance={ws.maintenance}
+            serviceHistory={ws.serviceHistory}
+            handleMaintenanceCompleted={ws.handleMaintenanceCompleted}
+            fuelPerformance={ws.fuelPerformance}
+            fuelPerformanceLoading={ws.fuelPerformanceLoading}
+            todayRefuel={ws.todayRefuel}
+            fuelRequests={ws.fuelRequests}
+            lastRefill={ws.lastRefill}
+            todayTrips={ws.todayTrips}
+            openServiceCount={ws.openServiceCount}
+            overviewMetrics={ws.overviewMetrics}
+            overviewMetricsLoading={ws.overviewMetricsLoading}
+            vehicleEngine={ws.vehicleEngine}
+            onSaveNotes={handleSaveNotes}
+            notesSaving={notesSaving}
           />
         )}
 
-        {!loading && !error && !vehicle && (
+        {!ws.loading && !ws.error && !ws.vehicle && (
           <Alert severity="warning">Vehicle not found or access denied.</Alert>
         )}
       </FleetWorkspaceShell>

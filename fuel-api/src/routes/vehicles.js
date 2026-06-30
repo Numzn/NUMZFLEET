@@ -28,6 +28,18 @@ import {
   create as createImmobilizationIntent,
   cancel as cancelImmobilizationIntent,
 } from '../controllers/immobilizationIntentController.js';
+import {
+  getOverviewMetrics,
+  getFleetFuelAverage,
+  patchVehicleWorkspaceFields,
+  postVehiclePhoto,
+  getVehicleAttachment,
+  listVehicleDocuments,
+  postVehicleDocument,
+  deleteVehicleDocumentHandler,
+} from '../controllers/vehicleWorkspaceController.js';
+import { getEngine } from '../vehicleEngine/vehicleEngineController.js';
+import { vehicleUpload } from '../middleware/vehicleUpload.js';
 import * as authMiddleware from '../middleware/auth.js';
 import { requireAuth, requireManager as _requireManager, requireRealAuth } from '../middleware/authGates.js';
 import { attachTenantContext } from '../middleware/tenantContext.js';
@@ -38,6 +50,9 @@ const requireManager = authMiddleware.requireManager || _requireManager;
 
 router.use(authenticate);
 router.use(attachTenantContext);
+
+router.get('/attachments/:fileId', requireAuth, requireManager, getVehicleAttachment);
+router.get('/fuel-efficiency/fleet-average', requireAuth, requireManager, getFleetFuelAverage);
 
 // Mutations and fleet reads: managers only (v1)
 router.post('/', requireAuth, requireManager, createVehicle);
@@ -58,7 +73,14 @@ router.post(
 );
 
 router.get('/:id/assignments', requireAuth, requireManager, getVehicleAssignments);
+router.get('/:id/engine', requireAuth, requireManager, getEngine);
+router.get('/:id/overview-metrics', requireAuth, requireManager, getOverviewMetrics);
 router.get('/:id/fuel-statistics', requireAuth, requireManager, getVehicleFuelStatistics);
+router.get('/:id/documents', requireAuth, requireManager, listVehicleDocuments);
+router.post('/:id/documents', requireAuth, requireManager, vehicleUpload.single('file'), postVehicleDocument);
+router.delete('/:id/documents/:docId', requireAuth, requireManager, deleteVehicleDocumentHandler);
+router.post('/:id/photo', requireAuth, requireManager, vehicleUpload.single('file'), postVehiclePhoto);
+router.patch('/:id', requireAuth, requireManager, patchVehicleWorkspaceFields);
 router.get('/:id/service-records', requireAuth, requireManager, listVehicleServiceRecords);
 router.post('/:id/service-records', requireAuth, requireManager, createVehicleServiceRecord);
 router.patch('/:id/service-records/:recordId', requireAuth, requireManager, updateVehicleServiceRecord);

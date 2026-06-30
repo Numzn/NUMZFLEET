@@ -17,9 +17,11 @@ export const listRecords = async (req, res) => {
   try {
     const fleetVehicleId = req.query.fleetVehicleId || req.query.fleet_vehicle_id;
     const legacyVehicleId = req.query.vehicleId;
+    const activeOnly = req.query.activeOnly === 'true' || req.query.activeOnly === '1';
     const rows = await listServiceRecords(req.auth?.companyId, {
       fleetVehicleId: fleetVehicleId || undefined,
       status: req.query.status,
+      activeOnly,
     });
     if (legacyVehicleId && !fleetVehicleId) {
       const deviceId = Number(legacyVehicleId);

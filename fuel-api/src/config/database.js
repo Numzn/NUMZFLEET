@@ -5,7 +5,16 @@ dotenv.config();
 
 function buildDatabaseUrl() {
   const explicit = process.env.DATABASE_URL?.trim();
-  if (explicit) return explicit;
+  if (explicit) {
+    try {
+      const parsed = new URL(explicit);
+      if (parsed.password) {
+        return explicit;
+      }
+    } catch {
+      // fall through to POSTGRES_PASSWORD
+    }
+  }
   const password = process.env.POSTGRES_PASSWORD;
   if (!password) {
     return '';
