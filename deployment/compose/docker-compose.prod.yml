@@ -150,6 +150,8 @@ services:
       TRACCAR_ENABLED: ${TRACCAR_ENABLED:-true}
       DEV_AUTH_BYPASS: ${DEV_AUTH_BYPASS:-false}
       HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
+      INVOICE_UPLOAD_DIR: /app/data/invoice-attachments
+      VEHICLE_UPLOAD_DIR: /app/data/vehicle-attachments
     # Bound to loopback so the backend is only reachable publicly via Caddy → frontend → /api;
     # ops can still reach it directly via SSH tunnel: ssh -L 3000:127.0.0.1:3000 <host>.
     ports:
@@ -163,6 +165,9 @@ services:
         condition: service_healthy
       erb-api:
         condition: service_healthy
+    volumes:
+      - invoice_attachments:/app/data/invoice-attachments
+      - vehicle_attachments:/app/data/vehicle-attachments
     healthcheck:
       test:
         [
@@ -229,3 +234,7 @@ volumes:
     name: numzfleet_prod_caddy_data
   caddy_config:
     name: numzfleet_prod_caddy_config
+  invoice_attachments:
+    name: numzfleet_prod_invoice_attachments
+  vehicle_attachments:
+    name: numzfleet_prod_vehicle_attachments

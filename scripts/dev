@@ -34,7 +34,7 @@ source "${ENV_FILE}"
 set +a
 
 # Ensure shared data volumes exist (historical name: numzfleet_staging_*).
-for vol in numzfleet_staging_postgres_data numzfleet_staging_traccar_mysql_data numzfleet_staging_erb_data numzfleet_invoice_attachments; do
+for vol in numzfleet_staging_postgres_data numzfleet_staging_traccar_mysql_data numzfleet_staging_erb_data numzfleet_invoice_attachments numzfleet_vehicle_attachments; do
   docker volume inspect "$vol" >/dev/null 2>&1 || docker volume create "$vol" >/dev/null
 done
 

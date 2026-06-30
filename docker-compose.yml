@@ -41,6 +41,7 @@ services:
       HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
       # TRACKING_NOTIFICATION_BRIDGE / TRACKING_BRIDGE_* — set in ./backend/.env (env_file)
       INVOICE_UPLOAD_DIR: /app/data/invoice-attachments
+      VEHICLE_UPLOAD_DIR: /app/data/vehicle-attachments
     ports:
       - "3000:3000"
     depends_on:
@@ -64,6 +65,7 @@ services:
       start_period: 90s
     volumes:
       - invoice_attachments:/app/data/invoice-attachments
+      - vehicle_attachments:/app/data/vehicle-attachments
 
   db:
     image: postgres:15-alpine
@@ -128,3 +130,5 @@ volumes:
     name: numzfleet_traccar_mysql_data
   invoice_attachments:
     name: numzfleet_invoice_attachments
+  vehicle_attachments:
+    name: numzfleet_vehicle_attachments
