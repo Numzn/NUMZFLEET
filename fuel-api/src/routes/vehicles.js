@@ -14,6 +14,7 @@ import {
   getVehicleAssignments,
   assignDevice,
   updateVehicleConfig,
+  updateRoutineService,
   updateVehicle,
   deleteVehicle,
   listVehicleServiceRecords,
@@ -31,14 +32,27 @@ import {
 import {
   getOverviewMetrics,
   getFleetFuelAverage,
+  getFleetFuelIntelligenceSummaryHandler,
   patchVehicleWorkspaceFields,
   postVehiclePhoto,
   getVehicleAttachment,
   listVehicleDocuments,
   postVehicleDocument,
+  postVehicleDocumentOcr,
   deleteVehicleDocumentHandler,
 } from '../controllers/vehicleWorkspaceController.js';
 import { getEngine } from '../vehicleEngine/vehicleEngineController.js';
+import { resetTraccarMaintenanceHandler } from '../controllers/maintenanceController.js';
+import {
+  getVehicleOdometer,
+  postOdometerObservation,
+} from '../controllers/vehicleOdometerController.js';
+import {
+  listVehicleCompliance,
+  createVehicleCompliance,
+  updateVehicleCompliance,
+  deleteVehicleCompliance,
+} from '../controllers/vehicleComplianceController.js';
 import { vehicleUpload } from '../middleware/vehicleUpload.js';
 import * as authMiddleware from '../middleware/auth.js';
 import { requireAuth, requireManager as _requireManager, requireRealAuth } from '../middleware/authGates.js';
@@ -53,6 +67,7 @@ router.use(attachTenantContext);
 
 router.get('/attachments/:fileId', requireAuth, requireManager, getVehicleAttachment);
 router.get('/fuel-efficiency/fleet-average', requireAuth, requireManager, getFleetFuelAverage);
+router.get('/fuel-intelligence/summary', requireAuth, requireManager, getFleetFuelIntelligenceSummaryHandler);
 
 // Mutations and fleet reads: managers only (v1)
 router.post('/', requireAuth, requireManager, createVehicle);
@@ -74,11 +89,18 @@ router.post(
 
 router.get('/:id/assignments', requireAuth, requireManager, getVehicleAssignments);
 router.get('/:id/engine', requireAuth, requireManager, getEngine);
+router.get('/:id/odometer', requireAuth, requireManager, getVehicleOdometer);
+router.post('/:id/odometer/observation', requireAuth, requireManager, postOdometerObservation);
 router.get('/:id/overview-metrics', requireAuth, requireManager, getOverviewMetrics);
 router.get('/:id/fuel-statistics', requireAuth, requireManager, getVehicleFuelStatistics);
 router.get('/:id/documents', requireAuth, requireManager, listVehicleDocuments);
 router.post('/:id/documents', requireAuth, requireManager, vehicleUpload.single('file'), postVehicleDocument);
+router.post('/:id/documents/:docId/ocr', requireAuth, requireManager, postVehicleDocumentOcr);
 router.delete('/:id/documents/:docId', requireAuth, requireManager, deleteVehicleDocumentHandler);
+router.get('/:id/compliance', requireAuth, requireManager, listVehicleCompliance);
+router.post('/:id/compliance', requireAuth, requireManager, createVehicleCompliance);
+router.patch('/:id/compliance/:complianceId', requireAuth, requireManager, updateVehicleCompliance);
+router.delete('/:id/compliance/:complianceId', requireAuth, requireManager, deleteVehicleCompliance);
 router.post('/:id/photo', requireAuth, requireManager, vehicleUpload.single('file'), postVehiclePhoto);
 router.patch('/:id', requireAuth, requireManager, patchVehicleWorkspaceFields);
 router.get('/:id/service-records', requireAuth, requireManager, listVehicleServiceRecords);
@@ -86,6 +108,8 @@ router.post('/:id/service-records', requireAuth, requireManager, createVehicleSe
 router.patch('/:id/service-records/:recordId', requireAuth, requireManager, updateVehicleServiceRecord);
 router.get('/:id', requireAuth, requireManager, getVehicle);
 router.put('/:id/config', requireAuth, requireManager, updateVehicleConfig);
+router.put('/:id/routine-service', requireAuth, requireManager, updateRoutineService);
+router.put('/:id/traccar-maintenance/:maintenanceId/reset', requireAuth, requireManager, resetTraccarMaintenanceHandler);
 router.put('/:id', requireAuth, requireManager, updateVehicle);
 router.delete('/:id', requireAuth, requireManager, deleteVehicle);
 

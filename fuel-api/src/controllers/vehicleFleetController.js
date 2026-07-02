@@ -7,6 +7,7 @@ import {
   updateVehicle as updateVehicleService,
   updateVehicleMergedConfig,
   deleteVehicle as deleteVehicleService,
+  saveRoutineServiceForVehicle,
 } from '../services/vehicleFleetService.js';
 import {
   listServiceRecordsForVehicle,
@@ -118,6 +119,24 @@ export const updateVehicleConfig = async (req, res) => {
 };
 
 /**
+ * PUT /api/vehicles/:id/routine-service — sync Routine Service Traccar schedule
+ */
+export const updateRoutineService = async (req, res) => {
+  try {
+    const { intervalKm, startingOdometerKm } = req.body || {};
+    const merged = await saveRoutineServiceForVehicle(req.params.id, {
+      intervalKm,
+      startingOdometerKm,
+    });
+    return res.json(merged);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Update routine service error:', error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to save Routine Service') });
+  }
+};
+
+/**
  * PUT /api/vehicles/:id — update name / plate
  */
 export const updateVehicle = async (req, res) => {
@@ -218,6 +237,7 @@ export const updateVehicleServiceRecord = async (req, res) => {
       req.params.id,
       req.params.recordId,
       req.body || {},
+      { actorUserId: req.user?.id ?? null },
     );
     return res.json(updated);
   } catch (error) {

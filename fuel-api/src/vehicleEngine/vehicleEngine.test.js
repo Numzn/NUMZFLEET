@@ -8,7 +8,7 @@ const { buildCapabilities } = await import('./capabilitiesBuilder.js');
 const { buildIntelligence } = await import('./intelligenceBuilder.js');
 const { buildTimeline } = await import('./timelineBuilder.js');
 
-test('buildMaintenanceEngine picks most urgent schedule', () => {
+test('buildMaintenanceEngine picks routine service when tagged', () => {
   const hub = {
     maintenance: {
       schedules: [
@@ -16,35 +16,71 @@ test('buildMaintenanceEngine picks most urgent schedule', () => {
           id: 1,
           name: 'Oil',
           isActionable: true,
-          bucket: 'dueSoon',
-          dueSoon: true,
-          remaining: 5000,
-          remainingLabel: 'Due in 5 km',
-          type: 'totalDistance',
-        },
-        {
-          id: 2,
-          name: 'Brakes',
-          isActionable: true,
           bucket: 'overdue',
           isOverdue: true,
-          dueSoon: true,
           remaining: -100,
           remainingLabel: 'Due now',
           type: 'totalDistance',
+          attributes: {},
+        },
+        {
+          id: 2,
+          name: 'Routine Service',
+          isActionable: false,
+          bucket: 'scheduled',
+          dueSoon: false,
+          remaining: 1250000,
+          remainingLabel: 'Due in 1,250 km',
+          type: 'totalDistance',
+          period: 5000000,
+          nextDue: 130000000,
+          attributes: { numzServicePackage: true },
         },
       ],
-      scheduleKpis: { overdue: 1, dueToday: 0, dueThisWeek: 0, dueSoon: 1 },
-      scheduleHealthScore: 45,
-      workOrders: { summary: { open: 1, inProgress: 0, awaitingParts: 0 } },
+      scheduleKpis: { overdue: 1, dueToday: 0, dueThisWeek: 0, dueSoon: 0 },
+      scheduleHealthScore: 95,
+      workOrders: { summary: { open: 0, inProgress: 0, awaitingParts: 0 } },
+      routineLastService: {
+        completedAt: '2026-01-01T00:00:00.000Z',
+        odometerKm: 125000,
+        technician: 'Tech A',
+        notes: null,
+        title: 'Routine Service',
+      },
     },
   };
 
-  const result = buildMaintenanceEngine(hub);
-  assert.equal(result.nextService.name, 'Brakes');
-  assert.equal(result.nextService.urgency, 'overdue');
-  assert.equal(result.overdueCount, 1);
-  assert.equal(result.openWorkOrders, 1);
+  const result = buildMaintenanceEngine(hub, { odometerKm: 128750 });
+  assert.equal(result.routineServiceConfigured, true);
+  assert.equal(result.nextService.label, 'Routine Service');
+  assert.equal(result.nextService.remainingKm, 1250);
+  assert.equal(result.nextService.nextServiceAtKm, 130000);
+  assert.equal(result.nextService.status, 'on_track');
+  assert.equal(result.nextService.lastService.technician, 'Tech A');
+});
+
+test('buildMaintenanceEngine returns null nextService without routine tag', () => {
+  const hub = {
+    maintenance: {
+      schedules: [{
+        id: 2,
+        name: 'Brakes',
+        isActionable: true,
+        bucket: 'overdue',
+        isOverdue: true,
+        remaining: -100,
+        remainingLabel: 'Due now',
+        type: 'totalDistance',
+        attributes: {},
+      }],
+      scheduleKpis: { overdue: 1 },
+      workOrders: { summary: { open: 0, inProgress: 0, awaitingParts: 0 } },
+    },
+  };
+
+  const result = buildMaintenanceEngine(hub, { odometerKm: 50000 });
+  assert.equal(result.nextService, null);
+  assert.equal(result.legacyNextService.name, 'Brakes');
 });
 
 test('buildHealthEngine computes overall from domains', () => {
@@ -86,23 +122,27 @@ test('buildCapabilities reflects tracker and fuel signals', () => {
   assert.equal(bare.maintenance, false);
 });
 
-test('buildIntelligence emits structured recommendations for overdue service', () => {
+test('buildIntelligence emits structured recommendations for overdue routine service', () => {
   const intel = buildIntelligence({
     maintenance: {
       overdueCount: 1,
       dueSoonCount: 0,
       nextService: {
-        name: 'Oil change',
-        dueLabel: 'Due now',
+        label: 'Routine Service',
+        name: 'Routine Service',
+        dueLabel: '500 km overdue',
+        status: 'overdue',
+        statusLabel: 'Overdue',
         urgency: 'overdue',
         maintenanceId: 9,
+        remainingKm: -500,
       },
     },
     health: { overall: 65 },
     fuel: { risk: null },
     status: { operational: 'available' },
   });
-  assert.ok(intel.findings.some((f) => f.code === 'MAINTENANCE_OVERDUE'));
+  assert.ok(intel.findings.some((f) => f.code === 'ROUTINE_SERVICE_OVERDUE'));
   assert.ok(intel.recommendations.some((r) => r.action === 'schedule_service'));
 });
 

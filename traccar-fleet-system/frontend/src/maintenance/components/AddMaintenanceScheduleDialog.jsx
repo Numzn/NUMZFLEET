@@ -92,7 +92,7 @@ export default function AddMaintenanceScheduleDialog({
           {' '}
           <strong>Next Service Due In</strong>
           {' '}
-          on the overview.
+            on the vehicle card.
         </Typography>
 
         {!deviceId ? (

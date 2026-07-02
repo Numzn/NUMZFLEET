@@ -1,6 +1,8 @@
 # Accounts and tenancy (NumzTrak / NUMZFLEET)
 
-How identity, authorization, and data isolation work across Traccar, fuel-api, and the frontend.
+> **Architecture authority:** [docs/PLATFORM_ARCHITECTURE.md](../../docs/PLATFORM_ARCHITECTURE.md) (frozen v1.0) defines platform vs company scope, Execution Context, permissions, provisioning, and governance. This file is the **operational supplement** — request flow, env vars, and troubleshooting.
+
+How identity, authorization, and data isolation work across Traccar, fuel-api, and the frontend **today** (transitional implementation).
 
 ## Two databases, two jobs
 
@@ -48,7 +50,7 @@ Calls `resolveCompanyContextForTraccarUser(req.user)`:
 
 1. Look up **`numz_users`** where `traccar_user_id = req.user.id` and `status = active`.
 2. If found → `companyId = numz_users.company_id`.
-3. If not found → **`DEFAULT_COMPANY_ID`** = `00000000-0000-0000-0000-000000000001` (“Default Fleet”).
+3. If not found → **`DEFAULT_COMPANY_ID`** = `00000000-0000-0000-0000-000000000001` (“Default Fleet”). **Legacy transitional behavior** — target architecture uses explicit `numz_users` provisioning; platform users have `company_id NULL`. See [PLATFORM_ARCHITECTURE.md](../../docs/PLATFORM_ARCHITECTURE.md).
 4. Derive **roles** from Traccar flags + optional `user.attributes.numzRole`:
    - `administrator` without company → `super_admin`
    - `administrator` or `isManager` → `company_admin`, `fleet_manager`
@@ -177,11 +179,16 @@ docker compose up -d db
 
 (Migrate list includes `20260616_multi_tenant_foundation.sql` as of the tenant foundation release.)
 
-## Future direction (not fully live)
+## Future direction
 
-- NumzTrak-native login with `numz_users.password_hash`
-- Strict Traccar group isolation per company (Company B cannot see Company A devices)
-- Super-admin cross-tenant tools
-- Role enforcement from `numz_user_roles` instead of inferring from Traccar flags only
+Target state is defined in [PLATFORM_ARCHITECTURE.md](../../docs/PLATFORM_ARCHITECTURE.md). Summary of what is **not yet implemented**:
 
-Until provisioning is complete, treat **Default Fleet** as the single tenant and Traccar as the source of truth for **who sees which devices on the map**.
+- `ExecutionContext` / `activeContext` (replacing `req.auth` + silent fallback)
+- Platform Services vs Company Services boundary
+- `/platform` workspace and Platform Health
+- NumzTrak-native JWT login
+- Strict Traccar group isolation per company
+- Resource ownership layer beyond Traccar device ACLs
+- `numz_user_roles` enforcement (not only inferred Traccar flags)
+
+Until provisioning is complete, legacy installs may still use **Default Fleet** as the data backfill tenant. Traccar remains the source of truth for **who sees which devices on the map**.

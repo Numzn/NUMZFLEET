@@ -7,9 +7,14 @@ import AddressValue from './AddressValue';
  * `/api/server/geocode` via AddressValue). Falls back to coordinates when the
  * server geocoder is disabled and no address is present.
  *
- * @param {{ position: object|null|undefined, showCoordsFallback?: boolean, unknownText?: string }} props
+ * @param {{ position: object|null|undefined, showCoordsFallback?: boolean, unknownText?: string, autoFetch?: boolean }} props
  */
-const VehicleLocationLine = ({ position, showCoordsFallback = true, unknownText = '' }) => {
+const VehicleLocationLine = ({
+  position,
+  showCoordsFallback = true,
+  unknownText = '',
+  autoFetch = false,
+}) => {
   const geocoderEnabled = useSelector((state) => state.session.server?.geocoderEnabled);
 
   if (!position || position.latitude == null || position.longitude == null) {
@@ -18,12 +23,14 @@ const VehicleLocationLine = ({ position, showCoordsFallback = true, unknownText 
 
   const address = position.address?.trim?.() || '';
 
-  if (address || geocoderEnabled) {
+  if (address || geocoderEnabled || autoFetch) {
     return (
       <AddressValue
         latitude={position.latitude}
         longitude={position.longitude}
         originalAddress={address || undefined}
+        autoFetch={autoFetch}
+        emptyText={autoFetch && !showCoordsFallback ? unknownText : ''}
       />
     );
   }

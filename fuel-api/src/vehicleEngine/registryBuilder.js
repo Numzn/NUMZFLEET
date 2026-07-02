@@ -1,7 +1,9 @@
 /**
  * Layer 1 — permanent identity from merged vehicle DTO.
+ * @param {object} merged
+ * @param {object|null} [odometerState] — from Vehicle Odometer Engine
  */
-export function buildRegistry(merged) {
+export function buildRegistry(merged, odometerState = null) {
   if (!merged) return null;
   return {
     id: merged.id,
@@ -17,5 +19,9 @@ export function buildRegistry(merged) {
     vehicleSpec: merged.vehicleSpec ?? null,
     fleetConfig: merged.fleetConfig ?? null,
     serviceSummary: merged.serviceSummary ?? null,
+    odometerKm: odometerState?.odometerKm ?? null,
+    odometerConfidence: odometerState?.odometerConfidence ?? 'unavailable',
+    odometerDriftPct: odometerState?.odometerDriftPct ?? null,
+    odometerDriftClass: odometerState?.odometerDriftClass ?? 'unknown',
   };
 }

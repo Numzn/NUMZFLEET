@@ -1,6 +1,8 @@
 /**
- * Traccar device commands via HTTP Basic auth (service account).
- * Used by the immobilization evaluator — not a general command orchestration layer.
+ * Traccar HTTP API via Basic auth (service account from backend/.env).
+ * Shared by immobilization commands and server-side Routine Service maintenance sync.
+ *
+ * Env: TRACCAR_API_BASE_URL | TRACCAR_SERVER_URL, TRACCAR_API_USER, TRACCAR_API_PASSWORD
  */
 
 const getBaseUrl = () => {
@@ -20,7 +22,8 @@ export function isTraccarCommandApiConfigured() {
   return Boolean(getBaseUrl() && getBasicAuthHeader());
 }
 
-async function traccarFetch(path, init = {}) {
+/** @param {string} path Traccar REST path e.g. `/api/maintenance` */
+export async function traccarFetch(path, init = {}) {
   const base = getBaseUrl();
   const auth = getBasicAuthHeader();
   if (!base || !auth) {

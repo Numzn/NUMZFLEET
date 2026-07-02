@@ -35,6 +35,7 @@ export default function VehicleOverviewTab(props) {
   const { sectionGap } = useVehicleWorkspaceDensity();
   const distanceUnit = useAttributePreference('distanceUnit');
   const t = useTranslation();
+  const routineConfigured = vehicleEngine?.engine?.maintenance?.routineServiceConfigured === true;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: sectionGap }}>
@@ -58,19 +59,22 @@ export default function VehicleOverviewTab(props) {
         }}
       >
         <VehicleMaintenanceOverviewPanel
-          maintenanceItems={maintenance.items}
+          maintenanceItems={routineConfigured ? [] : maintenance.items}
           serviceRecords={serviceHistory.records}
           openWorkOrders={maintenance.openWorkOrders}
           recentRepairs={vehicleEngine?.hub?.repairs?.recentCompleted}
           loading={maintenance.loading || serviceHistory.loading}
+          hidden={routineConfigured}
         />
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <VehicleServiceRemindersTimeline
-            maintenanceItems={maintenance.items}
-            telemetry={vehicleEngine?.hub?.telemetry ?? telemetry}
-            distanceUnit={distanceUnit}
-            t={t}
-          />
+          {!routineConfigured ? (
+            <VehicleServiceRemindersTimeline
+              maintenanceItems={maintenance.items}
+              odometerKm={vehicleEngine?.registry?.odometerKm ?? null}
+              distanceUnit={distanceUnit}
+              t={t}
+            />
+          ) : null}
           <VehicleDigitalEnginePlaceholder
             telemetry={telemetry}
             vehicle={vehicle}

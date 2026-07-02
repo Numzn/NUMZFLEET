@@ -2,6 +2,7 @@ import { Op } from 'sequelize';
 import { OperationSession, OperationSessionRefuel, OperationSessionInvoice } from '../models/index.js';
 import { listByUser } from '../repositories/operationSessionRepository.js';
 import { summarizeInvoices } from './invoiceReconciliationService.js';
+import { resolveOdometerMapForDevices } from './operationSessionCore.js';
 
 function pctAccuracy(forecast, actual) {
   const f = Number(forecast);
@@ -95,9 +96,12 @@ export async function getVehicleOperationKpis(user, query = {}, companyId = null
     limit: Math.min(Number(query.limit) || 50, 200),
   });
 
+  const odometerMap = await resolveOdometerMapForDevices(refuels.map((r) => r.vehicleId));
+
   const rows = refuels.map((r) => {
     const planned = r.plannedFuelLitres != null ? Number(r.plannedFuelLitres) : Number(r.estimatedFuelLitres || 0);
     const actual = Number(r.actualFuelLitres);
+    const liveOdometer = odometerMap.get(Number(r.vehicleId));
     return {
       refuelId: r.id,
       operationId: r.sessionId,
@@ -106,7 +110,8 @@ export async function getVehicleOperationKpis(user, query = {}, companyId = null
       actualLitres: actual,
       varianceLitres: Number((actual - planned).toFixed(2)),
       forecastAccuracyPercent: pctAccuracy(planned, actual),
-      mileage: r.currentMileage != null ? Number(r.currentMileage) : null,
+      mileage: liveOdometer?.odometerKm ?? null,
+      odometerKm: liveOdometer?.odometerKm ?? null,
       sessionDate: r.sessionDate,
     };
   });

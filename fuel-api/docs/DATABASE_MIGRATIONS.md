@@ -2,6 +2,8 @@
 
 SQL migrations live under `fuel-api/migrations/`. **Apply order is defined in `fuel-api/migrations/MIGRATION_ORDER`** (not alphabetical). Deploy scripts read that file only — see [deployment/MIGRATIONS_AND_DEPLOY.md](../../deployment/MIGRATIONS_AND_DEPLOY.md) for which deploy paths run migrations.
 
+Future platform migrations (companies lifecycle, `platform_audit_events`, etc.) must align with [docs/PLATFORM_ARCHITECTURE.md](../../docs/PLATFORM_ARCHITECTURE.md).
+
 Sequelize `sync` on startup does **not** replace these SQL files for production schema changes.
 
 ## Apply all migrations (local Docker — recommended)

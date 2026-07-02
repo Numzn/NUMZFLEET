@@ -162,6 +162,7 @@ export function buildPrefillRefuelRow({
     tankLevelStart: levelFrac,
     tankCapacitySnapshot: hasValidCapacity ? cap : null,
     currentMileage,
+    mileageSource: currentMileage != null && currentMileage > 0 ? 'snapshot' : null,
     attendant: null,
     pumpNumber: null,
     sessionDate,

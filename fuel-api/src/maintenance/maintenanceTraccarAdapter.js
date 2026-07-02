@@ -1,6 +1,7 @@
 import traccar, { getTraccarLatestPositionsByDeviceIds } from '../config/traccar.js';
 import { CompanyDevice, DeviceAssignment, Vehicle } from '../models/index.js';
 import { Op } from 'sequelize';
+import { resolveOdometerForDevice } from '../vehicleEngine/odometer/resolveVehicleOdometer.js';
 import {
   computeDue,
   classifyDueBucket,
@@ -91,15 +92,27 @@ async function loadFleetVehicleMap(companyId, deviceIds) {
   return map;
 }
 
+async function loadOdometerMetresByDevice(deviceIds) {
+  const unique = [...new Set(deviceIds.filter(Number.isFinite))];
+  const map = new Map();
+  await Promise.all(unique.map(async (deviceId) => {
+    const state = await resolveOdometerForDevice(deviceId);
+    const metres = state.odometerKm != null ? state.odometerKm * 1000 : null;
+    map.set(Number(deviceId), metres);
+  }));
+  return map;
+}
+
 /**
  * Compute maintenance due state for all company devices.
  */
 export async function loadCompanyMaintenanceDueState(companyId) {
   const deviceIds = await getCompanyDeviceIds(companyId);
-  const [schedules, positions, vehicleByDevice] = await Promise.all([
+  const [schedules, positions, vehicleByDevice, odometerMetresByDevice] = await Promise.all([
     loadMaintenancesForDevices(deviceIds),
     getTraccarLatestPositionsByDeviceIds(deviceIds),
     loadFleetVehicleMap(companyId, deviceIds),
+    loadOdometerMetresByDevice(deviceIds),
   ]);
 
   const positionByDevice = new Map(
@@ -108,7 +121,8 @@ export async function loadCompanyMaintenanceDueState(companyId) {
 
   const computed = schedules.map((schedule) => {
     const position = positionByDevice.get(schedule.deviceId);
-    const due = computeDue(schedule, position);
+    const odometerFallbackMeters = odometerMetresByDevice.get(schedule.deviceId) ?? null;
+    const due = computeDue(schedule, position, odometerFallbackMeters);
     const vehicle = vehicleByDevice.get(schedule.deviceId);
     const bucket = classifyDueBucket(due);
     return {
@@ -182,14 +196,16 @@ export async function loadVehicleMaintenanceDueState(companyId, fleetVehicleId) 
 
   const deviceId = Number(assignment.deviceId);
   const vehicle = assignment.Vehicle;
-  const [schedules, positions] = await Promise.all([
+  const [schedules, positions, odometerMetresByDevice] = await Promise.all([
     loadMaintenancesForDevices([deviceId]),
     getTraccarLatestPositionsByDeviceIds([deviceId]),
+    loadOdometerMetresByDevice([deviceId]),
   ]);
 
   const position = positions[0] || null;
   const computed = schedules.map((schedule) => {
-    const due = computeDue(schedule, position);
+    const odometerFallbackMeters = odometerMetresByDevice.get(schedule.deviceId) ?? null;
+    const due = computeDue(schedule, position, odometerFallbackMeters);
     const bucket = classifyDueBucket(due);
     return {
       ...due,

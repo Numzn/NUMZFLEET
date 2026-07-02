@@ -9,7 +9,7 @@ import {
 import { calculateSessionTotals } from './operationSessionAggregationService.js';
 import { getLatestErbPrice, resolveFuelTypeKey } from './fuelPriceService.js';
 import { getTelemetryWithFallback } from './refuelTelemetryService.js';
-import { getComputedOdometer } from './odometerService.js';
+import { resolveOdometerForDevice } from '../vehicleEngine/odometer/resolveVehicleOdometer.js';
 import { buildPrefillRefuelRow } from '../intelligence/RefuelEngine.js';
 import { enrichOperationMeta } from './operationLockHelper.js';
 
@@ -37,22 +37,22 @@ export async function prepareInitialRefuelsForSession(user, sessionId, vehiclePl
   const now = new Date();
   const prepared = [];
 
-  for (const { vehicleId, plannedLitres } of vehiclePlans) {
+  for (const { vehicleId: deviceId, plannedLitres } of vehiclePlans) {
     const [vehicleSpec, telemetry] = await Promise.all([
-      getVehicleSpec(vehicleId),
-      getTelemetryWithFallback(vehicleId),
+      getVehicleSpec(deviceId),
+      getTelemetryWithFallback(deviceId),
     ]);
     const tankCapacity = Number(vehicleSpec?.tankCapacity || 0);
     const fuelTypeSnapshot = resolveFuelTypeKey(vehicleSpec?.fuelType);
     const priceInfo = await getLatestErbPrice(fuelTypeSnapshot);
-    const computed = await getComputedOdometer(vehicleId);
-    const prefillMileage = computed.odometer != null ? computed.odometer : telemetry.mileage;
+    const odometerState = await resolveOdometerForDevice(deviceId);
+    const prefillMileage = odometerState.odometerKm ?? null;
 
     prepared.push(
       buildPrefillRefuelRow({
         sessionId,
         userId: user.id,
-        vehicleId,
+        vehicleId: deviceId,
         tankCapacity,
         tankLevelFraction: telemetry.tankLevelFraction,
         telemetryMileage: prefillMileage,
@@ -78,7 +78,18 @@ function deriveWorkflowStatus(record) {
   return 'planned';
 }
 
-export const toRefuelDto = (record) => ({
+/** Batch-resolve live odometer state for Traccar device ids. */
+export async function resolveOdometerMapForDevices(deviceIds) {
+  const unique = [...new Set(
+    (deviceIds || []).map((id) => Number(id)).filter(Number.isFinite),
+  )];
+  const entries = await Promise.all(
+    unique.map(async (deviceId) => [deviceId, await resolveOdometerForDevice(deviceId)]),
+  );
+  return new Map(entries);
+}
+
+export const toRefuelDto = (record, odometerState = null) => ({
   id: record.id,
   sessionId: record.sessionId,
   userId: record.userId,
@@ -101,8 +112,14 @@ export const toRefuelDto = (record) => ({
   meterFuelLitres: record.meterFuelLitres != null ? Number(record.meterFuelLitres) : null,
   meterVariance: record.meterVariance != null ? Number(record.meterVariance) : null,
   locked: Boolean(record.locked),
+  odometerKm: odometerState?.odometerKm ?? null,
+  odometerConfidence: odometerState?.odometerConfidence ?? 'unavailable',
   currentMileage: record.currentMileage != null ? Number(record.currentMileage) : null,
   mileageSource: record.mileageSource || null,
+  odometerConfidenceAtCapture: record.odometerConfidenceAtCapture || null,
+  odometerResolutionModeAtCapture: record.odometerResolutionModeAtCapture || null,
+  odometerDriftClassAtCapture: record.odometerDriftClassAtCapture || null,
+  isFullTank: Boolean(record.isFullTank),
   capturedBy: record.capturedBy != null ? Number(record.capturedBy) : null,
   capturedAt: record.capturedAt || null,
   arrivedAt: record.arrivedAt || null,
@@ -115,6 +132,17 @@ export const toRefuelDto = (record) => ({
   createdAt: record.createdAt,
   updatedAt: record.updatedAt,
 });
+
+export async function toRefuelDtos(records) {
+  const rows = records || [];
+  const map = await resolveOdometerMapForDevices(rows.map((r) => r.vehicleId));
+  return rows.map((record) => toRefuelDto(record, map.get(Number(record.vehicleId))));
+}
+
+export async function toRefuelDtoEnriched(record) {
+  const state = await resolveOdometerForDevice(record.vehicleId);
+  return toRefuelDto(record, state);
+}
 
 export async function toSessionDto(session) {
   const meta = await enrichOperationMeta(session);

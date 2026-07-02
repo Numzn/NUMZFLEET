@@ -46,20 +46,6 @@ function sumCompletedCosts(records, filterFn) {
     .reduce((s, r) => s + (Number(r.cost) || 0), 0);
 }
 
-function formatDueLabel(item) {
-  if (!item) return '—';
-  if (item.isOverdue) return 'Due now';
-  if (item.isTime && item.remaining != null) {
-    const days = Math.round(item.remaining / 86400000);
-    return `${days} days`;
-  }
-  if (item.type === 'totalDistance' && item.remaining != null) {
-    const km = Math.round(item.remaining / 1000);
-    return `${km.toLocaleString()} km`;
-  }
-  return item.name || '—';
-}
-
 function reliabilityStars(score) {
   const filled = Math.round(score / 20);
   return Array.from({ length: 5 }, (_, i) => (i < filled ? 'filled' : 'empty'));
@@ -112,16 +98,6 @@ export default function VehicleOverviewKpiRow({
     )
     : (overviewMetricsLoading ? 'Loading fleet comparison…' : null);
 
-  const actionable = (maintenanceItems || []).filter((i) => i.isActionable);
-  const nearest = actionable.sort((a, b) => (a.remaining ?? Infinity) - (b.remaining ?? Infinity))[0];
-  const nextService = overviewMetrics?.nextService ?? vehicleEngine?.engine?.maintenance?.nextService;
-  const nextServiceValue = nextService?.remainingKm != null
-    ? `${Number(nextService.remainingKm).toLocaleString()} km`
-    : (nextService?.dueLabel || formatDueLabel(nearest));
-  const nextServiceSub = nextService?.dueDate
-    ? new Date(nextService.dueDate).toLocaleDateString(undefined, { dateStyle: 'medium' })
-    : (nextService?.name || nearest?.name || null);
-
   const mtd = overviewMetrics?.maintenanceCostMtd ?? clientMtd;
   const ytd = overviewMetrics?.maintenanceCostYtd ?? clientYtd;
   const lifetime = overviewMetrics?.maintenanceCostLifetime ?? clientLifetime;
@@ -139,7 +115,7 @@ export default function VehicleOverviewKpiRow({
         gridTemplateColumns: {
           xs: '1fr',
           sm: 'repeat(2, 1fr)',
-          lg: 'repeat(5, 1fr)',
+          lg: 'repeat(4, 1fr)',
         },
         gap: 2,
         mb: 2,
@@ -175,11 +151,6 @@ export default function VehicleOverviewKpiRow({
             </Box>
           </Box>
         ) : 'Loading health score…'}
-      />
-      <KpiCard
-        title="Next Service Due In"
-        value={nextServiceValue}
-        subtitle={nextServiceSub}
       />
     </Box>
   );

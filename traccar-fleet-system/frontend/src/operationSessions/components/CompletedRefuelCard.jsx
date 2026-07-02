@@ -32,10 +32,10 @@ export default function CompletedRefuelCard({ refuel }) {
         {formatLitres(refuel.actualFuelLitres)}
         {' · '}
         {formatZmw(refuel.actualCost)}
-        {refuel.currentMileage != null && (
+        {refuel.odometerKm != null && (
           <>
             {' · '}
-            {Number(refuel.currentMileage).toLocaleString()}
+            {Number(refuel.odometerKm).toLocaleString()}
             {' km'}
           </>
         )}

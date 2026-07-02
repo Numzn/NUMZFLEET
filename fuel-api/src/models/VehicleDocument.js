@@ -39,6 +39,26 @@ export default (sequelize) => {
         allowNull: true,
         field: 'uploaded_by',
       },
+      ocrStatus: {
+        type: DataTypes.STRING(16),
+        allowNull: true,
+        field: 'ocr_status',
+      },
+      ocrRawText: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: 'ocr_raw_text',
+      },
+      ocrFacts: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        field: 'ocr_facts',
+      },
+      ocrProcessedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'ocr_processed_at',
+      },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,

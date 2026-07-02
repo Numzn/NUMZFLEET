@@ -1,5 +1,6 @@
 import { Box, Chip, Divider, Typography } from '@mui/material';
 import { vehicleDashboardCardSx } from '../dashboardCardSx.js';
+import { filterRepairWorkOrders } from '../serviceRecordUtils.js';
 
 function formatCost(cost) {
   if (cost == null || !Number.isFinite(Number(cost))) return null;
@@ -18,16 +19,19 @@ export default function VehicleMaintenanceOverviewPanel({
   openWorkOrders = [],
   recentRepairs = [],
   loading,
+  hidden = false,
 }) {
+  if (hidden) return null;
+  const repairRecords = filterRepairWorkOrders(serviceRecords);
   const openRecords = openWorkOrders.length > 0
     ? openWorkOrders
-    : serviceRecords.filter((r) => isActiveWorkOrder(r.status));
+    : repairRecords.filter((r) => isActiveWorkOrder(r.status));
   const pendingMaintenance = maintenanceItems.filter((i) => i.isActionable);
   const openCount = openRecords.length + pendingMaintenance.length;
 
   const completed = recentRepairs.length > 0
     ? recentRepairs.slice(0, 5)
-    : serviceRecords.filter((r) => r.status === 'completed').slice(0, 5);
+    : repairRecords.filter((r) => r.status === 'completed').slice(0, 5);
 
   return (
     <Box sx={vehicleDashboardCardSx}>

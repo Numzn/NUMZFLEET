@@ -24,3 +24,6 @@
 20260624_service_records_fleet_vehicle.sql
 20260626_vehicle_workspace_fields.sql
 20260626_maintenance_operations_phase1.sql
+20260702_refuel_odometer_capture.sql
+20260703_vehicle_fuel_learning.sql
+20260702_vehicle_document_ocr.sql

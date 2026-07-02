@@ -22,12 +22,14 @@ import {
   parseSessionVehiclesInput,
 } from '../intelligence/OperationEngine.js';
 import { resolveActualFuelLitres, buildRefuelMetricsPatch, estimateFromTankMetadata } from '../intelligence/RefuelEngine.js';
+import { captureRefuelOdometer } from '../vehicleEngine/fuel/captureRefuelOdometer.js';
+import { processFuelLearningOnRefuelComplete } from '../vehicleEngine/fuel/fuelLearningService.js';
 import { rankVehiclesByRefuelUrgency } from '../intelligence/SuggestionEngine.js';
 import {
   assertCanAccessSession,
   OperationSessionRefuel,
   refreshSessionTotals,
-  toRefuelDto,
+  toRefuelDtos,
   toSessionDto,
 } from './operationSessionCore.js';
 import {
@@ -107,7 +109,7 @@ export async function getOperationSessionDetails(user, sessionId, companyId = nu
 
   return {
     ...dto,
-    refuels: (refreshed.refuels || []).map(toRefuelDto),
+    refuels: await toRefuelDtos(refreshed.refuels || []),
     vehicleCount: summary.vehicleCount,
     statusCounts: summary.statusCounts,
     fuelBreakdown: summarizeByFuelType(refreshed.refuels || []),
@@ -259,7 +261,6 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
           estimatedCost: metaFromTank.estimatedCost,
         } : {}),
         status: metaFromTank.status,
-        currentMileage: mileage,
         erbPricePerLitre: pricePerLitre ?? refuel.erbPricePerLitre,
         sessionDate: new Date(),
       }, { transaction });
@@ -296,16 +297,40 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
       exceedsCapacityOverride: exceedsCapacity,
     });
 
+    const mileageProvided = update?.mileage !== undefined && update?.mileage !== '';
+    const isFullTank = update?.isFullTank === true || update?.isFullTank === 'true';
+
+    const odometerCapture = await captureRefuelOdometer({
+      deviceId: refuel.vehicleId,
+      clientMileage: mileageProvided ? mileage : null,
+      clientMileageSource: mileageProvided
+        ? (update?.mileageSource ? String(update.mileageSource) : 'manual')
+        : null,
+    });
+
     await refuel.update({
       ...patch,
       fuelCost: patch.actualCost ?? refuel.fuelCost,
       tankCapacitySnapshot: metaFromTank.tankCapacitySnapshot,
       tankLevelStart: metaFromTank.tankLevelStart,
       estimatedCost: patch.estimatedCost ?? refuel.estimatedCost,
-      currentMileage: mileage,
+      currentMileage: odometerCapture.currentMileage,
+      mileageSource: odometerCapture.mileageSource,
+      odometerConfidenceAtCapture: odometerCapture.odometerConfidenceAtCapture,
+      odometerResolutionModeAtCapture: odometerCapture.odometerResolutionModeAtCapture,
+      odometerDriftClassAtCapture: odometerCapture.odometerDriftClassAtCapture,
+      isFullTank: isFullTank || refuel.isFullTank,
+      capturedBy: user.id,
+      capturedAt: new Date(),
       erbPricePerLitre: pricePerLitre ?? refuel.erbPricePerLitre,
       sessionDate: new Date(),
     }, { transaction });
+
+    await processFuelLearningOnRefuelComplete({
+      refuel,
+      deviceId: refuel.vehicleId,
+      transaction,
+    });
 
     updatedRows.push(refuel);
   }
@@ -315,7 +340,7 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
   return {
     sessionId: Number(session.id),
     updatedCount: updatedRows.length,
-    records: updatedRows.map(toRefuelDto),
+    records: await toRefuelDtos(updatedRows),
   };
 }
 

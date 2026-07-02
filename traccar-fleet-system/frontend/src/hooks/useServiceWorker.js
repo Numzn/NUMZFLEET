@@ -1,5 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 
+/** Homelab *.numzlab uses a private CA; browsers block Service Worker until the CA is installed. */
+function shouldRegisterServiceWorker() {
+  if (String(import.meta.env.VITE_DISABLE_SERVICE_WORKER || '').toLowerCase() === 'true') {
+    return false;
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname || '';
+    if (host === 'numzlab' || host.endsWith('.numzlab')) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Hook for managing Service Worker and PWA push notifications
  * Provides service worker registration and push notification capabilities
@@ -11,7 +25,7 @@ export const useServiceWorker = (options = {}) => {
   const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !shouldRegisterServiceWorker()) {
       return;
     }
 
@@ -54,7 +68,12 @@ export const useServiceWorker = (options = {}) => {
         })
         .catch((error) => {
           const message = error?.message || '';
-          if (message.includes('MIME type') || message.includes('404')) {
+          if (
+            message.includes('MIME type')
+            || message.includes('404')
+            || message.includes('SSL certificate')
+            || error?.name === 'SecurityError'
+          ) {
             return;
           }
           console.error('❌ [ServiceWorker] Service Worker registration failed:', error);

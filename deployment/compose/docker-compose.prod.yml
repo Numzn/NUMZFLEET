@@ -144,6 +144,8 @@ services:
       TRACCAR_MYSQL_USER: traccar
       TRACCAR_SERVER_URL: http://traccar:8082
       TRACCAR_API_URL: http://traccar:8082
+      TRACCAR_API_USER: ${TRACCAR_API_USER:-}
+      TRACCAR_API_PASSWORD: ${TRACCAR_API_PASSWORD:-}
       ERB_API_BASE_URL: http://erb-api:8000
       CORS_ORIGIN: ${CORS_ORIGIN:-https://numz.site,http://localhost:3002}
       AUTH_STRATEGY: ${AUTH_STRATEGY:-strict}

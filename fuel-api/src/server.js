@@ -29,6 +29,7 @@ import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.j
 import { startImmobilizationEvaluatorScheduler } from './jobs/immobilizationEvaluatorScheduler.js';
 import { startTrackingNotificationBridgeScheduler } from './jobs/trackingNotificationBridgeScheduler.js';
 import { startOperationLockNotificationScheduler } from './jobs/operationLockNotificationScheduler.js';
+import { startComplianceNotificationScheduler } from './jobs/complianceNotificationScheduler.js';
 import {
   reconcileStuckExecuting,
   shouldReconcileOnStartup,
@@ -437,6 +438,7 @@ let stopErbLoginInsightScheduler = () => {};
 let stopImmobilizationEvaluatorScheduler = () => {};
 let stopTrackingNotificationBridgeScheduler = () => {};
 let stopOperationLockNotificationScheduler = () => {};
+let stopComplianceNotificationScheduler = () => {};
 
 async function runImmobilizationStartupReconcile() {
   if (!shouldReconcileOnStartup()) return;
@@ -554,6 +556,7 @@ const startServer = async () => {
         stopTrackingNotificationBridgeScheduler = startTrackingNotificationBridgeScheduler(io);
       });
       stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
+      stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
     });
     
     return; // Exit early (sync already attempted if Postgres was reachable)
@@ -586,6 +589,7 @@ const startServer = async () => {
       stopTrackingNotificationBridgeScheduler = startTrackingNotificationBridgeScheduler(io);
     });
     stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
+    stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
     reconcileDeviceAssignmentLabels()
       .then((stats) => {
         if (process.env.NODE_ENV === 'development') {
@@ -616,6 +620,7 @@ process.on('SIGTERM', () => {
   stopImmobilizationEvaluatorScheduler();
   stopTrackingNotificationBridgeScheduler();
   stopOperationLockNotificationScheduler();
+  stopComplianceNotificationScheduler();
   httpServer.close(() => {
     if (isDev) {
       console.log('✅ Server closed');

@@ -235,6 +235,30 @@ export function computeVehicleSetupReadiness({
     });
   }
 
+  if (!hasDevice) {
+    modules.push({
+      id: SETUP_MODULE_IDS.routineService,
+      status: 'blocked',
+      label: 'Requires device',
+      detail: 'Link a tracker to configure Routine Service.',
+    });
+  } else if (vehicle?.fleetConfig?.routineService?.maintenanceId) {
+    const rs = vehicle.fleetConfig.routineService;
+    modules.push({
+      id: SETUP_MODULE_IDS.routineService,
+      status: 'complete',
+      label: 'Routine Service configured',
+      detail: `Every ${Number(rs.intervalKm).toLocaleString()} km`,
+    });
+  } else {
+    modules.push({
+      id: SETUP_MODULE_IDS.routineService,
+      status: 'recommended',
+      label: 'Routine Service not configured',
+      detail: 'Set interval and starting odometer, then save setup.',
+    });
+  }
+
   modules.push({
     id: SETUP_MODULE_IDS.geofence,
     ...computeZoneMonitoringReadiness({

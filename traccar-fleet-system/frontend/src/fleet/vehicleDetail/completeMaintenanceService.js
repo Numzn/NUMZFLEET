@@ -1,8 +1,7 @@
-import { traccarPath } from '../../config/traccarApi.js';
-import fetchOrThrow from '../../common/util/fetchOrThrow';
 import {
   createVehicleServiceRecord,
   updateVehicleServiceRecord,
+  resetTraccarMaintenanceSchedule,
 } from '../vehiclesApi.js';
 
 export function isTimeMaintenanceType(type) {
@@ -52,12 +51,10 @@ function toTraccarMaintenanceBody(maintenanceItem, newStart) {
   };
 }
 
-export async function resetTraccarMaintenance(maintenanceItem, newStart) {
+export async function resetTraccarMaintenance(user, fleetVehicleId, maintenanceItem, newStart) {
   const start = newStart ?? resolveResetStart(maintenanceItem);
-  await fetchOrThrow(traccarPath(`/api/maintenance/${maintenanceItem.id}`), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(toTraccarMaintenanceBody(maintenanceItem, start)),
+  await resetTraccarMaintenanceSchedule(user, fleetVehicleId, maintenanceItem.id, {
+    ...toTraccarMaintenanceBody(maintenanceItem, start),
   });
 }
 
@@ -73,12 +70,20 @@ export async function completeMaintenanceService(user, fleetVehicleId, maintenan
     throw new Error('Cannot complete service without current telemetry data');
   }
 
-  const resetStart = resolveResetStart(maintenanceItem);
+  const resetStart = (() => {
+    if (isDistanceMaintenanceType(maintenanceItem.type)
+      && form.odometerKm !== ''
+      && form.odometerKm != null
+      && Number.isFinite(Number(form.odometerKm))) {
+      return Math.round(Number(form.odometerKm) * 1000);
+    }
+    return resolveResetStart(maintenanceItem);
+  })();
 
   const payload = {
     title: maintenanceItem.name,
     maintenanceId: maintenanceItem.id,
-    vendor: form.vendor?.trim() || undefined,
+    vendor: form.technician?.trim() || form.vendor?.trim() || undefined,
     notes: form.notes?.trim() || undefined,
   };
 
@@ -103,10 +108,14 @@ export async function completeMaintenanceService(user, fleetVehicleId, maintenan
   }
 
   const record = await createVehicleServiceRecord(user, fleetVehicleId, payload);
-  await updateVehicleServiceRecord(user, fleetVehicleId, record.id, { status: 'completed' });
+  const completionPatch = { status: 'completed' };
+  if (form.completedAt) {
+    completionPatch.completedAt = form.completedAt;
+  }
+  await updateVehicleServiceRecord(user, fleetVehicleId, record.id, completionPatch);
 
   try {
-    await resetTraccarMaintenance(maintenanceItem, resetStart);
+    await resetTraccarMaintenance(user, fleetVehicleId, maintenanceItem, resetStart);
   } catch (error) {
     const wrapped = new Error(
       'Service was recorded but the maintenance schedule could not be reset. '

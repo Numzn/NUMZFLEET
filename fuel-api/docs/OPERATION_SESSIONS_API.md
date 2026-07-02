@@ -69,12 +69,14 @@ POST /api/operation-sessions/:id/refuel
   "refuelId": 345,
   "actualFuelLitres": 31.8,
   "mileage": 221450,
-  "mileageSource": "odometer",
+  "mileageSource": "snapshot",
   "overrideReason": "optional when mileage < previous"
 }
 ```
 
 Requires `approved` + writable. Stores `capturedBy`, `capturedAt`.
+
+**Odometer Snapshots:** On session plan/approve, `currentMileage` is prefilled from the Vehicle Odometer Engine (`registry.odometerKm`). Accepting that prefill unchanged is a **Snapshot** only (`mileageSource: snapshot`). It does not create an Observation. Human dashboard confirmations use `POST /api/vehicles/:id/odometer/observation` (see [VEHICLE_ODOMETER_IMPLEMENTATION.md](../../docs/VEHICLE_ODOMETER_IMPLEMENTATION.md)).
 
 ### Mark arrived / skip a vehicle (run page)
 
@@ -160,7 +162,7 @@ POST /api/operation-sessions/:id/unlock
       "arrivedAt": "2026-06-12T07:40:00.000Z",
       "skippedAt": null,
       "currentMileage": 221450,
-      "mileageSource": "odometer",
+      "mileageSource": "snapshot",
       "locked": false
     }
   ]

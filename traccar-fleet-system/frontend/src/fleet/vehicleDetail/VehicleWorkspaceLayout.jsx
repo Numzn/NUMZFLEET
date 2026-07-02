@@ -56,6 +56,7 @@ export default function VehicleWorkspaceLayout({
           deviceId={deviceId}
           linkedDrivers={linkedDrivers}
           groupName={groupName}
+          nextService={vehicleEngine?.engine?.maintenance?.nextService ?? null}
           onPhotoUpdated={onRefreshVehicle}
         />
         <VehicleHealthSidebar

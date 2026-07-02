@@ -1,7 +1,11 @@
 import { fetchMaintenanceFacts } from '../providers/traccarMaintenanceProvider.js';
 import { listServiceRecords } from '../../services/serviceRecordService.js';
 import { aggregateMaintenanceCosts } from '../../services/vehicleOverviewMetricsService.js';
-import { summarizeForVehicle } from '../../repositories/serviceRecordRepository.js';
+import {
+  findLatestCompletedForMaintenance,
+  summarizeForVehicle,
+} from '../../repositories/serviceRecordRepository.js';
+import { isRoutineServiceSchedule } from '../../maintenance/routineServiceStatus.js';
 
 function mapSchedule(item) {
   return {
@@ -52,10 +56,31 @@ export async function buildMaintenanceHub(companyId, fleetVehicleId) {
     summarizeForVehicle(fleetVehicleId, companyId),
   ]);
 
+  const schedules = (dueState.items || []).map(mapSchedule);
+  const routineSchedule = schedules.find((s) => isRoutineServiceSchedule(s)) ?? null;
+  let routineLastService = null;
+  if (routineSchedule) {
+    const row = await findLatestCompletedForMaintenance(
+      companyId,
+      fleetVehicleId,
+      routineSchedule.id,
+    );
+    if (row) {
+      routineLastService = {
+        completedAt: row.completedAt ? new Date(row.completedAt).toISOString() : null,
+        odometerKm: row.odometerKm != null ? Number(row.odometerKm) : null,
+        technician: row.vendor || row.assignee || null,
+        notes: row.notes || null,
+        title: row.title || null,
+      };
+    }
+  }
+
   return {
-    schedules: (dueState.items || []).map(mapSchedule),
+    schedules,
     scheduleKpis: dueState.kpis,
     scheduleHealthScore: dueState.healthScore,
+    routineLastService,
     workOrders: {
       active: activeRows.map(mapWorkOrder),
       summary: {

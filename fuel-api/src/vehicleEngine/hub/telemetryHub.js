@@ -1,10 +1,3 @@
-function resolveOdometerKm(position) {
-  if (!position?.telemetry) return null;
-  const meters = Number(position.telemetry.totalDistance);
-  if (!Number.isFinite(meters)) return null;
-  return Math.round(meters / 1000);
-}
-
 function isOnline(device) {
   if (!device) return false;
   if (device.status === 'online') return true;
@@ -18,10 +11,17 @@ export function buildTelemetryHub(merged) {
   const device = merged?.device ?? null;
   const speed = position?.speed != null ? Number(position.speed) : null;
 
+  const totalDistanceM = position?.telemetry?.totalDistance != null
+    ? Number(position.telemetry.totalDistance)
+    : null;
+
   return {
     position,
     telemetry: position?.telemetry ?? null,
-    odometerKm: resolveOdometerKm(position),
+    evidence: {
+      rawDistanceM: Number.isFinite(totalDistanceM) ? totalDistanceM : null,
+      lastFixAt: position?.fixTime ?? null,
+    },
     online: isOnline(device),
     lastUpdate: device?.lastUpdate ?? position?.fixTime ?? null,
     speedKph: speed,

@@ -1,8 +1,8 @@
 import { Alert, FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material';
 import { FUEL_TYPES } from '../useVehicleSetupForm.js';
-import VehicleVerifiedOdometer from './VehicleVerifiedOdometer.jsx';
+import VehicleOdometerObservation from './VehicleOdometerObservation.jsx';
 
-export default function FuelSetupModule({ form, patch, canSaveSpecs, deviceId }) {
+export default function FuelSetupModule({ form, patch, canSaveSpecs, deviceId, fleetVehicleId }) {
   const isElectric = form.fuelType === 'Electric';
 
   return (
@@ -64,8 +64,8 @@ export default function FuelSetupModule({ form, patch, canSaveSpecs, deviceId })
               : ' '
         }
       />
-      {canSaveSpecs && deviceId != null && (
-        <VehicleVerifiedOdometer deviceId={deviceId} />
+      {canSaveSpecs && deviceId != null && fleetVehicleId && (
+        <VehicleOdometerObservation fleetVehicleId={fleetVehicleId} />
       )}
     </>
   );

@@ -3,6 +3,11 @@ import {
   loadCompanyMaintenanceDueState,
   getOnlineDeviceCount,
 } from '../maintenance/maintenanceTraccarAdapter.js';
+import {
+  deriveRoutineServiceStatus,
+  isRoutineServiceSchedule,
+  ROUTINE_SERVICE_LABEL,
+} from '../maintenance/routineServiceStatus.js';
 import { aggregateMaintenanceCosts } from '../maintenance/maintenanceCostService.js';
 import {
   listServiceRecords,
@@ -11,43 +16,40 @@ import {
 import { countCompletedToday } from '../repositories/serviceRecordRepository.js';
 import { Vehicle } from '../models/index.js';
 
-const URGENCY_ORDER = { overdue: 0, dueToday: 1, dueThisWeek: 2, dueSoon: 3 };
-
-function pickWorstItem(items) {
-  const actionable = items.filter((i) => i.isActionable && i.bucket);
-  if (!actionable.length) return null;
-  return actionable.sort((a, b) => {
-    const ua = URGENCY_ORDER[a.bucket] ?? 99;
-    const ub = URGENCY_ORDER[b.bucket] ?? 99;
-    if (ua !== ub) return ua - ub;
-    return (a.remaining ?? 0) - (b.remaining ?? 0);
-  })[0];
-}
-
 function buildImmediateAttention(dueState, openWorkOrdersByVehicle, limit = 10) {
   const byVehicle = new Map();
 
   for (const item of dueState.items) {
-    if (!item.fleetVehicleId || !item.isActionable) continue;
-    const existing = byVehicle.get(item.fleetVehicleId);
-    const cur = pickWorstItem(existing ? [existing._worst, item] : [item]);
+    if (!item.fleetVehicleId || !isRoutineServiceSchedule(item)) continue;
+    let remainingKm = null;
+    if (item.type === 'totalDistance' && item.remaining != null) {
+      remainingKm = Math.round(Number(item.remaining) / 1000);
+    }
+    const { status, statusLabel } = deriveRoutineServiceStatus(remainingKm);
+    if (status === 'on_track') continue;
+
+    const urgency = status === 'overdue' ? 'overdue'
+      : (status === 'due_now' || status === 'prepare' ? 'due_today' : 'due_soon');
+
     byVehicle.set(item.fleetVehicleId, {
       fleetVehicleId: item.fleetVehicleId,
       plate: item.plateNumber || item.vehicleName || 'Vehicle',
       model: item.vehicleName || null,
-      serviceLabel: item.name,
-      urgency: item.bucket === 'overdue' ? 'overdue' : (item.bucket === 'dueToday' ? 'due_today' : 'due_soon'),
+      serviceLabel: ROUTINE_SERVICE_LABEL,
+      urgency,
+      status,
+      statusLabel,
+      remainingKm,
       remainingLabel: item.remainingLabel,
+      nextServiceAtKm: item.nextDue != null ? Math.round(Number(item.nextDue) / 1000) : null,
       openWorkOrderId: openWorkOrdersByVehicle.get(item.fleetVehicleId)?.id || null,
-      _worst: cur,
     });
   }
 
+  const statusOrder = { overdue: 0, due_now: 1, prepare: 2, due_soon: 3, upcoming: 4 };
   return [...byVehicle.values()]
-    .sort((a, b) => (URGENCY_ORDER[a.urgency === 'overdue' ? 'overdue' : a.urgency === 'due_today' ? 'dueToday' : 'dueSoon'] ?? 99)
-      - (URGENCY_ORDER[b.urgency === 'overdue' ? 'overdue' : b.urgency === 'due_today' ? 'dueToday' : 'dueSoon'] ?? 99))
-    .slice(0, limit)
-    .map(({ _worst, ...rest }) => rest);
+    .sort((a, b) => (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99))
+    .slice(0, limit);
 }
 
 function mapActiveWorkOrder(row) {

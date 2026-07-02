@@ -17,7 +17,7 @@ function formatDueShort(item, distanceUnit, t) {
 
 export default function VehicleServiceRemindersTimeline({
   maintenanceItems = [],
-  telemetry,
+  odometerKm,
   distanceUnit,
   t,
 }) {
@@ -26,7 +26,7 @@ export default function VehicleServiceRemindersTimeline({
     .sort((a, b) => (a.remaining ?? Infinity) - (b.remaining ?? Infinity))
     .slice(0, 4);
 
-  const currentOdo = telemetry?.totalDistance;
+  const currentOdoMeters = odometerKm != null ? odometerKm * 1000 : null;
 
   return (
     <Box sx={vehicleDashboardCardSx}>
@@ -34,7 +34,7 @@ export default function VehicleServiceRemindersTimeline({
         Service Reminders
       </Typography>
 
-      {currentOdo != null && (
+      {currentOdoMeters != null && (
         <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
           <Box
             sx={{
@@ -47,7 +47,7 @@ export default function VehicleServiceRemindersTimeline({
           <Box>
             <Typography variant="body2" fontWeight={600}>Current mileage</Typography>
             <Typography variant="caption" color="text.secondary">
-              {formatDistance(currentOdo, distanceUnit, t)}
+              {formatDistance(currentOdoMeters, distanceUnit, t)}
             </Typography>
           </Box>
         </Box>

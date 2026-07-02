@@ -3,9 +3,11 @@ import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
 import { vehicleModuleSx } from './dashboardCardSx.js';
+import { efficiencySourceLabel } from './fuelEfficiencyDisplay.js';
 
 export default function FuelCard({ fuel }) {
-  const pct = fuel.levelPct != null ? Math.max(0, Math.min(100, fuel.levelPct)) : null;
+  const pct = fuel?.levelPct != null ? Math.max(0, Math.min(100, fuel.levelPct)) : null;
+  const sourceLabel = efficiencySourceLabel(fuel?.efficiencySource);
 
   return (
     <Box sx={vehicleModuleSx}>
@@ -46,19 +48,31 @@ export default function FuelCard({ fuel }) {
         </Typography>
       )}
       <Typography variant="body2" color="text.secondary">
-        Capacity: {fuel.capacityL != null ? `${fuel.capacityL} L` : '—'}
+        Capacity: {fuel?.capacityL != null ? `${fuel.capacityL} L` : '—'}
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Est. range: {fuel.rangeKm != null ? `${fuel.rangeKm} km` : '—'}
+        Est. range: {fuel?.rangeKm != null ? `${fuel.rangeKm} km` : '—'}
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
         <Typography variant="body2" color="text.secondary" component="span">
-          Consumption: {fuel.lPer100km != null ? `${fuel.lPer100km} L/100km` : '—'}
+          Consumption: {fuel?.lPer100km != null ? `${fuel.lPer100km} L/100km` : '—'}
         </Typography>
-        {fuel.lPer100km != null && (
+        {fuel?.lPer100km != null && (
           <TrendingDownIcon sx={{ fontSize: 16, opacity: 0.5 }} color="success" />
         )}
       </Box>
+      {sourceLabel && (
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+          {sourceLabel}
+          {fuel?.confidence != null ? ` · ${Math.round(fuel.confidence)}% confidence` : ''}
+          {fuel?.intervalCount > 0 ? ` · ${fuel.intervalCount} intervals` : ''}
+        </Typography>
+      )}
+      {fuel?.estimatedFillCostZmw != null && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          Est. fill cost: ZMW {Number(fuel.estimatedFillCostZmw).toFixed(2)}
+        </Typography>
+      )}
     </Box>
   );
 }

@@ -1,10 +1,20 @@
 # NumzLab overlay — merge after docker-compose.yml + docker-compose.erb.yml
-# Adds restart policies for persistent home-lab services.
-# Does not publish ports or change images.
+# Adds restart policies and NumzLab gateway port (fleet.numzlab → :3003).
+# Does not change images.
 
 services:
+  frontend:
+    build:
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_DISABLE_SERVICE_WORKER: "true"
+    ports: !override
+      - "3003:80"
   backend:
     restart: unless-stopped
+    environment:
+      # Literal (no ${CORS_ORIGIN}) — root .env must not override NumzLab gateway origins.
+      CORS_ORIGIN: https://fleet.numzlab,http://fleet.numzlab,http://localhost:3003,http://127.0.0.1:3003,https://numz.site,http://localhost:3002
   db:
     restart: unless-stopped
   traccar:

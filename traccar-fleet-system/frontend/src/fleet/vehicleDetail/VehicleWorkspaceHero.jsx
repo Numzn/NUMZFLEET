@@ -31,21 +31,80 @@ import { resolveFuelEfficiencyDisplay } from './fuelEfficiencyDisplay.js';
 import { vehicleTypeLabel } from './vehicleDetailSections.js';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 import { uploadVehiclePhoto } from '../vehiclesApi.js';
-
-function formatOdometer(meters) {
-  if (meters == null || !Number.isFinite(meters)) return '—';
-  if (meters >= 500) {
-    return `${(meters / 1000).toLocaleString(undefined, { maximumFractionDigits: 0 })} km`;
-  }
-  return `${Math.round(meters)} m`;
-}
+import VehicleLocationLine from '../../common/components/VehicleLocationLine.jsx';
+import {
+  ROUTINE_SERVICE_LABEL,
+  ROUTINE_SERVICE_STATUS_COLORS,
+} from '../routineServiceConstants.js';
 
 function plateInitials(plate, name) {
   const src = (plate || name || 'V').trim();
   return src.slice(0, 2).toUpperCase();
 }
 
-function StatItem({ label, value, highlight }) {
+function RoutineServiceStat({ nextService, vehicleId, onConfigure }) {
+  if (!nextService) {
+    return (
+      <Box sx={{ minWidth: 0, textAlign: { xs: 'left', sm: 'center' } }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '0.625rem' }}
+        >
+          Routine Service
+        </Typography>
+        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+          Not configured
+        </Typography>
+        {vehicleId ? (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={onConfigure}
+            sx={{ textTransform: 'none', fontWeight: 600, mt: 0.25, fontSize: '0.7rem' }}
+          >
+            Configure in Setup
+          </Button>
+        ) : null}
+      </Box>
+    );
+  }
+
+  const dueText = nextService.remainingKm != null
+    ? `Due in ${Number(nextService.remainingKm).toLocaleString()} km`
+    : (nextService.dueLabel || '—');
+  const nextAt = nextService.nextServiceAtKm != null
+    ? `${Number(nextService.nextServiceAtKm).toLocaleString()} km`
+    : '—';
+  const statusColor = ROUTINE_SERVICE_STATUS_COLORS[nextService.status] || 'default';
+
+  return (
+    <Box sx={{ minWidth: 0, textAlign: { xs: 'left', sm: 'center' } }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '0.625rem' }}
+      >
+        {ROUTINE_SERVICE_LABEL}
+      </Typography>
+      <Typography variant="body2" fontWeight={700} noWrap>
+        {dueText}
+      </Typography>
+      <Typography variant="caption" color="text.secondary" display="block" noWrap>
+        Next at {nextAt}
+      </Typography>
+      <Chip
+        size="small"
+        label={nextService.statusLabel || '—'}
+        color={statusColor}
+        variant={statusColor === 'default' ? 'outlined' : 'filled'}
+        sx={{ mt: 0.5, height: 20, fontSize: '0.65rem', fontWeight: 600 }}
+      />
+    </Box>
+  );
+}
+
+function StatItem({ label, value, subtitle, highlight, warn }) {
   return (
     <Box sx={{ minWidth: 0, textAlign: { xs: 'left', sm: 'center' } }}>
       <Typography
@@ -59,10 +118,19 @@ function StatItem({ label, value, highlight }) {
         variant="body2"
         fontWeight={600}
         noWrap
-        sx={{ color: highlight ? WORKSPACE_COLORS.success : 'text.primary' }}
+        sx={{
+          color: warn
+            ? WORKSPACE_COLORS.warning
+            : (highlight ? WORKSPACE_COLORS.success : 'text.primary'),
+        }}
       >
         {value}
       </Typography>
+      {subtitle && (
+        <Typography variant="caption" color="text.secondary" noWrap display="block">
+          {subtitle}
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -79,6 +147,7 @@ export default function VehicleWorkspaceHero({
   groupName,
   onQuickAction,
   onPhotoUpdated,
+  nextService,
 }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -107,8 +176,14 @@ export default function VehicleWorkspaceHero({
   const efficiencyDisplay = resolveFuelEfficiencyDisplay(fuelPerformance, fuel?.fuelEfficiencyKmL);
   const efficiencyValue = fuelPerformanceLoading ? '…' : efficiencyDisplay.label;
 
-  const baseLabel = vehicle?.homeBaseLabel || groupName || '—';
+  const currentMileageLabel = nextService?.currentOdometerKm != null
+    ? `${Number(nextService.currentOdometerKm).toLocaleString()} km`
+    : '—';
   const statusLabel = online ? 'Online' : (status === 'offline' ? 'Offline' : status || 'Unknown');
+
+  const openSetup = () => {
+    if (vehicleId) navigate(vehicleSetupPath(vehicleId));
+  };
 
   const CommandBtn = ({ icon, label, onClick, disabled, color }) => {
     if (density.commandsIconOnly) {
@@ -245,6 +320,20 @@ export default function VehicleWorkspaceHero({
             {setupIncomplete && (
               <Chip size="small" color="warning" variant="outlined" label="Setup incomplete" sx={{ height: 22 }} />
             )}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              component="div"
+              sx={{ ml: 'auto', minWidth: 0, maxWidth: '100%', textAlign: 'right' }}
+            >
+              Current location:{' '}
+              <VehicleLocationLine
+                position={livePosition}
+                unknownText="Location unavailable"
+                autoFetch
+                showCoordsFallback={false}
+              />
+            </Typography>
           </Box>
           {modelLine && (
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -307,9 +396,13 @@ export default function VehicleWorkspaceHero({
         }}
       >
         <StatItem label="Driver" value={driverName} />
-        <StatItem label="Odometer" value={formatOdometer(telemetry?.totalDistance)} />
+        <RoutineServiceStat
+          nextService={nextService}
+          vehicleId={vehicleId}
+          onConfigure={openSetup}
+        />
         <StatItem label="Fuel Economy" value={efficiencyValue} />
-        <StatItem label="Base" value={baseLabel} />
+        <StatItem label="Current Mileage" value={currentMileageLabel} />
         <StatItem label="Status" value={statusLabel} highlight={online} />
       </Box>
     </Box>

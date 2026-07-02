@@ -19,6 +19,7 @@ import {
   getTrackerLinkLabel,
   getSetupChipProps,
   getStatusChipProps,
+  getRoutineServiceChipProps,
   getVehicleRegistryLines,
 } from './vehicleRegistryUtils';
 
@@ -44,6 +45,7 @@ const VehicleRegistryTable = ({
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Vehicle</TableCell>
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Tracker</TableCell>
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Status</TableCell>
+          <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Service</TableCell>
           <TableCell sx={{ fontWeight: 600, py: 1.25 }}>Setup</TableCell>
           <TableCell align="right" sx={{ fontWeight: 600, py: 1.25 }}>Actions</TableCell>
         </TableRow>
@@ -51,7 +53,7 @@ const VehicleRegistryTable = ({
       <TableBody>
         {rows.length === 0 && !loading ? (
           <TableRow>
-            <TableCell colSpan={5}>
+            <TableCell colSpan={6}>
               <Typography variant="body2" sx={{ color: 'var(--color-text-secondary)', py: 1 }}>
                 No vehicles yet. Add one or assign a Traccar device.
               </Typography>
@@ -60,6 +62,7 @@ const VehicleRegistryTable = ({
         ) : (
           rows.map((row) => {
             const statusChip = getStatusChipProps(row);
+            const serviceChip = getRoutineServiceChipProps(row);
             const setupChip = getSetupChipProps(row);
             const { primary, secondary } = getVehicleRegistryLines(row);
             return (
@@ -82,6 +85,13 @@ const VehicleRegistryTable = ({
                 <TableCell sx={{ py: 1.25 }}>
                   {statusChip ? (
                     <Chip size="small" label={statusChip.label} variant={statusChip.variant} />
+                  ) : (
+                    '—'
+                  )}
+                </TableCell>
+                <TableCell sx={{ py: 1.25 }}>
+                  {serviceChip ? (
+                    <Chip size="small" label={serviceChip.label} color={serviceChip.variant} variant="filled" />
                   ) : (
                     '—'
                   )}

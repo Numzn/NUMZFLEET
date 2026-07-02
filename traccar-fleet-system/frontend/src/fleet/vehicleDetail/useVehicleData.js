@@ -188,9 +188,17 @@ export default function useVehicleData(vehicleId) {
       livePosition?.attributes && typeof livePosition.attributes === 'object'
         ? livePosition.attributes
         : null;
-    const base = liveAttrs
-      ? normalizePositionTelemetry(liveAttrs)
-      : apiPos?.telemetry || normalizePositionTelemetry(null);
+    const apiTelemetry = apiPos?.telemetry
+      || (apiPos?.attributes ? normalizePositionTelemetry(apiPos.attributes) : null)
+      || normalizePositionTelemetry(null);
+    const liveTelemetry = liveAttrs ? normalizePositionTelemetry(liveAttrs) : null;
+    const base = liveTelemetry
+      ? {
+        ...apiTelemetry,
+        ...liveTelemetry,
+        fuelPct: liveTelemetry.fuelPct ?? apiTelemetry.fuelPct ?? null,
+      }
+      : apiTelemetry;
     const speed =
       livePosition?.speed != null
         ? Number(livePosition.speed)
@@ -209,19 +217,16 @@ export default function useVehicleData(vehicleId) {
     };
   }, [vehicle, livePosition]);
 
-  const fuel = useMemo(() => {
-    const cap = vehicle?.vehicleSpec?.tankCapacity != null ? Number(vehicle.vehicleSpec.tankCapacity) : null;
-    const eff = vehicle?.vehicleSpec?.fuelEfficiency != null ? Number(vehicle.vehicleSpec.fuelEfficiency) : null;
-    const levelPct = telemetry.fuelPct != null ? telemetry.fuelPct : null;
-    const litresLeft =
-      cap != null && levelPct != null ? Math.round((levelPct / 100) * cap * 10) / 10 : null;
-    const rangeKm =
-      cap != null && levelPct != null && eff != null && eff > 0
-        ? Math.round((levelPct / 100) * cap * eff)
-        : null;
-    const lPer100km = eff != null && eff > 0 ? Math.round((100 / eff) * 10) / 10 : null;
-    return { levelPct, capacityL: cap, litresLeft, rangeKm, lPer100km, fuelEfficiencyKmL: eff };
-  }, [vehicle, telemetry.fuelPct]);
+  const fuelFallback = useMemo(() => ({
+    levelPct: telemetry.fuelPct,
+    capacityL: vehicle?.vehicleSpec?.tankCapacity != null ? Number(vehicle.vehicleSpec.tankCapacity) : null,
+    litresLeft: null,
+    rangeKm: null,
+    lPer100km: null,
+    fuelEfficiencyKmL: vehicle?.vehicleSpec?.fuelEfficiency != null
+      ? Number(vehicle.vehicleSpec.fuelEfficiency)
+      : null,
+  }), [telemetry.fuelPct, vehicle?.vehicleSpec?.tankCapacity, vehicle?.vehicleSpec?.fuelEfficiency]);
 
   const showGeofenceAlerts = vehicle?.fleetConfig?.alerts?.geofence !== false;
 
@@ -292,7 +297,7 @@ export default function useVehicleData(vehicleId) {
   return {
     vehicle,
     telemetry,
-    fuel,
+    fuelFallback,
     erb: erbState,
     alerts,
     geofenceAlertsHidden: !showGeofenceAlerts,

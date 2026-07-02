@@ -6,9 +6,11 @@ Safety-governed operational intents: fuel-api evaluates conditions, Traccar deli
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `TRACCAR_SERVER_URL` | `http://traccar:8082` | Traccar base URL for command HTTP |
+| `TRACCAR_SERVER_URL` | `http://traccar:8082` | Traccar base URL for server-side HTTP (also `TRACCAR_API_BASE_URL`) |
 | `TRACCAR_API_USER` | — | Service account email (Basic auth) — dedicated Traccar user, not per-operator login |
 | `TRACCAR_API_PASSWORD` | — | Service account password |
+
+These same three variables power **Routine Service** Traccar schedule create/update from Vehicle Setup (`PUT /api/vehicles/:id/routine-service`). No extra credentials required.
 
 Create the user in Traccar (**Settings → Users**) before expecting capabilities to load. Wrong or missing credentials return `blockedReason: traccar_service_account_auth_failed` with `commandApiConfigured: true`.
 | `IMMOBILIZATION_EVALUATOR_INTERVAL_MS` | `2000` | Evaluator tick; `0` disables |

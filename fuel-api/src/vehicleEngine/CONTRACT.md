@@ -32,6 +32,8 @@ Do not add parallel KPI, health, or due-date endpoints for the same vehicle fact
 
 Health, due status, urgency, fleet fuel delta, and cost rollups live in `engine/`. Modules and UI do not recompute them.
 
+This also applies to document/compliance operational interpretation: modules write source records, and Vehicle Engine computes operational signals before intelligence.
+
 ### Rule 4
 
 > Domain modules own writes.
@@ -39,8 +41,16 @@ Health, due status, urgency, fleet fuel delta, and cost rollups live in `engine/
 - Fuel owns fuel transactions.
 - Maintenance owns work orders and service records.
 - Trips own trip records.
+- Documents own document lifecycle and evidence records.
+- Compliance owns compliance item records and due-date metadata.
 
 The Vehicle Engine reads those records and produces a unified view. It does not own the write models.
+
+### Rule 7
+
+> Intelligence Builder consumes Vehicle Engine state only.
+
+Do not call document/compliance services from `intelligenceBuilder.js`. If a new finding needs data, aggregate it in Vehicle Engine hub/engine layers first.
 
 ### Rule 5
 
@@ -101,6 +111,21 @@ Vehicle Engine
 
 Static identity from `getVehicleMerged`: id, name, plate, spec, assignment, device snapshot.
 
+**Vehicle Odometer (M3):** `registry.odometerKm` is the sole live odometer for fleet UI and backend consumers. It is resolved only by `vehicleEngine/odometer/` (see [docs/VEHICLE_ODOMETER_STANDARD.md](../../../docs/VEHICLE_ODOMETER_STANDARD.md) and [docs/VEHICLE_ODOMETER_IMPLEMENTATION.md](../../../docs/VEHICLE_ODOMETER_IMPLEMENTATION.md)). Do not derive odometer from `hub.telemetry` or parallel services.
+
+Additive registry fields:
+
+```json
+{
+  "odometerKm": 221450,
+  "odometerConfidence": "high",
+  "odometerDriftPct": 0.05,
+  "odometerDriftClass": "excellent"
+}
+```
+
+Observations (human-confirmed dashboard readings) are written via `POST /api/vehicles/:id/odometer/observation`. Fuel refuel prefills store **Snapshots** in `currentMileage` only.
+
 ### Capabilities
 
 Booleans derived from registry + hub — no capability framework.
@@ -117,7 +142,7 @@ Booleans derived from registry + hub — no capability framework.
 
 ### Hub
 
-Normalized facts: `telemetry`, `fuel`, `maintenance`, `repairs`. No scores.
+Normalized facts: `telemetry`, `fuel`, `maintenance`, `repairs`, `compliance`. No scores.
 
 Maintenance schedules are loaded via `providers/traccarMaintenanceProvider.js` today. Swap the provider file to change GPS backend; hub shape stays the same.
 
@@ -125,7 +150,54 @@ Maintenance schedules are loaded via `providers/traccarMaintenanceProvider.js` t
 
 Derived intelligence: `status`, `health`, `maintenance`, `fuel`, `costs`.
 
-New calculators belong in `fuel-api/src/vehicleEngine/engine/`.
+New calculators belong in `fuel-api/src/vehicleEngine/engine/` and `fuel-api/src/vehicleEngine/fuel/`.
+
+#### `engine.fuel` snapshot (additive v1)
+
+Authoritative fuel KPIs for UI — clients must not recompute range, consumption, or efficiency locally.
+
+```json
+{
+  "efficiencyKmL": 9.2,
+  "lPer100km": 10.9,
+  "efficiencySource": "learned",
+  "confidence": 72,
+  "trend": "stable",
+  "fleetDeltaPct": -3.5,
+  "fleetEfficiencyAvg": 9.5,
+  "risk": "low",
+  "measured": true,
+  "tankLevelPct": 45,
+  "tankLevelSource": "telemetry",
+  "capacityL": 75,
+  "litresRemaining": 33.8,
+  "estimatedRangeKm": 311,
+  "estimatedFillCostZmw": 1085.5,
+  "sampleCount": 6,
+  "intervalCount": 4,
+  "windowDays": 30,
+  "measuredStats": {
+    "totalDistanceKm": 2400,
+    "totalFuelLitres": 260,
+    "kmPerLitre": 9.2,
+    "lPer100km": 10.9,
+    "learnableIntervalCount": 4,
+    "storedIntervalCount": 1,
+    "rejectedIntervalCount": 0
+  },
+  "learned": {
+    "currentEfficiency": 9.2,
+    "confidence": 72,
+    "trend": "stable",
+    "totalObservations": 4
+  }
+}
+```
+
+`efficiencySource`: `learned` | `measured` | `spec` | `none`
+
+Refuel writes capture odometer trust metadata (`odometerConfidenceAtCapture`, `isFullTank`) used by the interval validator and learning pipeline.
+
 
 ### Intelligence
 

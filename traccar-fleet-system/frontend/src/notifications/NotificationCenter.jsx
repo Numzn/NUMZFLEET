@@ -195,7 +195,7 @@ const NotificationCenter = () => {
           </Box>
 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-            {['', 'fuel', 'tracking', 'system', 'assignment'].map((c) => (
+            {['', 'fuel', 'tracking', 'maintenance', 'compliance', 'system', 'assignment'].map((c) => (
               <Chip
                 key={c || 'all'}
                 size="small"

@@ -7,8 +7,11 @@ import {
   createDocument,
   deleteDocument,
 } from '../services/vehicleDocumentService.js';
+import { runDocumentOcr } from '../services/vehicleDocumentOcrService.js';
 import { resolveStoredVehiclePath } from '../middleware/vehicleUpload.js';
 import { dbErrorMessage } from '../utils/dbErrorMessage.js';
+import { computeFleetFuelEfficiencyAverage } from '../services/fleetFuelBenchmarkService.js';
+import { getFleetFuelIntelligenceSummary } from '../services/fleetFuelIntelligenceService.js';
 
 export async function buildOverviewMetrics(fleetVehicleId, companyId) {
   const snapshot = await getVehicleEngine(fleetVehicleId, companyId);
@@ -53,6 +56,16 @@ export const getFleetFuelAverage = async (req, res) => {
   } catch (error) {
     console.error('Fleet fuel average error:', error);
     return res.status(500).json({ error: dbErrorMessage(error, 'Failed to fetch fleet fuel average') });
+  }
+};
+
+export const getFleetFuelIntelligenceSummaryHandler = async (req, res) => {
+  try {
+    const summary = await getFleetFuelIntelligenceSummary(req.auth?.companyId);
+    return res.json(summary);
+  } catch (error) {
+    console.error('Fleet fuel intelligence summary error:', error);
+    return res.status(500).json({ error: dbErrorMessage(error, 'Failed to fetch fleet fuel intelligence summary') });
   }
 };
 
@@ -130,6 +143,17 @@ export const postVehicleDocument = async (req, res) => {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Upload vehicle document error:', error);
     return res.status(status).json({ error: dbErrorMessage(error, 'Failed to upload document') });
+  }
+};
+
+export const postVehicleDocumentOcr = async (req, res) => {
+  try {
+    const updated = await runDocumentOcr(req.auth?.companyId, req.params.id, req.params.docId);
+    return res.json(updated);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Document OCR error:', error);
+    return res.status(status).json({ error: error.message || 'Document OCR failed' });
   }
 };
 

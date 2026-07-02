@@ -122,6 +122,32 @@ services:
       retries: 3
       start_period: 40s
 
+  document-ocr:
+    build:
+      context: ../../document-ocr
+      dockerfile: Dockerfile
+    container_name: numzfleet-dev-document-ocr
+    restart: unless-stopped
+    env_file:
+      - ../../backend/.env
+    environment:
+      DOCUMENT_OCR_MAX_BYTES: ${DOCUMENT_OCR_MAX_BYTES:-10485760}
+    volumes:
+      - ../../document-ocr:/app
+    command: ["python", "-m", "uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/v1/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   backend:
     image: node:20-alpine
     container_name: numzfleet-dev-fuel-api
@@ -140,6 +166,8 @@ services:
       TRACCAR_MYSQL_USER: traccar
       TRACCAR_SERVER_URL: http://traccar:8082
       TRACCAR_API_URL: http://traccar:8082
+      # TRACCAR_API_USER / TRACCAR_API_PASSWORD: from backend/.env (env_file). Do not override
+      # with empty ${TRACCAR_API_USER:-} here — that wipes env_file when deployment/.env.dev omits them.
       ERB_API_BASE_URL: http://erb-api:8000
       CORS_ORIGIN: ${CORS_ORIGIN:-http://fleet.numzlab,https://fleet.numzlab,http://100.121.79.2:3003,http://localhost:3003,http://127.0.0.1:3003,http://localhost:5174}
       AUTH_STRATEGY: ${AUTH_STRATEGY:-hybrid}
@@ -148,6 +176,8 @@ services:
       HYBRID_FALLBACK: ${HYBRID_FALLBACK:-false}
       INVOICE_UPLOAD_DIR: /app/data/invoice-attachments
       VEHICLE_UPLOAD_DIR: /app/data/vehicle-attachments
+      DOCUMENT_OCR_BASE_URL: http://document-ocr:8010
+      DOCUMENT_OCR_ON_UPLOAD: ${DOCUMENT_OCR_ON_UPLOAD:-1}
     ports:
       - "3000:3000"
     volumes:
@@ -164,6 +194,8 @@ services:
       traccar:
         condition: service_healthy
       erb-api:
+        condition: service_healthy
+      document-ocr:
         condition: service_healthy
     healthcheck:
       test:
@@ -190,6 +222,11 @@ services:
       VITE_TRACCAR_PREFIX: /traccar
       VITE_FLEET_COMMAND_SHEET: "1"
       VITE_COOKIE_DOMAIN_REWRITE: "false"
+      VITE_DISABLE_SERVICE_WORKER: "true"
+      VITE_HMR_EXTERNAL: ${VITE_HMR_EXTERNAL:-}
+      VITE_HMR_PORT: ${VITE_HMR_PORT:-}
+      VITE_HMR_CLIENT_PORT: ${VITE_HMR_CLIENT_PORT:-}
+      VITE_HMR_PROTOCOL: ${VITE_HMR_PROTOCOL:-}
     ports:
       # Map host :3003 (gateway target) to Vite :5174 inside container
       - "3003:5174"

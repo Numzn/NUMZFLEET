@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useDispatch, useSelector, connect } from 'react-redux';
 import { traccarPath } from './config/traccarApi.js';
 import { fuelApiAuthHeaders } from './config/fuelApiAuth.js';
+import { fetchTraccarMaintenances } from './fleet/vehiclesApi.js';
 import {
   geofencesActions, groupsActions, driversActions, maintenancesActions, calendarsActions, fuelRequestsActions,
 } from './store';
@@ -38,11 +39,11 @@ const CachingController = () => {
   }, [authenticated]);
 
   useEffectAsync(async () => {
-    if (authenticated) {
-      const response = await fetchOrThrow(traccarPath('/api/maintenance'));
-      dispatch(maintenancesActions.refresh(await response.json()));
+    if (authenticated && user) {
+      const rows = await fetchTraccarMaintenances(user);
+      dispatch(maintenancesActions.refresh(rows));
     }
-  }, [authenticated]);
+  }, [authenticated, user]);
 
   useEffectAsync(async () => {
     if (authenticated) {

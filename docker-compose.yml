@@ -32,6 +32,10 @@ services:
       # TRACCAR_MYSQL_PASSWORD comes from ./backend/.env (env_file).
       TRACCAR_SERVER_URL: http://traccar:8082
       TRACCAR_API_URL: http://traccar:8082
+      # Override backend/.env placeholders — project root .env holds the real service account
+      # (shared by immobilization + Routine Service Traccar sync).
+      TRACCAR_API_USER: ${TRACCAR_API_USER:-}
+      TRACCAR_API_PASSWORD: ${TRACCAR_API_PASSWORD:-}
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
       CORS_ORIGIN: https://numz.site,http://localhost:3002
       # Auth: allow x-user-id header fallback when cookie Path is /traccar
@@ -42,6 +46,8 @@ services:
       # TRACKING_NOTIFICATION_BRIDGE / TRACKING_BRIDGE_* — set in ./backend/.env (env_file)
       INVOICE_UPLOAD_DIR: /app/data/invoice-attachments
       VEHICLE_UPLOAD_DIR: /app/data/vehicle-attachments
+      DOCUMENT_OCR_BASE_URL: ${DOCUMENT_OCR_BASE_URL:-http://document-ocr:8010}
+      DOCUMENT_OCR_ON_UPLOAD: ${DOCUMENT_OCR_ON_UPLOAD:-1}
     ports:
       - "3000:3000"
     depends_on:
@@ -50,6 +56,8 @@ services:
       traccar-mysql:
         condition: service_healthy
       traccar:
+        condition: service_healthy
+      document-ocr:
         condition: service_healthy
     healthcheck:
       test:
@@ -122,6 +130,27 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
+
+  document-ocr:
+    build:
+      context: ./document-ocr
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      DOCUMENT_OCR_MAX_BYTES: ${DOCUMENT_OCR_MAX_BYTES:-10485760}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/v1/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:

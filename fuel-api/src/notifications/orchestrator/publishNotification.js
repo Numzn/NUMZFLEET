@@ -30,6 +30,7 @@ export async function publishNotification(spec, ctx = {}) {
     return { userIds: [], persisted: 0 };
   }
 
+  const now = new Date();
   const rows = userIds.map((userId) => ({
     userId,
     type,
@@ -43,6 +44,8 @@ export async function publishNotification(spec, ctx = {}) {
     archived: false,
     tenantId: spec.companyId || metadata?.companyId || DEFAULT_COMPANY_ID,
     clientDedupKey: `${userId}:${clientDedupKey}`,
+    createdAt: now,
+    updatedAt: now,
   }));
 
   let persistedApiRows = [];

@@ -1,5 +1,4 @@
 import { getTraccarPosition } from '../config/traccar.js';
-import { findLatestByVehicleId } from '../repositories/operationSessionRefuelRepository.js';
 
 function normalizeTankLevel(attributes = {}) {
   const raw = attributes?.fuelLevel ?? attributes?.fuel ?? attributes?.fuel_level;
@@ -19,33 +18,28 @@ function normalizeTankLevel(attributes = {}) {
 export async function getVehicleTelemetry(deviceId) {
   try {
     const position = await getTraccarPosition(deviceId);
-    const mileage = Number(position?.attributes?.odometer ?? position?.attributes?.totalDistance ?? position?.attributes?.mileage);
-    const tankLevelFraction = normalizeTankLevel(position?.attributes);
+    const attrs = position?.attributes || {};
+    const tankLevelFraction = normalizeTankLevel(attrs);
 
     return {
       source: 'traccar',
-      mileage: Number.isFinite(mileage) ? mileage : null,
       tankLevelFraction,
+      positionAttributes: {
+        odometer: attrs.odometer,
+        totalDistance: attrs.totalDistance,
+        mileage: attrs.mileage,
+      },
     };
   } catch (error) {
     return {
       source: 'unavailable',
-      mileage: null,
       tankLevelFraction: null,
+      positionAttributes: null,
     };
   }
 }
 
+/** Tank level (+ raw position attrs). Odometer resolution is owned by the Vehicle Odometer Engine. */
 export async function getTelemetryWithFallback(deviceId) {
-  const telemetry = await getVehicleTelemetry(deviceId);
-  if (telemetry.mileage != null) {
-    return telemetry;
-  }
-
-  const lastRefuel = await findLatestByVehicleId(deviceId);
-  return {
-    ...telemetry,
-    source: telemetry.source === 'traccar' ? 'fallback-last-refuel' : telemetry.source,
-    mileage: lastRefuel?.currentMileage != null ? Number(lastRefuel.currentMileage) : null,
-  };
+  return getVehicleTelemetry(deviceId);
 }

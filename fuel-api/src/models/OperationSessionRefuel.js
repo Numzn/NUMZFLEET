@@ -108,6 +108,23 @@ export default (sequelize) => {
       type: DataTypes.STRING(32),
       allowNull: true,
     },
+    odometerConfidenceAtCapture: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
+    odometerResolutionModeAtCapture: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+    },
+    odometerDriftClassAtCapture: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+    },
+    isFullTank: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
     capturedBy: {
       type: DataTypes.INTEGER,
       allowNull: true,

@@ -11,7 +11,7 @@ const formatErbTime = (iso) => {
   }
 };
 
-export default function ErbInsightCard({ erb, vehicleSpec }) {
+export default function ErbInsightCard({ erb, vehicleSpec, estimatedFillCostZmw = null }) {
   return (
     <Box sx={vehicleModuleSx}>
       <Typography variant="subtitle1" fontWeight={600} gutterBottom>
@@ -32,6 +32,11 @@ export default function ErbInsightCard({ erb, vehicleSpec }) {
       <Typography variant="caption" color="text.secondary" display="block">
         {formatErbTime(erb.timestamp) || '—'}
       </Typography>
+      {estimatedFillCostZmw != null && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Est. fill to full: ZMW {Number(estimatedFillCostZmw).toFixed(2)}
+        </Typography>
+      )}
       <Button
         size="small"
         endIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />}

@@ -5,8 +5,6 @@ import {
   updateVehicleSpecification,
   syncFromTraccarAttributes,
   bulkUpdateSpecs,
-  getOdometer,
-  verifyOdometer
 } from '../controllers/vehicleSpecController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireAuth, requireManager } from '../middleware/authGates.js';
@@ -25,12 +23,6 @@ router.get('/:deviceId', requireAuth, getVehicleSpec);
 // Update vehicle specification (managers only)
 router.put('/:deviceId', requireAuth, requireManager, updateVehicleSpecification);
 
-// Computed odometer (verified baseline + Traccar delta)
-router.get('/:deviceId/odometer', requireAuth, getOdometer);
-
-// Set verified odometer baseline (managers only)
-router.post('/:deviceId/verify-odometer', requireAuth, requireManager, verifyOdometer);
-
 // Sync from Traccar attributes (managers only)
 router.post('/:deviceId/sync', requireAuth, requireManager, syncFromTraccarAttributes);
 
@@ -38,6 +30,3 @@ router.post('/:deviceId/sync', requireAuth, requireManager, syncFromTraccarAttri
 router.post('/bulk-update', requireAuth, requireManager, bulkUpdateSpecs);
 
 export default router;
-
-
-

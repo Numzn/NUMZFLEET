@@ -18,7 +18,7 @@ import useVehicleData from './useVehicleData';
 import { useLinkedDrivers } from './useVehicleDriver.js';
 import { useLinkedGeofences } from './useLinkedGeofences.js';
 import { vehicleWorkspacePath } from '../vehicleRegistry/vehicleRegistryUtils.js';
-import { patchVehicleFields } from '../vehiclesApi.js';
+import { patchVehicleFields, saveRoutineService } from '../vehiclesApi.js';
 import { fetchImmobilizationCapabilities } from './immobilizationIntentsApi.js';
 import useVehicleSetupForm from './setup/useVehicleSetupForm.js';
 import useVehicleSetupReadiness from './setup/useVehicleSetupReadiness.js';
@@ -34,6 +34,7 @@ import FuelSetupModule from './setup/modules/FuelSetupModule.jsx';
 import ZoneMonitoringModule from './setup/modules/ZoneMonitoringModule.jsx';
 import SafetyImmobilizationModule from './setup/modules/SafetyImmobilizationModule.jsx';
 import AlertsMonitoringModule from './setup/modules/AlertsMonitoringModule.jsx';
+import RoutineServiceSetupModule from './setup/modules/RoutineServiceSetupModule.jsx';
 import { useToastNotifications } from '../../hooks/useToastNotifications.jsx';
 
 const useStyles = makeStyles()((theme) => ({
@@ -73,7 +74,16 @@ function renderModuleContent(moduleId, props) {
         />
       );
     case 'fuel':
-      return <FuelSetupModule form={props.form} patch={props.patch} canSaveSpecs={props.canSaveSpecs} deviceId={props.deviceId} />;
+      return <FuelSetupModule form={props.form} patch={props.patch} canSaveSpecs={props.canSaveSpecs} deviceId={props.deviceId} fleetVehicleId={props.vehicleId} />;
+    case 'routineService':
+      return (
+        <RoutineServiceSetupModule
+          form={props.form}
+          patch={props.patch}
+          canSaveSpecs={props.canSaveSpecs}
+          fleetVehicleId={props.vehicleId}
+        />
+      );
     case 'geofence':
       return (
         <ZoneMonitoringModule
@@ -221,18 +231,48 @@ export default function VehicleSetupPage() {
         homeBaseLabel: form.homeBaseLabel?.trim() || null,
       });
       const merged = await save(saveConfig);
+      if (canSaveSpecs && deviceId != null) {
+        const intervalKm = Number(form.routineServiceIntervalKm);
+        const startingOdometerKm = Number(form.routineServiceStartingOdometerKm);
+        if (!Number.isFinite(intervalKm) || intervalKm <= 0) {
+          throw new Error('Routine Service interval must be greater than zero.');
+        }
+        if (!Number.isFinite(startingOdometerKm) || startingOdometerKm < 0) {
+          throw new Error('Starting odometer is required for Routine Service.');
+        }
+        await saveRoutineService(user, vehicleId, { intervalKm, startingOdometerKm });
+      }
       setReviewOpen(false);
-      // save() hydrates form from PUT response; refresh drivers/zones only (avoids clobbering dirty toggles).
-      await Promise.all([reloadLinked(), reloadLinkedGeofences()]);
+      await Promise.all([reloadLinked(), reloadLinkedGeofences(), refresh()]);
       const notifyOn = merged?.fleetConfig?.alerts?.geofence !== false;
       showToast(
         `Setup saved. Geofence notifications ${notifyOn ? 'enabled' : 'disabled'}.`,
         'success',
       );
-    } catch {
-      // err set in hook
+    } catch (e) {
+      if (e?.message && !err) {
+        setErr(e.message);
+      }
     }
-  }, [save, saveConfig, reloadLinked, reloadLinkedGeofences, showToast, user, vehicleId, form.make, form.model, form.homeBaseLabel]);
+  }, [
+    save,
+    saveConfig,
+    reloadLinked,
+    reloadLinkedGeofences,
+    refresh,
+    showToast,
+    user,
+    vehicleId,
+    form.make,
+    form.model,
+    form.homeBaseLabel,
+    form.routineServiceIntervalKm,
+    form.routineServiceStartingOdometerKm,
+    canSaveSpecs,
+    deviceId,
+    err,
+    setErr,
+  ]);
 
   if (!manager) {
     return (

@@ -69,6 +69,14 @@ After merge to `main`, GitHub Actions builds Docker images, pushes to Docker Hub
 
 Backups go to `/srv/backups/databases/numzfleet/`.
 
+## Architecture documents
+
+| Document | Purpose |
+|----------|---------|
+| [docs/PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) | **Frozen** platform tenancy, context, permissions, governance |
+| [fuel-api/docs/ACCOUNTS_AND_TENANCY.md](../fuel-api/docs/ACCOUNTS_AND_TENANCY.md) | Operational request flow and troubleshooting |
+| [docs/VEHICLE_ODOMETER_STANDARD.md](VEHICLE_ODOMETER_STANDARD.md) | Frozen vehicle odometer business language (M1) |
+
 ## GPS devices
 
 Device protocols use host ports `5055`, `5001–5020` — not behind the HTTP gateway. Point devices at NumzLab **public or LAN IP**, not Tailscale.

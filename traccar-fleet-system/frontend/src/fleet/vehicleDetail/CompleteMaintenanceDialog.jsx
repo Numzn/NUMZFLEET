@@ -18,16 +18,14 @@ import {
   isTimeMaintenanceType,
 } from './completeMaintenanceService.js';
 
-function prefillOdometerKm(item) {
-  const meters = Number(item?.current);
-  if (!Number.isFinite(meters)) return '';
-  return String(Math.round(meters / 1000));
-}
-
 function prefillEngineHours(item) {
   const ms = Number(item?.current);
   if (!Number.isFinite(ms)) return '';
   return String(Math.round((ms / 3600000) * 10) / 10);
+}
+
+function toDateInputValue(isoOrDate = new Date()) {
+  return dayjs(isoOrDate).format('YYYY-MM-DD');
 }
 
 export default function CompleteMaintenanceDialog({
@@ -37,24 +35,31 @@ export default function CompleteMaintenanceDialog({
   user,
   onClose,
   onCompleted,
+  registryOdometerKm,
+  routineServiceMode = false,
 }) {
+  const [completionDate, setCompletionDate] = useState(toDateInputValue());
   const [odometerKm, setOdometerKm] = useState('');
   const [engineHours, setEngineHours] = useState('');
   const [cost, setCost] = useState('');
-  const [vendor, setVendor] = useState('');
+  const [technician, setTechnician] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!open || !maintenanceItem) return;
-    setOdometerKm(prefillOdometerKm(maintenanceItem));
+    const fromEngine = registryOdometerKm != null && Number.isFinite(Number(registryOdometerKm))
+      ? String(Math.round(Number(registryOdometerKm)))
+      : '';
+    setCompletionDate(toDateInputValue());
+    setOdometerKm(fromEngine);
     setEngineHours(prefillEngineHours(maintenanceItem));
     setCost('');
-    setVendor('');
+    setTechnician('');
     setNotes('');
     setError(null);
-  }, [open, maintenanceItem]);
+  }, [open, maintenanceItem, registryOdometerKm]);
 
   const handleClose = () => {
     if (saving) return;
@@ -68,9 +73,11 @@ export default function CompleteMaintenanceDialog({
     try {
       await completeMaintenanceService(user, fleetVehicleId, maintenanceItem, {
         odometerKm,
-        cost,
-        vendor,
+        cost: routineServiceMode ? undefined : cost,
+        vendor: technician,
+        technician,
         notes,
+        completedAt: completionDate ? dayjs(completionDate).toISOString() : undefined,
       });
       onClose();
       await onCompleted?.();
@@ -90,20 +97,33 @@ export default function CompleteMaintenanceDialog({
   const isTime = isTimeMaintenanceType(maintenanceItem.type);
   const isHours = isHoursMaintenanceType(maintenanceItem.type);
   const isDistance = isDistanceMaintenanceType(maintenanceItem.type);
-  const blocked = maintenanceItem.unknown;
+  const blocked = maintenanceItem.unknown
+    && !(routineServiceMode && odometerKm !== '' && odometerKm != null);
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Complete service</DialogTitle>
+      <DialogTitle>{routineServiceMode ? 'Complete Routine Service' : 'Complete service'}</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+        {!routineServiceMode ? (
+          <TextField
+            label="Service type"
+            value={maintenanceItem.name || ''}
+            InputProps={{ readOnly: true }}
+            fullWidth
+          />
+        ) : null}
+
         <TextField
-          label="Service type"
-          value={maintenanceItem.name || ''}
-          InputProps={{ readOnly: true }}
+          label="Completion date"
+          type="date"
+          value={completionDate}
+          onChange={(e) => setCompletionDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
           fullWidth
+          autoFocus={routineServiceMode}
         />
 
-        {isTime ? (
+        {isTime && !routineServiceMode ? (
           <TextField
             label="Completion date"
             value={dayjs().format('MMM D, YYYY')}
@@ -114,13 +134,13 @@ export default function CompleteMaintenanceDialog({
 
         {isDistance ? (
           <TextField
-            label="Current odometer (km)"
+            label="Completion odometer (km)"
             type="number"
             value={odometerKm}
             onChange={(e) => setOdometerKm(e.target.value)}
             inputProps={{ min: 0 }}
             fullWidth
-            autoFocus
+            autoFocus={!routineServiceMode}
           />
         ) : null}
 
@@ -136,19 +156,21 @@ export default function CompleteMaintenanceDialog({
         ) : null}
 
         <TextField
-          label="Garage / vendor"
-          value={vendor}
-          onChange={(e) => setVendor(e.target.value)}
+          label={routineServiceMode ? 'Technician' : 'Garage / vendor'}
+          value={technician}
+          onChange={(e) => setTechnician(e.target.value)}
           fullWidth
         />
-        <TextField
-          label="Cost"
-          type="number"
-          value={cost}
-          onChange={(e) => setCost(e.target.value)}
-          inputProps={{ min: 0, step: 0.01 }}
-          fullWidth
-        />
+        {!routineServiceMode ? (
+          <TextField
+            label="Cost"
+            type="number"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            inputProps={{ min: 0, step: 0.01 }}
+            fullWidth
+          />
+        ) : null}
         <TextField
           label="Notes"
           value={notes}
@@ -173,7 +195,7 @@ export default function CompleteMaintenanceDialog({
           Cancel
         </Button>
         <Button variant="contained" onClick={handleSubmit} disabled={saving || blocked}>
-          Save
+          {routineServiceMode ? 'Complete Service' : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>

@@ -41,18 +41,18 @@ export async function updateVehicle(user, vehicleId, { name, plateNumber }) {
   return res.json();
 }
 
-export async function fetchVehicleOdometer(user, deviceId) {
-  const res = await fetchOrThrow(`/api/vehicle-specs/${encodeURIComponent(deviceId)}/odometer`, {
+export async function fetchVehicleOdometerState(user, fleetVehicleId) {
+  const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(fleetVehicleId)}/odometer`, {
     headers: fuelApiAuthHeaders(user),
   });
   return res.json();
 }
 
-export async function verifyVehicleOdometer(user, deviceId, { verifiedOdometerKm, source }) {
-  const res = await fetchOrThrow(`/api/vehicle-specs/${encodeURIComponent(deviceId)}/verify-odometer`, {
+export async function recordOdometerObservation(user, fleetVehicleId, { odometerKm, source }) {
+  const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(fleetVehicleId)}/odometer/observation`, {
     method: 'POST',
     headers: fuelApiAuthHeaders(user),
-    body: JSON.stringify({ verifiedOdometerKm: Number(verifiedOdometerKm), source: source || 'audit' }),
+    body: JSON.stringify({ odometerKm: Number(odometerKm), source: source || 'manual' }),
   });
   return res.json();
 }
@@ -100,6 +100,40 @@ export async function updateVehicleConfig(user, vehicleId, body) {
     },
     body: JSON.stringify(body),
   });
+  return res.json();
+}
+
+export async function saveRoutineService(user, vehicleId, { intervalKm, startingOdometerKm }) {
+  const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}/routine-service`, {
+    method: 'PUT',
+    headers: {
+      ...fuelApiAuthHeaders(user),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ intervalKm, startingOdometerKm }),
+  });
+  return res.json();
+}
+
+export async function fetchTraccarMaintenances(user) {
+  const res = await fetchOrThrow('/api/fleet/traccar-maintenances', {
+    headers: fuelApiAuthHeaders(user),
+  });
+  return res.json();
+}
+
+export async function resetTraccarMaintenanceSchedule(user, fleetVehicleId, maintenanceId, body) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/traccar-maintenance/${encodeURIComponent(maintenanceId)}/reset`,
+    {
+      method: 'PUT',
+      headers: {
+        ...fuelApiAuthHeaders(user),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
   return res.json();
 }
 
@@ -209,6 +243,59 @@ export async function uploadVehicleDocument(user, fleetVehicleId, file, { title,
 export async function deleteVehicleDocument(user, fleetVehicleId, docId) {
   await fetchOrThrow(
     `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/documents/${encodeURIComponent(docId)}`,
+    {
+      method: 'DELETE',
+      headers: fuelApiAuthHeaders(user),
+    },
+  );
+}
+
+export async function runVehicleDocumentOcr(user, fleetVehicleId, docId) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/documents/${encodeURIComponent(docId)}/ocr`,
+    {
+      method: 'POST',
+      headers: fuelApiAuthHeaders(user),
+    },
+  );
+  return res.json();
+}
+
+export async function fetchVehicleCompliance(user, fleetVehicleId) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/compliance`,
+    { headers: fuelApiAuthHeaders(user) },
+  );
+  return res.json();
+}
+
+export async function createVehicleCompliance(user, fleetVehicleId, payload) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/compliance`,
+    {
+      method: 'POST',
+      headers: fuelApiAuthHeaders(user),
+      body: JSON.stringify(payload),
+    },
+  );
+  return res.json();
+}
+
+export async function updateVehicleCompliance(user, fleetVehicleId, complianceId, payload) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/compliance/${encodeURIComponent(complianceId)}`,
+    {
+      method: 'PATCH',
+      headers: fuelApiAuthHeaders(user),
+      body: JSON.stringify(payload),
+    },
+  );
+  return res.json();
+}
+
+export async function deleteVehicleCompliance(user, fleetVehicleId, complianceId) {
+  await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/compliance/${encodeURIComponent(complianceId)}`,
     {
       method: 'DELETE',
       headers: fuelApiAuthHeaders(user),

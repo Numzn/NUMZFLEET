@@ -37,6 +37,9 @@ export default function VehicleFuelColumn({
   erb,
   fuelPerformance,
   fuelPerformanceLoading = false,
+  odometerKm = null,
+  odometerConfidence = null,
+  intelligence = null,
 }) {
   const navigate = useNavigate();
   const { pendingCount, lastApproved } = useVehicleFuelRequests(deviceId);
@@ -60,7 +63,13 @@ export default function VehicleFuelColumn({
     [fuelPerformance, fuel],
   );
 
-  const performanceMeasured = fuelPerformance?.measured === true;
+  const performanceMeasured = fuelPerformance?.measured === true
+    || fuelPerformance?.efficiencySource === 'learned'
+    || fuelPerformance?.efficiencySource === 'measured';
+
+  const odometerFinding = (intelligence?.recommendations || []).find(
+    (r) => r.action === 'confirm_odometer_observation',
+  );
 
   return (
     <Box sx={[vehicleWorkspaceCardSx, { height: 'auto' }]}>
@@ -80,6 +89,12 @@ export default function VehicleFuelColumn({
           </Box>
         </AccordionSummary>
         <AccordionDetails sx={{ pt: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {odometerFinding && (
+            <Typography variant="body2" color="warning.main">
+              {odometerFinding.text}
+              {odometerConfidence ? ` (odometer: ${odometerConfidence})` : ''}
+            </Typography>
+          )}
           <SubCard title="TODAY'S FUELING DAY">
             {todayLoading && (
               <Typography variant="body2" color="text.secondary">Loading…</Typography>
@@ -183,9 +198,11 @@ export default function VehicleFuelColumn({
                   {lastRefill.refuel.actualFuelLitres != null
                     ? `${Number(lastRefill.refuel.actualFuelLitres).toFixed(1)} L`
                     : '—'}
-                  {lastRefill.refuel.currentMileage != null
-                    ? ` at ${Number(lastRefill.refuel.currentMileage).toLocaleString()} km`
-                    : ''}
+                  {odometerKm != null
+                    ? ` at ${Number(odometerKm).toLocaleString()} km`
+                    : (lastRefill.refuel.odometerKm != null
+                      ? ` at ${Number(lastRefill.refuel.odometerKm).toLocaleString()} km`
+                      : '')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
                   {formatDate(lastRefill.session?.sessionDate)}

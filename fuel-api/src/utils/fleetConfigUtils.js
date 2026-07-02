@@ -82,6 +82,16 @@ export function parseDeviceFleetConfig(deviceAttributes) {
       engineCut: normalizeBool(merged.alerts.engineCut, DEFAULT_FLEET_CONFIG.alerts.engineCut),
     };
   }
+  if (raw?.routineService && typeof raw.routineService === 'object') {
+    merged.routineService = {
+      maintenanceId: raw.routineService.maintenanceId ?? null,
+      intervalKm: raw.routineService.intervalKm != null ? Number(raw.routineService.intervalKm) : null,
+      startingOdometerKm: raw.routineService.startingOdometerKm != null
+        ? Number(raw.routineService.startingOdometerKm)
+        : null,
+      configuredAt: raw.routineService.configuredAt ?? null,
+    };
+  }
   return merged;
 }
 

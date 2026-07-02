@@ -2,7 +2,7 @@ import {
   SERVICE_RECORD_STATUSES,
   SERVICE_RECORD_PRIORITIES,
 } from '../models/ServiceRecord.js';
-import { DeviceAssignment } from '../models/index.js';
+import { DeviceAssignment, Vehicle } from '../models/index.js';
 import {
   listByCompany,
   findByIdForCompany,
@@ -11,7 +11,8 @@ import {
   nextWorkOrderNumber,
 } from '../repositories/serviceRecordRepository.js';
 import { assertVehicleInTenant } from './vehicleFleetService.js';
-import { setVerifiedOdometer } from './odometerService.js';
+import { applyObservation } from '../vehicleEngine/odometer/applyObservation.js';
+import { notifyRoutineServiceCompleted } from '../notifications/maintenanceNotificationService.js';
 
 function badRequest(message) {
   const error = new Error(message);
@@ -163,13 +164,15 @@ export async function createServiceRecord(user, companyId, fleetVehicleId, paylo
   return toServiceRecordDto(record);
 }
 
-export async function updateServiceRecord(companyId, fleetVehicleId, id, payload = {}) {
+export async function updateServiceRecord(companyId, fleetVehicleId, id, payload = {}, options = {}) {
   await assertVehicleInTenant(fleetVehicleId, companyId);
 
   const record = await findByIdForVehicle(id, companyId, fleetVehicleId);
   if (!record) {
     throw notFound('Service record not found');
   }
+
+  const wasCompleted = record.status === 'completed';
 
   const patch = {};
   if (payload.status != null) {
@@ -178,7 +181,13 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
       throw badRequest(`status must be one of: ${SERVICE_RECORD_STATUSES.join(', ')}`);
     }
     patch.status = status;
-    patch.completedAt = status === 'completed' ? new Date() : null;
+    if (payload.completedAt) {
+      patch.completedAt = new Date(payload.completedAt);
+    } else {
+      patch.completedAt = status === 'completed' ? new Date() : null;
+    }
+  } else if (payload.completedAt) {
+    patch.completedAt = new Date(payload.completedAt);
   }
   if (payload.title != null) {
     const title = String(payload.title).trim();
@@ -220,13 +229,35 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
 
   if (patch.status === 'completed' && record.odometerKm != null && deviceId) {
     try {
-      await setVerifiedOdometer(deviceId, record.odometerKm, 'service', record.createdBy);
+      await applyObservation(deviceId, record.odometerKm, 'service');
     } catch (error) {
       console.error('Failed to set verified odometer from service record:', error.message);
     }
   }
 
-  return toServiceRecordDto(record);
+  const dto = toServiceRecordDto(record);
+
+  if (patch.status === 'completed' && !wasCompleted && record.maintenanceId != null) {
+    try {
+      const vehicle = await Vehicle.findByPk(String(fleetVehicleId), {
+        attributes: ['id', 'name', 'plateNumber'],
+      });
+      await notifyRoutineServiceCompleted({
+        record: dto,
+        vehicle,
+        companyId: String(companyId),
+        actorUserId: options.actorUserId ?? record.createdBy ?? null,
+      });
+    } catch (error) {
+      console.error(
+        'Failed to publish routine service completion notification:',
+        error?.message || error,
+        error?.stack || '',
+      );
+    }
+  }
+
+  return dto;
 }
 
 export async function createServiceRecordLegacy(user, companyId, payload = {}) {

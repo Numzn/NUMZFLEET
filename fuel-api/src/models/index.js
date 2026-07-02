@@ -17,6 +17,9 @@ import CompanyDeviceModel from './CompanyDevice.js';
 import ServiceRecordModel from './ServiceRecord.js';
 import MaintenanceBudgetModel from './MaintenanceBudget.js';
 import VehicleDocumentModel from './VehicleDocument.js';
+import VehicleComplianceModel from './VehicleCompliance.js';
+import VehicleFuelLearningModel from './VehicleFuelLearning.js';
+import VehicleFuelIntervalModel from './VehicleFuelInterval.js';
 
 const FuelRequest = FuelRequestModel(sequelize);
 const VehicleSpec = VehicleSpecModel(sequelize);
@@ -36,6 +39,9 @@ const CompanyDevice = CompanyDeviceModel(sequelize);
 const ServiceRecord = ServiceRecordModel(sequelize);
 const MaintenanceBudget = MaintenanceBudgetModel(sequelize);
 const VehicleDocument = VehicleDocumentModel(sequelize);
+const VehicleCompliance = VehicleComplianceModel(sequelize);
+const VehicleFuelLearning = VehicleFuelLearningModel(sequelize);
+const VehicleFuelInterval = VehicleFuelIntervalModel(sequelize);
 
 Company.hasMany(Vehicle, { foreignKey: 'companyId' });
 Vehicle.belongsTo(Company, { foreignKey: 'companyId' });
@@ -56,6 +62,14 @@ Vehicle.hasMany(ServiceRecord, { foreignKey: 'fleetVehicleId', as: 'serviceRecor
 ServiceRecord.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
 Vehicle.hasMany(VehicleDocument, { foreignKey: 'fleetVehicleId', as: 'documents' });
 VehicleDocument.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
+Vehicle.hasMany(VehicleCompliance, { foreignKey: 'fleetVehicleId', as: 'complianceItems' });
+VehicleCompliance.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
+VehicleDocument.hasMany(VehicleCompliance, { foreignKey: 'documentId', as: 'complianceItems' });
+VehicleCompliance.belongsTo(VehicleDocument, { foreignKey: 'documentId', as: 'document' });
+Vehicle.hasOne(VehicleFuelLearning, { foreignKey: 'fleetVehicleId', as: 'fuelLearning' });
+VehicleFuelLearning.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
+Vehicle.hasMany(VehicleFuelInterval, { foreignKey: 'fleetVehicleId', as: 'fuelIntervals' });
+VehicleFuelInterval.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
 OperationSession.hasMany(OperationSessionRefuel, {
   foreignKey: 'sessionId',
   as: 'refuels',
@@ -192,6 +206,9 @@ export {
   ServiceRecord,
   MaintenanceBudget,
   VehicleDocument,
+  VehicleCompliance,
+  VehicleFuelLearning,
+  VehicleFuelInterval,
   DEFAULT_COMPANY_ID,
 };
 export default sequelize;

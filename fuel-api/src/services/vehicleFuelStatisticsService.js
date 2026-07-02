@@ -1,5 +1,12 @@
+import { resolveOdometerForDevice } from '../vehicleEngine/odometer/resolveVehicleOdometer.js';
 import { findCompletedRefuelsByVehicleId } from '../repositories/operationSessionRefuelRepository.js';
-import { calculateTankToTankEfficiency, DEFAULT_WINDOW_DAYS } from '../utils/fuelEfficiencyUtils.js';
+import {
+  calculateTankToTankEfficiency,
+  DEFAULT_WINDOW_DAYS,
+  scoreFuelConfidence,
+} from '../utils/fuelEfficiencyUtils.js';
+import { getVehicleSpec } from './vehicleSpecService.js';
+import { odometerConfidenceToNumeric } from '../vehicleEngine/fuel/intervalValidator.js';
 
 function daysBetween(a, b) {
   const ms = Math.abs(new Date(b).getTime() - new Date(a).getTime());
@@ -11,13 +18,6 @@ function mean(values) {
   return values.reduce((s, v) => s + v, 0) / values.length;
 }
 
-function stdDev(values, avg) {
-  if (values.length < 2) return 0;
-  const m = avg ?? mean(values);
-  const variance = values.reduce((s, v) => s + (v - m) ** 2, 0) / values.length;
-  return Math.sqrt(variance);
-}
-
 function computeTrend(recentAvg, priorAvg) {
   if (recentAvg == null || priorAvg == null || priorAvg <= 0) return 'stable';
   const pct = ((recentAvg - priorAvg) / priorAvg) * 100;
@@ -26,20 +26,38 @@ function computeTrend(recentAvg, priorAvg) {
   return 'stable';
 }
 
+function worstOdometerConfidence(rows) {
+  let worst = 'high';
+  for (const row of rows) {
+    const c = row?.odometerConfidenceAtCapture ?? 'unavailable';
+    if (odometerConfidenceToNumeric(c) < odometerConfidenceToNumeric(worst)) {
+      worst = c;
+    }
+  }
+  return worst;
+}
+
 /**
  * History-based vehicle fuel profile (no tank balance).
  */
 export async function getVehicleFuelStatistics(vehicleId, options = {}) {
   const windowDays = options.windowDays ?? DEFAULT_WINDOW_DAYS;
   const rows = await findCompletedRefuelsByVehicleId(vehicleId, 48);
-  const emptyFuelPerformance = calculateTankToTankEfficiency([], { windowDays });
+  const vehicleSpec = await getVehicleSpec(Number(vehicleId));
+  const tankCapacity = vehicleSpec?.tankCapacity ?? null;
+  const specEfficiencyKmL = vehicleSpec?.fuelEfficiency ?? null;
+  const calcOptions = { windowDays, tankCapacity, specEfficiencyKmL };
+  const emptyFuelPerformance = calculateTankToTankEfficiency([], calcOptions);
 
   if (!rows.length) {
+    const liveOdometer = await resolveOdometerForDevice(Number(vehicleId));
     return {
       vehicleId: Number(vehicleId),
       lastRefillDate: null,
       lastRefillLitres: null,
       lastRefillMileage: null,
+      liveOdometerKm: liveOdometer.odometerKm ?? null,
+      liveOdometerConfidence: liveOdometer.odometerConfidence ?? 'unavailable',
       averageRefillLitres: null,
       averageKmBetweenRefills: null,
       averageDaysBetweenRefills: null,
@@ -78,17 +96,22 @@ export async function getVehicleFuelStatistics(vehicleId, options = {}) {
   const fuelTrend = computeTrend(recentAvg, priorAvg);
 
   const sampleCount = litres.length;
-  const cv = avgLitres > 0 ? (stdDev(litres, avgLitres) / avgLitres) : 1;
-  let confidenceScore = Math.min(100, Math.round(sampleCount * 18 - cv * 30));
-  confidenceScore = Math.max(0, confidenceScore);
-
-  const fuelPerformance = calculateTankToTankEfficiency(rows, { windowDays });
+  const fuelPerformance = calculateTankToTankEfficiency(rows, calcOptions);
+  const confidenceScore = scoreFuelConfidence({
+    sampleCount,
+    learnableIntervalCount: fuelPerformance.learnableIntervalCount ?? 0,
+    litreValues: litres,
+    worstOdometerConfidence: worstOdometerConfidence(sorted),
+  });
+  const liveOdometer = await resolveOdometerForDevice(Number(vehicleId));
 
   return {
     vehicleId: Number(vehicleId),
     lastRefillDate: last.sessionDate || last.createdAt,
     lastRefillLitres: Number(last.actualFuelLitres),
     lastRefillMileage: last.currentMileage != null ? Number(last.currentMileage) : null,
+    liveOdometerKm: liveOdometer.odometerKm ?? null,
+    liveOdometerConfidence: liveOdometer.odometerConfidence ?? 'unavailable',
     averageRefillLitres: avgLitres != null ? Number(avgLitres.toFixed(1)) : null,
     averageKmBetweenRefills: kmGaps.length ? Number(mean(kmGaps).toFixed(0)) : null,
     averageDaysBetweenRefills: dayGaps.length ? Number(mean(dayGaps).toFixed(1)) : null,

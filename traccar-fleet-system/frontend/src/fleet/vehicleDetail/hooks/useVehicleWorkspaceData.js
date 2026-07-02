@@ -30,6 +30,8 @@ export default function useVehicleWorkspaceData(vehicleId) {
   const openServiceCount = vehicleEngine.engine?.maintenance?.openWorkOrders
     ?? ((Number(woSummary?.open) || 0) + (Number(woSummary?.inProgress) || 0));
 
+  const fuel = vehicleEngine.fuelSnapshot ?? core.fuelFallback;
+
   const handleMaintenanceCompleted = async () => {
     await vehicleEngine.reload();
     await serviceHistory.reload();
@@ -38,6 +40,7 @@ export default function useVehicleWorkspaceData(vehicleId) {
 
   return {
     ...core,
+    fuel,
     fleetVehicleId,
     vehicleEngine,
     linkedGeofences: linkedGeofences.linkedGeofences,

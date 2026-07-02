@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -9,6 +9,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   MenuItem,
   TextField,
   Typography,
@@ -22,20 +23,14 @@ import {
   updateVehicleServiceRecord,
 } from '../vehiclesApi.js';
 import useVehicleServiceHistory from './hooks/useVehicleServiceHistory.js';
-
-const STATUS_LABELS = {
-  open: 'Open',
-  in_progress: 'In progress',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
-
-const STATUS_COLORS = {
-  open: 'default',
-  in_progress: 'info',
-  completed: 'success',
-  cancelled: 'default',
-};
+import RoutineServiceHistoryPanel from './RoutineServiceHistoryPanel.jsx';
+import {
+  EDITABLE_WORK_ORDER_STATUSES,
+  WORK_ORDER_STATUS_COLORS,
+  WORK_ORDER_STATUS_LABELS,
+  filterRepairWorkOrders,
+  partitionWorkOrders,
+} from './serviceRecordUtils.js';
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -81,9 +76,16 @@ function ServiceRecordRow({ record, canManage, fleetVehicleId, user, onUpdated }
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="body2" fontWeight={700} noWrap>
-            {record.title}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+            <Typography variant="body2" fontWeight={700} noWrap sx={{ minWidth: 0 }}>
+              {record.title}
+            </Typography>
+            {record.workOrderNumber ? (
+              <Typography variant="caption" color="text.secondary">
+                {record.workOrderNumber}
+              </Typography>
+            ) : null}
+          </Box>
           <Typography variant="caption" color="text.secondary" display="block">
             {formatDate(record.completedAt || record.createdAt)}
             {record.odometerKm != null ? ` · ${Math.round(record.odometerKm).toLocaleString()} km` : ''}
@@ -103,19 +105,19 @@ function ServiceRecordRow({ record, canManage, fleetVehicleId, user, onUpdated }
             value={record.status}
             onChange={handleStatusChange}
             disabled={saving}
-            sx={{ minWidth: 130 }}
+            sx={{ minWidth: 140 }}
           >
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
+            {EDITABLE_WORK_ORDER_STATUSES.map((value) => (
               <MenuItem key={value} value={value}>
-                {label}
+                {WORK_ORDER_STATUS_LABELS[value] || value}
               </MenuItem>
             ))}
           </TextField>
         ) : (
           <Chip
             size="small"
-            label={STATUS_LABELS[record.status] || record.status}
-            color={STATUS_COLORS[record.status] || 'default'}
+            label={WORK_ORDER_STATUS_LABELS[record.status] || record.status}
+            color={WORK_ORDER_STATUS_COLORS[record.status] || 'default'}
             variant="outlined"
           />
         )}
@@ -129,7 +131,7 @@ function ServiceRecordRow({ record, canManage, fleetVehicleId, user, onUpdated }
   );
 }
 
-function LogServiceDialog({ open, onClose, fleetVehicleId, user, onCreated }) {
+function LogRepairDialog({ open, onClose, fleetVehicleId, user, onCreated }) {
   const [title, setTitle] = useState('');
   const [odometerKm, setOdometerKm] = useState('');
   const [cost, setCost] = useState('');
@@ -174,7 +176,7 @@ function LogServiceDialog({ open, onClose, fleetVehicleId, user, onCreated }) {
       onClose();
       await onCreated();
     } catch (e) {
-      setError(fuelApiErrorMessage(e, 'Failed to log service'));
+      setError(fuelApiErrorMessage(e, 'Failed to log repair'));
     } finally {
       setSaving(false);
     }
@@ -182,8 +184,11 @@ function LogServiceDialog({ open, onClose, fleetVehicleId, user, onCreated }) {
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Log service</DialogTitle>
+      <DialogTitle>Log repair</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          Breakdowns and one-off workshop jobs. Routine service completions are recorded from the Maintenance tab.
+        </Typography>
         <TextField
           label="Title"
           value={title}
@@ -236,12 +241,38 @@ function LogServiceDialog({ open, onClose, fleetVehicleId, user, onCreated }) {
   );
 }
 
+function RecordList({ records, canManage, fleetVehicleId, user, onUpdated }) {
+  if (!records.length) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        None
+      </Typography>
+    );
+  }
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      {records.map((record) => (
+        <ServiceRecordRow
+          key={record.id}
+          record={record}
+          canManage={canManage}
+          fleetVehicleId={fleetVehicleId}
+          user={user}
+          onUpdated={onUpdated}
+        />
+      ))}
+    </Box>
+  );
+}
+
 export default function VehicleServiceHistory({
   fleetVehicleId,
   records: recordsProp,
   loading: loadingProp,
   error: errorProp,
   reload: reloadProp,
+  routineMaintenanceId = null,
 }) {
   const user = useSelector((state) => state.session.user);
   const canManage = useManager();
@@ -254,6 +285,9 @@ export default function VehicleServiceHistory({
   const reload = reloadProp ?? internal.reload;
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const repairRecords = useMemo(() => filterRepairWorkOrders(records), [records]);
+  const { active, history } = useMemo(() => partitionWorkOrders(repairRecords), [repairRecords]);
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
@@ -264,45 +298,83 @@ export default function VehicleServiceHistory({
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-        <Typography variant="subtitle2" fontWeight={700}>
-          Service history
-        </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 1.5 }}>
+        <Box>
+          <Typography variant="subtitle1" fontWeight={700}>
+            Repairs & work orders
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Breakdowns and ad-hoc repairs. Completed routine service visits are listed below.
+          </Typography>
+        </Box>
         {canManage && fleetVehicleId ? (
           <Button
             size="small"
-            variant="outlined"
+            variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setDialogOpen(true)}
+            sx={{ flexShrink: 0, textTransform: 'none', fontWeight: 600 }}
           >
-            Log service
+            Log repair
           </Button>
         ) : null}
       </Box>
 
       {error ? <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert> : null}
 
-      {!records.length && !error ? (
+      {!repairRecords.length && !error ? (
         <Typography variant="body2" color="text.secondary">
-          No service history yet
+          No work orders yet. Log a repair when something breaks, or complete routine service from the Maintenance tab.
         </Typography>
       ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {records.map((record) => (
-            <ServiceRecordRow
-              key={record.id}
-              record={record}
-              canManage={canManage}
-              fleetVehicleId={fleetVehicleId}
-              user={user}
-              onUpdated={reload}
-            />
-          ))}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+              Open / in progress ({active.length})
+            </Typography>
+            {active.length > 0 ? (
+              <RecordList
+                records={active}
+                canManage={canManage}
+                fleetVehicleId={fleetVehicleId}
+                user={user}
+                onUpdated={reload}
+              />
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No open work orders
+              </Typography>
+            )}
+          </Box>
+
+          {history.length > 0 ? (
+            <>
+              <Divider />
+              <Box>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                  History ({history.length})
+                </Typography>
+                <RecordList
+                  records={history}
+                  canManage={canManage}
+                  fleetVehicleId={fleetVehicleId}
+                  user={user}
+                  onUpdated={reload}
+                />
+              </Box>
+            </>
+          ) : null}
         </Box>
       )}
 
+      <RoutineServiceHistoryPanel
+        records={records}
+        routineMaintenanceId={routineMaintenanceId}
+        loading={loading}
+      />
+
       {canManage && fleetVehicleId ? (
-        <LogServiceDialog
+        <LogRepairDialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}
           fleetVehicleId={fleetVehicleId}

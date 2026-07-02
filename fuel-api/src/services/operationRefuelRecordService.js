@@ -11,10 +11,12 @@ import { recordAuditEvent, AUDIT_EVENT_TYPES } from './auditEventService.js';
 import {
   assertCanAccessSession,
   refreshSessionTotals,
-  toRefuelDto,
+  toRefuelDtoEnriched,
 } from './operationSessionCore.js';
 import { assertOperationWritable, maybePersistLock, enrichOperationMeta } from './operationLockHelper.js';
 import { buildRefuelMetricsPatch } from '../intelligence/RefuelEngine.js';
+import { captureRefuelOdometer } from '../vehicleEngine/fuel/captureRefuelOdometer.js';
+import { processFuelLearningOnRefuelComplete } from '../vehicleEngine/fuel/fuelLearningService.js';
 
 function parsePositiveNumber(value, field) {
   const number = Number(value);
@@ -60,6 +62,7 @@ export async function recordOperationRefuel(user, sessionId, payload = {}, compa
   const actualFuelLitres = parsePositiveNumber(payload.actualFuelLitres, 'actualFuelLitres');
   const mileage = parseOptionalMileage(payload.mileage);
   const mileageSource = payload.mileageSource ? String(payload.mileageSource) : 'manual';
+  const isFullTank = payload.isFullTank === true || payload.isFullTank === 'true';
 
   return sequelize.transaction(async (transaction) => {
     const refuel = await findBySessionAndId(session.id, refuelId, { transaction });
@@ -112,17 +115,33 @@ export async function recordOperationRefuel(user, sessionId, payload = {}, compa
       tankCapacitySnapshot: refuel.tankCapacitySnapshot,
     });
 
+    const odometerCapture = await captureRefuelOdometer({
+      deviceId: refuel.vehicleId,
+      clientMileage: mileage,
+      clientMileageSource: mileage != null ? mileageSource : null,
+    });
+
     const now = new Date();
     await refuel.update({
       ...patch,
       fuelCost: patch.actualCost ?? refuel.fuelCost,
-      currentMileage: mileage ?? refuel.currentMileage,
-      mileageSource: mileage != null ? mileageSource : refuel.mileageSource,
+      currentMileage: odometerCapture.currentMileage,
+      mileageSource: odometerCapture.mileageSource,
+      odometerConfidenceAtCapture: odometerCapture.odometerConfidenceAtCapture,
+      odometerResolutionModeAtCapture: odometerCapture.odometerResolutionModeAtCapture,
+      odometerDriftClassAtCapture: odometerCapture.odometerDriftClassAtCapture,
+      isFullTank,
       capturedBy: user.id,
       capturedAt: now,
       erbPricePerLitre: pricePerLitre ?? refuel.erbPricePerLitre,
       sessionDate: now,
     }, { transaction });
+
+    await processFuelLearningOnRefuelComplete({
+      refuel,
+      deviceId: refuel.vehicleId,
+      transaction,
+    });
 
     await refreshSessionTotals(session.id, transaction);
 
@@ -133,7 +152,7 @@ export async function recordOperationRefuel(user, sessionId, payload = {}, compa
       mileage,
     }, { transaction });
 
-    return toRefuelDto(refuel);
+    return toRefuelDtoEnriched(refuel);
   });
 }
 
@@ -172,7 +191,7 @@ export async function markRefuelArrived(user, sessionId, payload = {}, companyId
     await refuel.update({ arrivedAt: new Date() });
   }
 
-  return toRefuelDto(refuel);
+  return toRefuelDtoEnriched(refuel);
 }
 
 /**
@@ -222,7 +241,7 @@ export async function skipRefuel(user, sessionId, payload = {}, companyId = null
     });
   }
 
-  return toRefuelDto(refuel);
+  return toRefuelDtoEnriched(refuel);
 }
 
 /** Clear a skip so a vehicle returns to the fueling queue. */
@@ -254,5 +273,5 @@ export async function unskipRefuel(user, sessionId, payload = {}, companyId = nu
     });
   }
 
-  return toRefuelDto(refuel);
+  return toRefuelDtoEnriched(refuel);
 }

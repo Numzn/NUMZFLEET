@@ -60,10 +60,11 @@ export default function ImmediateAttentionStrip({ items = [], highlightVehicleId
                   <Chip
                     size="small"
                     color={URGENCY_COLOR[item.urgency] || 'default'}
-                    label={URGENCY_LABEL[item.urgency] || item.urgency}
+                    label={item.statusLabel || URGENCY_LABEL[item.urgency] || item.urgency}
                   />
                   <Typography variant="caption" color="text.secondary">
                     {item.remainingLabel}
+                    {item.remainingKm != null ? ` · ${Number(item.remainingKm).toLocaleString()} km` : ''}
                   </Typography>
                 </Box>
               </CardContent>

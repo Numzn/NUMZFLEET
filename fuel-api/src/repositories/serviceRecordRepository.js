@@ -95,6 +95,19 @@ export async function summarizeForVehicle(fleetVehicleId, companyId) {
   return summarizeServiceRecordRows(rows);
 }
 
+export async function findLatestCompletedForMaintenance(companyId, fleetVehicleId, maintenanceId) {
+  if (maintenanceId == null) return null;
+  return ServiceRecord.findOne({
+    where: {
+      companyId: String(companyId),
+      fleetVehicleId: String(fleetVehicleId),
+      maintenanceId: Number(maintenanceId),
+      status: 'completed',
+    },
+    order: [['completedAt', 'DESC']],
+  });
+}
+
 export async function countCompletedToday(companyId) {
   const start = new Date();
   start.setHours(0, 0, 0, 0);

@@ -52,6 +52,23 @@ export function getStatusChipProps(row) {
   return null;
 }
 
+/** Routine Service status chip for vehicle registry list. */
+export function getRoutineServiceChipProps(row) {
+  const rs = row?.routineService;
+  if (!rs?.status || rs.status === 'on_track') return null;
+  const colorMap = {
+    upcoming: 'info',
+    due_soon: 'warning',
+    prepare: 'warning',
+    due_now: 'error',
+    overdue: 'error',
+  };
+  return {
+    label: rs.statusLabel || rs.status,
+    variant: colorMap[rs.status] || 'outlined',
+  };
+}
+
 export function vehicleWorkspacePath(vehicleId) {
   return `/fleet/vehicles/${encodeURIComponent(vehicleId)}`;
 }

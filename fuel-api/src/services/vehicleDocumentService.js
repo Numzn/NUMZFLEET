@@ -1,6 +1,8 @@
 import { VehicleDocument } from '../models/index.js';
-import { buildVehicleAttachmentPath } from '../middleware/vehicleUpload.js';
 import { assertVehicleInTenant } from './vehicleFleetService.js';
+import { runDocumentOcr } from './vehicleDocumentOcrService.js';
+import { isDocumentOcrConfigured } from '../ocr/documentOcrClient.js';
+import { mapDocumentRow } from '../documents/vehicleDocumentMapper.js';
 
 export async function listDocumentsForVehicle(companyId, fleetVehicleId) {
   await assertVehicleInTenant(fleetVehicleId, companyId);
@@ -12,15 +14,7 @@ export async function listDocumentsForVehicle(companyId, fleetVehicleId) {
     order: [['created_at', 'DESC']],
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    category: row.category,
-    fileId: row.fileId,
-    url: buildVehicleAttachmentPath(row.fileId),
-    uploadedBy: row.uploadedBy,
-    createdAt: row.createdAt?.toISOString?.() || row.createdAt,
-  }));
+  return rows.map((row) => mapDocumentRow(row));
 }
 
 export async function createDocument(companyId, fleetVehicleId, { title, category, fileId, uploadedBy }) {
@@ -44,17 +38,24 @@ export async function createDocument(companyId, fleetVehicleId, { title, categor
     category: category || 'other',
     fileId: String(fileId),
     uploadedBy: uploadedBy ?? null,
+    ocrStatus: isDocumentOcrConfigured() && process.env.DOCUMENT_OCR_ON_UPLOAD === '1'
+      ? 'pending'
+      : null,
   });
 
-  return {
-    id: row.id,
-    title: row.title,
-    category: row.category,
-    fileId: row.fileId,
-    url: buildVehicleAttachmentPath(row.fileId),
-    uploadedBy: row.uploadedBy,
-    createdAt: row.createdAt?.toISOString?.() || row.createdAt,
-  };
+  const mapped = mapDocumentRow(row);
+
+  if (process.env.DOCUMENT_OCR_ON_UPLOAD === '1' && isDocumentOcrConfigured()) {
+    try {
+      return await runDocumentOcr(companyId, fleetVehicleId, row.id);
+    } catch (error) {
+      console.error('Auto document OCR failed:', error?.message || error);
+      await row.reload();
+      return mapDocumentRow(row);
+    }
+  }
+
+  return mapped;
 }
 
 export async function deleteDocument(companyId, fleetVehicleId, documentId) {

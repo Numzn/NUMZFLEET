@@ -1,9 +1,9 @@
 import { computeFleetFuelEfficiencyAverage } from '../../services/fleetFuelBenchmarkService.js';
+import { buildFuelSnapshot } from '../fuel/fuelSnapshotBuilder.js';
 
-export async function buildFuelEngine(companyId, hub, registry) {
+export async function buildFuelEngine(companyId, hub, registry, options = {}) {
   const fuel = hub?.fuel ?? {};
-  const specEfficiency = registry?.vehicleSpec?.fuelEfficiency ?? null;
-  let efficiencyKmL = fuel.kmPerLitre ?? specEfficiency;
+  const learning = options.learning ?? null;
 
   let fleetDeltaPct = null;
   let fleetEfficiencyAvg = null;
@@ -11,30 +11,21 @@ export async function buildFuelEngine(companyId, hub, registry) {
   try {
     const bench = await computeFleetFuelEfficiencyAverage(companyId);
     fleetEfficiencyAvg = bench.avgKmPerLitre;
-    if (
-      efficiencyKmL != null
-      && bench.avgKmPerLitre != null
-      && bench.avgKmPerLitre > 0
-    ) {
+    const eff = fuel.kmPerLitre ?? registry?.vehicleSpec?.fuelEfficiency ?? null;
+    if (eff != null && bench.avgKmPerLitre != null && bench.avgKmPerLitre > 0) {
       fleetDeltaPct = Math.round(
-        ((efficiencyKmL - bench.avgKmPerLitre) / bench.avgKmPerLitre) * 1000,
+        ((eff - bench.avgKmPerLitre) / bench.avgKmPerLitre) * 1000,
       ) / 10;
     }
   } catch {
     /* optional benchmark */
   }
 
-  let risk = null;
-  if (fuel.tankLevelPct != null && fuel.tankLevelPct <= 15) risk = 'high';
-  else if (fuel.tankLevelPct != null && fuel.tankLevelPct <= 25) risk = 'medium';
-  else if (fuel.measured || fuel.tankLevelPct != null) risk = 'low';
-
-  return {
-    efficiencyKmL,
-    measured: fuel.measured ?? false,
+  return buildFuelSnapshot({
+    hubFuel: fuel,
+    registry,
+    learning,
     fleetDeltaPct,
     fleetEfficiencyAvg,
-    risk,
-    trend: fuel.trend ?? null,
-  };
+  });
 }

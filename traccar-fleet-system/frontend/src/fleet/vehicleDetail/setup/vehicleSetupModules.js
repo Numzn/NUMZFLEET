@@ -5,6 +5,7 @@ import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import FenceIcon from '@mui/icons-material/Fence';
 import SecurityIcon from '@mui/icons-material/Security';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import BuildCircleOutlinedIcon from '@mui/icons-material/BuildCircleOutlined';
 
 /** Setup module keys — stable anchors and readiness ids. */
 export const SETUP_MODULE_IDS = {
@@ -12,6 +13,7 @@ export const SETUP_MODULE_IDS = {
   device: 'device',
   driver: 'driver',
   fuel: 'fuel',
+  routineService: 'routineService',
   geofence: 'geofence',
   safety: 'safety',
   alerts: 'alerts',
@@ -44,6 +46,13 @@ export const SETUP_MODULES = [
     title: 'Fuel Setup',
     subtitle: 'Enable fuel planning and low-fuel insights',
     icon: LocalGasStationIcon,
+    optional: false,
+  },
+  {
+    id: SETUP_MODULE_IDS.routineService,
+    title: 'Routine Service',
+    subtitle: 'Recurring service interval and starting odometer',
+    icon: BuildCircleOutlinedIcon,
     optional: false,
   },
   {

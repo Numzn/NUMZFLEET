@@ -1,3 +1,5 @@
+import { normalizeFuelLevelFromAttrs } from './normalizeFuelLevel.js';
+
 /**
  * Normalize Traccar position `attributes` for fleet dashboards (vendor keys vary).
  * @param {Record<string, unknown>|null|undefined} attrs
@@ -27,7 +29,7 @@ export function normalizePositionTelemetry(attrs) {
       attrs.coolantTemperature ?? attrs.coolantTemp ?? attrs.engineTemperature ?? attrs.temp ?? attrs.temperature,
     ),
     engineLoadPct: n(attrs.engineLoad ?? attrs.pdt ?? attrs.obdEngineLoad),
-    fuelPct: n(attrs.fuel ?? attrs.fuelLevel ?? attrs.fuel1),
+    fuelPct: normalizeFuelLevelFromAttrs(attrs),
     totalDistance: n(attrs.totalDistance),
     ignition: attrs.ignition ?? attrs.engineOn ?? attrs.ignitionOn ?? null,
     speedLimitKph: n(attrs.speedLimit ?? attrs.speedLimitKph),

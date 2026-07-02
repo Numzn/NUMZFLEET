@@ -19,7 +19,13 @@ export default defineConfig(({ mode }) => {
   // Mobile / LAN: set VITE_HMR_EXTERNAL to this machine’s IP so phones can reach the HMR WebSocket.
   // Otherwise use `hmr: true` so the WebSocket uses the same port as the page (fixes e.g. page on :3003 but ws on :3002).
   const hmrExternal = String(env.VITE_HMR_EXTERNAL || '').trim();
-  const useCustomHmr = Boolean(hmrExternal);
+  const hmrClientPortRaw = String(env.VITE_HMR_CLIENT_PORT || '').trim();
+  const hmrClientPort = hmrClientPortRaw ? parseInt(hmrClientPortRaw, 10) : null;
+  const hmrProtocol = String(env.VITE_HMR_PROTOCOL || '').trim()
+    || (hmrClientPort === 443 ? 'wss' : '');
+  // LAN/mobile: explicit host for phones. Gateway: only clientPort+protocol (host from browser URL).
+  const useLanHmr = Boolean(hmrExternal);
+  const useGatewayHmr = !useLanHmr && Number.isFinite(hmrClientPort) && hmrClientPort > 0;
   // In Compose dev (fleet.numzlab), do not rewrite Set-Cookie to localhost — breaks HTTPS gateway login.
   const cookieDomainRewrite =
     env.VITE_COOKIE_DOMAIN_REWRITE === 'false'
@@ -30,7 +36,10 @@ export default defineConfig(({ mode }) => {
   // Detect environment mode
   const isLocalDev = env.LOCAL_DEV === 'true';
   const isProd = mode === 'production';
-  const apiBaseUrl = env.VITE_API_BASE_URL || 'http://localhost';
+  const disableServiceWorker = String(env.VITE_DISABLE_SERVICE_WORKER || '').toLowerCase() === 'true';
+  const apiBaseUrl = env.VITE_API_BASE_URL === ''
+    ? ''
+    : (env.VITE_API_BASE_URL || 'http://localhost');
   const remoteApiBaseUrl = env.REMOTE_API_BASE_URL || env.VITE_REMOTE_API_BASE_URL;
   /** When using REMOTE_API_BASE_URL for Traccar, point fuel-only routes to a host that serves fuel-api (e.g. http://localhost:3000). */
   const explicitFuelApiUrl = env.VITE_FUEL_API_URL || env.VITE_FUEL_API_BASE_URL;
@@ -40,8 +49,9 @@ export default defineConfig(({ mode }) => {
   
   if (isProd) {
     // Production build: API base from VITE_API_BASE_URL (same-origin nginx / static host, etc.)
-    traccarUrl = `${apiBaseUrl}/api/traccar`;
-    fuelApiUrl = `${apiBaseUrl}/api/fuel`;
+    const base = apiBaseUrl;
+    traccarUrl = base ? `${base}/api/traccar` : '/traccar';
+    fuelApiUrl = base ? `${base}/api/fuel` : '/api';
     console.log('🌐 [Vite] Running in PRODUCTION mode (env / same-origin API base)');
     console.log(`   API Base: ${apiBaseUrl}`);
     console.log(`   Traccar: ${traccarUrl}`);
@@ -112,18 +122,26 @@ export default defineConfig(({ mode }) => {
       allowedHosts: isProd
         ? ['localhost', '127.0.0.1']
         : true,
-      ...(useCustomHmr
+      ...(useLanHmr
         ? {
             hmr: {
               host: hmrExternal,
               port: parseInt(env.VITE_HMR_PORT || String(devServerPort), 10),
               clientPort: parseInt(
                 env.VITE_HMR_CLIENT_PORT || env.VITE_HMR_PORT || String(devServerPort),
-                10
+                10,
               ),
+              ...(hmrProtocol ? { protocol: hmrProtocol } : {}),
             },
           }
-        : { hmr: true }),
+        : useGatewayHmr
+          ? {
+              hmr: {
+                clientPort: hmrClientPort,
+                ...(hmrProtocol ? { protocol: hmrProtocol } : {}),
+              },
+            }
+          : { hmr: true }),
       proxy: {
       // IMPORTANT: Order matters! More specific routes should come first
       // Socket.IO proxy MUST come before /api routes to avoid conflicts
@@ -419,7 +437,7 @@ export default defineConfig(({ mode }) => {
   plugins: [
     svgr(),
     react(),
-    VitePWA({
+    ...(disableServiceWorker ? [] : [VitePWA({
       includeAssets: ['NUMZLOGO.png', 'apple-touch-icon.png', 'favicon-32x32.png'],
       strategies: 'generateSW', // Generate service worker with workbox
       // Enable service worker in development mode
@@ -486,7 +504,7 @@ export default defineConfig(({ mode }) => {
       },
       // Disable manifest injection in HTML if commented out
       injectManifest: false,
-    }),
+    })]),
     viteStaticCopy({
       targets: [
         { src: 'node_modules/@mapbox/mapbox-gl-rtl-text/dist/mapbox-gl-rtl-text.js', dest: '' },

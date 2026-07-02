@@ -45,10 +45,10 @@ export default function OperationVehicleRow({ refuel, onReportCorrection, linkTa
           {formatZmw(refuel.actualCost)}
         </>
       )}
-      {refuel.currentMileage != null && (
+      {refuel.odometerKm != null && (
         <>
           {' · '}
-          {Number(refuel.currentMileage).toLocaleString()}
+          {Number(refuel.odometerKm).toLocaleString()}
           {' km'}
         </>
       )}

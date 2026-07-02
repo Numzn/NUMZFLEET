@@ -19,9 +19,11 @@ import {
   parseDeviceFleetConfig,
   mergeFleetConfigFromBody,
 } from '../utils/fleetConfigUtils.js';
-import { updateVehicleSpec } from './vehicleSpecService.js';
+import { updateVehicleSpec, getVehicleSpec } from './vehicleSpecService.js';
 import { summarizeForVehicle } from '../repositories/serviceRecordRepository.js';
 import { buildVehicleAttachmentPath } from '../middleware/vehicleUpload.js';
+import { loadCompanyMaintenanceDueState } from '../maintenance/maintenanceTraccarAdapter.js';
+import { buildRoutineServiceSummaryByVehicle } from '../maintenance/routineServiceSummary.js';
 
 /**
  * v1 merged vehicle DTO — single shape for list and get-by-id.
@@ -329,9 +331,19 @@ export async function listVehiclesMerged(companyId = DEFAULT_COMPANY_ID) {
   const deviceIds = [...new Set(assignments.map((a) => Number(a.deviceId)))];
   const { deviceMap, positionMap, specMap } = await loadMergeMapsForDeviceIds(deviceIds);
 
-  return vehicles.map((v) =>
-    toMergedDto(v, assignmentByVehicleId.get(v.id), deviceMap, positionMap, specMap),
-  );
+  let routineByVehicle = new Map();
+  try {
+    const dueState = await loadCompanyMaintenanceDueState(companyId);
+    routineByVehicle = buildRoutineServiceSummaryByVehicle(dueState);
+  } catch {
+    routineByVehicle = new Map();
+  }
+
+  return vehicles.map((v) => {
+    const dto = toMergedDto(v, assignmentByVehicleId.get(v.id), deviceMap, positionMap, specMap);
+    dto.routineService = routineByVehicle.get(String(v.id)) ?? null;
+    return dto;
+  });
 }
 
 export async function getVehicleMerged(id, companyId = null) {
@@ -424,6 +436,7 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
   try {
     await syncVehicleDeviceLabels(vehicle, did);
     await ensureDeviceInCompany(vehicle.companyId || DEFAULT_COMPANY_ID, did, vid);
+    await getVehicleSpec(did);
   } catch (err) {
     console.error('[vehicleFleet] label sync after assign failed:', err?.message || err);
   }
@@ -514,6 +527,52 @@ export async function updateVehicleMergedConfig(vehicleId, body = {}) {
     const next = mergeFleetConfigFromBody(current, body);
     await upsertTraccarDeviceAttribute(deviceId, 'numzFleetConfig', next);
   }
+
+  return getVehicleMerged(vehicleId);
+}
+
+/**
+ * Sync Routine Service Traccar schedule and persist config on device attributes.
+ */
+export async function saveRoutineServiceForVehicle(vehicleId, { intervalKm, startingOdometerKm }) {
+  const vehicle = await Vehicle.findByPk(vehicleId);
+  if (!vehicle) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const assignment = await DeviceAssignment.findOne({
+    where: { vehicleId, isActive: true },
+  });
+  if (!assignment) {
+    const err = new Error('Assign a Traccar device before configuring Routine Service');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const deviceId = Number(assignment.deviceId);
+  const { upsertRoutineService } = await import('../maintenance/routineServiceTraccarService.js');
+  const { maintenanceId } = await upsertRoutineService({
+    deviceId,
+    intervalKm,
+    startingOdometerKm,
+  });
+
+  const devices = await getTraccarDevicesByIds([deviceId]);
+  const tr = devices[0];
+  const devAttrs = parseTraccarAttributesRaw(tr?.attributes);
+  const current = parseDeviceFleetConfig(devAttrs);
+  const next = {
+    ...current,
+    routineService: {
+      maintenanceId,
+      intervalKm: Number(intervalKm),
+      startingOdometerKm: Number(startingOdometerKm),
+      configuredAt: new Date().toISOString(),
+    },
+  };
+  await upsertTraccarDeviceAttribute(deviceId, 'numzFleetConfig', next);
 
   return getVehicleMerged(vehicleId);
 }

@@ -2,7 +2,7 @@
  * Canonical notification domain constants (unified notification system).
  */
 
-/** @typedef {'fuel'|'tracking'|'security'|'maintenance'|'assignment'|'system'} NotificationCategory */
+/** @typedef {'fuel'|'tracking'|'security'|'maintenance'|'compliance'|'assignment'|'system'} NotificationCategory */
 /** @typedef {'info'|'success'|'warning'|'critical'} NotificationSeverity */
 /** @typedef {'traccar'|'fuel-api'} NotificationSource */
 
@@ -11,6 +11,7 @@ export const NOTIFICATION_CATEGORIES = Object.freeze([
   'tracking',
   'security',
   'maintenance',
+  'compliance',
   'assignment',
   'system',
 ]);

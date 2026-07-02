@@ -38,11 +38,15 @@ export function computeDue(m, position, odometerFallbackMeters = null) {
   }
 
   const positionValue = Number(position?.attributes?.[m.type]);
-  const current = Number.isFinite(positionValue)
-    ? positionValue
-    : (m.type === 'totalDistance' && Number.isFinite(Number(odometerFallbackMeters))
-      ? Number(odometerFallbackMeters)
-      : NaN);
+  const fallbackValue = m.type === 'totalDistance' && Number.isFinite(Number(odometerFallbackMeters))
+    ? Number(odometerFallbackMeters)
+    : NaN;
+
+  // For distance schedules, prefer the higher of live telemetry vs verified odometer.
+  // This prevents stale tracker values from immediately re-flagging a just-completed service.
+  const current = Number.isFinite(positionValue) && Number.isFinite(fallbackValue)
+    ? Math.max(positionValue, fallbackValue)
+    : (Number.isFinite(positionValue) ? positionValue : fallbackValue);
 
   if (!Number.isFinite(current) || period <= 0) {
     return withActionableFlags({

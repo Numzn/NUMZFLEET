@@ -20,6 +20,8 @@ const defaultForm = () => ({
   alSpeed: true,
   alGeo: true,
   alCut: false,
+  routineServiceIntervalKm: '5000',
+  routineServiceStartingOdometerKm: '',
 });
 
 /** Coerce fleet config booleans without treating false as missing. */
@@ -58,6 +60,14 @@ export function buildFormFromVehicle(vehicle) {
     alSpeed: fleet?.alerts?.speeding !== false,
     alGeo: fleet?.alerts?.geofence !== false,
     alCut: fleetBool(fleet?.alerts?.engineCut, false),
+    routineServiceIntervalKm:
+      fleet?.routineService?.intervalKm != null
+        ? String(fleet.routineService.intervalKm)
+        : '5000',
+    routineServiceStartingOdometerKm:
+      fleet?.routineService?.startingOdometerKm != null
+        ? String(Math.round(Number(fleet.routineService.startingOdometerKm)))
+        : '',
   };
 }
 

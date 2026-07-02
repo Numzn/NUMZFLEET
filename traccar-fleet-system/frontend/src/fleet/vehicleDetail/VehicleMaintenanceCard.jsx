@@ -38,6 +38,7 @@ export default function VehicleMaintenanceCard({
   deviceId,
   fleetVehicleId,
   currentOdometerMeters,
+  currentOdometerKm,
   openWorkOrders = [],
   canManage = false,
   onCompleted,
@@ -149,7 +150,7 @@ export default function VehicleMaintenanceCard({
             {' '}
             <strong>Next Service Due In</strong>
             {' '}
-            on the overview.
+            on the vehicle card.
           </Typography>
           {canManage && deviceId ? (
             <Button
@@ -228,6 +229,7 @@ export default function VehicleMaintenanceCard({
           maintenanceItem={selectedItem}
           fleetVehicleId={fleetVehicleId}
           user={user}
+          registryOdometerKm={currentOdometerKm}
           onClose={handleCloseDialog}
           onCompleted={async () => {
             handleCloseDialog();

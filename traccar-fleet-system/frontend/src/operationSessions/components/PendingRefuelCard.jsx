@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Box,
   Button,
   Chip,
+  FormControlLabel,
+  Checkbox,
   Stack,
   TextField,
   Typography,
@@ -12,7 +13,7 @@ import {
 import DriverValue from '../../common/components/DriverValue';
 import { fuelApiErrorMessage } from '../../fleet/vehiclesApi.js';
 import { formatZmw, formatZmwPerLitre } from '../utils/formatters.js';
-import { resolveMileageFromDeviceState, validateMileageAgainstPrevious } from '../utils/mileage.js';
+import { validateMileageAgainstPrevious } from '../utils/validateMileage.js';
 import { varianceTone } from '../utils/operationDayUtils.js';
 import OperationVehicleLabel from './OperationVehicleLabel.jsx';
 
@@ -31,17 +32,10 @@ export default function PendingRefuelCard({
   onArrived,
   onSkip,
 }) {
-  const devicesItems = useSelector((state) => state.devices.items || {});
-  const positions = useSelector((state) => state.session.positions || {});
-
-  const telemetryMileage = useMemo(
-    () => resolveMileageFromDeviceState(devicesItems, refuel.vehicleId, positions),
-    [devicesItems, positions, refuel.vehicleId],
-  );
-
   const [litres, setLitres] = useState('');
   const [mileage, setMileage] = useState('');
   const [mileageSource, setMileageSource] = useState(null);
+  const [isFullTank, setIsFullTank] = useState(true);
   const [overrideReason, setOverrideReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [arriving, setArriving] = useState(false);
@@ -51,14 +45,11 @@ export default function PendingRefuelCard({
 
   useEffect(() => {
     if (mileage !== '') return;
-    if (refuel.currentMileage != null) {
-      setMileage(String(refuel.currentMileage));
-      setMileageSource(refuel.mileageSource || 'computed');
-    } else if (telemetryMileage.mileage != null) {
-      setMileage(String(telemetryMileage.mileage));
-      setMileageSource(telemetryMileage.mileageSource);
+    if (refuel.odometerKm != null) {
+      setMileage(String(refuel.odometerKm));
+      setMileageSource('snapshot');
     }
-  }, [telemetryMileage, mileage, refuel.currentMileage, refuel.mileageSource]);
+  }, [mileage, refuel.odometerKm]);
 
   const planned = refuel.plannedFuelLitres != null
     ? Number(refuel.plannedFuelLitres)
@@ -92,6 +83,7 @@ export default function PendingRefuelCard({
         actualFuelLitres: parsed,
         mileage: parsedMileage,
         mileageSource: mileageSource || 'manual',
+        isFullTank,
         overrideReason: needsOverride ? overrideReason.trim() : undefined,
       });
       setLitres('');
@@ -209,6 +201,27 @@ export default function PendingRefuelCard({
             disabled={disabled || saving}
             helperText={mileageSource ? `Source: ${mileageSource}` : ' '}
             FormHelperTextProps={{ sx: { mx: 0 } }}
+          />
+        </Stack>
+
+        <Stack direction="row" flexWrap="wrap" alignItems="center" gap={1}>
+          {refuel.odometerConfidence && refuel.odometerConfidence !== 'unavailable' && (
+            <Chip
+              size="small"
+              label={`Odometer: ${refuel.odometerConfidence}`}
+              variant="outlined"
+            />
+          )}
+          <FormControlLabel
+            control={(
+              <Checkbox
+                size="small"
+                checked={isFullTank}
+                onChange={(e) => setIsFullTank(e.target.checked)}
+                disabled={disabled || saving}
+              />
+            )}
+            label="Full tank"
           />
         </Stack>
 

@@ -7,12 +7,10 @@ import VehicleWorkspaceLayout from './VehicleWorkspaceLayout.jsx';
 import VehicleWorkspaceMobileNav from './VehicleWorkspaceMobileNav.jsx';
 import VehicleWorkspaceMoreSheet from './VehicleWorkspaceMoreSheet.jsx';
 import VehicleOverviewTab from './overview/VehicleOverviewTab.jsx';
-import VehicleFuelColumn from './VehicleFuelColumn.jsx';
+import VehicleFuelTab from './VehicleFuelTab.jsx';
 import VehicleAlertsColumn from './VehicleAlertsColumn.jsx';
 import VehicleMaintenanceTab from './VehicleMaintenanceTab.jsx';
 import VehicleServiceHistory from './VehicleServiceHistory.jsx';
-import FuelCard from './FuelCard.jsx';
-import ErbInsightCard from './ErbInsightCard.jsx';
 import VehicleDocumentsPanel from './VehicleDocumentsPanel.jsx';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 import useVehicleWorkspaceTab from './hooks/useVehicleWorkspaceTab.js';
@@ -108,7 +106,10 @@ export default function VehicleWorkspaceTabs(props) {
           />
         );
 
-      case VEHICLE_WORKSPACE_TAB_IDS.repairs:
+      case VEHICLE_WORKSPACE_TAB_IDS.repairs: {
+        const routineScheduleItem = (maintenance?.items ?? []).find(
+          (item) => item.attributes?.numzServicePackage === true,
+        ) ?? null;
         return (
           <VehicleServiceHistory
             fleetVehicleId={vehicle?.id}
@@ -116,8 +117,14 @@ export default function VehicleWorkspaceTabs(props) {
             loading={serviceHistory.loading}
             error={serviceHistory.error}
             reload={serviceHistory.reload}
+            routineMaintenanceId={
+              routineScheduleItem?.id
+              ?? vehicleEngine?.engine?.maintenance?.nextService?.maintenanceId
+              ?? null
+            }
           />
         );
+      }
 
       case VEHICLE_WORKSPACE_TAB_IDS.documents:
         return (
@@ -143,24 +150,17 @@ export default function VehicleWorkspaceTabs(props) {
           </Box>
         );
 
-      case VEHICLE_WORKSPACE_TAB_IDS.performance:
+      case VEHICLE_WORKSPACE_TAB_IDS.fuel:
         return (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: sectionGap }}>
-            <Typography variant="h2" sx={{ color: 'var(--color-text-primary)' }}>
-              Performance
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-              <FuelCard fuel={fuel} />
-              <ErbInsightCard erb={erb} vehicleSpec={vehicle?.vehicleSpec} />
-            </Box>
-            <VehicleFuelColumn
-              deviceId={deviceId}
-              fuel={fuel}
-              erb={erb}
-              fuelPerformance={fuelPerformance}
-              fuelPerformanceLoading={fuelPerformanceLoading}
-            />
-          </Box>
+          <VehicleFuelTab
+            vehicle={vehicle}
+            fuel={fuel}
+            erb={erb}
+            deviceId={deviceId}
+            fuelPerformance={fuelPerformance}
+            fuelPerformanceLoading={fuelPerformanceLoading}
+            vehicleEngine={vehicleEngine}
+          />
         );
 
       default:

@@ -31,6 +31,13 @@ source "${ROOT}/backend/.env"
 # NumzLab dev overrides (CORS, etc.) — after backend/.env so Tailscale origins win
 # shellcheck disable=SC1091
 source "${ENV_FILE}"
+# Traccar service account — root .env overrides backend/.env placeholders (matches production compose).
+if [[ -f "${ROOT}/.env" ]]; then
+  while IFS= read -r line; do
+    [[ "${line}" =~ ^TRACCAR_API_(USER|PASSWORD)= ]] || continue
+    export "${line?}"
+  done < <(grep -E '^TRACCAR_API_(USER|PASSWORD)=' "${ROOT}/.env" || true)
+fi
 set +a
 
 # Ensure shared data volumes exist (historical name: numzfleet_staging_*).
