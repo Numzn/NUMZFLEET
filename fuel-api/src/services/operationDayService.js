@@ -16,6 +16,7 @@ import { notifyPlanReady } from './operationNotificationService.js';
 import { listAssignedDeviceIdsForCompany } from './vehicleFleetService.js';
 import { predictForVehicle } from '../intelligence/PredictionEngine.js';
 import { getVehicleFuelStatistics } from './vehicleFuelStatisticsService.js';
+import { loadPredictionEngineContextWithSpec } from './predictionEngineContext.js';
 
 const DEFAULT_PLANNED_LITRES = 50;
 
@@ -30,7 +31,9 @@ function buildFuelingDayReference(calendarDate, sequence) {
 }
 
 async function suggestedPlannedLitres(deviceId) {
-  const prediction = await predictForVehicle(deviceId, getVehicleFuelStatistics);
+  const prediction = await predictForVehicle(deviceId, getVehicleFuelStatistics, {
+    loadEngineContext: loadPredictionEngineContextWithSpec,
+  });
   const litres = Number(prediction?.predictedLitres);
   if (Number.isFinite(litres) && litres > 0) {
     return litres;

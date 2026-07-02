@@ -103,3 +103,33 @@ export async function archive(req) {
 export async function patchLifecycle(req) {
   return repo.patchLifecycleForUser(req.user.id, req.params.id, req.body || {});
 }
+
+export async function escalateVehicleAlert(req) {
+  const { deviceId, alertId, message, title } = req.body || {};
+  const userId = req.user?.id;
+  if (!deviceId) {
+    const err = new Error('deviceId is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  const dedupKey = `escalate:${deviceId}:${alertId || 'manual'}:${Date.now()}`;
+  await publishNotification({
+    type: 'tracking.alert.escalated',
+    entityType: 'tracking',
+    entityId: String(alertId || deviceId),
+    severity: 'critical',
+    title: title || 'Vehicle alert escalated',
+    message: message || `Alert escalated for device ${deviceId}`,
+    source: 'fuel-api',
+    audience: { managers: true },
+    metadata: {
+      deviceId: Number(deviceId),
+      alertId: alertId ?? null,
+      escalatedBy: userId,
+      dedupKey,
+    },
+    clientDedupKey: dedupKey,
+    channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.PUSH],
+  }, { io: req.io });
+  return { ok: true };
+}

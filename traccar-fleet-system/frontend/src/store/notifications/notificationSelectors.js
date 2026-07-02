@@ -84,3 +84,33 @@ export const selectGroupedByCategory = createSelector(
     return groups;
   },
 );
+
+export const makeSelectGroupedByCategory = () => createSelector(
+  [selectAllNotifications, (_, filters) => filters],
+  (all, filters) => {
+    const list = filters ? all.filter((n) => matchesFilters(n, filters)) : all;
+    const groups = {};
+    list.forEach((n) => {
+      const c = n.category || 'system';
+      if (!groups[c]) groups[c] = [];
+      groups[c].push(n);
+    });
+    return groups;
+  },
+);
+
+export const makeSelectGroupedByVehicle = () => createSelector(
+  [selectAllNotifications, (_, filters) => filters],
+  (all, filters) => {
+    const list = filters ? all.filter((n) => matchesFilters(n, filters)) : all;
+    const groups = {};
+    list.forEach((n) => {
+      const key = n.metadata?.vehicleId != null
+        ? `Vehicle ${n.metadata.vehicleId}`
+        : (n.metadata?.deviceId != null ? `Device ${n.metadata.deviceId}` : 'General');
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(n);
+    });
+    return groups;
+  },
+);

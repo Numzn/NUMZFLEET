@@ -7,6 +7,7 @@ import {
   getMotionLabel,
   getVehicleStatusKey,
 } from '../../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import useMotionDurationTick from '../../../fleet/vehicleDetail/useMotionDurationTick.js';
 import { STATUS_TINT } from './fleetMobileCardSx';
 
 dayjs.extend(relativeTime);
@@ -19,13 +20,14 @@ const FleetVehicleListRow = ({
 }) => {
   const { getDisplayForDevice } = useVehicleDisplayContext();
   const display = getDisplayForDevice(device.id, device);
+  const motionNow = useMotionDurationTick();
 
   const key = getVehicleStatusKey(device, position);
   const tint = STATUS_TINT[key];
 
   const motionLabel = getMotionLabel(device.status, position?.speed);
   const motionDuration = device.status === 'online'
-    ? getMotionDurationLabel(device.id, device.status, position?.speed)
+    ? getMotionDurationLabel(device.id, device.status, position?.speed, motionNow, position?.attributes)
     : null;
 
   let statusText = motionDuration ? `${motionLabel} • ${motionDuration}` : motionLabel;

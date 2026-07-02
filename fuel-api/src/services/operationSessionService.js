@@ -22,8 +22,11 @@ import {
   parseSessionVehiclesInput,
 } from '../intelligence/OperationEngine.js';
 import { resolveActualFuelLitres, buildRefuelMetricsPatch, estimateFromTankMetadata } from '../intelligence/RefuelEngine.js';
-import { captureRefuelOdometer } from '../vehicleEngine/fuel/captureRefuelOdometer.js';
-import { processFuelLearningOnRefuelComplete } from '../vehicleEngine/fuel/fuelLearningService.js';
+import {
+  completeRefuelRow,
+  finalizeRefuelSession,
+  resolveRefuelPricePerLitre,
+} from './completeRefuelHelper.js';
 import { rankVehiclesByRefuelUrgency } from '../intelligence/SuggestionEngine.js';
 import {
   assertCanAccessSession,
@@ -300,42 +303,34 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
     const mileageProvided = update?.mileage !== undefined && update?.mileage !== '';
     const isFullTank = update?.isFullTank === true || update?.isFullTank === 'true';
 
-    const odometerCapture = await captureRefuelOdometer({
-      deviceId: refuel.vehicleId,
-      clientMileage: mileageProvided ? mileage : null,
-      clientMileageSource: mileageProvided
-        ? (update?.mileageSource ? String(update.mileageSource) : 'manual')
-        : null,
-    });
-
-    await refuel.update({
-      ...patch,
-      fuelCost: patch.actualCost ?? refuel.fuelCost,
-      tankCapacitySnapshot: metaFromTank.tankCapacitySnapshot,
-      tankLevelStart: metaFromTank.tankLevelStart,
-      estimatedCost: patch.estimatedCost ?? refuel.estimatedCost,
-      currentMileage: odometerCapture.currentMileage,
-      mileageSource: odometerCapture.mileageSource,
-      odometerConfidenceAtCapture: odometerCapture.odometerConfidenceAtCapture,
-      odometerResolutionModeAtCapture: odometerCapture.odometerResolutionModeAtCapture,
-      odometerDriftClassAtCapture: odometerCapture.odometerDriftClassAtCapture,
-      isFullTank: isFullTank || refuel.isFullTank,
-      capturedBy: user.id,
-      capturedAt: new Date(),
-      erbPricePerLitre: pricePerLitre ?? refuel.erbPricePerLitre,
-      sessionDate: new Date(),
-    }, { transaction });
-
-    await processFuelLearningOnRefuelComplete({
+    await completeRefuelRow({
+      user,
+      session,
       refuel,
-      deviceId: refuel.vehicleId,
+      actualFuelLitres,
+      estimatedFuelLitresForVariance,
+      pricePerLitre,
+      tankCapacitySnapshot: metaFromTank.tankCapacitySnapshot ?? tankCap,
+      mileage: mileageProvided ? mileage : null,
+      mileageSource: mileageProvided
+        ? (update?.mileageSource ? String(update.mileageSource) : 'manual')
+        : 'manual',
+      isFullTank,
+      overrideReason: update?.overrideReason,
+      exceedsCapacityOverride: exceedsCapacity,
+      extraPatch: {
+        tankCapacitySnapshot: metaFromTank.tankCapacitySnapshot,
+        tankLevelStart: metaFromTank.tankLevelStart,
+        estimatedCost: patch.estimatedCost ?? refuel.estimatedCost,
+      },
+      recordFuelAudit: true,
       transaction,
     });
 
     updatedRows.push(refuel);
   }
 
-  await refreshSessionTotals(session.id, transaction);
+  await finalizeRefuelSession(session.id, transaction);
 
   return {
     sessionId: Number(session.id),

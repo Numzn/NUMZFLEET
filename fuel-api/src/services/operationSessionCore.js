@@ -114,6 +114,7 @@ export const toRefuelDto = (record, odometerState = null) => ({
   locked: Boolean(record.locked),
   odometerKm: odometerState?.odometerKm ?? null,
   odometerConfidence: odometerState?.odometerConfidence ?? 'unavailable',
+  /** Point-in-time mileage snapshot at refuel capture; used for history, prediction km gaps, efficiency. */
   currentMileage: record.currentMileage != null ? Number(record.currentMileage) : null,
   mileageSource: record.mileageSource || null,
   odometerConfidenceAtCapture: record.odometerConfidenceAtCapture || null,

@@ -8,6 +8,7 @@ import { listBySessionId } from '../repositories/operationSessionRefuelRepositor
 import { getLatestErbPrice } from './fuelPriceService.js';
 import { getVehicleFuelStatistics } from './vehicleFuelStatisticsService.js';
 import { predictForVehicle } from '../intelligence/PredictionEngine.js';
+import { loadPredictionEngineContextWithSpec } from './predictionEngineContext.js';
 import { recordAuditEvent, AUDIT_EVENT_TYPES } from './auditEventService.js';
 import { ensureAssignedVehiclesSeededForDraft } from './operationDayService.js';
 import {
@@ -24,7 +25,9 @@ async function buildForecastForSession(session) {
 
   const vehicles = await Promise.all(
     refuels.map(async (refuel) => {
-      const prediction = await predictForVehicle(refuel.vehicleId, getVehicleFuelStatistics);
+      const prediction = await predictForVehicle(refuel.vehicleId, getVehicleFuelStatistics, {
+        loadEngineContext: loadPredictionEngineContextWithSpec,
+      });
       return {
         refuelId: refuel.id,
         vehicleId: refuel.vehicleId,
@@ -86,7 +89,9 @@ export async function regenerateOperationForecast(user, sessionId) {
   return sequelize.transaction(async (transaction) => {
     const refuels = await listBySessionId(session.id, { transaction });
     for (const refuel of refuels) {
-      const prediction = await predictForVehicle(refuel.vehicleId, getVehicleFuelStatistics);
+      const prediction = await predictForVehicle(refuel.vehicleId, getVehicleFuelStatistics, {
+        loadEngineContext: loadPredictionEngineContextWithSpec,
+      });
       if (prediction.predictedLitres != null) {
         await refuel.update({ plannedFuelLitres: prediction.predictedLitres }, { transaction });
       }
@@ -104,6 +109,8 @@ export async function regenerateOperationForecast(user, sessionId) {
 
 export async function getVehicleFuelProfile(user, vehicleId) {
   const stats = await getVehicleFuelStatistics(vehicleId);
-  const prediction = await predictForVehicle(vehicleId, getVehicleFuelStatistics);
+  const prediction = await predictForVehicle(vehicleId, getVehicleFuelStatistics, {
+    loadEngineContext: loadPredictionEngineContextWithSpec,
+  });
   return { statistics: stats, ...prediction };
 }

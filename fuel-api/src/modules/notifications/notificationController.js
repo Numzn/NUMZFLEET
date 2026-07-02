@@ -62,3 +62,13 @@ export const patchLifecycle = async (req, res) => {
     res.status(500).json({ error: 'Failed to update lifecycle' });
   }
 };
+
+export const postEscalate = async (req, res) => {
+  try {
+    const data = await svc.escalateVehicleAlert(req);
+    res.json(data);
+  } catch (e) {
+    const status = e.statusCode || 500;
+    res.status(status).json({ error: e.message || 'Failed to escalate alert' });
+  }
+};

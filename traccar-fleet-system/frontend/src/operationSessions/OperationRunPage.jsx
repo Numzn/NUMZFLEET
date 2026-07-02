@@ -158,6 +158,7 @@ const OperationRunPage = () => {
                     refuel={refuel}
                     device={devicesItems[refuel.vehicleId]}
                     disabled={!canRecord}
+                    sessionInProgress={canRecord}
                     previousMileage={previousMileageByVehicle[refuel.vehicleId]}
                     onDone={submitRefuel}
                     onArrived={submitArrived}
@@ -183,6 +184,7 @@ const OperationRunPage = () => {
                     refuel={refuel}
                     device={devicesItems[refuel.vehicleId]}
                     disabled={!canRecord}
+                    sessionInProgress={canRecord}
                     previousMileage={previousMileageByVehicle[refuel.vehicleId]}
                     onDone={submitRefuel}
                     onArrived={submitArrived}

@@ -14,6 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import { SEVERITY_BORDER } from './vehicleWorkspaceTokens.js';
 import { enrichAlerts } from './vehicleAlertUtils.js';
+import useVehicleTrackingNotifications from './useVehicleTrackingNotifications.js';
+import { useEscalateVehicleAlert } from './escalateVehicleAlert.js';
 import { useToastNotifications } from '../../hooks/useToastNotifications.jsx';
 
 const formatTime = (t) => {
@@ -42,9 +44,25 @@ export default function VehicleAlertsColumn({
 }) {
   const navigate = useNavigate();
   const { showToast } = useToastNotifications();
-  const enriched = useMemo(() => enrichAlerts(alerts), [alerts]);
-  const hasAlerts = enriched.length > 0;
+  const escalateAlert = useEscalateVehicleAlert();
+  const legacyEnriched = useMemo(() => enrichAlerts(alerts), [alerts]);
+  const displayAlerts = useVehicleTrackingNotifications(deviceId, legacyEnriched);
+  const hasAlerts = displayAlerts.length > 0;
   const [expanded, setExpanded] = useState(hasAlerts);
+
+  const handleEscalate = async (alert) => {
+    try {
+      await escalateAlert({
+        deviceId,
+        alertId: alert.id,
+        title: alert.message || 'Vehicle alert escalated',
+        message: alert.message || alert.type,
+      });
+      showToast('Alert escalated to managers', 'success');
+    } catch (e) {
+      showToast(e?.message || 'Escalation failed', 'error');
+    }
+  };
 
   return (
     <Box sx={[vehicleWorkspaceCardSx, { height: 'auto' }]}>
@@ -63,7 +81,7 @@ export default function VehicleAlertsColumn({
             </Typography>
             {hasAlerts && (
               <Typography variant="caption" color="text.secondary">
-                ({enriched.length})
+                ({displayAlerts.length})
               </Typography>
             )}
           </Box>
@@ -85,7 +103,7 @@ export default function VehicleAlertsColumn({
             </Box>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {enriched.map((a) => (
+              {displayAlerts.map((a) => (
                 <Box
                   key={a.id}
                   sx={{
@@ -105,6 +123,7 @@ export default function VehicleAlertsColumn({
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
                     {a.type}
+                    {a.source === 'notification' ? ' · notification' : ''}
                     {' · '}
                     {formatTime(a.time)}
                   </Typography>
@@ -112,7 +131,7 @@ export default function VehicleAlertsColumn({
                     <Button
                       size="small"
                       sx={{ mt: 1, textTransform: 'none', fontSize: '0.75rem' }}
-                      onClick={() => showToast('Escalation workflow coming soon', 'info')}
+                      onClick={() => handleEscalate(a)}
                     >
                       Escalate
                     </Button>
@@ -123,15 +142,9 @@ export default function VehicleAlertsColumn({
                 <Button
                   size="small"
                   sx={{ textTransform: 'none' }}
-                  onClick={() => {
-                    if (deviceId != null) {
-                      navigate(`/reports/events?deviceId=${deviceId}`);
-                    } else {
-                      navigate('/reports/events');
-                    }
-                  }}
+                  onClick={() => navigate('/?notifications=tracking')}
                 >
-                  View all alerts →
+                  Open notification inbox →
                 </Button>
               </Box>
             </Box>

@@ -2,21 +2,20 @@ import sequelize from '../config/database.js';
 import {
   findById as findSessionById,
 } from '../repositories/operationSessionRepository.js';
-import {
-  findBySessionAndId,
-  findLatestByVehicleId,
-} from '../repositories/operationSessionRefuelRepository.js';
-import { getLatestErbPrice } from './fuelPriceService.js';
+import { findBySessionAndId } from '../repositories/operationSessionRefuelRepository.js';
 import { recordAuditEvent, AUDIT_EVENT_TYPES } from './auditEventService.js';
+import { emitDomainEvent } from '../events/eventBus.js';
+import { EVENT_NAMES } from '../events/eventNames.js';
 import {
   assertCanAccessSession,
-  refreshSessionTotals,
   toRefuelDtoEnriched,
 } from './operationSessionCore.js';
 import { assertOperationWritable, maybePersistLock, enrichOperationMeta } from './operationLockHelper.js';
-import { buildRefuelMetricsPatch } from '../intelligence/RefuelEngine.js';
-import { captureRefuelOdometer } from '../vehicleEngine/fuel/captureRefuelOdometer.js';
-import { processFuelLearningOnRefuelComplete } from '../vehicleEngine/fuel/fuelLearningService.js';
+import {
+  completeRefuelRow,
+  finalizeRefuelSession,
+  resolveRefuelPricePerLitre,
+} from './completeRefuelHelper.js';
 
 function parsePositiveNumber(value, field) {
   const number = Number(value);
@@ -64,7 +63,7 @@ export async function recordOperationRefuel(user, sessionId, payload = {}, compa
   const mileageSource = payload.mileageSource ? String(payload.mileageSource) : 'manual';
   const isFullTank = payload.isFullTank === true || payload.isFullTank === 'true';
 
-  return sequelize.transaction(async (transaction) => {
+  const result = await sequelize.transaction(async (transaction) => {
     const refuel = await findBySessionAndId(session.id, refuelId, { transaction });
     if (!refuel) {
       const error = new Error('Refuel not found in this operation');
@@ -78,82 +77,41 @@ export async function recordOperationRefuel(user, sessionId, payload = {}, compa
       throw error;
     }
 
-    if (mileage != null) {
-      const previous = await findLatestByVehicleId(refuel.vehicleId, { transaction });
-      const prevMileage = previous && previous.id !== refuel.id
-        ? Number(previous.currentMileage)
-        : null;
-
-      if (prevMileage != null && Number.isFinite(prevMileage) && mileage < prevMileage) {
-        const overrideReason = payload.overrideReason ? String(payload.overrideReason).trim() : '';
-        if (!overrideReason) {
-          const error = new Error('Mileage is lower than previous refuel; overrideReason is required');
-          error.statusCode = 400;
-          throw error;
-        }
-        await recordAuditEvent(session.id, AUDIT_EVENT_TYPES.MILEAGE_OVERRIDDEN, user.id, {
-          refuelId,
-          vehicleId: refuel.vehicleId,
-          previousMileage: prevMileage,
-          newMileage: mileage,
-          overrideReason,
-        }, { transaction });
-      }
-    }
-
     const plannedBaseline = refuel.plannedFuelLitres != null && Number(refuel.plannedFuelLitres) > 0
       ? Number(refuel.plannedFuelLitres)
       : (refuel.estimatedFuelLitres != null ? Number(refuel.estimatedFuelLitres) : 0);
 
-    const priceInfo = await getLatestErbPrice(refuel.fuelTypeSnapshot || 'diesel');
-    const pricePerLitre = priceInfo.pricePerLitre ?? refuel.erbPricePerLitre ?? null;
+    const pricePerLitre = await resolveRefuelPricePerLitre(refuel);
 
-    const patch = buildRefuelMetricsPatch({
+    await completeRefuelRow({
+      user,
+      session,
+      refuel,
       actualFuelLitres,
-      estimatedFuelLitres: plannedBaseline,
+      estimatedFuelLitresForVariance: plannedBaseline,
       pricePerLitre,
       tankCapacitySnapshot: refuel.tankCapacitySnapshot,
-    });
-
-    const odometerCapture = await captureRefuelOdometer({
-      deviceId: refuel.vehicleId,
-      clientMileage: mileage,
-      clientMileageSource: mileage != null ? mileageSource : null,
-    });
-
-    const now = new Date();
-    await refuel.update({
-      ...patch,
-      fuelCost: patch.actualCost ?? refuel.fuelCost,
-      currentMileage: odometerCapture.currentMileage,
-      mileageSource: odometerCapture.mileageSource,
-      odometerConfidenceAtCapture: odometerCapture.odometerConfidenceAtCapture,
-      odometerResolutionModeAtCapture: odometerCapture.odometerResolutionModeAtCapture,
-      odometerDriftClassAtCapture: odometerCapture.odometerDriftClassAtCapture,
+      mileage,
+      mileageSource,
       isFullTank,
-      capturedBy: user.id,
-      capturedAt: now,
-      erbPricePerLitre: pricePerLitre ?? refuel.erbPricePerLitre,
-      sessionDate: now,
-    }, { transaction });
-
-    await processFuelLearningOnRefuelComplete({
-      refuel,
-      deviceId: refuel.vehicleId,
+      overrideReason: payload.overrideReason,
+      recordFuelAudit: true,
       transaction,
     });
 
-    await refreshSessionTotals(session.id, transaction);
-
-    await recordAuditEvent(session.id, AUDIT_EVENT_TYPES.FUEL_RECORDED, user.id, {
-      refuelId,
-      vehicleId: refuel.vehicleId,
-      actualFuelLitres,
-      mileage,
-    }, { transaction });
+    await finalizeRefuelSession(session.id, transaction);
 
     return toRefuelDtoEnriched(refuel);
   });
+
+  emitDomainEvent(EVENT_NAMES.OPERATION_REFUEL_RECORDED, {
+    session,
+    refuel: result,
+    actorUserId: user.id,
+    sessionId: session.id,
+  });
+
+  return result;
 }
 
 /**
@@ -191,7 +149,14 @@ export async function markRefuelArrived(user, sessionId, payload = {}, companyId
     await refuel.update({ arrivedAt: new Date() });
   }
 
-  return toRefuelDtoEnriched(refuel);
+  const dto = await toRefuelDtoEnriched(refuel);
+  emitDomainEvent(EVENT_NAMES.OPERATION_REFUEL_ARRIVED, {
+    session,
+    refuel: dto,
+    actorUserId: user.id,
+    sessionId: session.id,
+  });
+  return dto;
 }
 
 /**
@@ -241,7 +206,15 @@ export async function skipRefuel(user, sessionId, payload = {}, companyId = null
     });
   }
 
-  return toRefuelDtoEnriched(refuel);
+  const dto = await toRefuelDtoEnriched(refuel);
+  emitDomainEvent(EVENT_NAMES.OPERATION_REFUEL_SKIPPED, {
+    session,
+    refuel: dto,
+    actorUserId: user.id,
+    sessionId: session.id,
+    reason,
+  });
+  return dto;
 }
 
 /** Clear a skip so a vehicle returns to the fueling queue. */

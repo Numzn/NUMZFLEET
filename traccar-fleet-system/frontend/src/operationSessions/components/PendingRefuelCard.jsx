@@ -1,21 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Box,
   Button,
   Chip,
-  FormControlLabel,
-  Checkbox,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import DriverValue from '../../common/components/DriverValue';
 import { fuelApiErrorMessage } from '../../fleet/vehiclesApi.js';
-import { formatZmw, formatZmwPerLitre } from '../utils/formatters.js';
 import { validateMileageAgainstPrevious } from '../utils/validateMileage.js';
-import { varianceTone } from '../utils/operationDayUtils.js';
 import OperationVehicleLabel from './OperationVehicleLabel.jsx';
+import FuelCaptureFields from './FuelCaptureFields.jsx';
+import SkipReasonDialog from './SkipReasonDialog.jsx';
 
 const fuelTypeLabel = (value) => {
   if (!value) return null;
@@ -28,10 +25,12 @@ export default function PendingRefuelCard({
   device,
   disabled,
   previousMileage,
+  sessionInProgress = false,
   onDone,
   onArrived,
   onSkip,
 }) {
+  const litresInputRef = useRef(null);
   const [litres, setLitres] = useState('');
   const [mileage, setMileage] = useState('');
   const [mileageSource, setMileageSource] = useState(null);
@@ -40,8 +39,32 @@ export default function PendingRefuelCard({
   const [saving, setSaving] = useState(false);
   const [arriving, setArriving] = useState(false);
   const [skipping, setSkipping] = useState(false);
+  const [skipOpen, setSkipOpen] = useState(false);
+  const [focusLitres, setFocusLitres] = useState(false);
   const [localError, setLocalError] = useState('');
   const arrived = refuel.arrivedAt != null;
+  const hideArrivedStep = sessionInProgress && arrived;
+
+  const planned = refuel.plannedFuelLitres != null
+    ? Number(refuel.plannedFuelLitres)
+    : (refuel.estimatedFuelLitres != null ? Number(refuel.estimatedFuelLitres) : null);
+  const price = refuel.erbPricePerLitre != null ? Number(refuel.erbPricePerLitre) : null;
+  const parsed = Number(litres);
+  const parsedMileage = mileage !== '' ? Number(mileage) : null;
+  const hasDraft = Number.isFinite(parsed) && parsed > 0;
+  const mileageCheck = validateMileageAgainstPrevious(parsedMileage, previousMileage);
+  const needsOverride = !mileageCheck.valid;
+  const quickSubmit = hasDraft
+    && planned != null
+    && Math.abs(parsed - planned) < 0.05
+    && !needsOverride;
+  const fuelType = fuelTypeLabel(refuel.fuelTypeSnapshot);
+  const driverId = device?.attributes?.driverUniqueId;
+
+  useEffect(() => {
+    if (litres !== '' || planned == null || !Number.isFinite(planned)) return;
+    setLitres(String(planned));
+  }, [litres, planned]);
 
   useEffect(() => {
     if (mileage !== '') return;
@@ -51,22 +74,14 @@ export default function PendingRefuelCard({
     }
   }, [mileage, refuel.odometerKm]);
 
-  const planned = refuel.plannedFuelLitres != null
-    ? Number(refuel.plannedFuelLitres)
-    : (refuel.estimatedFuelLitres != null ? Number(refuel.estimatedFuelLitres) : null);
-  const price = refuel.erbPricePerLitre != null ? Number(refuel.erbPricePerLitre) : null;
-  const parsed = Number(litres);
-  const parsedMileage = mileage !== '' ? Number(mileage) : null;
-  const hasDraft = Number.isFinite(parsed) && parsed > 0;
-  const diff = hasDraft && planned != null && Number.isFinite(planned) ? parsed - planned : null;
-  const estCost = hasDraft && price != null ? parsed * price : null;
-  const mileageCheck = validateMileageAgainstPrevious(parsedMileage, previousMileage);
-  const needsOverride = !mileageCheck.valid;
-  const fuelType = fuelTypeLabel(refuel.fuelTypeSnapshot);
+  useEffect(() => {
+    if (focusLitres) {
+      litresInputRef.current?.focus();
+      setFocusLitres(false);
+    }
+  }, [focusLitres]);
 
-  const driverId = device?.attributes?.driverUniqueId;
-
-  const handleDone = async () => {
+  const submitRefuel = async () => {
     if (!hasDraft) {
       setLocalError('Enter litres dispensed.');
       return;
@@ -101,6 +116,7 @@ export default function PendingRefuelCard({
     setArriving(true);
     try {
       await onArrived(refuel.id);
+      setFocusLitres(true);
     } catch (e) {
       setLocalError(fuelApiErrorMessage(e, 'Failed to mark arrived'));
     } finally {
@@ -108,13 +124,13 @@ export default function PendingRefuelCard({
     }
   };
 
-  const handleSkip = async () => {
+  const handleSkipConfirm = async (reason) => {
     if (!onSkip) return;
-    const reason = window.prompt('Reason for skipping this vehicle (optional):') ?? undefined;
     setLocalError('');
     setSkipping(true);
     try {
-      await onSkip(refuel.id, reason ? reason.trim() : undefined);
+      await onSkip(refuel.id, reason);
+      setSkipOpen(false);
     } catch (e) {
       setLocalError(fuelApiErrorMessage(e, 'Failed to skip vehicle'));
     } finally {
@@ -152,7 +168,7 @@ export default function PendingRefuelCard({
             )}
             {arrived ? (
               <Chip size="small" label="Arrived" color="info" variant="outlined" />
-            ) : onArrived ? (
+            ) : onArrived && !hideArrivedStep ? (
               <Button
                 size="small"
                 variant="outlined"
@@ -167,103 +183,39 @@ export default function PendingRefuelCard({
               <Button
                 size="small"
                 color="inherit"
-                onClick={handleSkip}
+                onClick={() => setSkipOpen(true)}
                 disabled={disabled || skipping}
                 sx={{ textTransform: 'none', py: 0.25, color: 'text.secondary' }}
               >
-                {skipping ? 'Skipping…' : 'Skip'}
+                Skip
               </Button>
             )}
           </Stack>
         </Box>
 
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
-          <TextField
-            label="Actual litres"
-            type="number"
-            size="small"
-            fullWidth
-            value={litres}
-            onChange={(e) => setLitres(e.target.value)}
-            disabled={disabled || saving}
-            inputProps={{ min: 0.01, step: 0.1 }}
-          />
-          <TextField
-            label="Mileage (km)"
-            type="number"
-            size="small"
-            fullWidth
-            value={mileage}
-            onChange={(e) => {
-              setMileage(e.target.value);
-              setMileageSource('manual');
-            }}
-            disabled={disabled || saving}
-            helperText={mileageSource ? `Source: ${mileageSource}` : ' '}
-            FormHelperTextProps={{ sx: { mx: 0 } }}
-          />
-        </Stack>
+        <FuelCaptureFields
+          litres={litres}
+          onLitresChange={setLitres}
+          mileage={mileage}
+          onMileageChange={(value) => {
+            setMileage(value);
+            setMileageSource('manual');
+          }}
+          isFullTank={isFullTank}
+          onFullTankChange={setIsFullTank}
+          planned={planned}
+          price={price}
+          mileageCheck={mileageCheck}
+          overrideReason={overrideReason}
+          onOverrideReasonChange={setOverrideReason}
+          disabled={disabled || saving}
+          litresInputRef={litresInputRef}
+          autoFocusLitres={focusLitres}
+        />
 
-        <Stack direction="row" flexWrap="wrap" alignItems="center" gap={1}>
-          {refuel.odometerConfidence && refuel.odometerConfidence !== 'unavailable' && (
-            <Chip
-              size="small"
-              label={`Odometer: ${refuel.odometerConfidence}`}
-              variant="outlined"
-            />
-          )}
-          <FormControlLabel
-            control={(
-              <Checkbox
-                size="small"
-                checked={isFullTank}
-                onChange={(e) => setIsFullTank(e.target.checked)}
-                disabled={disabled || saving}
-              />
-            )}
-            label="Full tank"
-          />
-        </Stack>
-
-        {needsOverride && (
-          <TextField
-            label="Override reason"
-            fullWidth
-            size="small"
-            multiline
-            minRows={2}
-            value={overrideReason}
-            onChange={(e) => setOverrideReason(e.target.value)}
-            disabled={disabled || saving}
-          />
+        {refuel.odometerConfidence && refuel.odometerConfidence !== 'unavailable' && (
+          <Chip size="small" label={`Odometer: ${refuel.odometerConfidence}`} variant="outlined" />
         )}
-
-        {(hasDraft && diff != null) || (hasDraft && estCost != null) ? (
-          <Stack direction="row" flexWrap="wrap" gap={1.5} alignItems="center">
-            {hasDraft && diff != null && (
-              <Typography variant="body2" component="span">
-                Difference:
-                {' '}
-                <Chip
-                  size="small"
-                  label={`${diff >= 0 ? '+' : ''}${diff.toFixed(1)} L`}
-                  color={varianceTone(planned, parsed)}
-                />
-              </Typography>
-            )}
-            {hasDraft && estCost != null && (
-              <Typography variant="body2" color="text.secondary">
-                Est.
-                {' '}
-                {formatZmw(estCost)}
-                {' '}
-                @
-                {' '}
-                {formatZmwPerLitre(price)}
-              </Typography>
-            )}
-          </Stack>
-        ) : null}
 
         {localError && <Alert severity="error" sx={{ py: 0 }}>{localError}</Alert>}
 
@@ -271,14 +223,21 @@ export default function PendingRefuelCard({
           <Button
             variant="contained"
             size="small"
-            onClick={handleDone}
+            onClick={submitRefuel}
             disabled={disabled || saving}
             sx={{ textTransform: 'none', minWidth: 88 }}
           >
-            {saving ? 'Saving…' : 'Done'}
+            {saving ? 'Saving…' : (quickSubmit ? 'Confirm' : 'Done')}
           </Button>
         </Box>
       </Stack>
+
+      <SkipReasonDialog
+        open={skipOpen}
+        onClose={() => setSkipOpen(false)}
+        onConfirm={handleSkipConfirm}
+        saving={skipping}
+      />
     </Box>
   );
 }

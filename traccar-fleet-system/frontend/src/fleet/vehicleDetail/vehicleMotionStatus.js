@@ -23,10 +23,33 @@ export function getIgnitionPhrase(positionAttributes) {
 /**
  * Session-scoped motion-state tracker: remembers when each device last changed
  * between Moving / Idle / Offline so the UI can show "Idle 2h 14m".
- * State is held in-memory for the session (resets on full page reload); good
- * enough for a live dashboard without extra API calls.
+ * Prefers Traccar position attributes (stopTime, motionTime) when present;
+ * falls back to session tracker only when telemetry lacks onset timestamps.
  */
 const motionStateTracker = new Map();
+
+function parseAttributeTimestamp(attrs, keys) {
+  if (!attrs) return null;
+  for (const key of keys) {
+    const raw = attrs[key];
+    if (raw == null || raw === '') continue;
+    const ms = typeof raw === 'number' ? raw : Date.parse(String(raw));
+    if (Number.isFinite(ms) && ms > 0) return ms;
+  }
+  return null;
+}
+
+/** Resolve motion-state onset from Traccar position attributes when available. */
+export function getMotionStateSinceFromAttributes(state, positionAttributes) {
+  if (!positionAttributes) return null;
+  if (state === 'Moving') {
+    return parseAttributeTimestamp(positionAttributes, ['motionTime', 'motionStart', 'eventTime']);
+  }
+  if (state === 'Idle') {
+    return parseAttributeTimestamp(positionAttributes, ['stopTime', 'idleTime', 'parkedTime', 'eventTime']);
+  }
+  return null;
+}
 
 function formatMotionDuration(ms) {
   if (ms == null || ms < 0) return null;
@@ -46,13 +69,23 @@ function formatMotionDuration(ms) {
  * Records the transition the first time a new state is observed and returns a
  * short human label like "45m" or "2h 14m". Returns null when device id is unknown.
  */
-export function getMotionDurationLabel(deviceId, deviceStatus, positionSpeed, now = Date.now()) {
+export function getMotionDurationLabel(
+  deviceId,
+  deviceStatus,
+  positionSpeed,
+  now = Date.now(),
+  positionAttributes = null,
+) {
   if (deviceId == null) return null;
   const state = getMotionLabel(deviceStatus, positionSpeed);
+  const attrSince = getMotionStateSinceFromAttributes(state, positionAttributes);
   const prev = motionStateTracker.get(deviceId);
   let since;
   if (!prev || prev.state !== state) {
-    since = now;
+    since = attrSince ?? now;
+    motionStateTracker.set(deviceId, { state, since });
+  } else if (attrSince != null && attrSince < prev.since) {
+    since = attrSince;
     motionStateTracker.set(deviceId, { state, since });
   } else {
     since = prev.since;

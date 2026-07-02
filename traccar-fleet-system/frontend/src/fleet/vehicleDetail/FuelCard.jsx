@@ -1,4 +1,4 @@
-import { Box, Typography, LinearProgress } from '@mui/material';
+import { Box, Typography, LinearProgress, Chip } from '@mui/material';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
@@ -61,6 +61,15 @@ export default function FuelCard({ fuel }) {
           <TrendingDownIcon sx={{ fontSize: 16, opacity: 0.5 }} color="success" />
         )}
       </Box>
+      {fuel?.efficiencySource === 'spec' && (
+        <Chip
+          size="small"
+          label="Using default efficiency"
+          color="warning"
+          variant="outlined"
+          sx={{ mt: 1 }}
+        />
+      )}
       {sourceLabel && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
           {sourceLabel}

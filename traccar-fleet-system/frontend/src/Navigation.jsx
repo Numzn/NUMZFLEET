@@ -69,6 +69,8 @@ import FuelOperationsReportPage from './reports/FuelOperationsReportPage';
 import ToastNotificationTest from './test/ToastNotificationTest';
 import FuelRequestsRouteGuard from './fuelRequests/FuelRequestsRouteGuard';
 import VehiclesPage from './fleet/VehiclesPage';
+import FleetDriversPage from './fleet/drivers/FleetDriversPage';
+import FleetDriverPage from './fleet/drivers/FleetDriverPage';
 import VehicleDetailPage from './fleet/vehicleDetail/VehicleDetailPage';
 import VehicleSetupPage from './fleet/vehicleDetail/VehicleSetupPage';
 import VehicleImmobilizerPage from './fleet/vehicleDetail/VehicleImmobilizerPage';
@@ -143,6 +145,9 @@ const Navigation = () => {
           <Route index element={<DashboardPage />} />
           <Route path="map" element={<LiveMapPage />} />
           <Route path="fuel-requests" element={<FuelRequestsRouteGuard />} />
+          <Route path="fleet/drivers/new" element={<FleetDriverPage />} />
+          <Route path="fleet/drivers/:id" element={<FleetDriverPage />} />
+          <Route path="fleet/drivers" element={<FleetDriversPage />} />
           <Route path="fleet/vehicles/:vehicleId/setup" element={<VehicleSetupPage />} />
           <Route path="fleet/vehicles/:vehicleId/immobilizer" element={<VehicleImmobilizerPage />} />
           <Route path="fleet/vehicles/:vehicleId" element={<VehicleDetailPage />} />

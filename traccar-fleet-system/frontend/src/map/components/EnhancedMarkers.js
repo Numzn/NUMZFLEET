@@ -520,7 +520,7 @@ const EnhancedMarkers = ({
       return;
     }
 
-    const pos = safePositions.find((p) => p.deviceId === externalHoveredDeviceId);
+    const pos = safePositions.find((p) => String(p.deviceId) === String(externalHoveredDeviceId));
     if (!pos) {
       src.setData({ type: 'FeatureCollection', features: [] });
       return;

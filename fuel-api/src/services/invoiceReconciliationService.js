@@ -9,6 +9,8 @@ import {
   upsertForOperation,
 } from '../repositories/operationSessionInvoiceRepository.js';
 import { recordAuditEvent, AUDIT_EVENT_TYPES } from './auditEventService.js';
+import { emitDomainEvent } from '../events/eventBus.js';
+import { EVENT_NAMES } from '../events/eventNames.js';
 import { assertCanAccessSession } from './operationSessionCore.js';
 import { maybePersistLock } from './operationLockHelper.js';
 
@@ -269,7 +271,16 @@ export async function createOperationInvoice(user, sessionId, payload = {}, comp
     reconciliationStatus: values.reconciliationStatus,
   });
 
-  return toInvoiceDto(record);
+  const dto = toInvoiceDto(record);
+  emitDomainEvent(EVENT_NAMES.OPERATION_INVOICE_RECONCILED, {
+    session,
+    user,
+    sessionId: session.id,
+    invoiceId: record.id,
+    invoice: dto,
+  });
+
+  return dto;
 }
 
 export async function updateOperationInvoice(user, sessionId, invoiceId, payload = {}, companyId = null) {
@@ -306,7 +317,16 @@ export async function updateOperationInvoice(user, sessionId, invoiceId, payload
     reconciliationStatus: values.reconciliationStatus,
   });
 
-  return toInvoiceDto(record);
+  const dto = toInvoiceDto(record);
+  emitDomainEvent(EVENT_NAMES.OPERATION_INVOICE_RECONCILED, {
+    session,
+    user,
+    sessionId: session.id,
+    invoiceId: record.id,
+    invoice: dto,
+  });
+
+  return dto;
 }
 
 export async function getOperationInvoice(user, sessionId, companyId = null) {
@@ -337,5 +357,14 @@ export async function upsertOperationInvoice(user, sessionId, payload = {}, comp
     reconciliationStatus: values.reconciliationStatus,
   });
 
-  return toInvoiceDto(record);
+  const dto = toInvoiceDto(record);
+  emitDomainEvent(EVENT_NAMES.OPERATION_INVOICE_RECONCILED, {
+    session,
+    user,
+    sessionId: session.id,
+    invoiceId: record.id,
+    invoice: dto,
+  });
+
+  return dto;
 }

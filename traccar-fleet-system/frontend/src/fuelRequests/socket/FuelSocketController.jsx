@@ -10,6 +10,7 @@ import { normalizeNotificationCreated } from '../../notifications/adapters/norma
 import { isUnifiedNotificationsEnabled } from '../../notifications/notificationFeatureFlags.js';
 import { requestNotificationSync } from '../../notifications/NotificationSyncController.jsx';
 import useFeatures from '../../common/util/useFeatures';
+import { dispatchOperationSessionUpdate } from '../../operationSessions/utils/operationSessionSocketBridge.js';
 
 const SOCKET_STATE = Object.freeze({
   CONNECTED: 'CONNECTED',
@@ -328,6 +329,20 @@ const FuelSocketController = () => {
       if (typeof window === 'undefined') return;
       window.dispatchEvent(new CustomEvent('immobilization.updated', { detail: payload }));
     });
+
+    const handleOperationRefuelSocket = (type) => (payload) => {
+      dispatchOperationSessionUpdate({ type, ...payload });
+    };
+
+    socket.off('operation-refuel-recorded');
+    socket.off('operation-refuel-arrived');
+    socket.off('operation-refuel-skipped');
+    socket.off('operation-invoice-reconciled');
+
+    socket.on('operation-refuel-recorded', handleOperationRefuelSocket('refuel.recorded'));
+    socket.on('operation-refuel-arrived', handleOperationRefuelSocket('refuel.arrived'));
+    socket.on('operation-refuel-skipped', handleOperationRefuelSocket('refuel.skipped'));
+    socket.on('operation-invoice-reconciled', handleOperationRefuelSocket('invoice.reconciled'));
 
     socket.off('connect');
     socket.on('connect', () => {

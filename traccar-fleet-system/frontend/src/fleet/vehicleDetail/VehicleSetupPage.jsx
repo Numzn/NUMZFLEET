@@ -22,7 +22,7 @@ import { patchVehicleFields, saveRoutineService } from '../vehiclesApi.js';
 import { fetchImmobilizationCapabilities } from './immobilizationIntentsApi.js';
 import useVehicleSetupForm from './setup/useVehicleSetupForm.js';
 import useVehicleSetupReadiness from './setup/useVehicleSetupReadiness.js';
-import { SETUP_MODULES } from './setup/vehicleSetupModules.js';
+import { SETUP_MODULES, SETUP_MODULE_GROUPS } from './setup/vehicleSetupModules.js';
 import { getModuleReadiness } from './setup/vehicleSetupReadiness.js';
 import VehicleSetupOverview from './setup/VehicleSetupOverview.jsx';
 import VehicleSetupModuleCard from './setup/VehicleSetupModuleCard.jsx';
@@ -344,17 +344,32 @@ export default function VehicleSetupPage() {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <VehicleSetupOverview readiness={readiness} vehicleName={vehicle.name} />
 
-            {SETUP_MODULES.map((mod) => (
-              <VehicleSetupModuleCard
-                key={mod.id}
-                moduleId={mod.id}
-                title={mod.title}
-                subtitle={mod.subtitle}
-                icon={mod.icon}
-                readiness={getModuleReadiness(readiness, mod.id)}
-              >
-                {renderModuleContent(mod.id, moduleProps)}
-              </VehicleSetupModuleCard>
+            {SETUP_MODULE_GROUPS.map((group) => (
+              <Box key={group.id}>
+                <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  {group.title}
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 2 }}>
+                  {group.moduleIds.map((moduleId) => {
+                    const mod = SETUP_MODULES.find((m) => m.id === moduleId);
+                    if (!mod) return null;
+                    const modReadiness = getModuleReadiness(readiness, mod.id);
+                    return (
+                      <VehicleSetupModuleCard
+                        key={mod.id}
+                        moduleId={mod.id}
+                        title={mod.title}
+                        subtitle={mod.subtitle}
+                        icon={mod.icon}
+                        readiness={modReadiness}
+                        defaultExpanded={modReadiness?.status !== 'complete'}
+                      >
+                        {renderModuleContent(mod.id, moduleProps)}
+                      </VehicleSetupModuleCard>
+                    );
+                  })}
+                </Box>
+              </Box>
             ))}
 
             <Box
@@ -365,6 +380,10 @@ export default function VehicleSetupPage() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 pt: 1,
+                position: { xs: 'sticky', sm: 'static' },
+                bottom: { xs: 8, sm: 'auto' },
+                bgcolor: { xs: 'background.paper', sm: 'transparent' },
+                zIndex: 1,
               }}
             >
               {dirty && !saving ? (

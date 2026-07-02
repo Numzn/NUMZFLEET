@@ -258,7 +258,7 @@ const UnifiedSidebar = ({
     if (!readonly) {
       out.push({ title: t('sharedPreferences'), path: '/settings/preferences', icon: TuneIcon });
       out.push({
-        title: t('sharedNotifications'),
+        title: 'Alert rules',
         path: '/settings/notifications',
         icon: NotificationsIcon,
         activeMatch: (path) => path.startsWith('/settings/notification'),
@@ -391,8 +391,8 @@ const UnifiedSidebar = ({
           badgeHint: 'Live activity — recent Traccar events in this session (not notification unread)',
           children: [
             { title: 'Vehicles', path: '/fleet/vehicles', show: manager },
-            { title: 'Drivers', path: '/settings/drivers', show: !features.disableDrivers },
-            { title: 'Geofences', path: '/geofences' },
+            { title: 'Drivers', path: '/fleet/drivers', show: !features.disableDrivers && manager },
+            { title: 'Geofences', path: '/geofences', show: admin },
           ].filter((c) => c.show !== false),
         },
         {
@@ -425,10 +425,10 @@ const UnifiedSidebar = ({
       key: 'intelligence',
       label: 'INTELLIGENCE',
       items: [
-        { title: 'Analytics', path: '/reports/statistics', icon: InsightsOutlinedIcon },
-        { title: 'Reports', path: '/reports/summary', icon: BarChartOutlinedIcon },
-        { title: 'Fuel reports', path: '/reports/fuel-operations', icon: LocalGasStationOutlinedIcon },
-      ],
+        { title: 'Fuel reports', path: '/reports/fuel-operations', icon: LocalGasStationOutlinedIcon, show: manager },
+        { title: 'Analytics', path: '/reports/statistics', icon: InsightsOutlinedIcon, show: admin },
+        { title: 'Traccar reports', path: '/reports/summary', icon: BarChartOutlinedIcon, show: admin },
+      ].filter((i) => i.show !== false),
     },
     {
       key: 'system',
@@ -436,16 +436,18 @@ const UnifiedSidebar = ({
       items: [
         {
           key: 'system',
-          title: 'System',
+          title: 'Administration',
           icon: SettingsOutlinedIcon,
+          show: manager || admin,
           children: systemChildren,
         },
-      ],
+      ].filter((i) => i.show !== false),
     },
   ]), [
     alertsBadgeCount,
     features.disableDrivers,
     manager,
+    admin,
     pendingFuelCount,
     maintenanceBadge,
     readonly,

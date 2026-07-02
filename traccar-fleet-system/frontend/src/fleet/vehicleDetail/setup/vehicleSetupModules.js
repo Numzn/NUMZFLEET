@@ -78,6 +78,32 @@ export const SETUP_MODULES = [
   },
 ];
 
+export const SETUP_MODULE_GROUPS = [
+  {
+    id: 'identity',
+    title: 'Identity & Device',
+    moduleIds: [SETUP_MODULE_IDS.identity, SETUP_MODULE_IDS.device],
+  },
+  {
+    id: 'operations',
+    title: 'Operations',
+    moduleIds: [
+      SETUP_MODULE_IDS.driver,
+      SETUP_MODULE_IDS.fuel,
+      SETUP_MODULE_IDS.routineService,
+    ],
+  },
+  {
+    id: 'monitoring',
+    title: 'Monitoring',
+    moduleIds: [
+      SETUP_MODULE_IDS.geofence,
+      SETUP_MODULE_IDS.alerts,
+      SETUP_MODULE_IDS.safety,
+    ],
+  },
+];
+
 export function setupModuleAnchorId(moduleId) {
   return `setup-module-${moduleId}`;
 }

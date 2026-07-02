@@ -130,8 +130,8 @@ services:
       TRACCAR_MYSQL_USER: traccar
       TRACCAR_SERVER_URL: http://traccar:8082
       TRACCAR_API_URL: http://traccar:8082
-      TRACCAR_API_USER: ${TRACCAR_API_USER:-}
-      TRACCAR_API_PASSWORD: ${TRACCAR_API_PASSWORD:-}
+      # TRACCAR_API_USER / TRACCAR_API_PASSWORD: from backend/.env (env_file). Do not override
+      # with empty ${TRACCAR_API_USER:-} — that wipes env_file when deployment/.env omits them.
       ERB_API_BASE_URL: http://erb-api:8000
       CORS_ORIGIN: ${CORS_ORIGIN:-http://100.121.79.2:3003,http://localhost:5174}
       AUTH_STRATEGY: ${AUTH_STRATEGY:-hybrid}

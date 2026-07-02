@@ -12,6 +12,7 @@ import {
   getMotionLabel,
   getVehicleStatusKey,
 } from '../../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import useMotionDurationTick from '../../../fleet/vehicleDetail/useMotionDurationTick.js';
 import VehicleLocationLine from '../../../common/components/VehicleLocationLine';
 import DeviceQuickActions from '../DeviceQuickActions';
 import { getGpsStaleWarning } from './gpsStaleWarning';
@@ -28,6 +29,7 @@ const VehicleContextCard = ({
 }) => {
   const { getDisplayForDevice } = useVehicleDisplayContext();
   const display = getDisplayForDevice(device?.id, device);
+  const motionNow = useMotionDurationTick();
 
   if (!device) return null;
 
@@ -35,7 +37,7 @@ const VehicleContextCard = ({
   const tint = STATUS_TINT[key];
   const motionLabel = getMotionLabel(device.status, position?.speed);
   const motionDuration = device.status === 'online'
-    ? getMotionDurationLabel(device.id, device.status, position?.speed)
+    ? getMotionDurationLabel(device.id, device.status, position?.speed, motionNow, position?.attributes)
     : null;
   const statusText = motionDuration ? `${motionLabel} • ${motionDuration}` : motionLabel;
   const gpsStale = position ? getGpsStaleWarning(position?.fixTime) : null;

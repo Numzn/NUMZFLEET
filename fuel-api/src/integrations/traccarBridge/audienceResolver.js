@@ -52,14 +52,23 @@ export async function getDeviceLinkedUserIds(deviceId) {
 export async function resolveTrackingEventAudience(deviceId, opts = {}) {
   const managerIds = await getManagerUserIds();
   const deviceUserIds = await getDeviceLinkedUserIds(deviceId);
+  const fleetConfig = await fetchFleetConfigByDeviceId(deviceId);
 
-  if (opts.respectGeofenceMute) {
-    const fleetConfig = await fetchFleetConfigByDeviceId(deviceId);
-    if (fleetConfig?.alerts?.geofence === false) {
-      const isGeofence = isGeofenceTrackingEvent(opts.traccarType, opts.attributes);
-      if (isGeofence) {
-        return [];
-      }
+  if (opts.respectGeofenceMute && fleetConfig) {
+    const type = String(opts.traccarType || '').toLowerCase();
+    const alarm = String(opts.attributes?.alarm || '').toLowerCase();
+
+    if (fleetConfig.alerts?.geofence === false && isGeofenceTrackingEvent(opts.traccarType, opts.attributes)) {
+      return [];
+    }
+    if (fleetConfig.alerts?.speeding === false && (type.includes('overspeed') || type === 'deviceoverspeed')) {
+      return [];
+    }
+    if (fleetConfig.alerts?.lowFuel === false && (type.includes('fuel') || alarm.includes('fuel'))) {
+      return [];
+    }
+    if (fleetConfig.alerts?.engineCut === false && (alarm.includes('powercut') || alarm.includes('ignition'))) {
+      return [];
     }
   }
 

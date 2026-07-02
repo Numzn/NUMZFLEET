@@ -38,6 +38,19 @@ export default function SmartInvoiceAttachment({
   const [totalCost, setTotalCost] = useState(
     invoice?.totalCost != null ? String(invoice.totalCost) : '',
   );
+  const [invoiceDate, setInvoiceDate] = useState(
+    invoice?.invoiceDate ? String(invoice.invoiceDate).slice(0, 16) : '',
+  );
+  const [pricePerLitre, setPricePerLitre] = useState(
+    invoice?.pricePerLitre != null ? String(invoice.pricePerLitre) : '',
+  );
+  const [stationName, setStationName] = useState(invoice?.stationName || '');
+  const [dieselLitres, setDieselLitres] = useState(
+    invoice?.dieselLitres != null ? String(invoice.dieselLitres) : '',
+  );
+  const [petrolLitres, setPetrolLitres] = useState(
+    invoice?.petrolLitres != null ? String(invoice.petrolLitres) : '',
+  );
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -69,6 +82,13 @@ export default function SmartInvoiceAttachment({
       if (extracted.invoiceNumber && !label) setLabel(extracted.invoiceNumber);
       if (extracted.totalLitres != null) setTotalLitres(String(extracted.totalLitres));
       if (extracted.totalCost != null) setTotalCost(String(extracted.totalCost));
+      if (extracted.invoiceDate && !invoiceDate) {
+        setInvoiceDate(String(extracted.invoiceDate).slice(0, 16));
+      }
+      if (extracted.pricePerLitre != null) setPricePerLitre(String(extracted.pricePerLitre));
+      if (extracted.stationName && !stationName) setStationName(extracted.stationName);
+      if (extracted.dieselLitres != null) setDieselLitres(String(extracted.dieselLitres));
+      if (extracted.petrolLitres != null) setPetrolLitres(String(extracted.petrolLitres));
       if (extracted.totalLitres == null && extracted.totalCost == null) {
         setOcrError('Could not read totals — check the photo or enter them below.');
       }
@@ -87,6 +107,11 @@ export default function SmartInvoiceAttachment({
       invoiceNumber: label.trim() || undefined,
       totalLitres: totalLitres.trim() ? Number(totalLitres) : undefined,
       totalCost: totalCost.trim() ? Number(totalCost) : undefined,
+      invoiceDate: invoiceDate.trim() || undefined,
+      pricePerLitre: pricePerLitre.trim() ? Number(pricePerLitre) : undefined,
+      stationName: stationName.trim() || undefined,
+      dieselLitres: dieselLitres.trim() ? Number(dieselLitres) : undefined,
+      petrolLitres: petrolLitres.trim() ? Number(petrolLitres) : undefined,
     });
   };
 
@@ -197,6 +222,58 @@ export default function SmartInvoiceAttachment({
           onChange={(e) => setTotalCost(e.target.value)}
           disabled={busy}
           inputProps={{ min: 0, step: 0.01 }}
+        />
+      </Stack>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+        <TextField
+          label="Price per litre"
+          type="number"
+          size="small"
+          fullWidth
+          value={pricePerLitre}
+          onChange={(e) => setPricePerLitre(e.target.value)}
+          disabled={busy}
+          inputProps={{ min: 0, step: 0.01 }}
+        />
+        <TextField
+          label="Invoice date"
+          type="datetime-local"
+          size="small"
+          fullWidth
+          value={invoiceDate}
+          onChange={(e) => setInvoiceDate(e.target.value)}
+          disabled={busy}
+          InputLabelProps={{ shrink: true }}
+        />
+      </Stack>
+      <TextField
+        label="Station name"
+        size="small"
+        fullWidth
+        value={stationName}
+        onChange={(e) => setStationName(e.target.value)}
+        disabled={busy}
+      />
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+        <TextField
+          label="Diesel litres"
+          type="number"
+          size="small"
+          fullWidth
+          value={dieselLitres}
+          onChange={(e) => setDieselLitres(e.target.value)}
+          disabled={busy}
+          inputProps={{ min: 0, step: 0.1 }}
+        />
+        <TextField
+          label="Petrol litres"
+          type="number"
+          size="small"
+          fullWidth
+          value={petrolLitres}
+          onChange={(e) => setPetrolLitres(e.target.value)}
+          disabled={busy}
+          inputProps={{ min: 0, step: 0.1 }}
         />
       </Stack>
 

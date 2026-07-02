@@ -12,6 +12,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { devicesActions } from '../../store';
 import DeviceQuickActions from './DeviceQuickActions';
 import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from '../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import useMotionDurationTick from '../../fleet/vehicleDetail/useMotionDurationTick.js';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 import VehicleLocationLine from '../../common/components/VehicleLocationLine';
 
@@ -59,6 +60,7 @@ const VehicleListItem = ({
   const dispatch = useDispatch();
   const { getDisplayForDevice } = useVehicleDisplayContext();
   const display = getDisplayForDevice(device.id, device);
+  const motionNow = useMotionDurationTick();
 
   const speedKmh = position ? Math.round(Number(position.speed || 0) * 1.852) : null;
   const motionDotColor = device.status !== 'online'
@@ -67,7 +69,7 @@ const VehicleListItem = ({
 
   const motionLabel = getMotionLabel(device.status, position?.speed);
   const motionDuration = device.status === 'online'
-    ? getMotionDurationLabel(device.id, device.status, position?.speed)
+    ? getMotionDurationLabel(device.id, device.status, position?.speed, motionNow, position?.attributes)
     : null;
   const motionDisplay = motionDuration ? `${motionLabel} ${motionDuration}` : motionLabel;
 

@@ -6,6 +6,8 @@ import { parseDocumentFacts } from '../documents/documentFactParser.js';
 import { mapDocumentRow } from '../documents/vehicleDocumentMapper.js';
 import { assertVehicleInTenant } from './vehicleFleetService.js';
 import { resolveStoredVehiclePath } from '../middleware/vehicleUpload.js';
+import { emitDomainEvent } from '../events/eventBus.js';
+import { EVENT_NAMES } from '../events/eventNames.js';
 
 function guessMimeType(fileId) {
   const ext = path.extname(String(fileId || '')).toLowerCase();
@@ -62,7 +64,15 @@ export async function runDocumentOcr(companyId, fleetVehicleId, documentId) {
     });
 
     await row.reload();
-    return mapDocumentRow(row);
+    const mapped = mapDocumentRow(row);
+    emitDomainEvent(EVENT_NAMES.VEHICLE_DOCUMENT_OCR_COMPLETED, {
+      fleetVehicleId,
+      documentId: row.id,
+      companyId,
+      ocrStatus: row.ocrStatus,
+      document: mapped,
+    });
+    return mapped;
   } catch (error) {
     await row.update({
       ocrStatus: 'failed',

@@ -1,6 +1,8 @@
 import { publishNotification } from '../notifications/orchestrator/publishNotification.js';
 import { CHANNELS } from '../notifications/contracts/notificationContract.js';
 import { getNotificationIo } from '../notifications/notificationContext.js';
+import { emitDomainEvent } from '../events/eventBus.js';
+import { EVENT_NAMES } from '../events/eventNames.js';
 
 /**
  * Operation-session notifications (approve / lock approaching / incomplete / unlock).
@@ -25,7 +27,11 @@ function operationLabel(operation) {
   return operation.name || `Fuel operation ${calendarKey(operation) || ''}`.trim();
 }
 
-async function publish(spec) {
+async function publish(spec, operation) {
+  emitDomainEvent(EVENT_NAMES.OPERATION_NOTIFICATION, { operation, spec });
+}
+
+export async function deliverOperationNotification({ operation, spec }) {
   try {
     await publishNotification({
       source: 'fuel-api',
@@ -68,7 +74,7 @@ export async function notifyPlanReady(operation, actorUserId) {
     message: `${operationLabel(operation)} has vehicles planned and is ready to approve.`,
     event: 'plan-ready',
     extraMeta: { actorUserId: actorUserId ?? null },
-  }));
+  }), operation);
 }
 
 export async function notifyOperationApproved(operation, actorUserId) {
@@ -80,7 +86,7 @@ export async function notifyOperationApproved(operation, actorUserId) {
     message: `${operationLabel(operation)} was approved and is now open for recording.`,
     event: 'approved',
     extraMeta: { actorUserId: actorUserId ?? null },
-  }));
+  }), operation);
 }
 
 export async function notifyOperationUnlocked(operation, actorUserId, { expiresAt, reason } = {}) {
@@ -93,7 +99,7 @@ export async function notifyOperationUnlocked(operation, actorUserId, { expiresA
     // Unlock windows can be granted more than once — key on expiry so each grant alerts.
     event: `unlocked:${expiresAt || Date.now()}`,
     extraMeta: { actorUserId: actorUserId ?? null, expiresAt: expiresAt || null, reason: reason || null },
-  }));
+  }), operation);
 }
 
 export async function notifyLockApproaching(operation, minutesRemaining) {
@@ -105,7 +111,7 @@ export async function notifyLockApproaching(operation, minutesRemaining) {
     message: `${operationLabel(operation)} locks in about ${minutesRemaining} minutes. Finish recording before it closes.`,
     event: 'lock-approaching',
     extraMeta: { minutesRemaining },
-  }));
+  }), operation);
 }
 
 export async function notifyRecordingIncompleteAtLock(operation, { incomplete, total }) {
@@ -117,7 +123,7 @@ export async function notifyRecordingIncompleteAtLock(operation, { incomplete, t
     message: `${incomplete} of ${total} vehicles are still unrecorded as ${operationLabel(operation)} approaches lock.`,
     event: 'recording-incomplete',
     extraMeta: { incomplete, total },
-  }));
+  }), operation);
 }
 
 export default {

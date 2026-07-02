@@ -6,6 +6,7 @@ import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 import { fetchVehicle, updateVehicleConfig as putVehicleConfig, fuelApiErrorMessage } from '../vehiclesApi.js';
 import { normalizePositionTelemetry } from './telemetryUtils.js';
 import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from './vehicleMotionStatus.js';
+import useMotionDurationTick from './useMotionDurationTick.js';
 import { isGeofenceEventType, resolveEventType } from './vehicleAlertUtils.js';
 
 const erbFuelKey = (fuelType) => {
@@ -67,6 +68,7 @@ export default function useVehicleData(vehicleId) {
   const events = useSelector((s) => s.events.items);
   const devicesById = useSelector((s) => s.devices.items);
   const groupsById = useSelector((s) => s.groups.items);
+  const motionNow = useMotionDurationTick();
 
   const [vehicle, setVehicle] = useState(null);
   const [erbState, setErbState] = useState({
@@ -279,9 +281,15 @@ export default function useVehicleData(vehicleId) {
   const motionDurationLabel = useMemo(
     () =>
       vehicle?.device?.status === 'online'
-        ? getMotionDurationLabel(deviceId, vehicle.device.status, livePosition?.speed)
+        ? getMotionDurationLabel(
+          deviceId,
+          vehicle.device.status,
+          livePosition?.speed,
+          motionNow,
+          livePosition?.attributes,
+        )
         : null,
-    [deviceId, vehicle?.device?.status, livePosition?.speed],
+    [deviceId, vehicle?.device?.status, livePosition?.speed, livePosition?.attributes, motionNow],
   );
 
   const saveConfig = useCallback(

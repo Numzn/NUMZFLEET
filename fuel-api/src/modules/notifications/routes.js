@@ -14,6 +14,7 @@ router.get('/', requireAuth, ctrl.listNotifications);
 router.patch('/read-all', requireAuth, ctrl.patchReadAll);
 router.patch('/:id/read', requireAuth, ctrl.patchRead);
 router.patch('/:id/lifecycle', requireAuth, ctrl.patchLifecycle);
+router.post('/escalate', requireAuth, ctrl.postEscalate);
 router.delete('/:id', requireAuth, ctrl.removeOne);
 
 export default router;
