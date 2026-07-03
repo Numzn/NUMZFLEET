@@ -174,7 +174,11 @@ export default function VehicleWorkspaceHero({
     : (display.secondary && display.secondary !== title ? display.secondary : null);
 
   const efficiencyDisplay = resolveFuelEfficiencyDisplay(fuelPerformance, fuel?.fuelEfficiencyKmL);
-  const efficiencyValue = fuelPerformanceLoading ? '…' : efficiencyDisplay.label;
+  const efficiencyValue = fuelPerformanceLoading
+    && fuelPerformance == null
+    && fuel?.fuelEfficiencyKmL == null
+    ? '…'
+    : efficiencyDisplay.label;
 
   const currentMileageLabel = nextService?.currentOdometerKm != null
     ? `${Number(nextService.currentOdometerKm).toLocaleString()} km`

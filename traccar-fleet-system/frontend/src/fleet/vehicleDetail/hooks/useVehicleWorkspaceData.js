@@ -36,7 +36,7 @@ export default function useVehicleWorkspaceData(vehicleId) {
   const fuel = vehicleEngine.fuelSnapshot ?? core.fuelFallback;
 
   const handleMaintenanceCompleted = async () => {
-    await vehicleEngine.reload();
+    await vehicleEngine.reload({ silent: true });
     await serviceHistory.reload();
     await core.refresh();
   };
@@ -58,7 +58,7 @@ export default function useVehicleWorkspaceData(vehicleId) {
     fuelRequests,
     todayTrips,
     fuelPerformance: vehicleEngine.fuelPerformance,
-    fuelPerformanceLoading: vehicleEngine.loading,
+    fuelPerformanceLoading: vehicleEngine.initialLoading,
     fuelPerformanceError: vehicleEngine.error,
     fuelPerformanceStats: vehicleEngine.hub?.fuel ?? null,
     reloadFuelPerformance: vehicleEngine.reload,
@@ -70,7 +70,7 @@ export default function useVehicleWorkspaceData(vehicleId) {
     serviceHistory,
     openServiceCount,
     overviewMetrics: vehicleEngine.overviewMetrics,
-    overviewMetricsLoading: vehicleEngine.loading,
+    overviewMetricsLoading: vehicleEngine.initialLoading,
     handleMaintenanceCompleted,
   };
 }

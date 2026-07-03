@@ -67,6 +67,8 @@ export default function VehicleFuelColumn({
     || fuelPerformance?.efficiencySource === 'learned'
     || fuelPerformance?.efficiencySource === 'measured';
 
+  const showPerformanceLoading = fuelPerformanceLoading && efficiencyDisplay.value == null;
+
   const odometerFinding = (intelligence?.recommendations || []).find(
     (r) => r.action === 'confirm_odometer_observation',
   );
@@ -241,10 +243,10 @@ export default function VehicleFuelColumn({
           </SubCard>
 
           <SubCard title="FUEL PERFORMANCE">
-            {fuelPerformanceLoading && (
+            {showPerformanceLoading && (
               <Typography variant="body2" color="text.secondary">Loading…</Typography>
             )}
-            {!fuelPerformanceLoading && performanceMeasured && (
+            {!showPerformanceLoading && performanceMeasured && (
               <>
                 <PerformanceRow
                   label="Distance travelled"
@@ -265,7 +267,7 @@ export default function VehicleFuelColumn({
                 </Typography>
               </>
             )}
-            {!fuelPerformanceLoading && !performanceMeasured && (
+            {!showPerformanceLoading && !performanceMeasured && (
               <>
                 <Typography variant="metricValue" textAlign="center">
                   {efficiencyDisplay.label}

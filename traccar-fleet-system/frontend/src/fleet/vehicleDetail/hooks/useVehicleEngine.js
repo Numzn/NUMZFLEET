@@ -89,40 +89,61 @@ export function overviewMetricsFromEngine(snapshot) {
 export default function useVehicleEngine(fleetVehicleId, { deviceId = null, livePosition = null } = {}) {
   const user = useSelector((s) => s.session.user);
   const [snapshot, setSnapshot] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const reloadRef = useRef(null);
   const lastEvidenceRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  const hasSnapshotRef = useRef(false);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async ({ silent } = {}) => {
     if (!user || !fleetVehicleId) {
+      hasSnapshotRef.current = false;
       setSnapshot(null);
       setError(null);
+      setInitialLoading(false);
+      setRefreshing(false);
       return null;
     }
-    setLoading(true);
+
+    const isSilent = silent ?? hasSnapshotRef.current;
+    if (isSilent) {
+      setRefreshing(true);
+    } else {
+      setInitialLoading(true);
+    }
     setError(null);
+
     try {
       const data = await fetchVehicleEngine(user, fleetVehicleId);
       setSnapshot(data);
+      hasSnapshotRef.current = data != null;
       return data;
     } catch (err) {
-      setSnapshot(null);
-      setError(err?.message || 'Failed to load vehicle engine');
+      if (!isSilent) {
+        hasSnapshotRef.current = false;
+        setSnapshot(null);
+        setError(err?.message || 'Failed to load vehicle engine');
+      }
       return null;
     } finally {
-      setLoading(false);
+      if (isSilent) {
+        setRefreshing(false);
+      } else {
+        setInitialLoading(false);
+      }
     }
   }, [user, fleetVehicleId]);
 
   reloadRef.current = reload;
 
   useEffect(() => {
+    hasSnapshotRef.current = false;
     setSnapshot(null);
     setError(null);
     lastEvidenceRef.current = null;
-    reload();
+    reload({ silent: false });
   }, [reload]);
 
   // Refresh engine when live tracker mileage evidence changes (debounced).
@@ -137,7 +158,7 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = window.setTimeout(() => {
-      reloadRef.current?.();
+      reloadRef.current?.({ silent: true });
     }, ENGINE_RELOAD_DEBOUNCE_MS);
 
     return () => {
@@ -152,7 +173,7 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
   useEffect(() => {
     if (!user || !fleetVehicleId) return undefined;
     const id = window.setInterval(() => {
-      reloadRef.current?.();
+      reloadRef.current?.({ silent: true });
     }, ENGINE_POLL_MS);
     return () => window.clearInterval(id);
   }, [user, fleetVehicleId]);
@@ -163,7 +184,10 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
 
   return {
     snapshot,
-    loading,
+    /** True only on first load for this vehicle (no cached snapshot yet). */
+    loading: initialLoading,
+    initialLoading,
+    refreshing,
     error,
     reload,
     registry: snapshot?.registry ?? null,
@@ -180,7 +204,7 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
     fuelSnapshot: fuelSnapshotFromEngine(snapshot),
     maintenance: {
       items: maintenanceItems,
-      loading,
+      loading: initialLoading,
       dueSoonCount,
       openWorkOrders,
       summary: snapshot?.hub?.maintenance?.workOrders?.summary ?? null,

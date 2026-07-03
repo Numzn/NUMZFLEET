@@ -96,7 +96,7 @@ export default function VehicleOverviewKpiRow({
         {`${Math.round(fleetDelta)}% better than fleet avg`}
       </Box>
     )
-    : (overviewMetricsLoading ? 'Loading fleet comparison…' : null);
+    : (overviewMetricsLoading && overviewMetrics == null ? 'Loading fleet comparison…' : null);
 
   const mtd = overviewMetrics?.maintenanceCostMtd ?? clientMtd;
   const ytd = overviewMetrics?.maintenanceCostYtd ?? clientYtd;
@@ -123,7 +123,9 @@ export default function VehicleOverviewKpiRow({
     >
       <KpiCard
         title="Fuel Efficiency (Avg)"
-        value={fuelPerformanceLoading ? '…' : efficiencyDisplay.label}
+        value={fuelPerformanceLoading && fuelPerformance == null && fuelSpecEfficiency == null
+          ? '…'
+          : efficiencyDisplay.label}
         subtitle={fleetDeltaSub || efficiencyDisplay.sub}
       />
       <KpiCard
