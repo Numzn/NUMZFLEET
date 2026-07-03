@@ -147,6 +147,21 @@ export function buildIntelligence(engine, options = {}) {
     });
   }
 
+  const activityAnomalies = Array.isArray(options.activityAnomalies)
+    ? options.activityAnomalies
+    : (engine?.activity?.anomalies ?? []);
+
+  for (const anomaly of activityAnomalies) {
+    if (!anomaly?.code || !anomaly?.text) continue;
+    if (anomaly.code === 'ACTIVITY_BRIEF_STOPS_COLLAPSED') continue;
+    findings.push({
+      domain: 'activity',
+      severity: anomaly.severity === 'warning' ? 'warning' : 'info',
+      code: anomaly.code,
+      text: anomaly.text,
+    });
+  }
+
   if (engine?.health?.overall != null && engine.health.overall < 70) {
     findings.push({
       domain: 'health',

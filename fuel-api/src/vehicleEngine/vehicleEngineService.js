@@ -16,6 +16,8 @@ import { buildIntelligence } from './intelligenceBuilder.js';
 import { buildTimeline } from './timelineBuilder.js';
 import { notifyRoutineServiceState } from '../notifications/maintenanceNotificationService.js';
 import { evaluateCompliance } from '../compliance/complianceEvaluator.js';
+import { buildActivityHub } from './activity/buildActivityHub.js';
+import { buildActivityEngine } from './activity/buildActivityEngine.js';
 
 export async function getVehicleEngine(fleetVehicleId, companyId) {
   const merged = await getVehicleMerged(fleetVehicleId, companyId);
@@ -29,10 +31,11 @@ export async function getVehicleEngine(fleetVehicleId, companyId) {
   const odometerState = await resolveVehicleOdometer({ merged, deviceId });
   const registry = buildRegistry(merged, odometerState);
 
-  const [maintenance, repairs, fuel] = await Promise.all([
+  const [maintenance, repairs, fuel, activityHub] = await Promise.all([
     buildMaintenanceHub(companyId, fleetVehicleId),
     buildRepairsHub(companyId, fleetVehicleId),
     buildFuelHub(deviceId, merged),
+    buildActivityHub(deviceId),
   ]);
 
   const telemetry = buildTelemetryHub(merged);
@@ -42,6 +45,7 @@ export async function getVehicleEngine(fleetVehicleId, companyId) {
     fuel,
     maintenance,
     repairs,
+    activity: activityHub,
   };
 
   const capabilities = buildCapabilities(registry, hub);
@@ -58,12 +62,14 @@ export async function getVehicleEngine(fleetVehicleId, companyId) {
   ]);
 
   const maintenanceEngine = buildMaintenanceEngine(hub, registry);
+  const activityEngine = buildActivityEngine(hub.activity);
   const status = buildStatusEngine(registry, telemetry);
 
   const engine = {
     status,
     health,
     maintenance: maintenanceEngine,
+    activity: activityEngine,
     fuel: fuelEngine,
     costs: {
       maintenanceMtd: maintenance.costs.mtd,
@@ -92,6 +98,7 @@ export async function getVehicleEngine(fleetVehicleId, companyId) {
       complianceFindings: compliance,
       registry,
       hub,
+      activityAnomalies: activityEngine.anomalies,
     }),
     timeline,
   };

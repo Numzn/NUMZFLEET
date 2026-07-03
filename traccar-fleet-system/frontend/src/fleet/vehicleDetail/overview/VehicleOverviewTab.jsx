@@ -86,6 +86,8 @@ export default function VehicleOverviewTab(props) {
           />
         </Box>
         <VehicleOperationalActivityPanel
+          engineActivities={vehicleEngine?.engine?.activity?.activities ?? []}
+          activityLoading={vehicleEngine?.loading}
           alerts={alerts}
           todayRefuel={todayRefuel}
           fuelRequests={fuelRequests}

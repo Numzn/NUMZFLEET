@@ -174,6 +174,7 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
     capabilities: snapshot?.capabilities ?? null,
     hub: snapshot?.hub ?? null,
     engine: snapshot?.engine ?? null,
+    activity: snapshot?.engine?.activity ?? null,
     intelligence: snapshot?.intelligence ?? null,
     timeline: snapshot?.timeline ?? [],
     fuelSnapshot: fuelSnapshotFromEngine(snapshot),
