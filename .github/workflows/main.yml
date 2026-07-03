@@ -54,6 +54,11 @@ jobs:
 
       - name: Install and test fuel-api
         working-directory: fuel-api
+        env:
+          # src/config/database.js throws at import time if this is unset, even
+          # though it only builds a lazy Sequelize pool (no connection attempt
+          # until a query actually runs) — no real Postgres needed for unit tests.
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_placeholder
         run: |
           npm ci
           npm test
