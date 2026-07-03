@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Tab, Tabs, Typography, Badge } from '@mui/material';
+import { Box, Tab, Tabs, Badge } from '@mui/material';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { useManager } from '../../common/util/permissions';
@@ -8,7 +8,6 @@ import VehicleWorkspaceMobileNav from './VehicleWorkspaceMobileNav.jsx';
 import VehicleWorkspaceMoreSheet from './VehicleWorkspaceMoreSheet.jsx';
 import VehicleOverviewTab from './overview/VehicleOverviewTab.jsx';
 import VehicleFuelTab from './VehicleFuelTab.jsx';
-import VehicleAlertsColumn from './VehicleAlertsColumn.jsx';
 import VehicleMaintenanceTab from './VehicleMaintenanceTab.jsx';
 import VehicleServiceHistory from './VehicleServiceHistory.jsx';
 import VehicleDocumentsPanel from './VehicleDocumentsPanel.jsx';
@@ -27,10 +26,6 @@ export default function VehicleWorkspaceTabs(props) {
     fuel,
     erb,
     alerts,
-    geofenceAlertsHidden,
-    geofenceAlertsSuppressed,
-    linkedZoneCount,
-    linkedZonesLoading,
     livePosition,
     deviceId,
     linkedDrivers,
@@ -64,7 +59,6 @@ export default function VehicleWorkspaceTabs(props) {
   const badgeContext = {
     dueSoonCount: maintenance.dueSoonCount,
     openServiceCount,
-    alerts,
   };
 
   const renderTabPanel = () => {
@@ -129,25 +123,6 @@ export default function VehicleWorkspaceTabs(props) {
       case VEHICLE_WORKSPACE_TAB_IDS.documents:
         return (
           <VehicleDocumentsPanel fleetVehicleId={fleetVehicleId} />
-        );
-
-      case VEHICLE_WORKSPACE_TAB_IDS.alerts:
-        return (
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 'var(--space-3)' }}>
-              <Typography variant="h2" sx={{ color: 'var(--color-text-primary)' }}>
-                Alerts
-              </Typography>
-            </Box>
-            <VehicleAlertsColumn
-              alerts={alerts}
-              deviceId={deviceId}
-              geofenceAlertsHidden={geofenceAlertsHidden}
-              geofenceAlertsSuppressed={geofenceAlertsSuppressed}
-              linkedZoneCount={linkedZoneCount}
-              linkedZonesLoading={linkedZonesLoading}
-            />
-          </Box>
         );
 
       case VEHICLE_WORKSPACE_TAB_IDS.fuel:

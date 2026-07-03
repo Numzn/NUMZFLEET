@@ -13,13 +13,10 @@ export async function collectEvidence({ merged, deviceId }) {
   let telemetryKm = null;
   let telemetryAttribute = null;
 
-  if (position?.telemetry?.totalDistance != null) {
-    const km = rawTelemetryToKm(position.telemetry.totalDistance, 'totalDistance');
-    telemetryKm = km;
-    telemetryAttribute = 'totalDistance';
-  }
-
-  if (telemetryKm == null && deviceId != null) {
+  // Prefer live Traccar attrs with full evidence priority (odometer → totalDistance → mileage).
+  // Merged position telemetry only exposes totalDistance; using it first could ignore a
+  // updating odometer/mileage field and leave anchored mileage stuck at the last observation.
+  if (deviceId != null) {
     const live = await getVehicleTelemetry(deviceId);
     const attrs = live.positionAttributes;
     if (attrs) {
@@ -29,6 +26,12 @@ export async function collectEvidence({ merged, deviceId }) {
         telemetryAttribute = extracted.attribute;
       }
     }
+  }
+
+  if (telemetryKm == null && position?.telemetry?.totalDistance != null) {
+    const km = rawTelemetryToKm(position.telemetry.totalDistance, 'totalDistance');
+    telemetryKm = km;
+    telemetryAttribute = 'totalDistance';
   }
 
   let anchor = null;

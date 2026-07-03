@@ -92,10 +92,6 @@ export default function VehicleDetailPage() {
             fuel={ws.fuel}
             erb={ws.erb}
             alerts={ws.alerts}
-            geofenceAlertsHidden={ws.geofenceAlertsHidden}
-            geofenceAlertsSuppressed={ws.geofenceAlertsSuppressed}
-            linkedZoneCount={ws.linkedZoneCount}
-            linkedZonesLoading={ws.linkedZonesLoading}
             livePosition={ws.livePosition}
             deviceId={ws.deviceId}
             linkedDrivers={ws.linkedDrivers}

@@ -1,6 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { fetchVehicleEngine } from '../../vehiclesApi.js';
+
+const ENGINE_POLL_MS = 60_000;
+const ENGINE_RELOAD_DEBOUNCE_MS = 5_000;
+
+/** Stable fingerprint of mileage evidence on a live Traccar position. */
+export function mileageEvidenceFingerprint(position) {
+  const attrs = position?.attributes;
+  if (!attrs || typeof attrs !== 'object') return null;
+  for (const key of ['odometer', 'totalDistance', 'mileage']) {
+    const raw = attrs[key];
+    if (raw == null || raw === '') continue;
+    const num = Number(raw);
+    if (Number.isFinite(num)) return `${key}:${num}`;
+  }
+  return null;
+}
 
 /** Map engine.fuel to FuelCard / workspace fuel shape. */
 export function fuelSnapshotFromEngine(snapshot) {
@@ -70,11 +86,14 @@ export function overviewMetricsFromEngine(snapshot) {
   };
 }
 
-export default function useVehicleEngine(fleetVehicleId) {
+export default function useVehicleEngine(fleetVehicleId, { deviceId = null, livePosition = null } = {}) {
   const user = useSelector((s) => s.session.user);
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const reloadRef = useRef(null);
+  const lastEvidenceRef = useRef(null);
+  const debounceTimerRef = useRef(null);
 
   const reload = useCallback(async () => {
     if (!user || !fleetVehicleId) {
@@ -97,11 +116,46 @@ export default function useVehicleEngine(fleetVehicleId) {
     }
   }, [user, fleetVehicleId]);
 
+  reloadRef.current = reload;
+
   useEffect(() => {
     setSnapshot(null);
     setError(null);
+    lastEvidenceRef.current = null;
     reload();
   }, [reload]);
+
+  // Refresh engine when live tracker mileage evidence changes (debounced).
+  useEffect(() => {
+    if (deviceId == null) return undefined;
+    const fingerprint = mileageEvidenceFingerprint(livePosition);
+    if (fingerprint == null) return undefined;
+    if (lastEvidenceRef.current === fingerprint) return undefined;
+    lastEvidenceRef.current = fingerprint;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = window.setTimeout(() => {
+      reloadRef.current?.();
+    }, ENGINE_RELOAD_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, [deviceId, livePosition]);
+
+  // Periodic refresh while workspace is open (covers devices that rarely emit distance attrs).
+  useEffect(() => {
+    if (!user || !fleetVehicleId) return undefined;
+    const id = window.setInterval(() => {
+      reloadRef.current?.();
+    }, ENGINE_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [user, fleetVehicleId]);
 
   const maintenanceItems = snapshot?.hub?.maintenance?.schedules ?? [];
   const dueSoonCount = snapshot?.engine?.maintenance?.actionableCount ?? 0;
@@ -134,4 +188,4 @@ export default function useVehicleEngine(fleetVehicleId) {
     overviewMetrics: overviewMetricsFromEngine(snapshot),
   };
 }
-
+

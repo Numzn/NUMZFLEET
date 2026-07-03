@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveOdometerKm } from './resolveOdometer.js';
-import { rawTelemetryToKm, legacyAnchorTelemetryToKm } from './normaliseEvidence.js';
+import { rawTelemetryToKm, legacyAnchorTelemetryToKm, extractTelemetryEvidence } from './normaliseEvidence.js';
 import { calculateDrift } from './calculateDrift.js';
 import { scoreConfidence } from './scoreConfidence.js';
 
@@ -36,6 +36,15 @@ test('resolveOdometerKm telemetry-only', () => {
 
 test('rawTelemetryToKm converts totalDistance metres', () => {
   assert.equal(rawTelemetryToKm(221450000, 'totalDistance'), 221450);
+});
+
+test('extractTelemetryEvidence prefers odometer over totalDistance', () => {
+  const { km, attribute } = extractTelemetryEvidence({
+    odometer: 250,
+    totalDistance: 190000,
+  });
+  assert.equal(attribute, 'odometer');
+  assert.equal(km, 250);
 });
 
 test('calculateDrift uses latest observation', () => {
