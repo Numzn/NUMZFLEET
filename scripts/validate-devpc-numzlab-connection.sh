@@ -51,7 +51,7 @@ echo
 echo "[1] Direct Tailscale (what Vite proxies to)"
 probe "Fuel API /api/health" "http://${TS_HOST}:3000/api/health"
 probe "Traccar /api/health" "http://${TS_HOST}:8082/api/health"
-probe "Staging UI /health" "http://${TS_HOST}:3003/health"
+probe "NumzLab UI /health" "http://${TS_HOST}:3003/health"
 echo
 
 echo "[2] Direct LAN (often faster at home)"

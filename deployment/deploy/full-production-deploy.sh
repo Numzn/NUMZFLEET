@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Full production deployment: VERIFY -> DEPLOY -> VERIFY, using registry pull-only flow.
+# Full production deployment: BACKUP -> MIGRATE -> DEPLOY -> VERIFY, using registry pull-only flow.
+# On failure after the pre-migration backup, automatically redeploys the previous SHA (images only;
+# migrations are additive and are not reverted — see deployment/deploy/rollback.sh for the same policy).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,6 +11,8 @@ BACKEND_ENV="$ROOT_DIR/backend/.env"
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-numzfleet-prod-db}"
 PRE_DEPLOY_CHECK="$ROOT_DIR/deployment/verify/pre-deploy-check.sh"
 DEPLOY_SCRIPT="$ROOT_DIR/deployment/deploy/deploy-from-registry.sh"
+BASELINE_BACKUP="$ROOT_DIR/deployment/backup/baseline-backup.sh"
+LAST_DEPLOY_FILE="$ROOT_DIR/deployment/deploy/.last_deploy"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://numz.site}"
 
 MIGRATE_LOG_PREFIX="[full-deploy]"
@@ -135,8 +139,42 @@ post_deploy_verify() {
   check_recent_logs
 }
 
+# Runs migrate -> deploy -> verify in a subshell so a failure anywhere in here
+# returns to main() instead of killing the whole process, letting main() trigger
+# the auto-rollback before it exits non-zero.
+#
+# NOTE: this must be invoked as a *plain statement* (see call site), never as
+# the condition of `if`/`while`/`!`/`||` — bash suspends `set -e` for the
+# entire duration of a compound command used as such a condition, including
+# any subshell it wraps, so a failing step would silently be ignored and only
+# the last command's exit status would count. The subshell re-enables `set -e`
+# itself so its own failures still stop it immediately.
+run_deploy_sequence() {
+  local sha="$1"
+  (
+    set -euo pipefail
+    if [[ "${SKIP_MIGRATIONS:-0}" != "1" ]]; then
+      require_file "$BACKEND_ENV"
+      set -a
+      # shellcheck disable=SC1090,SC1091
+      source "$BACKEND_ENV"
+      set +a
+      log "MIGRATE: Postgres (all files in fuel-api/migrations/MIGRATION_ORDER)"
+      verify_migration_db
+      run_all_fuel_migrations
+    else
+      log "SKIP_MIGRATIONS=1 — skipping Postgres migrations"
+    fi
+
+    log "DEPLOY: registry pull-only deployment"
+    bash "$DEPLOY_SCRIPT" "$sha" "$ENV_FILE"
+
+    post_deploy_verify
+  )
+}
+
 main() {
-  local sha
+  local sha rc
   sha="$(resolve_sha "${1:-}")"
   validate_sha "$sha"
 
@@ -148,27 +186,49 @@ main() {
   log "VERIFY: pre-deploy checks"
   bash "$PRE_DEPLOY_CHECK" "$sha" "$ENV_FILE"
 
-  if [[ "${SKIP_MIGRATIONS:-0}" != "1" ]]; then
-    require_file "$BACKEND_ENV"
-    set -a
-    # shellcheck disable=SC1090,SC1091
-    source "$BACKEND_ENV"
-    set +a
-    log "MIGRATE: Postgres (all files in fuel-api/migrations/MIGRATION_ORDER)"
-    verify_migration_db
-    run_all_fuel_migrations
-  else
-    log "SKIP_MIGRATIONS=1 — skipping Postgres migrations"
+  local prev_sha=""
+  if [[ -f "$LAST_DEPLOY_FILE" ]]; then
+    prev_sha="$(tr -d '[:space:]' < "$LAST_DEPLOY_FILE" 2>/dev/null || true)"
   fi
 
-  log "DEPLOY: registry pull-only deployment"
-  bash "$DEPLOY_SCRIPT" "$sha" "$ENV_FILE"
+  if [[ -n "$prev_sha" ]]; then
+    log "BACKUP: pre-migration snapshot of current production DB (currently deployed SHA=$prev_sha)"
+    require_file "$BASELINE_BACKUP"
+    bash "$BASELINE_BACKUP" "$prev_sha"
+  else
+    log "BACKUP: skipped — no previous deployment recorded in $LAST_DEPLOY_FILE (first-ever deploy)"
+  fi
 
-  post_deploy_verify
+  # Plain statement, not an if/while/!/||/&& condition: set -e stays fully
+  # active for every step inside run_deploy_sequence's subshell, and its exit
+  # code is captured afterward without needing to disable -e here at all.
+  set +e
+  run_deploy_sequence "$sha"
+  rc=$?
+  set -e
 
-  printf '\n[full-deploy] SHA deployed: %s\n' "$sha"
-  printf '[full-deploy] Deployment status: SUCCESS\n'
-  printf '[full-deploy] Services health summary: all required containers running; internal and public health checks passed; recent logs clean.\n'
+  if [[ "$rc" -eq 0 ]]; then
+    printf '\n[full-deploy] SHA deployed: %s\n' "$sha"
+    printf '[full-deploy] Deployment status: SUCCESS\n'
+    printf '[full-deploy] Services health summary: all required containers running; internal and public health checks passed; recent logs clean.\n'
+    return 0
+  fi
+
+  printf '[full-deploy] Deployment sequence FAILED for SHA=%s\n' "$sha" >&2
+
+  if [[ -n "$prev_sha" ]]; then
+    printf '[full-deploy] AUTO-ROLLBACK: restoring previous SHA=%s\n' "$prev_sha" >&2
+    if bash "$DEPLOY_SCRIPT" "$prev_sha" "$ENV_FILE"; then
+      printf '[full-deploy] AUTO-ROLLBACK: previous SHA=%s restored successfully. Database migrations were NOT reverted (additive-only policy) — see deployment/deploy/rollback.sh.\n' "$prev_sha" >&2
+    else
+      printf '[full-deploy] AUTO-ROLLBACK FAILED: production may be in a broken state. Manual intervention required. Last known-good SHA=%s, pre-migration backup is in deployment/backups/.\n' "$prev_sha" >&2
+    fi
+  else
+    printf '[full-deploy] AUTO-ROLLBACK: no previous SHA recorded — nothing to roll back to. Manual intervention required.\n' >&2
+  fi
+
+  printf '\n[full-deploy] Deployment status: FAILED (SHA=%s)\n' "$sha" >&2
+  exit 1
 }
 
 main "$@"

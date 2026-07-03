@@ -6,17 +6,16 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full workflow.
 
 ```bash
 cd /srv/projects/numzfleet
-git checkout develop
 ./scripts/dev
 ./scripts/verify
 ```
 
-## Branches
+## Branch and CI
 
-| Branch | Environment | CI |
-|--------|-------------|-----|
-| `develop` | NumzLab (hot reload) | Lint/test only |
-| `main` | OCI production | Build → Docker Hub → deploy |
+Single branch: **`main`**. There is no `develop` branch and no staging environment.
+
+Every push to `main` runs CI (lint/test) and, if it passes, automatically builds images, pushes to Docker
+Hub, and deploys to OCI production — see [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md).
 
 ## Repository layout
 
@@ -310,7 +309,7 @@ Optional ERB overlay: `docker compose -f docker-compose.yml -f docker-compose.er
 Production servers **do not build images**. They **pull** SHA-tagged images from Docker Hub and run `deployment/compose/docker-compose.prod.yml`.
 
 Operator runbook: [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md)  
-CI build/push: [.github/workflows/build-push-numzfleet-images.yml](.github/workflows/build-push-numzfleet-images.yml)  
+CI build/push/deploy: [.github/workflows/main.yml](.github/workflows/main.yml)  
 Workstation deploy helper: [deployment/scripts/auto_deploy.py](deployment/scripts/auto_deploy.py) — see [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md).
 
 ### Docker commands (local)

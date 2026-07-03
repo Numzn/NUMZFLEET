@@ -26,7 +26,7 @@ When the user says **rebuild**, when either of you suggests **“try rebuilding�
 
 When the user says **deploy to the server / production**, the canonical path is **registry-based** (no `docker compose build` on the server).
 
-- **Build/publish images**: GitHub Actions builds and pushes SHA-tagged images (`.github/workflows/build-push-numzfleet-images.yml`).
+- **Build/publish/deploy**: single branch (`main`), single pipeline. GitHub Actions (`.github/workflows/main.yml`) runs quality checks, builds and pushes SHA-tagged images, then deploys to OCI automatically on every push to `main` — no `develop` branch, no staging.
 - **Deploy (no migrations)**: `bash deployment/deploy/deploy-from-registry.sh <full-git-sha> deployment/.env`
 - **Deploy (with migrations)**: `./deployment/run-migrate-and-deploy.sh <full-git-sha>` (preferred when `fuel-api/migrations/` changed)
 - **Never drift**: do not substitute ad-hoc compose commands for production deploy; only use targeted follow-up commands (e.g. `docker compose logs <service>`) *after* the deploy script reports failure.

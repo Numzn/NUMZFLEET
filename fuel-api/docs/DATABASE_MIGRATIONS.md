@@ -14,7 +14,7 @@ With the stack up (`docker compose up -d db` or full `.\rebuild-stack.ps1`):
 .\fuel-api\scripts\apply-fuel-migrations.ps1
 ```
 
-This runs every migration in `MIGRATION_ORDER` (idempotent). Production/staging use the same list via `deployment/utils/fuel-migrations-lib.sh`.
+This runs every migration in `MIGRATION_ORDER` (idempotent). Production uses the same list via `deployment/utils/fuel-migrations-lib.sh`.
 
 ## If you see `column "company_id" does not exist`
 

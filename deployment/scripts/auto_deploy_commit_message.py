@@ -7,7 +7,7 @@ Documented under auto_deploy in deployment/REGISTRY_DEPLOY.md.
 
 from __future__ import annotations
 
-CI_IMAGE_WORKFLOW = ".github/workflows/build-push-numzfleet-images.yml"
+CI_IMAGE_WORKFLOW = ".github/workflows/main.yml"
 
 
 def classify_files(files: list[str]) -> dict[str, bool]:

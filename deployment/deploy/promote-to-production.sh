@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Promote a staging-validated SHA to OCI production (pull only).
+# Deploy a SHA to OCI production (registry pull-only) via full-production-deploy.sh.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,21 +43,7 @@ case "${REGISTRY_PROVIDER:-}" in
     ;;
 esac
 
-export PROMOTED_SHA="$SHA"
-# Staging promotion gate is off by default (staging retired). Set REQUIRE_STAGING_GATE=1 to enforce v3 gate.
-if [[ "${REQUIRE_STAGING_GATE:-0}" == "1" ]]; then
-  if [[ "${SKIP_PROMOTION_GATE:-0}" == "1" ]]; then
-    log "SKIP_PROMOTION_GATE=1 set; relying on upstream gate checks"
-  else
-    : "${GITHUB_TOKEN:?GITHUB_TOKEN is required for promotion gate}"
-    : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required for promotion gate}"
-    bash "$ROOT_DIR/deployment/verify/verify-staging-promotion.sh" "$SHA" "${REGISTRY_PREFIX:-numz14}"
-  fi
-else
-  log "Staging promotion gate skipped (REQUIRE_STAGING_GATE not set). See deployment/STAGING_RETIRED.md"
-fi
-
-log "Promotion gate passed. Running full production deploy for SHA=$SHA"
+log "Running full production deploy for SHA=$SHA"
 bash "$FULL_DEPLOY_SCRIPT" "$SHA" "$ENV_FILE"
 
 mkdir -p "$(dirname "$STATE_FILE")" "$(dirname "$HISTORY_FILE")"

@@ -218,36 +218,11 @@ def resolve_deploy_branch(
     loaded_user: Path | None,
     repo: Path,
 ) -> str:
-    """Staging uses develop unless a staging env file set NUMZFLEET_BRANCH (not production auto_deploy.env)."""
-    default_branch = "develop" if target == "staging" else "main"
+    """Deploy branch (default main), overridable via --branch or NUMZFLEET_BRANCH."""
+    del target, loaded_user, repo  # single-branch model: always main unless explicitly overridden
     if args_branch:
         return args_branch.strip()
-
-    staging_env_path = (repo / "deployment" / "scripts" / "auto_deploy.staging.env").resolve()
-    staging_env_loaded = loaded_user is not None and loaded_user.name == "auto_deploy.staging.env"
-    requested_staging = os.environ.get("NUMZFLEET_AUTO_DEPLOY_ENV_FILE", "").strip()
-
-    if target == "staging":
-        if not staging_env_loaded and (requested_staging or staging_env_path.exists()):
-            if not staging_env_path.is_file():
-                print(
-                    "[auto_deploy] WARNING: staging env file missing "
-                    f"({staging_env_path}). Copy auto_deploy.staging.env.example — "
-                    "until then, using develop and ignoring production NUMZFLEET_BRANCH.\n",
-                    file=sys.stderr,
-                )
-        env_branch = os.environ.get("NUMZFLEET_BRANCH", "").strip()
-        if staging_env_loaded:
-            return env_branch or default_branch
-        if env_branch and env_branch != default_branch:
-            print(
-                f"[auto_deploy] WARNING: ignoring NUMZFLEET_BRANCH={env_branch!r} for --target staging; "
-                f"using {default_branch}.\n",
-                file=sys.stderr,
-            )
-        return default_branch
-
-    return os.environ.get("NUMZFLEET_BRANCH", default_branch).strip() or default_branch
+    return os.environ.get("NUMZFLEET_BRANCH", "main").strip() or "main"
 
 
 def _askpass_env_keys() -> tuple[str, ...]:
@@ -486,7 +461,7 @@ def files_in_commit(repo: Path, sha: str) -> list[str]:
     return get_output(["git", "diff-tree", "--no-commit-id", "--name-only", "-r", sha], cwd=repo).splitlines()
 
 
-CI_IMAGE_WORKFLOW = ".github/workflows/build-push-numzfleet-images.yml"
+CI_IMAGE_WORKFLOW = ".github/workflows/main.yml"
 
 # Must match deployment/oci-server-setup.sh (clone under ubuntu home, not /opt).
 REMOTE_REPO_DEFAULT = "/home/ubuntu/NUMZFLEET"
@@ -534,7 +509,7 @@ def classify_changes(files: list[str]) -> dict[str, bool]:
     }
 
 
-# Path prefixes must stay aligned with .github/workflows/build-push-numzfleet-images.yml `paths:`.
+# Path prefixes must stay aligned with .github/workflows/main.yml `paths:`.
 CI_IMAGE_PATH_LOG_ARGS = (
     "traccar-fleet-system/frontend",
     "fuel-api",
@@ -602,13 +577,13 @@ def dockerhub_app_manifests_exist(sha: str) -> bool:
 
 
 def github_image_build_succeeded(sha: str) -> bool:
-    """True when 'Build and push NumzFleet images' completed successfully for this SHA."""
+    """True when the 'Production deploy' workflow's build-and-push job succeeded for this SHA."""
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     repo_slug = os.environ.get("GITHUB_REPOSITORY", "Numzn/NUMZFLEET").strip()
     if not token or not sha:
         return False
     api = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
-    workflow_file = "build-push-numzfleet-images.yml"
+    workflow_file = "main.yml"
     url = f"{api}/repos/{repo_slug}/actions/workflows/{workflow_file}/runs?head_sha={sha}&per_page=5"
     req = urllib.request.Request(
         url,
@@ -676,8 +651,8 @@ def adjust_deploy_sha_for_registry_images(
     if path_only and path_only != head_sha and not last_ci:
         print(
             f"[auto_deploy] ERROR: Latest image-path commit ({path_only[:12]}...) has no successful "
-            "'Build and push NumzFleet images' run — images are not in Docker Hub yet.\n"
-            "Wait for CI on develop to succeed, or set NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag "
+            "'Production deploy' build-and-push run — images are not in Docker Hub yet.\n"
+            "Wait for CI on main to succeed, or set NUMZFLEET_DEPLOY_IMAGE_TAG / --deploy-image-tag "
             "to a SHA that already built (e.g. last green build on GitHub Actions).\n",
             file=sys.stderr,
         )
@@ -907,9 +882,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--target",
-        choices=("staging", "production"),
+        choices=("production",),
         default="production",
-        help="Deploy target. production=OCI (default). staging is retired — see deployment/STAGING_RETIRED.md.",
+        help="Deploy target. Only OCI production is supported (single-branch, single-environment model).",
     )
     parser.add_argument("--skip-git", action="store_true", help="Do not add/commit/push; deploy current HEAD only.")
     parser.add_argument("--dry-run", action="store_true", help="Print what would run; no git or SSH.")
@@ -975,12 +950,12 @@ def main() -> int:
         "--promoted-sha",
         metavar="SHA",
         default=None,
-        help="Production v3 promote: staging-validated SHA (40 chars). Omit for direct OCI deploy (git → CI → pull).",
+        help="Deploy this exact SHA via the promote-to-production wrapper. Omit for direct OCI deploy (git → CI → pull).",
     )
     parser.add_argument(
         "--direct-production",
         action="store_true",
-        help="Production: skip staging promotion gate; SSH run-migrate-and-deploy (default when --promoted-sha omitted).",
+        help="Skip the promote wrapper; SSH run-migrate-and-deploy directly (default when --promoted-sha omitted).",
     )
     args = parser.parse_args()
 
@@ -1001,15 +976,6 @@ def main() -> int:
     fix_legacy_opt_repo_path()
 
     target = (args.target or "production").strip().lower()
-    if target == "staging":
-        print(
-            "[auto_deploy] ERROR: --target staging is retired.\n"
-            "  Dev: ./scripts/dev on NumzLab\n"
-            "  Production: python3 deployment/scripts/auto_deploy.py --target production --skip-git --deploy-image-tag <sha>\n"
-            "  See deployment/STAGING_RETIRED.md\n",
-            file=sys.stderr,
-        )
-        return 2
 
     branch = resolve_deploy_branch(
         target=target,
@@ -1020,8 +986,7 @@ def main() -> int:
     user = (args.ssh_user or os.environ.get("NUMZFLEET_SSH_USER") or "ubuntu").strip()
     host = (args.ssh_host or os.environ.get("NUMZFLEET_SSH_HOST") or "").strip()
     server_path = os.environ.get("NUMZFLEET_SERVER_REPO_PATH", REMOTE_REPO_DEFAULT).rstrip("/")
-    deploy_env_default = "deployment/.env.staging" if target == "staging" else "deployment/.env"
-    deploy_env = os.environ.get("NUMZFLEET_DEPLOY_ENV", deploy_env_default)
+    deploy_env = os.environ.get("NUMZFLEET_DEPLOY_ENV", "deployment/.env")
     use_migrations = _env_bool("NUMZFLEET_USE_MIGRATIONS", True) and not args.no_migrations
     # Three registry images (frontend, backend, ERB) often need >90s on GitHub-hosted runners.
     wait_sec = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS", 210)
@@ -1039,11 +1004,9 @@ def main() -> int:
         )
         return 2
 
-    prod_mode = ""
-    if target == "production":
-        promoted_sha_preview = (args.promoted_sha or "").strip()
-        direct_preview = args.direct_production or _env_bool("NUMZFLEET_DIRECT_PRODUCTION", False) or not promoted_sha_preview
-        prod_mode = " DIRECT" if direct_preview else " PROMOTE"
+    promoted_sha_preview = (args.promoted_sha or "").strip()
+    direct_preview = args.direct_production or _env_bool("NUMZFLEET_DIRECT_PRODUCTION", False) or not promoted_sha_preview
+    prod_mode = " DIRECT" if direct_preview else " PROMOTE"
 
     print("\n==============================")
     print(f"NUMZFLEET AUTO DEPLOY ({target.upper()}{prod_mode})")
@@ -1111,17 +1074,17 @@ def main() -> int:
     image_tag_source = (args.deploy_image_tag or os.environ.get("NUMZFLEET_DEPLOY_IMAGE_TAG") or "").strip()
     deploy_sha = sha
     promoted_sha = (args.promoted_sha or "").strip()
-    direct_production = target == "production" and (
+    direct_production = (
         args.direct_production
         or _env_bool("NUMZFLEET_DIRECT_PRODUCTION", False)
         or not promoted_sha
     )
-    if target == "production" and promoted_sha:
+    if promoted_sha:
         if len(promoted_sha) != 40:
             print("[auto_deploy] --promoted-sha must be a full 40-char SHA.", file=sys.stderr)
             return 2
         deploy_sha = promoted_sha
-    elif target == "production" and direct_production:
+    elif direct_production:
         print(
             "[auto_deploy] Direct production: migrations (if enabled) → registry pull on OCI.\n"
         )
@@ -1148,14 +1111,6 @@ def main() -> int:
         print(f"  {k}: {flags[k]}")
     print()
 
-    if direct_production and flags["image_build_required"] and branch == "main":
-        print(
-            "[auto_deploy] NOTE: CI image builds trigger on push to develop, not main. "
-            "Push to develop, set NUMZFLEET_BRANCH=develop, or run:\n"
-            "  gh workflow run build-push-numzfleet-images.yml -f git_sha=<sha>\n",
-            file=sys.stderr,
-        )
-
     if args.skip_deploy:
         print("==============================")
         print("DONE (--skip-deploy)")
@@ -1179,7 +1134,7 @@ def main() -> int:
         print("No image rebuild required from path filters (config-only or unrelated paths).")
         print("Registry deploy still pins images to this commit SHA.\n")
 
-    if target == "staging" or (target == "production" and direct_production):
+    if direct_production:
         deploy_sha = adjust_deploy_sha_for_registry_images(
             repo,
             head_sha=sha,
@@ -1195,17 +1150,6 @@ def main() -> int:
     sha_q = shlex.quote(deploy_sha)
     rpx = remote_repo_prefix(sp)
 
-    def remote_dockerhub_env_prefix() -> str:
-        """Pass Hub credentials to NumzLab for docker login before compose pull (avoids rate limits)."""
-        user = os.environ.get("DOCKERHUB_USERNAME", "").strip()
-        token = os.environ.get("DOCKERHUB_TOKEN", "").strip()
-        if not user or not token:
-            return ""
-        return (
-            f"export DOCKERHUB_USERNAME={shlex.quote(user)} "
-            f"DOCKERHUB_TOKEN={shlex.quote(token)} && "
-        )
-
     pull_strategy = os.environ.get("NUMZFLEET_GIT_PULL_STRATEGY", "reset").strip().lower()
     if pull_strategy in ("merge", "pull", "rebase"):
         pull_cmd = f"git pull origin {shlex.quote(branch)}"
@@ -1213,9 +1157,7 @@ def main() -> int:
         # Deploy servers: discard tracked edits so pull never blocks (local compose tweaks, etc.).
         pull_cmd = f"git fetch origin {shlex.quote(branch)} && git reset --hard FETCH_HEAD"
 
-    hub_prefix = remote_dockerhub_env_prefix() if target == "staging" else ""
-
-    if target == "production" and direct_production:
+    if direct_production:
         if use_migrations:
             deploy_body = (
                 "chmod +x deployment/run-migrate-and-deploy.sh && "
@@ -1227,27 +1169,12 @@ def main() -> int:
                 f"bash deployment/deploy/deploy-from-registry.sh {sha_q} {env_q}"
             )
         deploy_label = "direct production deploy"
-    elif target == "production":
+    else:
         deploy_body = (
             "chmod +x deployment/deploy/promote-to-production.sh && "
             f"bash deployment/deploy/promote-to-production.sh {sha_q} {env_q}"
         )
         deploy_label = "promote to production"
-    else:
-        if use_migrations:
-            deploy_body = (
-                hub_prefix
-                + "chmod +x deployment/run-migrate-and-deploy-staging.sh && "
-                f"bash deployment/run-migrate-and-deploy-staging.sh {sha_q} {env_q}"
-            )
-        else:
-            deploy_body = (
-                hub_prefix
-                + "chmod +x deployment/deploy/deploy-to-staging.sh deployment/verify/staging-smoke.sh && "
-                f"bash deployment/deploy/deploy-to-staging.sh {sha_q} {env_q} && "
-                "bash deployment/verify/staging-smoke.sh"
-            )
-        deploy_label = "staging deploy"
 
     remote_inner = rpx + pull_cmd + " && " + deploy_body
 
@@ -1340,11 +1267,7 @@ def main() -> int:
     print("DEPLOYMENT COMPLETE")
     print("==============================\n")
 
-    auto_skip_post_verify = args.skip_post_verify
-    if target == "staging" and not os.environ.get("NUMZFLEET_POST_VERIFY_ORIGIN", "").strip():
-        auto_skip_post_verify = True
-
-    v = post_deploy_verify_external(repo, skip=auto_skip_post_verify)
+    v = post_deploy_verify_external(repo, skip=args.skip_post_verify)
     if v != 0:
         return v
     return 0

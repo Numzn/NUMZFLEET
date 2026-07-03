@@ -43,9 +43,12 @@ Thank you for your interest in contributing to NumzTrak! This document provides 
 
 ## 🚢 Production releases (registry model)
 
-Production deployment is **registry-based only**: images are built in CI (or a release machine), pushed to Docker Hub as `numzfleet-frontend`, `numzfleet-backend`, and `numzfleet-erb` tagged with the **full git SHA**; servers run `deployment/deploy/deploy-from-registry.sh` (pull + up, no build).
+There is a single branch (`main`) and a single, fully automated pipeline: push to `main` runs quality
+checks, builds images in CI, pushes them to Docker Hub as `numzfleet-frontend`, `numzfleet-backend`, and
+`numzfleet-erb` tagged with the **full git SHA**, then deploys to OCI. Servers run
+`deployment/deploy/deploy-from-registry.sh` (pull + up, no build) — never `npm install`/`npm run build`/`docker compose build`.
 
-Read [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md) and ensure workflow secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are set for [.github/workflows/build-push-numzfleet-images.yml](.github/workflows/build-push-numzfleet-images.yml).
+Read [deployment/REGISTRY_DEPLOY.md](deployment/REGISTRY_DEPLOY.md) and ensure workflow secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are set for [.github/workflows/main.yml](.github/workflows/main.yml).
 
 ## 💻 Development Workflow
 
@@ -160,6 +163,8 @@ refactor(api): simplify fuel request service logic
 ```
 
 ## 🔀 Pull Request Process
+
+PRs (if used) target `main` directly — there is no `develop` branch to stage through.
 
 1. **Update documentation** if needed
 2. **Ensure tests pass** (if applicable)

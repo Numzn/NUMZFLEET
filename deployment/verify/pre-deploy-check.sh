@@ -67,14 +67,4 @@ fi
 
 log "All registry images exist for SHA=$SHA"
 
-if [[ -n "${PROMOTED_SHA:-}" ]]; then
-  [[ "$PROMOTED_SHA" == "$SHA" ]] || fail "PROMOTED_SHA ($PROMOTED_SHA) does not match requested SHA ($SHA)"
-  if [[ -n "${GITHUB_TOKEN:-}" && -n "${GITHUB_REPOSITORY:-}" ]]; then
-    log "PROMOTED_SHA set — verifying staging promotion gate"
-    bash "$ROOT_DIR/deployment/verify/verify-staging-promotion.sh" "$SHA" "$REGISTRY_PREFIX"
-  else
-    log "PROMOTED_SHA set but GitHub token context unavailable; assuming promotion gate ran upstream"
-  fi
-fi
-
 log "Pre-deploy verification passed"

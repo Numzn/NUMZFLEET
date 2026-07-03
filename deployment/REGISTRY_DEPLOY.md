@@ -1,55 +1,61 @@
 # Release Pipeline — NumzLab dev → OCI production
 
-**Staging is retired for now.** See [STAGING_RETIRED.md](STAGING_RETIRED.md).
+**Single branch, single pipeline.** There is no staging environment and no `develop` branch — see
+[legacy/staging-archived/](../legacy/staging-archived/) for the retired v3 staging+promotion model.
 
 ## Active flow
 
-1. **Develop** on NumzLab: `./scripts/dev` (hot reload).
-2. **Build/push** SHA-tagged images to Docker Hub.
-3. **Deploy production** from NumzLab:
-
-```bash
-python3 deployment/scripts/auto_deploy.py \
-  --target production \
-  --skip-git \
-  --deploy-image-tag <full-git-sha>
+```mermaid
+flowchart TD
+  Dev["NumzLab dev\n./scripts/dev (hot reload)"] --> Push["git push origin main"]
+  Push --> QC["GitHub Actions: quality-checks\nfuel-api tests, migration manifest, frontend build"]
+  QC -->|pass| Build["build-and-push\nbuild 3 SHA-tagged images, push Docker Hub"]
+  QC -->|fail| StopA["Pipeline stops — nothing pushed"]
+  Build --> Verify["Verify image manifests exist"]
+  Verify --> SSH["SSH to OCI\npromote-to-production.sh"]
+  SSH --> Backup["Pre-migration DB backup\n(snapshot of currently-live SHA)"]
+  Backup --> Migrate["Run Postgres migrations\n(idempotent, DROP/TRUNCATE blocked)"]
+  Migrate --> Pull["docker compose pull"]
+  Pull --> Up["docker compose up -d --wait"]
+  Up --> IntHealth["Internal health checks\n(containers, 127.0.0.1 endpoints)"]
+  IntHealth --> PubHealth["Public health checks\nhttps://numz.site/health, /api/health"]
+  PubHealth -->|pass| Done["Deployment complete"]
+  IntHealth -->|fail| Rollback
+  PubHealth -->|fail| Rollback
+  Migrate -->|fail| Rollback
+  Pull -->|fail| Rollback
+  Up -->|fail| Rollback
+  Rollback["AUTO-ROLLBACK\nredeploy previous SHA's images\n(migrations stay forward)"] --> Failed["Workflow fails — production restored to last-known-good"]
 ```
 
-Or on OCI directly:
+1. **Develop** on NumzLab: `./scripts/dev` (hot reload). Test locally.
+2. **Commit and push to `main`** — that's the only trigger:
+
+```bash
+git add .
+git commit -m "..."
+git push origin main
+```
+
+3. **GitHub Actions** (`.github/workflows/main.yml`, the only path to OCI) runs automatically:
+   - `quality-checks`: fuel-api tests, migration-manifest validation, frontend build — any failure stops the pipeline before anything is built or pushed.
+   - `build-and-push`: builds and pushes 3 SHA-tagged images (frontend, backend, ERB) to Docker Hub.
+   - `deploy-oci`: verifies the images actually landed on Docker Hub, SSHs to OCI, and runs `promote-to-production.sh` → `full-production-deploy.sh`, which takes a **pre-migration backup**, runs migrations, pulls + starts the new images, and runs internal + public health checks. Any failure after the backup **automatically redeploys the previous SHA's images** (migrations are additive and stay forward — same policy as `rollback.sh`), then the workflow still fails so you know the release didn't ship.
+4. OCI is **pull-only** (`docker compose pull` + `up`) — it never runs `npm install`, `npm run build`, or `docker compose build`.
+
+Manual/break-glass equivalent, without waiting on CI (e.g. to redeploy a SHA that already built):
+
+```bash
+python3 deployment/scripts/auto_deploy.py --skip-git --deploy-image-tag <full-git-sha>
+```
+
+Or directly on OCI:
 
 ```bash
 ./deployment/run-migrate-and-deploy.sh <full-git-sha> deployment/.env
 ```
 
-4. OCI is **pull-only** (`docker compose pull` + `up`) — never `docker compose build` on the server.
-
 Migrations: see [MIGRATIONS_AND_DEPLOY.md](MIGRATIONS_AND_DEPLOY.md).
-
----
-
-## Historical: Release Pipeline v3 (staging + promotion)
-
-<details>
-<summary>Collapsed — staging path not in use</summary>
-
-NUMZFLEET v3 used immutable SHA-tagged images and promotion-based releases:
-
-- `develop` -> build images -> deploy to NumzLab staging
-- staging success -> manual approval -> promote exact SHA to OCI production
-
-Staging deploy wrapper:
-
-```bash
-bash deployment/deploy/deploy-to-staging.sh <full-git-sha> deployment/.env.staging
-```
-
-Promotion gate check:
-
-```bash
-bash deployment/verify/verify-staging-promotion.sh <full-git-sha> numz14
-```
-
-</details>
 
 ---
 
@@ -183,15 +189,20 @@ python deployment/scripts/auto_deploy.py --dry-run --skip-git
 
 **Useful flags**: `--skip-git` (deploy only), `--skip-deploy` (push only), `--skip-wait` (skip CI buffer sleep), `--no-migrations` (always registry deploy), `--deploy-image-tag <ref>`, `--prompt-message` / `NUMZFLEET_AUTO_COMMIT_MESSAGE=0` for commit messages.
 
-**If `docker pull` fails with `manifest unknown` after a push:** GitHub Actions may still be building (three images: frontend, backend, ERB). Confirm the **Build and push NumzFleet images** run for that SHA is green, then run `python deployment/scripts/auto_deploy.py --skip-git` (or raise **`NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS`** — default **210s** before SSH when images are expected; with migrations + images, `auto_deploy` floors at **180s** unless you set higher).
+**If `docker pull` fails with `manifest unknown` after a push:** GitHub Actions may still be building (three images: frontend, backend, ERB). Confirm the **Production deploy** workflow's `build-and-push` job for that SHA is green, then run `python deployment/scripts/auto_deploy.py --skip-git` (or raise **`NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS`** — default **210s** before SSH when images are expected; with migrations + images, `auto_deploy` floors at **180s** unless you set higher).
 
 **Post-deploy verification (workstation):** After a successful SSH deploy, `auto_deploy` waits **`NUMZFLEET_POST_VERIFY_WAIT_SECONDS`** (default **60**), then **GET**s **`{origin}/health`** and **`{origin}/api/health`** from your machine with **no-cache** headers and a **cache-busting query** (force refresh through browsers/CDNs). Origin: **`NUMZFLEET_POST_VERIFY_ORIGIN`** if set; otherwise the **first non-loopback** entry in **`CORS_ORIGIN`** (comma-separated lists often put `https://numz.site` before `http://localhost:3002` — localhost alone would be skipped; set **`NUMZFLEET_POST_VERIFY_ORIGIN`** explicitly if needed). Override URLs with **`NUMZFLEET_POST_VERIFY_HEALTH_URL`** / **`NUMZFLEET_POST_VERIFY_API_HEALTH_URL`**. Disable with **`NUMZFLEET_POST_VERIFY=0`** or **`--skip-post-verify`**. Set **`NUMZFLEET_POST_VERIFY_STRICT=1`** to exit non-zero if probes fail after retries.
 
 Full env list: comments in `auto_deploy.defaults.env` and **`python deployment/scripts/auto_deploy.py --help`** epilog (points here).
 
-## Baseline backup (post-deploy snapshot)
+## Baseline backup (pre-migration snapshot, automatic)
 
-After a successful migrate+deploy, take a SHA-pinned baseline so the release is reversible at the data layer:
+`full-production-deploy.sh` runs this automatically, **before** migrations, as the real safety net: it
+snapshots the DB at whatever SHA is currently live (read from `.last_deploy`), so if the new migration or
+deploy fails, there's a restore point from *before* anything changed. You don't need to run it by hand as
+part of a normal deploy — it's step 2 of the pipeline (see the diagram above).
+
+To take an ad hoc snapshot at any other time (e.g. before a manual `psql` change):
 
 ```bash
 ./deployment/backup/baseline-backup.sh                   # uses last deployed SHA from .last_deploy
@@ -211,9 +222,14 @@ pg_restore --clean --if-exists --no-owner --no-privileges --dbname="$DATABASE_UR
   deployment/backups/<run-dir>/numztrak_fuel.dump
 ```
 
-## Rollback drill
+## Rollback
 
-Rollback re-deploys the **previous image SHA** recorded in `deployment/deploy/.deploy_history`. It does **not** revert DB migrations — migrations in this repo are additive, but if a release ships a destructive change, restore from the matching baseline snapshot **before** rolling back.
+**Automatic:** `full-production-deploy.sh` (the script both CI and the manual paths call) already rolls back
+on its own — if migrations, deploy, or health verification fail, it immediately redeploys the previous SHA's
+images and the workflow still fails so you know the intended release didn't ship. Production is left healthy
+on the last-known-good SHA; nothing further to do.
+
+**Manual drill:** re-deploys the **previous image SHA** recorded in `deployment/deploy/.deploy_history`. Neither path reverts DB migrations — migrations in this repo are additive, but if a release ships a destructive change, restore from the matching baseline snapshot **before** rolling back.
 
 ```bash
 bash deployment/deploy/rollback.sh deployment/.env
@@ -232,26 +248,21 @@ After the drill, re-deploy the latest SHA to return production to its intended s
 
 ## Standard release workflow
 
-One repeatable path — no manual guesswork:
+One repeatable, fully automated path — no manual guesswork:
 
-1. **Push** code to `main` (or run the workflow manually).
-2. **CI** (`.github/workflows/build-push-numzfleet-images.yml`) builds and pushes SHA-tagged images for `frontend`, `backend`, and `erb`.
-3. **Deploy** on the production host with the migrate+deploy wrapper:
+1. **Push** code to `main` (or run `.github/workflows/main.yml` manually via `workflow_dispatch`).
+2. **CI quality gates** run first: fuel-api tests, migration-manifest validation, frontend build. Any failure stops here — nothing is built or pushed.
+3. **CI builds and pushes** SHA-tagged images for `frontend`, `backend`, and `erb` to Docker Hub, then verifies the manifests exist.
+4. **CI deploys**: SSHs to OCI and runs `promote-to-production.sh` → `full-production-deploy.sh`, which backs up the DB, runs migrations, pulls + starts the new images, and verifies health — with automatic rollback to the previous SHA if anything fails.
+5. **CI verifies** edge + API health from GitHub's network as a final independent check.
 
-   ```bash
-   ./deployment/run-migrate-and-deploy.sh <full-git-sha>
-   ```
+Nothing further to do by hand. For the manual/break-glass path (bypassing CI), or to trigger it directly on the server:
 
-4. **Verify** edge + API health (script does this; spot-check in browser at `https://<domain>/`).
-5. **Snapshot** the database baseline:
+```bash
+./deployment/run-migrate-and-deploy.sh <full-git-sha>
+```
 
-   ```bash
-   ./deployment/backup/baseline-backup.sh <full-git-sha>
-   ```
-
-6. **(Periodic) drill** rollback to confirm reversibility (see "Rollback drill" above).
-
-### Operator release checklist
+### Operator release checklist (manual/break-glass path only)
 
 - [ ] Confirm the SHA exists on the registry (CI job for that SHA succeeded).
 - [ ] Confirm `deployment/.env` has the registry config (`REGISTRY_PROVIDER`, `REGISTRY_PREFIX` / `DOCKERHUB_USERNAME`).
@@ -259,12 +270,11 @@ One repeatable path — no manual guesswork:
 - [ ] Run `./deployment/run-migrate-and-deploy.sh <sha>`; confirm both health probes pass and log under `deployment/logs/` shows no DB or startup errors.
 - [ ] Spot-check `https://<domain>/`, `https://<domain>/api/health`, `https://<domain>/traccar/api/server` (per [ROUTING.md](../ROUTING.md)).
 - [ ] Confirm `:3000`, `:3002`, `:8082` are **not** reachable from a public network (only via SSH tunnel).
-- [ ] Run `./deployment/backup/baseline-backup.sh <sha>`; copy archive off-host.
-- [ ] Record the SHA, log path, and backup path in the release notes.
+- [ ] Record the SHA, log path, and backup path (`deployment/deploy/full-production-deploy.sh` writes the pre-migration backup automatically) in the release notes.
 
 ## Build and push (CI or release machine)
 
-GitHub Actions: [.github/workflows/build-push-numzfleet-images.yml](../.github/workflows/build-push-numzfleet-images.yml) (requires `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets).
+GitHub Actions: [.github/workflows/main.yml](../.github/workflows/main.yml), `build-and-push` job (requires `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets).
 
 Manual (same tags CI produces):
 

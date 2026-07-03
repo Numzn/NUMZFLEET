@@ -8,8 +8,7 @@ NumzLab is the **development workstation**. You edit code here via Cursor Remote
 |------|-------|
 | Path | `/srv/projects/numzfleet` |
 | GitHub | `https://github.com/Numzn/NUMZFLEET` |
-| Dev branch | `develop` |
-| Production branch | `main` |
+| Branch | `main` (single branch — no `develop`, no staging) |
 
 The PC folder `C:\Users\NUMERI\NUMZFLEET` is a **read-only backup**. Do not use it for active development.
 
@@ -17,7 +16,6 @@ The PC folder `C:\Users\NUMERI\NUMZFLEET` is a **read-only backup**. Do not use 
 
 ```bash
 cd /srv/projects/numzfleet
-git checkout develop
 ./scripts/dev          # start hot-reload stack
 ./scripts/logs         # follow logs
 ./scripts/stop         # stop stack
@@ -26,15 +24,19 @@ git checkout develop
 
 Edit files in Cursor (Remote SSH). Frontend and backend reload automatically.
 
-Commit and push from NumzLab:
+## Production release
+
+Every push to `main` deploys to production automatically — there's no separate release step:
 
 ```bash
 git add .
 git commit -m "your message"
-git push origin develop
+git push origin main
 ```
 
-Pushes to `develop` do **not** deploy to production.
+GitHub Actions (`.github/workflows/main.yml`) then runs quality checks, builds and pushes Docker images,
+and deploys to OCI (`numz.site`) with a pre-migration backup and automatic rollback on failure. See
+[deployment/REGISTRY_DEPLOY.md](../deployment/REGISTRY_DEPLOY.md) for the full pipeline.
 
 ## Access URLs (Tailscale)
 
@@ -45,14 +47,6 @@ Pushes to `develop` do **not** deploy to production.
 | Traccar | http://track.fleet.numzlab or http://100.121.79.2:8082 |
 
 Prerequisite: Tailscale Split DNS for domain `numzlab` → `100.121.79.2`.
-
-## Production release
-
-```bash
-./scripts/release      # opens PR develop → main
-```
-
-After merge to `main`, GitHub Actions builds Docker images, pushes to Docker Hub, and deploys to OCI (`numz.site`).
 
 ## Environment files
 

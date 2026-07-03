@@ -17,7 +17,7 @@ This file contains focused, actionable guidance to help an AI agent be productiv
   - Bring stack up without the script (docs / first run):
     - `docker compose -f docker-compose.yml up -d --build` (add `-f docker-compose.erb.yml` for ERB).
     - Logs: `docker compose logs -f`
-  - Production (registry-only, no build on server): see `deployment/REGISTRY_DEPLOY.md` and `deployment/deploy/deploy-from-registry.sh`; images `numzfleet-frontend`, `numzfleet-backend`, `numzfleet-erb` tagged with full git SHA; CI workflow `.github/workflows/build-push-numzfleet-images.yml`.
+  - Production (registry-only, no build on server): see `deployment/REGISTRY_DEPLOY.md` and `deployment/deploy/deploy-from-registry.sh`; images `numzfleet-frontend`, `numzfleet-backend`, `numzfleet-erb` tagged with full git SHA; CI workflow `.github/workflows/main.yml` (push to `main` builds, pushes, and deploys — single branch, no staging).
   - Fuel API local dev (fast iteration):
     - `cd fuel-api; npm install; npm run dev` (uses `nodemon`, entry `src/server.js`).
     - Env: uses `DATABASE_URL` and other vars from the root `docker-compose.yml` when running in Docker.

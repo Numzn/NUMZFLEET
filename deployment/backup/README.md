@@ -109,7 +109,7 @@ If you use Oracle Object Storage instead of S3, configure **AWS-compatible S3 AP
 - [ ] `backup-secrets.env` present, mode 600, matches `backend/.env` DB passwords
 - [ ] `COMPOSE_ARGS_OVERRIDE` (or defaults) in `backup.sh` / `backup.env` matches production `docker compose up` files
 - [ ] Successful manual backup; archive and checksum sizes sane
-- [ ] Full restore drill completed on staging or snapshot clone
+- [ ] Full restore drill completed on a snapshot clone
 - [ ] Cron + `MAILTO` or `BACKUP_WEBHOOK_URL`
 - [ ] Off-site upload verified; bucket lifecycle configured
 - [ ] Disk monitoring for `BACKUP_ROOT`
