@@ -24,6 +24,7 @@ LAST_DEPLOY_FILE="$ROOT_DIR/deployment/deploy/.last_deploy"
 BACKUP_ROOT="${BACKUP_ROOT:-$ROOT_DIR/deployment/backups}"
 LOG_DIR="$ROOT_DIR/deployment/logs"
 MIN_DUMP_BYTES="${MIN_DUMP_BYTES:-4096}"
+POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-numzfleet-prod-db}"
 
 log() { printf '[baseline-backup] %s\n' "$*"; }
 fail() { printf '[baseline-backup] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -32,6 +33,21 @@ mask_database_url() {
   local u="${1:-}"
   if [[ -z "$u" ]]; then echo "(empty)"; return; fi
   echo "$u" | sed -E 's#(postgresql://[^:/@]+:)[^@]+#\1***#; s#(postgres://[^:/@]+:)[^@]+#\1***#'
+}
+
+# Same technique as deployment/utils/fuel-migrations-lib.sh's psql_url_for_inside_db_container:
+# DATABASE_URL's host is the Compose service alias ("db"), only resolvable inside the
+# Docker network — from inside that same container, Postgres is reachable at 127.0.0.1.
+postgres_container_running() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$POSTGRES_CONTAINER"
+}
+
+url_for_inside_db_container() {
+  local u="$1"
+  u="${u//@db:/@127.0.0.1:}"
+  u="${u//@postgres:/@127.0.0.1:}"
+  printf '%s' "$u"
 }
 
 resolve_sha() {
@@ -58,7 +74,9 @@ main() {
   set +a
 
   : "${DATABASE_URL:?DATABASE_URL must be set in backend/.env}"
-  command -v pg_dump >/dev/null 2>&1 || fail "pg_dump not found on PATH"
+  if ! postgres_container_running && ! command -v pg_dump >/dev/null 2>&1; then
+    fail "pg_dump not on PATH and container '$POSTGRES_CONTAINER' is not running"
+  fi
 
   local TS HOST RUN_DIR DUMP_PATH CHECKSUM_PATH META_PATH
   TS="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
@@ -78,8 +96,14 @@ main() {
     log "DATABASE_URL (masked): $(mask_database_url "$DATABASE_URL")"
     log "Output dir: $RUN_DIR"
 
-    log "Running pg_dump (custom format) -> $DUMP_PATH"
-    pg_dump --format=custom --no-owner --no-privileges --file="$DUMP_PATH" "$DATABASE_URL"
+    if postgres_container_running; then
+      log "Running pg_dump inside container $POSTGRES_CONTAINER (custom format) -> $DUMP_PATH"
+      docker exec -i "$POSTGRES_CONTAINER" pg_dump --format=custom --no-owner --no-privileges \
+        "$(url_for_inside_db_container "$DATABASE_URL")" > "$DUMP_PATH"
+    else
+      log "Running pg_dump on host (custom format) -> $DUMP_PATH"
+      pg_dump --format=custom --no-owner --no-privileges --file="$DUMP_PATH" "$DATABASE_URL"
+    fi
 
     [[ -s "$DUMP_PATH" ]] || fail "Dump missing or empty: $DUMP_PATH"
     local SZ
