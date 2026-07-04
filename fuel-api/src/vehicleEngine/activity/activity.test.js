@@ -32,20 +32,33 @@ test('formatDurationMs renders human labels', () => {
 });
 
 test('buildActivityEngine collapses brief stop into user-facing activity', () => {
+  // buildActivityEngine only returns activities from "today" (isToday() compares
+  // against the real current date), so fixtures must be relative to test-run time,
+  // not hardcoded absolute dates — same convention as the "flags trip fragmentation"
+  // test below. Relative offsets here preserve the original fixture's timing:
+  // trip1 10:34-10:38, 45s brief stop, trip2 10:38:45-10:47, geofenceEnter at 10:40.
+  const now = new Date();
+  const iso = (msAgo) => new Date(now.getTime() - msAgo).toISOString();
+
+  const trip1Start = 14 * 60 * 1000;
+  const trip1End = 10 * 60 * 1000;
+  const trip2Start = trip1End - 45 * 1000;
+  const trip2End = trip2Start - (8 * 60 + 15) * 1000;
+  const geofenceEnter = trip2Start - 75 * 1000;
+
+  const rawTrips = [
+    { startTime: iso(trip1Start), endTime: iso(trip1End), distance: 5000 },
+    { startTime: iso(trip2Start), endTime: iso(trip2End), distance: 8000 },
+  ];
+
   const hub = {
     config: { briefStopThresholdMs: 180000 },
-    rawTrips: [
-      { startTime: '2026-07-03T10:34:00.000Z', endTime: '2026-07-03T10:38:00.000Z', distance: 5000 },
-      { startTime: '2026-07-03T10:38:45.000Z', endTime: '2026-07-03T10:47:00.000Z', distance: 8000 },
-    ],
-    journeys: segmentJourneys([
-      { startTime: '2026-07-03T10:34:00.000Z', endTime: '2026-07-03T10:38:00.000Z', distance: 5000 },
-      { startTime: '2026-07-03T10:38:45.000Z', endTime: '2026-07-03T10:47:00.000Z', distance: 8000 },
-    ]),
+    rawTrips,
+    journeys: segmentJourneys(rawTrips),
     rawEvents: [
-      { id: 1, type: 'deviceStopped', occurredAt: '2026-07-03T10:38:00.000Z', attributes: {} },
-      { id: 2, type: 'deviceMoving', occurredAt: '2026-07-03T10:38:45.000Z', attributes: {} },
-      { id: 3, type: 'geofenceEnter', occurredAt: '2026-07-03T10:40:00.000Z', attributes: {} },
+      { id: 1, type: 'deviceStopped', occurredAt: iso(trip1End), attributes: {} },
+      { id: 2, type: 'deviceMoving', occurredAt: iso(trip2Start), attributes: {} },
+      { id: 3, type: 'geofenceEnter', occurredAt: iso(geofenceEnter), attributes: {} },
     ],
   };
 
