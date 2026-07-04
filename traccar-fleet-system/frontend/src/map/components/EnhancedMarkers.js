@@ -57,8 +57,11 @@ const EnhancedMarkers = ({
     const displayName = display.secondary
       ? `${display.primary} (${display.secondary})`
       : display.primary;
-    const isOnline = device?.status === 'online';
-    const isMoving = position.speed > 0;
+    // Canonical, backend-persisted state — same field the fleet list and
+    // KPI counts read, so the marker color can't disagree with them.
+    const state = display.activityState?.state ?? 'offline';
+    const isOnline = state !== 'offline';
+    const isMoving = state === 'moving';
     const isSelected = selectedPositionId === position.id;
     const course = Number(position.course) || 0;
     const hasHeading = course > 5;

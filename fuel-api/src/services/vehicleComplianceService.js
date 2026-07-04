@@ -9,6 +9,7 @@ import {
   VEHICLE_COMPLIANCE_STATUSES,
   VEHICLE_COMPLIANCE_TYPES,
 } from '../models/VehicleCompliance.js';
+import { evaluateDueDateStatus } from '../compliance/complianceEvaluator.js';
 
 const DEFAULT_LEAD_DAYS = 30;
 
@@ -77,17 +78,23 @@ async function assertDocumentBelongsToVehicle(companyId, fleetVehicleId, documen
   return row;
 }
 
-function toDto(row) {
+export function toDto(row) {
   if (!row) return null;
   const plain = row.toJSON ? row.toJSON() : row;
+  const reminderLeadDays = Number(plain.reminderLeadDays ?? DEFAULT_LEAD_DAYS);
+  // Computed on read from the same evaluator the notification scheduler
+  // uses (evaluateDueDateStatus) — the stored `status` column is legacy/
+  // non-authoritative and must not be echoed back as current truth.
+  const evaluated = evaluateDueDateStatus({ dueDate: plain.dueDate, reminderLeadDays });
   return {
     id: plain.id,
     companyId: plain.companyId,
     fleetVehicleId: plain.fleetVehicleId,
     type: plain.type,
     dueDate: plain.dueDate || null,
-    status: plain.status,
-    reminderLeadDays: Number(plain.reminderLeadDays ?? DEFAULT_LEAD_DAYS),
+    status: evaluated.status.toUpperCase(),
+    daysRemaining: evaluated.daysRemaining,
+    reminderLeadDays,
     documentId: plain.documentId ?? null,
     metadata: plain.metadata && typeof plain.metadata === 'object' ? plain.metadata : {},
     createdAt: plain.createdAt ? new Date(plain.createdAt).toISOString() : null,
@@ -117,9 +124,26 @@ export async function listComplianceForCompany(companyId) {
   return rows.map(toDto);
 }
 
+/**
+ * Routine Service is Traccar-owned (tc_maintenances, tagged numzServicePackage)
+ * — a compliance row of this type would be a second, parallel source of truth
+ * for the same obligation. Historical rows (if any) are left alone; only new
+ * creation/conversion through the public API is blocked.
+ */
+export function rejectRoutineServiceType(type) {
+  if (type === 'ROUTINE_SERVICE') {
+    const error = new Error(
+      'Routine Service is owned by the Traccar maintenance schedule — configure it from Vehicle Setup, not as a compliance obligation.',
+    );
+    error.statusCode = 409;
+    throw error;
+  }
+}
+
 export async function createComplianceForVehicle(companyId, fleetVehicleId, payload = {}) {
   await assertVehicleInTenant(fleetVehicleId, companyId);
   const type = parseType(payload.type);
+  rejectRoutineServiceType(type);
   const status = parseStatus(payload.status || 'VALID');
   const dueDate = asIsoDate(payload.dueDate);
   const reminderLeadDays = parseLeadDays(payload.reminderLeadDays);
@@ -160,7 +184,16 @@ export async function updateComplianceForVehicle(
   }
 
   const patch = {};
-  if (payload.type !== undefined) patch.type = parseType(payload.type);
+  if (payload.type !== undefined) {
+    const nextType = parseType(payload.type);
+    // Allow editing a pre-existing ROUTINE_SERVICE row (historical data is
+    // preserved as-is); block converting some OTHER type into it, or
+    // creating a new parallel one via update-in-place.
+    if (nextType !== row.type) {
+      rejectRoutineServiceType(nextType);
+    }
+    patch.type = nextType;
+  }
   if (payload.status !== undefined) patch.status = parseStatus(payload.status);
   if (payload.dueDate !== undefined) patch.dueDate = asIsoDate(payload.dueDate);
   if (payload.reminderLeadDays !== undefined) patch.reminderLeadDays = parseLeadDays(payload.reminderLeadDays);

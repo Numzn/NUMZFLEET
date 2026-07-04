@@ -1,15 +1,22 @@
 import { normalizePositionTelemetry } from './telemetryUtils.js';
 
-/** Status tint key for fleet mobile UI (moving / idle / offline). */
-export function getVehicleStatusKey(device, position) {
-  if (device.status !== 'online') return 'offline';
-  return position && Number(position.speed) > 0 ? 'moving' : 'idle';
+const MOTION_LABELS = { moving: 'Moving', idle: 'Idle', offline: 'Offline' };
+
+/**
+ * Status tint key for fleet UI (moving / idle / offline) — derived entirely
+ * from the canonical, backend-persisted activity state (see
+ * fuel-api/src/vehicleEngine/activity/resolveActivityState.js). No local
+ * recomputation from device.status/position.speed here anymore — every
+ * consumer of this file reads the same resolved value.
+ * @param {{ state: 'moving'|'idle'|'offline' }|null} activityState
+ */
+export function getVehicleStatusKey(activityState) {
+  return activityState?.state ?? 'offline';
 }
 
-/** Motion label from device connectivity + live speed (Traccar speed in knots). */
-export function getMotionLabel(deviceStatus, positionSpeed) {
-  if (deviceStatus !== 'online') return 'Offline';
-  return positionSpeed != null && Number(positionSpeed) > 0 ? 'Moving' : 'Idle';
+/** Human label for the same canonical state. */
+export function getMotionLabel(activityState) {
+  return MOTION_LABELS[activityState?.state] ?? 'Offline';
 }
 
 /** Short ignition phrase when online; null if unknown. */
@@ -17,37 +24,6 @@ export function getIgnitionPhrase(positionAttributes) {
   const { ignition } = normalizePositionTelemetry(positionAttributes || null);
   if (ignition === true || ignition === 'true' || ignition === 1 || ignition === '1') return 'Ignition ON';
   if (ignition === false || ignition === 'false' || ignition === 0 || ignition === '0') return 'Ignition OFF';
-  return null;
-}
-
-/**
- * Session-scoped motion-state tracker: remembers when each device last changed
- * between Moving / Idle / Offline so the UI can show "Idle 2h 14m".
- * Prefers Traccar position attributes (stopTime, motionTime) when present;
- * falls back to session tracker only when telemetry lacks onset timestamps.
- */
-const motionStateTracker = new Map();
-
-function parseAttributeTimestamp(attrs, keys) {
-  if (!attrs) return null;
-  for (const key of keys) {
-    const raw = attrs[key];
-    if (raw == null || raw === '') continue;
-    const ms = typeof raw === 'number' ? raw : Date.parse(String(raw));
-    if (Number.isFinite(ms) && ms > 0) return ms;
-  }
-  return null;
-}
-
-/** Resolve motion-state onset from Traccar position attributes when available. */
-export function getMotionStateSinceFromAttributes(state, positionAttributes) {
-  if (!positionAttributes) return null;
-  if (state === 'Moving') {
-    return parseAttributeTimestamp(positionAttributes, ['motionTime', 'motionStart', 'eventTime']);
-  }
-  if (state === 'Idle') {
-    return parseAttributeTimestamp(positionAttributes, ['stopTime', 'idleTime', 'parkedTime', 'eventTime']);
-  }
   return null;
 }
 
@@ -65,30 +41,17 @@ function formatMotionDuration(ms) {
 }
 
 /**
- * How long the device has held its current motion state (Moving/Idle/Offline).
- * Records the transition the first time a new state is observed and returns a
- * short human label like "45m" or "2h 14m". Returns null when device id is unknown.
+ * How long the vehicle has held its current activity state. Backed by
+ * `activityState.stateEnteredAt`, which the backend persists and only
+ * updates on an actual detected transition (reconstructed from Traccar's
+ * event log when possible, not stamped "now" on every read) — a vehicle
+ * moving for 5 hours no longer shows "Idle 1m" just because this is the
+ * first time this session evaluated it.
+ * @param {{ stateEnteredAt: string|Date }|null} activityState
  */
-export function getMotionDurationLabel(
-  deviceId,
-  deviceStatus,
-  positionSpeed,
-  now = Date.now(),
-  positionAttributes = null,
-) {
-  if (deviceId == null) return null;
-  const state = getMotionLabel(deviceStatus, positionSpeed);
-  const attrSince = getMotionStateSinceFromAttributes(state, positionAttributes);
-  const prev = motionStateTracker.get(deviceId);
-  let since;
-  if (!prev || prev.state !== state) {
-    since = attrSince ?? now;
-    motionStateTracker.set(deviceId, { state, since });
-  } else if (attrSince != null && attrSince < prev.since) {
-    since = attrSince;
-    motionStateTracker.set(deviceId, { state, since });
-  } else {
-    since = prev.since;
-  }
+export function getMotionDurationLabel(activityState, now = Date.now()) {
+  if (!activityState?.stateEnteredAt) return null;
+  const since = new Date(activityState.stateEnteredAt).getTime();
+  if (!Number.isFinite(since)) return null;
   return formatMotionDuration(now - since);
 }

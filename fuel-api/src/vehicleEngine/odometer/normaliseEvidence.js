@@ -37,14 +37,16 @@ export function rawTelemetryToKm(value, attribute) {
   if (!Number.isFinite(n)) return null;
 
   if (attribute === 'totalDistance') {
+    // Traccar protocol-normalises totalDistance to metres regardless of
+    // source device/protocol — this conversion is guaranteed, not a guess.
     return Number((n / 1000).toFixed(1));
   }
 
-  // odometer / mileage: fleet context usually km; very large values treated as metres
-  if (n >= 500_000) {
-    return Number((n / 1000).toFixed(1));
-  }
-
+  // odometer / mileage: Traccar does not normalise these; the unit is
+  // device/protocol-dependent and cannot be inferred from magnitude alone.
+  // Assume km (the common convention) here — any x1000 mismatch is detected
+  // and corrected against the verified anchor in detectUnitMismatch()
+  // (validateEvidence.js), not guessed by an absolute threshold.
   return Number(n.toFixed(1));
 }
 

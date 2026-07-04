@@ -242,13 +242,17 @@ export function computeVehicleSetupReadiness({
       label: 'Requires device',
       detail: 'Link a tracker to configure Routine Service.',
     });
-  } else if (vehicle?.fleetConfig?.routineService?.maintenanceId) {
-    const rs = vehicle.fleetConfig.routineService;
+  } else if (vehicle?.routineService) {
+    // Authoritative: the actual Traccar schedule (tagged numzServicePackage),
+    // not the cached numzFleetConfig.routineService pointer. A schedule can
+    // exist with a missing/stale pointer (or vice versa) — only the real
+    // schedule counts as "configured".
+    const rs = vehicle.routineService;
     modules.push({
       id: SETUP_MODULE_IDS.routineService,
       status: 'complete',
       label: 'Routine Service configured',
-      detail: `Every ${Number(rs.intervalKm).toLocaleString()} km`,
+      detail: rs.intervalKm != null ? `Every ${Number(rs.intervalKm).toLocaleString()} km` : 'Schedule active',
     });
   } else {
     modules.push({

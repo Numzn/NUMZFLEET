@@ -6,24 +6,29 @@ import WarningIcon from '@mui/icons-material/Warning';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import ModernKPICard from './ModernKPICard';
 import { isPendingFuelStatus } from '../../fuelRequests/fuelRequestStatus';
+import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 
 // Removed useStyles - using ModernKPICard instead
 
-const KPICards = ({ devices, positions }) => {
+const KPICards = ({ devices }) => {
   const events = useSelector((state) => state.events.items);
   const fuelRequests = useSelector((state) => state.fuelRequests?.items || {});
+  const { getDisplayForDevice } = useVehicleDisplayContext();
 
-  // Calculate device statistics
+  // Calculate device statistics from the canonical, backend-persisted
+  // activity state — same field the fleet list and map markers read, not a
+  // separate "does a position exist" heuristic that could disagree with them.
   const deviceStats = useMemo(() => {
     const stats = { moving: 0, online: 0, offline: 0, total: devices.length };
-    
+
     devices.forEach((device) => {
-      const position = positions.find(p => p.deviceId === device.id);
-      if (!position) {
+      const display = getDisplayForDevice(device.id, device);
+      const state = display.activityState?.state ?? 'offline';
+      if (state === 'offline') {
         stats.offline++;
       } else {
         stats.online++;
-        if (position.speed > 0) {
+        if (state === 'moving') {
           stats.moving++;
         }
       }
@@ -31,9 +36,9 @@ const KPICards = ({ devices, positions }) => {
 
     const onlinePercentage = stats.total > 0 ? Math.round((stats.online / stats.total) * 100) : 0;
     const movingPercentage = stats.total > 0 ? Math.round((stats.moving / stats.total) * 100) : 0;
-    
+
     return { ...stats, onlinePercentage, movingPercentage };
-  }, [devices, positions]);
+  }, [devices, getDisplayForDevice]);
 
   // Calculate alert statistics
   const alertStats = useMemo(() => {

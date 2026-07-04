@@ -13,6 +13,8 @@ export const SERVICE_RECORD_ACTIVE_STATUSES = ['open', 'scheduled', 'in_progress
 
 export const SERVICE_RECORD_PRIORITIES = ['low', 'medium', 'high'];
 
+export const SCHEDULE_RESET_STATUSES = ['not_applicable', 'pending', 'synced', 'failed'];
+
 export default (sequelize) => {
   const ServiceRecord = sequelize.define('ServiceRecord', {
     id: {
@@ -120,6 +122,16 @@ export default (sequelize) => {
     },
     createdBy: {
       type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    scheduleResetStatus: {
+      type: DataTypes.STRING(16),
+      allowNull: false,
+      defaultValue: 'not_applicable',
+      comment: 'not_applicable / pending / synced / failed — Traccar schedule rebase outcome on completion',
+    },
+    scheduleResetError: {
+      type: DataTypes.TEXT,
       allowNull: true,
     },
   }, {

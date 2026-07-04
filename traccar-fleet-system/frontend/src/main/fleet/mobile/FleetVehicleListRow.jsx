@@ -22,16 +22,15 @@ const FleetVehicleListRow = ({
   const display = getDisplayForDevice(device.id, device);
   const motionNow = useMotionDurationTick();
 
-  const key = getVehicleStatusKey(device, position);
+  const activityState = display.activityState;
+  const key = getVehicleStatusKey(activityState);
   const tint = STATUS_TINT[key];
 
-  const motionLabel = getMotionLabel(device.status, position?.speed);
-  const motionDuration = device.status === 'online'
-    ? getMotionDurationLabel(device.id, device.status, position?.speed, motionNow, position?.attributes)
-    : null;
+  const motionLabel = getMotionLabel(activityState);
+  const motionDuration = getMotionDurationLabel(activityState, motionNow);
 
   let statusText = motionDuration ? `${motionLabel} • ${motionDuration}` : motionLabel;
-  if (device.status !== 'online' && device.lastUpdate) {
+  if (key === 'offline' && device.lastUpdate) {
     statusText = `Offline • ${dayjs(device.lastUpdate).fromNow()}`;
   }
 

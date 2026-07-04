@@ -1,7 +1,6 @@
 import {
   createVehicleServiceRecord,
   updateVehicleServiceRecord,
-  resetTraccarMaintenanceSchedule,
 } from '../vehiclesApi.js';
 
 export function isTimeMaintenanceType(type) {
@@ -17,50 +16,11 @@ export function isDistanceMaintenanceType(type) {
 }
 
 /**
- * Maps a computed maintenance item to the Traccar `start` value used to reset
- * the schedule after service. Does not compute intervals — only reads current
- * accumulator or wall clock per Traccar's maintenance model.
- */
-export function resolveResetStart(maintenanceItem) {
-  if (!maintenanceItem || maintenanceItem.unknown) {
-    throw new Error('Cannot reset maintenance without current telemetry data');
-  }
-
-  const { type } = maintenanceItem;
-
-  if (isTimeMaintenanceType(type)) {
-    return Date.now();
-  }
-
-  const current = Number(maintenanceItem.current);
-  if (!Number.isFinite(current)) {
-    throw new Error('Cannot reset maintenance without current telemetry data');
-  }
-
-  return current;
-}
-
-function toTraccarMaintenanceBody(maintenanceItem, newStart) {
-  return {
-    id: maintenanceItem.id,
-    name: maintenanceItem.name,
-    type: maintenanceItem.type,
-    start: newStart,
-    period: maintenanceItem.period,
-    attributes: maintenanceItem.attributes ?? {},
-  };
-}
-
-export async function resetTraccarMaintenance(user, fleetVehicleId, maintenanceItem, newStart) {
-  const start = newStart ?? resolveResetStart(maintenanceItem);
-  await resetTraccarMaintenanceSchedule(user, fleetVehicleId, maintenanceItem.id, {
-    ...toTraccarMaintenanceBody(maintenanceItem, start),
-  });
-}
-
-/**
- * Records a completed service and resets the linked Traccar maintenance schedule.
- * Traccar remains the schedule source of truth; fuel-api stores the audit trail.
+ * Records a completed service. The linked Traccar maintenance schedule is
+ * rebased server-side, as part of the same completion request (see
+ * serviceRecordService.js) — not a second client-initiated call, so a lost
+ * connection between "record completed" and "schedule rebased" can no
+ * longer leave the system silently inconsistent.
  */
 export async function completeMaintenanceService(user, fleetVehicleId, maintenanceItem, form = {}) {
   if (!maintenanceItem?.id) {
@@ -69,16 +29,6 @@ export async function completeMaintenanceService(user, fleetVehicleId, maintenan
   if (maintenanceItem.unknown) {
     throw new Error('Cannot complete service without current telemetry data');
   }
-
-  const resetStart = (() => {
-    if (isDistanceMaintenanceType(maintenanceItem.type)
-      && form.odometerKm !== ''
-      && form.odometerKm != null
-      && Number.isFinite(Number(form.odometerKm))) {
-      return Math.round(Number(form.odometerKm) * 1000);
-    }
-    return resolveResetStart(maintenanceItem);
-  })();
 
   const payload = {
     title: maintenanceItem.name,
@@ -112,20 +62,18 @@ export async function completeMaintenanceService(user, fleetVehicleId, maintenan
   if (form.completedAt) {
     completionPatch.completedAt = form.completedAt;
   }
-  await updateVehicleServiceRecord(user, fleetVehicleId, record.id, completionPatch);
+  const completed = await updateVehicleServiceRecord(user, fleetVehicleId, record.id, completionPatch);
 
-  try {
-    await resetTraccarMaintenance(user, fleetVehicleId, maintenanceItem, resetStart);
-  } catch (error) {
+  if (completed.scheduleResetStatus === 'failed') {
     const wrapped = new Error(
-      'Service was recorded but the maintenance schedule could not be reset. '
-      + 'Update the schedule manually under Settings → Maintenance.',
+      completed.scheduleResetError
+        ? `Service was recorded but the maintenance schedule could not be reset: ${completed.scheduleResetError}`
+        : 'Service was recorded but the maintenance schedule could not be reset.',
     );
-    wrapped.cause = error;
-    wrapped.serviceRecordId = record.id;
+    wrapped.serviceRecordId = completed.id;
     wrapped.partialSuccess = true;
     throw wrapped;
   }
 
-  return record;
+  return completed;
 }

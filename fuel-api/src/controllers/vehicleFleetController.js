@@ -13,6 +13,7 @@ import {
   listServiceRecordsForVehicle,
   createServiceRecord,
   updateServiceRecord,
+  retryScheduleReset,
 } from '../services/serviceRecordService.js';
 import { getVehicleFuelStatistics as computeVehicleFuelStatistics } from '../services/vehicleFuelStatisticsService.js';
 import { calculateTankToTankEfficiency, DEFAULT_WINDOW_DAYS } from '../utils/fuelEfficiencyUtils.js';
@@ -244,5 +245,16 @@ export const updateVehicleServiceRecord = async (req, res) => {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Update vehicle service record error:', error);
     return res.status(status).json({ error: dbErrorMessage(error, 'Failed to update service record') });
+  }
+};
+
+export const retryVehicleServiceRecordScheduleReset = async (req, res) => {
+  try {
+    const updated = await retryScheduleReset(req.auth?.companyId, req.params.id, req.params.recordId);
+    return res.json(updated);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Retry service record schedule reset error:', error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to retry schedule reset') });
   }
 };

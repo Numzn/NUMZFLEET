@@ -193,6 +193,18 @@ export async function updateVehicleServiceRecord(user, fleetVehicleId, recordId,
   return res.json();
 }
 
+/** Retry a failed Traccar schedule rebase for a completed, maintenance-linked service record. */
+export async function retryServiceRecordScheduleReset(user, fleetVehicleId, recordId) {
+  const res = await fetchOrThrow(
+    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/service-records/${encodeURIComponent(recordId)}/retry-schedule-reset`,
+    {
+      method: 'POST',
+      headers: fuelApiAuthHeaders(user),
+    },
+  );
+  return res.json();
+}
+
 export async function patchVehicleFields(user, vehicleId, fields) {
   const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
     method: 'PATCH',

@@ -1,6 +1,7 @@
 import { publishNotification } from './orchestrator/publishNotification.js';
 import { CHANNELS } from './contracts/notificationContract.js';
 import { getNotificationIo } from './notificationContext.js';
+import { localDateString } from '../utils/businessDay.js';
 
 function toTitle(type, status) {
   const label = String(type || 'Compliance').replaceAll('_', ' ').toLowerCase();
@@ -39,7 +40,9 @@ export async function notifyComplianceFinding({
   if (!finding?.fleetVehicleId || !finding?.type || !finding?.status) return;
   if (['valid', 'unknown'].includes(String(finding.status).toLowerCase())) return;
 
-  const dayStamp = new Date().toISOString().slice(0, 10);
+  // Africa/Lusaka business day, not UTC calendar day — otherwise the dedup
+  // boundary rolls over at 02:00 local time instead of local midnight.
+  const dayStamp = localDateString(new Date());
   const io = getNotificationIo();
   const type = String(finding.type).toLowerCase();
   const status = String(finding.status).toLowerCase();

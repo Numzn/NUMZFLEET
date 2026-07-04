@@ -2,6 +2,7 @@ import { publishNotification } from './orchestrator/publishNotification.js';
 import { CHANNELS } from './contracts/notificationContract.js';
 import { getNotificationIo } from './notificationContext.js';
 import { ROUTINE_SERVICE_LABEL } from '../maintenance/routineServiceStatus.js';
+import { localDateString } from '../utils/businessDay.js';
 
 function vehicleLabel(vehicle) {
   if (!vehicle) return 'Vehicle';
@@ -95,7 +96,10 @@ export async function notifyRoutineServiceState({
     ? `${label} — ${ROUTINE_SERVICE_LABEL}: ${dueLabel}`
     : `${label} — ${ROUTINE_SERVICE_LABEL} needs attention`;
   const severity = mappedType === 'overdue' ? 'warning' : 'info';
-  const dayStamp = new Date().toISOString().slice(0, 10);
+  // Africa/Lusaka business day, not UTC calendar day — same fix already
+  // applied to complianceNotificationService.js, reusing the same helper
+  // rather than a second timezone implementation.
+  const dayStamp = localDateString(new Date());
   const io = getNotificationIo();
 
   await publishNotification({

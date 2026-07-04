@@ -22,14 +22,58 @@ import {
 import { updateVehicleSpec, getVehicleSpec } from './vehicleSpecService.js';
 import { summarizeForVehicle } from '../repositories/serviceRecordRepository.js';
 import { buildVehicleAttachmentPath } from '../middleware/vehicleUpload.js';
-import { loadCompanyMaintenanceDueState } from '../maintenance/maintenanceTraccarAdapter.js';
+import { loadCompanyMaintenanceDueState, loadVehicleMaintenanceDueState } from '../maintenance/maintenanceTraccarAdapter.js';
 import { buildRoutineServiceSummaryByVehicle } from '../maintenance/routineServiceSummary.js';
+import { buildEvidenceFromBatch } from '../vehicleEngine/odometer/collectEvidence.js';
+import { resolveOdometerFromEvidence } from '../vehicleEngine/odometer/resolveVehicleOdometer.js';
+import { evaluateAndPersistActivityStates } from '../vehicleEngine/activity/activityStateService.js';
+
+/**
+ * Canonical odometer fields for an unassigned/evidence-less vehicle — mirrors
+ * the defaults used by registryBuilder.js / formatOdometerResponse.js so the
+ * fleet list, vehicle detail, and maintenance surfaces agree on vocabulary.
+ */
+const UNAVAILABLE_ODOMETER_STATE = {
+  odometerKm: null,
+  odometerConfidence: 'unavailable',
+  odometerDriftPct: null,
+  odometerDriftClass: 'unknown',
+};
+
+/**
+ * Resolve canonical odometer for one vehicle from already-batch-loaded rows
+ * (no per-vehicle Traccar/DB query). Same engine as the single-vehicle path
+ * (resolveOdometerFromEvidence) — only the evidence-gathering differs.
+ * @param {{ device: object|null, position: object|null, spec: object|null }}
+ */
+function resolveOdometerForMergedRow({ device, position, spec }) {
+  const rawAttrs = position?.attributes && typeof position.attributes === 'object'
+    ? position.attributes
+    : null;
+  const evidence = buildEvidenceFromBatch({
+    deviceStatus: device?.status ?? null,
+    deviceLastUpdate: device?.lastupdate ?? null,
+    positionFixTime: position?.fixtime ?? null,
+    positionAttributes: rawAttrs,
+    verifiedOdometerKm: spec?.verifiedOdometerKm ?? null,
+    verifiedOdometerAt: spec?.verifiedOdometerAt ?? null,
+    verifiedOdometerSource: spec?.verifiedOdometerSource ?? null,
+    verifiedTraccarDistance: spec?.verifiedTraccarDistance ?? null,
+  });
+  const state = resolveOdometerFromEvidence(evidence);
+  return {
+    odometerKm: state.odometerKm,
+    odometerConfidence: state.odometerConfidence,
+    odometerDriftPct: state.odometerDriftPct,
+    odometerDriftClass: state.odometerDriftClass,
+  };
+}
 
 /**
  * v1 merged vehicle DTO — single shape for list and get-by-id.
  * Merge logic lives only in this module (see fleet plan).
  */
-function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
+export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
   const base = {
     id: vehicle.id,
     name: vehicle.name,
@@ -49,6 +93,7 @@ function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
       position: null,
       vehicleSpec: null,
       fleetConfig: null,
+      ...UNAVAILABLE_ODOMETER_STATE,
     };
   }
 
@@ -97,6 +142,11 @@ function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
   const devAttrs = tr ? parseTraccarAttributesRaw(tr.attributes) : {};
   const fleetConfig = tr ? parseDeviceFleetConfig(devAttrs) : null;
 
+  // Canonical odometer, resolved from the same tr/pos/spec rows already
+  // batch-loaded above — no extra query per vehicle. Independent of the
+  // lat/lng guard on positionDto: mileage evidence doesn't require a GPS fix.
+  const odometerState = resolveOdometerForMergedRow({ device: tr, position: pos, spec });
+
   return {
     ...base,
     assignment: assignmentDto,
@@ -104,6 +154,7 @@ function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
     position: positionDto,
     vehicleSpec: vehicleSpecDto,
     fleetConfig,
+    ...odometerState,
   };
 }
 
@@ -339,9 +390,34 @@ export async function listVehiclesMerged(companyId = DEFAULT_COMPANY_ID) {
     routineByVehicle = new Map();
   }
 
+  // Canonical, persisted activity state — one batched evaluation for the
+  // whole company (not one call per vehicle), reusing device/position rows
+  // already fetched above.
+  let activityByVehicle = new Map();
+  try {
+    const activityRows = vehicles
+      .filter((v) => assignmentByVehicleId.has(v.id))
+      .map((v) => {
+        const deviceId = Number(assignmentByVehicleId.get(v.id).deviceId);
+        const device = deviceMap.get(deviceId);
+        const position = positionMap.get(deviceId);
+        return {
+          vehicleId: v.id,
+          deviceId,
+          deviceStatus: device?.status ?? null,
+          deviceLastUpdate: device?.lastupdate ?? null,
+          positionSpeed: position?.speed != null ? Number(position.speed) : null,
+        };
+      });
+    activityByVehicle = await evaluateAndPersistActivityStates(activityRows);
+  } catch {
+    activityByVehicle = new Map();
+  }
+
   return vehicles.map((v) => {
     const dto = toMergedDto(v, assignmentByVehicleId.get(v.id), deviceMap, positionMap, specMap);
     dto.routineService = routineByVehicle.get(String(v.id)) ?? null;
+    dto.activityState = activityByVehicle.get(String(v.id)) ?? null;
     return dto;
   });
 }
@@ -360,6 +436,40 @@ export async function getVehicleMerged(id, companyId = null) {
   const merged = toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap);
   const effectiveCompanyId = companyId || vehicle.companyId || DEFAULT_COMPANY_ID;
   merged.serviceSummary = await summarizeForVehicle(id, effectiveCompanyId);
+
+  // Authoritative routine-service signal (actual Traccar schedule, tagged
+  // numzServicePackage) — not the cached numzFleetConfig.routineService
+  // pointer. Device-scoped lookup, no full-fleet scan (matches the batched
+  // company-wide computation already used by listVehiclesMerged).
+  try {
+    const dueState = await loadVehicleMaintenanceDueState(effectiveCompanyId, id);
+    merged.routineService = buildRoutineServiceSummaryByVehicle(dueState).get(String(id)) ?? null;
+  } catch {
+    merged.routineService = null;
+  }
+
+  // Same canonical, persisted activity-state path as listVehiclesMerged —
+  // single-vehicle batch of one, still going through one shared resolver.
+  if (assignment) {
+    try {
+      const deviceId = Number(assignment.deviceId);
+      const device = deviceMap.get(deviceId);
+      const position = positionMap.get(deviceId);
+      const activity = await evaluateAndPersistActivityStates([{
+        vehicleId: id,
+        deviceId,
+        deviceStatus: device?.status ?? null,
+        deviceLastUpdate: device?.lastupdate ?? null,
+        positionSpeed: position?.speed != null ? Number(position.speed) : null,
+      }]);
+      merged.activityState = activity.get(String(id)) ?? null;
+    } catch {
+      merged.activityState = null;
+    }
+  } else {
+    merged.activityState = null;
+  }
+
   return merged;
 }
 

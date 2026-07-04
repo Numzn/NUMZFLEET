@@ -36,7 +36,7 @@ import useVehicleData from './useVehicleData';
 import useImmobilizationIntent from './hooks/useImmobilizationIntent';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import { vehicleWorkspacePath } from '../vehicleRegistry/vehicleRegistryUtils.js';
-import { getIgnitionPhrase, getMotionLabel } from './vehicleMotionStatus.js';
+import { getIgnitionPhrase } from './vehicleMotionStatus.js';
 import { formatExecutionError, formatDeliveryPhase } from './immobilizationErrors.js';
 import { describeImmobilizationCapabilities } from './immobilizationDisplayUtils.js';
 

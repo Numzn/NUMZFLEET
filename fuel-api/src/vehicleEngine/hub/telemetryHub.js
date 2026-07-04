@@ -1,10 +1,4 @@
-function isOnline(device) {
-  if (!device) return false;
-  if (device.status === 'online') return true;
-  if (!device.lastUpdate) return false;
-  const last = new Date(device.lastUpdate).getTime();
-  return Date.now() - last < 5 * 60 * 1000;
-}
+import { resolveActivityState } from '../activity/resolveActivityState.js';
 
 export function buildTelemetryHub(merged) {
   const position = merged?.position ?? null;
@@ -15,6 +9,15 @@ export function buildTelemetryHub(merged) {
     ? Number(position.telemetry.totalDistance)
     : null;
 
+  // Canonical resolver (fuel-api/src/vehicleEngine/activity/resolveActivityState.js)
+  // — the same function used everywhere else state is computed, so this hub
+  // can't drift from the fleet counts or the persisted activity state.
+  const state = resolveActivityState({
+    deviceStatus: device?.status ?? null,
+    deviceLastUpdate: device?.lastUpdate ?? null,
+    positionSpeed: speed,
+  });
+
   return {
     position,
     telemetry: position?.telemetry ?? null,
@@ -22,9 +25,10 @@ export function buildTelemetryHub(merged) {
       rawDistanceM: Number.isFinite(totalDistanceM) ? totalDistanceM : null,
       lastFixAt: position?.fixTime ?? null,
     },
-    online: isOnline(device),
+    activityState: state,
+    online: state !== 'offline',
     lastUpdate: device?.lastUpdate ?? position?.fixTime ?? null,
     speedKph: speed,
-    moving: speed != null && speed > 1,
+    moving: state === 'moving',
   };
 }

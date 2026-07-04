@@ -27,3 +27,6 @@
 20260702_refuel_odometer_capture.sql
 20260703_vehicle_fuel_learning.sql
 20260702_vehicle_document_ocr.sql
+20260704_vehicle_daily_mileage.sql
+20260704_service_record_schedule_reset_status.sql
+20260704_vehicle_activity_state.sql

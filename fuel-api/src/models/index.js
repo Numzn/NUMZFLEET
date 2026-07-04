@@ -20,6 +20,8 @@ import VehicleDocumentModel from './VehicleDocument.js';
 import VehicleComplianceModel from './VehicleCompliance.js';
 import VehicleFuelLearningModel from './VehicleFuelLearning.js';
 import VehicleFuelIntervalModel from './VehicleFuelInterval.js';
+import VehicleDailyMileageModel from './VehicleDailyMileage.js';
+import VehicleActivityStateModel from './VehicleActivityState.js';
 
 const FuelRequest = FuelRequestModel(sequelize);
 const VehicleSpec = VehicleSpecModel(sequelize);
@@ -42,6 +44,8 @@ const VehicleDocument = VehicleDocumentModel(sequelize);
 const VehicleCompliance = VehicleComplianceModel(sequelize);
 const VehicleFuelLearning = VehicleFuelLearningModel(sequelize);
 const VehicleFuelInterval = VehicleFuelIntervalModel(sequelize);
+const VehicleDailyMileage = VehicleDailyMileageModel(sequelize);
+const VehicleActivityState = VehicleActivityStateModel(sequelize);
 
 Company.hasMany(Vehicle, { foreignKey: 'companyId' });
 Vehicle.belongsTo(Company, { foreignKey: 'companyId' });
@@ -70,6 +74,10 @@ Vehicle.hasOne(VehicleFuelLearning, { foreignKey: 'fleetVehicleId', as: 'fuelLea
 VehicleFuelLearning.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
 Vehicle.hasMany(VehicleFuelInterval, { foreignKey: 'fleetVehicleId', as: 'fuelIntervals' });
 VehicleFuelInterval.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
+Vehicle.hasMany(VehicleDailyMileage, { foreignKey: 'vehicleId', as: 'dailyMileage' });
+VehicleDailyMileage.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
+Vehicle.hasOne(VehicleActivityState, { foreignKey: 'vehicleId', as: 'activityState' });
+VehicleActivityState.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
 OperationSession.hasMany(OperationSessionRefuel, {
   foreignKey: 'sessionId',
   as: 'refuels',
@@ -209,6 +217,8 @@ export {
   VehicleCompliance,
   VehicleFuelLearning,
   VehicleFuelInterval,
+  VehicleDailyMileage,
+  VehicleActivityState,
   DEFAULT_COMPANY_ID,
 };
 export default sequelize;

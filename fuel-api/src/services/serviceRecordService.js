@@ -13,6 +13,7 @@ import {
 import { assertVehicleInTenant } from './vehicleFleetService.js';
 import { applyObservation } from '../vehicleEngine/odometer/applyObservation.js';
 import { notifyRoutineServiceCompleted } from '../notifications/maintenanceNotificationService.js';
+import { resetMaintenanceScheduleAfterCompletion } from '../maintenance/routineServiceTraccarService.js';
 
 function badRequest(message) {
   const error = new Error(message);
@@ -74,6 +75,8 @@ export function toServiceRecordDto(record) {
       ? new Date(plain.scheduledDueDate).toISOString()
       : (plain.dueAt ? new Date(plain.dueAt).toISOString() : null),
     completedAt: plain.completedAt ? new Date(plain.completedAt).toISOString() : null,
+    scheduleResetStatus: plain.scheduleResetStatus || 'not_applicable',
+    scheduleResetError: plain.scheduleResetError || null,
     createdBy: plain.createdBy != null ? Number(plain.createdBy) : null,
     createdAt: plain.createdAt ? new Date(plain.createdAt).toISOString() : null,
     updatedAt: plain.updatedAt ? new Date(plain.updatedAt).toISOString() : null,
@@ -235,6 +238,26 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
     }
   }
 
+  // Schedule rebase runs server-side, in the same request as completion —
+  // not a second client-initiated call — so a lost connection between steps
+  // can no longer leave the system silently inconsistent. Outcome is
+  // persisted (scheduleResetStatus/scheduleResetError), not just thrown.
+  if (patch.status === 'completed' && !wasCompleted && record.maintenanceId != null && deviceId) {
+    try {
+      await resetMaintenanceScheduleAfterCompletion({
+        deviceId,
+        maintenanceId: record.maintenanceId,
+        completionOdometerKm: record.odometerKm,
+      });
+      await record.update({ scheduleResetStatus: 'synced', scheduleResetError: null });
+    } catch (error) {
+      await record.update({
+        scheduleResetStatus: 'failed',
+        scheduleResetError: error?.message || 'Unknown error',
+      });
+    }
+  }
+
   const dto = toServiceRecordDto(record);
 
   if (patch.status === 'completed' && !wasCompleted && record.maintenanceId != null) {
@@ -258,6 +281,49 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
   }
 
   return dto;
+}
+
+/**
+ * Retry a failed Traccar schedule rebase. Idempotent: only acts on records
+ * currently marked `failed`, and always resets to the SAME completion
+ * mileage already on the record — never a newly-entered value — so a retry
+ * can never shift the baseline further or create a duplicate schedule.
+ */
+export async function retryScheduleReset(companyId, fleetVehicleId, id) {
+  await assertVehicleInTenant(fleetVehicleId, companyId);
+
+  const record = await findByIdForVehicle(id, companyId, fleetVehicleId);
+  if (!record) {
+    throw notFound('Service record not found');
+  }
+  if (record.status !== 'completed' || record.maintenanceId == null) {
+    throw badRequest('Only a completed record linked to a maintenance schedule can be retried');
+  }
+  if (record.scheduleResetStatus !== 'failed') {
+    // Nothing to retry — already synced, or never applicable. Not an error;
+    // just a no-op, so a stray double-click can't do anything unexpected.
+    return toServiceRecordDto(record);
+  }
+
+  const deviceId = record.deviceId != null
+    ? Number(record.deviceId)
+    : await resolveActiveDeviceId(fleetVehicleId);
+
+  try {
+    await resetMaintenanceScheduleAfterCompletion({
+      deviceId,
+      maintenanceId: record.maintenanceId,
+      completionOdometerKm: record.odometerKm,
+    });
+    await record.update({ scheduleResetStatus: 'synced', scheduleResetError: null });
+  } catch (error) {
+    await record.update({
+      scheduleResetStatus: 'failed',
+      scheduleResetError: error?.message || 'Unknown error',
+    });
+  }
+
+  return toServiceRecordDto(record);
 }
 
 export async function createServiceRecordLegacy(user, companyId, payload = {}) {

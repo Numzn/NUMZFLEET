@@ -20,6 +20,7 @@ import {
   listVehicleServiceRecords,
   createVehicleServiceRecord,
   updateVehicleServiceRecord,
+  retryVehicleServiceRecordScheduleReset,
   getVehicleFuelStatistics,
 } from '../controllers/vehicleFleetController.js';
 import {
@@ -106,6 +107,12 @@ router.patch('/:id', requireAuth, requireManager, patchVehicleWorkspaceFields);
 router.get('/:id/service-records', requireAuth, requireManager, listVehicleServiceRecords);
 router.post('/:id/service-records', requireAuth, requireManager, createVehicleServiceRecord);
 router.patch('/:id/service-records/:recordId', requireAuth, requireManager, updateVehicleServiceRecord);
+router.post(
+  '/:id/service-records/:recordId/retry-schedule-reset',
+  requireAuth,
+  requireManager,
+  retryVehicleServiceRecordScheduleReset,
+);
 router.get('/:id', requireAuth, requireManager, getVehicle);
 router.put('/:id/config', requireAuth, requireManager, updateVehicleConfig);
 router.put('/:id/routine-service', requireAuth, requireManager, updateRoutineService);

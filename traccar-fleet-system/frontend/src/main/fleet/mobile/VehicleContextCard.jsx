@@ -16,7 +16,7 @@ import useMotionDurationTick from '../../../fleet/vehicleDetail/useMotionDuratio
 import VehicleLocationLine from '../../../common/components/VehicleLocationLine';
 import DeviceQuickActions from '../DeviceQuickActions';
 import { getGpsStaleWarning } from './gpsStaleWarning';
-import { formatTodayDistanceLabel, resolveTodayDistanceRaw } from './vehicleTodayDistance';
+import { formatOdometerLabel } from './vehicleTodayDistance';
 import { STATUS_TINT } from './fleetMobileCardSx';
 
 const VehicleContextCard = ({
@@ -33,17 +33,16 @@ const VehicleContextCard = ({
 
   if (!device) return null;
 
-  const key = getVehicleStatusKey(device, position);
+  const activityState = display.activityState;
+  const key = getVehicleStatusKey(activityState);
   const tint = STATUS_TINT[key];
-  const motionLabel = getMotionLabel(device.status, position?.speed);
-  const motionDuration = device.status === 'online'
-    ? getMotionDurationLabel(device.id, device.status, position?.speed, motionNow, position?.attributes)
-    : null;
+  const motionLabel = getMotionLabel(activityState);
+  const motionDuration = getMotionDurationLabel(activityState, motionNow);
   const statusText = motionDuration ? `${motionLabel} • ${motionDuration}` : motionLabel;
   const gpsStale = position ? getGpsStaleWarning(position?.fixTime) : null;
-  const todayDistance = position
-    ? formatTodayDistanceLabel(resolveTodayDistanceRaw(position, device))
-    : null;
+  // Canonical odometer (fuel-api resolveOdometerKm), not raw Traccar distance —
+  // labeled "Odometer", not "Today", since no day-start baseline exists yet.
+  const odometerLabel = formatOdometerLabel(display.odometerKm);
   const hasFix = position?.latitude != null && position?.longitude != null;
 
   return (
@@ -99,9 +98,9 @@ const VehicleContextCard = ({
               </Typography>
             </Box>
           ) : null}
-          {todayDistance ? (
+          {odometerLabel ? (
             <Typography sx={{ fontSize: '0.6875rem', color: 'var(--color-text-secondary)', mt: 0.35 }}>
-              {todayDistance}
+              {odometerLabel}
             </Typography>
           ) : null}
         </Box>

@@ -27,6 +27,37 @@ test('toServiceRecordDto maps fleet vehicle fields', () => {
   assert.equal(dto.status, 'scheduled');
 });
 
+test('toServiceRecordDto defaults scheduleResetStatus to not_applicable', () => {
+  const dto = toServiceRecordDto({
+    id: 2,
+    companyId: '00000000-0000-0000-0000-000000000001',
+    fleetVehicleId: 'a7c8d9e0-1111-2222-3333-444455556666',
+    title: 'Log repair',
+    status: 'completed',
+    createdAt: new Date('2026-06-01T10:00:00Z'),
+    updatedAt: new Date('2026-06-01T10:00:00Z'),
+  });
+  assert.equal(dto.scheduleResetStatus, 'not_applicable');
+  assert.equal(dto.scheduleResetError, null);
+});
+
+test('toServiceRecordDto surfaces a failed schedule reset for the frontend to retry', () => {
+  const dto = toServiceRecordDto({
+    id: 3,
+    companyId: '00000000-0000-0000-0000-000000000001',
+    fleetVehicleId: 'a7c8d9e0-1111-2222-3333-444455556666',
+    maintenanceId: 2,
+    title: 'Routine Service',
+    status: 'completed',
+    scheduleResetStatus: 'failed',
+    scheduleResetError: 'Traccar service API not configured.',
+    createdAt: new Date('2026-06-01T10:00:00Z'),
+    updatedAt: new Date('2026-06-01T10:00:00Z'),
+  });
+  assert.equal(dto.scheduleResetStatus, 'failed');
+  assert.equal(dto.scheduleResetError, 'Traccar service API not configured.');
+});
+
 test('summarizeServiceRecordRows counts open and in-progress work', () => {
   const summary = summarizeServiceRecordRows([
     { status: 'open', completedAt: null },

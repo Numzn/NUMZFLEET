@@ -2,6 +2,7 @@ import {
   Vehicle, FuelRequest, OperationSession, CompanyDevice, DEFAULT_COMPANY_ID,
 } from '../models/index.js';
 import traccar from '../config/traccar.js';
+import { resolveActivityState } from '../vehicleEngine/activity/resolveActivityState.js';
 
 export async function getFleetCommandCenterKpis(companyId = DEFAULT_COMPANY_ID) {
   const [registeredVehicles, pendingFuel, activeOperations, deviceStats] = await Promise.all([
@@ -37,34 +38,31 @@ async function getCompanyDeviceIds(companyId) {
   }
 }
 
+/**
+ * Batched device fetch + canonical resolver evaluation — not a parallel raw-
+ * SQL rule. One query (not one per device), and "online" now agrees exactly
+ * with telemetryHub/the persisted activity state for the same devices.
+ */
 async function queryDeviceStats(companyId) {
   try {
     const pool = traccar.getTraccarPool();
     const deviceIds = await getCompanyDeviceIds(companyId);
 
-    // Scope to the company's mapped trackers when provisioned; otherwise fall
-    // back to a global count so unprovisioned tenants still see live numbers.
-    if (deviceIds.length > 0) {
-      const placeholders = deviceIds.map(() => '?').join(',');
-      const [rows] = await pool.execute(
-        `SELECT
-           COUNT(*) AS total,
-           SUM(CASE WHEN lastupdate >= NOW() - INTERVAL 5 MINUTE THEN 1 ELSE 0 END) AS online
-         FROM tc_devices WHERE id IN (${placeholders})`,
-        deviceIds,
-      );
-      const row = rows[0] || {};
-      return { total: Number(row.total || 0), online: Number(row.online || 0) };
-    }
-
+    const scopeClause = deviceIds.length > 0
+      ? `WHERE id IN (${deviceIds.map(() => '?').join(',')})`
+      : '';
     const [rows] = await pool.execute(
-      `SELECT
-         COUNT(*) AS total,
-         SUM(CASE WHEN lastupdate >= NOW() - INTERVAL 5 MINUTE THEN 1 ELSE 0 END) AS online
-       FROM tc_devices`,
+      `SELECT status, lastupdate FROM tc_devices ${scopeClause}`,
+      deviceIds.length > 0 ? deviceIds : [],
     );
-    const row = rows[0] || {};
-    return { total: Number(row.total || 0), online: Number(row.online || 0) };
+
+    const online = rows.filter((row) => resolveActivityState({
+      deviceStatus: row.status,
+      deviceLastUpdate: row.lastupdate,
+      positionSpeed: null,
+    }) !== 'offline').length;
+
+    return { total: rows.length, online };
   } catch {
     return { total: 0, online: 0 };
   }

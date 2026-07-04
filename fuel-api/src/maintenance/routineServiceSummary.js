@@ -24,6 +24,9 @@ export function buildRoutineServiceSummaryByVehicle(dueState) {
       statusLabel,
       remainingKm,
       nextServiceAtKm: item.nextDue != null ? Math.round(Number(item.nextDue) / 1000) : null,
+      // Authoritative interval (Traccar schedule period), not the cached
+      // numzFleetConfig pointer — lets readiness/UI stop trusting the cache.
+      intervalKm: item.period != null ? Math.round(Number(item.period) / 1000) : null,
       dueLabel: item.remainingLabel ?? null,
     });
   }

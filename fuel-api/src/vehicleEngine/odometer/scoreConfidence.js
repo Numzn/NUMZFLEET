@@ -34,6 +34,8 @@ export function scoreConfidence({
 
   if (diagnostics.includes('reset_suspected')) score -= 20;
   if (diagnostics.includes('stale_telemetry')) score -= 15;
+  if (diagnostics.includes('unit_mismatch_suspected')) score -= 25;
+  if (diagnostics.includes('unit_unconfirmed')) score -= 10;
 
   if (!hasObservation) {
     score = Math.min(score, 65);

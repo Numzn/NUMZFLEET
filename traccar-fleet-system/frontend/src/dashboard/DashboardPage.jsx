@@ -26,6 +26,7 @@ import { fuelApiAuthHeaders } from '../config/fuelApiAuth.js';
 import useTodayOperation from '../operationSessions/hooks/useTodayOperation';
 import { deriveFuelingDayStatus, FUELING_DAY_STATUS_LABEL, isRefuelComplete } from '../operationSessions/utils/operationDayUtils.js';
 import { isPendingFuelStatus } from '../fuelRequests/fuelRequestStatus';
+import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
 
 const DashboardPage = () => {
   const theme = useTheme();
@@ -48,6 +49,7 @@ const DashboardPage = () => {
   });
   const [filterSort] = usePersistedState('filterSort', '');
   const [filterMap] = usePersistedState('filterMap', false);
+  const { getDisplayForDevice } = useVehicleDisplayContext();
 
   useFilter(keyword, filter, filterSort, filterMap, positions, setFilteredDevices, setFilteredPositions);
 
@@ -78,8 +80,11 @@ const DashboardPage = () => {
   }, [location.hash]);
 
   const dashboardSummary = useMemo(() => {
+    // Fallback only (used before commandCenter resolves, or if it errors) —
+    // canonical activity state, same field KPICards/map/fleet list read, not
+    // a separate "does a position exist" heuristic.
     const onlineCount = filteredDevices.filter((device) => (
-      filteredPositions.some((position) => position.deviceId === device.id)
+      (getDisplayForDevice(device.id, device).activityState?.state ?? 'offline') !== 'offline'
     )).length;
     const urgentAlerts = Object.values(events).filter((event) => (
       event.type === 'alarm' || event.type === 'panic'
@@ -95,7 +100,7 @@ const DashboardPage = () => {
       pendingFuelRequests: commandCenter?.pendingFuelRequests ?? pendingFuelRequests,
       activeOperations: commandCenter?.activeOperations ?? 0,
     };
-  }, [events, filteredDevices, filteredPositions, fuelRequests, commandCenter]);
+  }, [events, filteredDevices, fuelRequests, commandCenter, getDisplayForDevice]);
 
   const todayOpSummary = useMemo(() => {
     if (!todayOperation?.id) return 'None today';
@@ -568,7 +573,7 @@ const DashboardPage = () => {
 
         {/* Fleet KPI cards */}
         <Box sx={{ mb: 4 }}>
-          <KPICards devices={filteredDevices} positions={filteredPositions} compactMobile={isMobile} />
+          <KPICards devices={filteredDevices} compactMobile={isMobile} />
         </Box>
 
         {/* ERB Fuel Prices */}

@@ -18,7 +18,10 @@ function trimOrNull(value) {
  * @param {string} [input.deviceName] - Traccar device name fallback
  * @param {number|string} [input.deviceId]
  * @param {string} [input.fleetVehicleId]
- * @returns {{ primary: string, secondary: string|null, deviceId: number|null, fleetVehicleId: string|null }}
+ * @param {number|null} [input.odometerKm] - canonical resolved odometer (fuel-api resolveOdometerKm), NOT daily mileage
+ * @param {string} [input.odometerConfidence]
+ * @param {object|null} [input.activityState] - canonical resolveActivityState() result, persisted server-side
+ * @returns {{ primary: string, secondary: string|null, deviceId: number|null, fleetVehicleId: string|null, odometerKm: number|null, odometerConfidence: string, activityState: object|null }}
  */
 export function resolveVehicleDisplay(input = {}) {
   const nickname = trimOrNull(input.name);
@@ -45,6 +48,9 @@ export function resolveVehicleDisplay(input = {}) {
     secondary,
     deviceId: Number.isFinite(deviceId) ? deviceId : null,
     fleetVehicleId,
+    odometerKm: Number.isFinite(Number(input.odometerKm)) ? Number(input.odometerKm) : null,
+    odometerConfidence: input.odometerConfidence ?? 'unavailable',
+    activityState: input.activityState ?? null,
   };
 }
 
@@ -62,6 +68,9 @@ export function resolveVehicleDisplayFromFleetRow(vehicleRow) {
     deviceName: vehicleRow.device?.name,
     deviceId: vehicleRow.assignment?.deviceId ?? vehicleRow.device?.id,
     fleetVehicleId: vehicleRow.id,
+    odometerKm: vehicleRow.odometerKm,
+    odometerConfidence: vehicleRow.odometerConfidence,
+    activityState: vehicleRow.activityState ?? null,
   });
 }
 

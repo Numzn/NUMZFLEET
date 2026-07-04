@@ -1,6 +1,7 @@
 import traccar from '../config/traccar.js';
 import sequelize from '../config/database.js';
 import { QueryTypes } from 'sequelize';
+import { resolveActivityState } from '../vehicleEngine/activity/resolveActivityState.js';
 
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2-minute cache — public endpoint, no auth
 
@@ -35,20 +36,17 @@ export async function getFleetSummary() {
   return data;
 }
 
+/** Batched fetch + canonical resolver — same rule as fleetCommandCenterService. */
 async function queryDeviceStats() {
   try {
     const pool = traccar.getTraccarPool();
-    const [rows] = await pool.execute(
-      `SELECT
-         COUNT(*) AS total,
-         SUM(CASE WHEN lastupdate >= NOW() - INTERVAL 5 MINUTE THEN 1 ELSE 0 END) AS online
-       FROM tc_devices`,
-    );
-    const row = rows[0] || {};
-    return {
-      total: Number(row.total || 0),
-      online: Number(row.online || 0),
-    };
+    const [rows] = await pool.execute(`SELECT status, lastupdate FROM tc_devices`);
+    const online = rows.filter((row) => resolveActivityState({
+      deviceStatus: row.status,
+      deviceLastUpdate: row.lastupdate,
+      positionSpeed: null,
+    }) !== 'offline').length;
+    return { total: rows.length, online };
   } catch {
     return { total: 0, online: 0 };
   }

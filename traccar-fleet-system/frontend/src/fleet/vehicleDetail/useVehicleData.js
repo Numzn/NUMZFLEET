@@ -106,6 +106,18 @@ export default function useVehicleData(vehicleId) {
     refresh();
   }, [refresh]);
 
+  // Canonical activityState/odometer/routineService are resolved and
+  // persisted backend-side, not pushed live over the websocket — refresh
+  // periodically (silently, no loading flicker) so they don't go stale for
+  // the whole time this page stays open.
+  useEffect(() => {
+    if (!vehicleId || !user) return undefined;
+    const id = window.setInterval(() => {
+      fetchVehicle(user, vehicleId).then(setVehicle).catch(() => {});
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [vehicleId, user]);
+
   const deviceId = vehicle?.assignment?.deviceId ?? null;
   const livePosition = deviceId != null ? positions[deviceId] : null;
 
@@ -266,8 +278,8 @@ export default function useVehicleData(vehicleId) {
   }, [devicesById, groupsById, deviceId]);
 
   const motionLabel = useMemo(
-    () => getMotionLabel(vehicle?.device?.status, livePosition?.speed),
-    [vehicle?.device?.status, livePosition?.speed],
+    () => getMotionLabel(vehicle?.activityState),
+    [vehicle?.activityState],
   );
 
   const ignitionPhrase = useMemo(
@@ -279,17 +291,8 @@ export default function useVehicleData(vehicleId) {
   );
 
   const motionDurationLabel = useMemo(
-    () =>
-      vehicle?.device?.status === 'online'
-        ? getMotionDurationLabel(
-          deviceId,
-          vehicle.device.status,
-          livePosition?.speed,
-          motionNow,
-          livePosition?.attributes,
-        )
-        : null,
-    [deviceId, vehicle?.device?.status, livePosition?.speed, livePosition?.attributes, motionNow],
+    () => getMotionDurationLabel(vehicle?.activityState, motionNow),
+    [vehicle?.activityState, motionNow],
   );
 
   const saveConfig = useCallback(

@@ -18,33 +18,25 @@ import VehicleLocationLine from '../../common/components/VehicleLocationLine';
 
 dayjs.extend(relativeTime);
 
-/** Compact numeric distance for display (no suffix). */
-function distanceKmNumber(raw) {
-  if (raw == null || raw === '') return null;
-  const n = Number(String(raw).replace(/,/g, ''));
-  if (Number.isNaN(n)) return null;
-  return n;
+/**
+ * Single right-column insight: canonical odometer (fuel-api resolveOdometerKm),
+ * NOT daily mileage — no day-start baseline exists yet (separate checkpoint),
+ * so this must not be labeled "today".
+ */
+function formatOdometerInsight(odometerKm) {
+  if (odometerKm == null || !Number.isFinite(Number(odometerKm))) return null;
+  const n = Number(odometerKm);
+  if (n >= 100) return `Odometer ${Math.round(n).toLocaleString()} km`;
+  return `Odometer ${n.toFixed(1)} km`;
 }
 
-/** Single right-column insight: operational “today” framing (same Traccar distance field as before). */
-function formatDistanceTodayInsight(raw) {
-  const n = distanceKmNumber(raw);
-  if (n == null) return null;
-  if (n <= 0) return '0 km today';
-  if (n >= 100) return `${Math.round(n)} km today`;
-  if (n >= 10) return `${n.toFixed(1)} km today`;
-  const rounded = Math.round(n * 10) / 10;
-  if (Math.abs(rounded - Math.round(n)) < 1e-6) return `${Math.round(n)} km today`;
-  return `${n.toFixed(1)} km today`;
-}
-
-function pickRightInsight({ device, position, todayDistInsight, fixRel }) {
-  if (device.status === 'offline') {
+function pickRightInsight({ device, isOffline, odometerInsight, fixRel }) {
+  if (isOffline) {
     if (fixRel) return `Last seen ${fixRel}`;
     if (device.lastUpdate) return `Last seen ${dayjs(device.lastUpdate).fromNow()}`;
     return null;
   }
-  if (todayDistInsight) return todayDistInsight;
+  if (odometerInsight) return odometerInsight;
   return null;
 }
 
@@ -62,27 +54,28 @@ const VehicleListItem = ({
   const display = getDisplayForDevice(device.id, device);
   const motionNow = useMotionDurationTick();
 
+  // Canonical, backend-persisted state — same field the fleet counts and
+  // map markers read, so this dot/label can't disagree with them.
+  const activityState = display.activityState;
+  const isOffline = (activityState?.state ?? 'offline') === 'offline';
   const speedKmh = position ? Math.round(Number(position.speed || 0) * 1.852) : null;
-  const motionDotColor = device.status !== 'online'
+  const motionDotColor = isOffline
     ? theme.palette.error.main
-    : (position && Number(position.speed) > 0 ? theme.palette.success.main : theme.palette.warning.main);
+    : (activityState?.state === 'moving' ? theme.palette.success.main : theme.palette.warning.main);
 
-  const motionLabel = getMotionLabel(device.status, position?.speed);
-  const motionDuration = device.status === 'online'
-    ? getMotionDurationLabel(device.id, device.status, position?.speed, motionNow, position?.attributes)
-    : null;
+  const motionLabel = getMotionLabel(activityState);
+  const motionDuration = getMotionDurationLabel(activityState, motionNow);
   const motionDisplay = motionDuration ? `${motionLabel} ${motionDuration}` : motionLabel;
 
   const fixRel = position?.fixTime ? dayjs(position.fixTime).fromNow() : null;
 
-  const rawDist = position?.attributes?.distance ?? device.attributes?.distance;
-  const todayDistInsight = formatDistanceTodayInsight(rawDist);
+  const odometerInsight = formatOdometerInsight(display.odometerKm);
 
   const hasFix = position?.latitude != null && position?.longitude != null;
-  const ign = device.status === 'online' ? getIgnitionPhrase(position?.attributes) : null;
+  const ign = !isOffline ? getIgnitionPhrase(position?.attributes) : null;
 
   const telemetryParts = [];
-  if (device.status === 'online') {
+  if (!isOffline) {
     if (speedKmh != null) telemetryParts.push(`${speedKmh} km/h`);
     if (ign) telemetryParts.push(ign);
     if (fixRel) telemetryParts.push(fixRel);
@@ -93,8 +86,8 @@ const VehicleListItem = ({
 
   const insight = pickRightInsight({
     device,
-    position,
-    todayDistInsight,
+    isOffline,
+    odometerInsight,
     fixRel,
   });
 
