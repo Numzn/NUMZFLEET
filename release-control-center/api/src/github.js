@@ -40,7 +40,7 @@ export async function getLatestWorkflowRun(workflowFile) {
     return mapWorkflowRun(run, workflowFile);
   } catch (err) {
     if (!String(err.message).includes('404')) throw err;
-    // Workflow may exist only on develop until merged to default branch.
+    // Workflow file may not exist yet on the default branch (e.g. right after adding it).
     return { workflowName: workflowFile, error: 'Workflow not on default branch yet (404)' };
   }
 }
@@ -70,50 +70,9 @@ function mapWorkflowRun(run, workflowFile) {
   };
 }
 
-export async function getStagingDeploymentsForSha(sha) {
-  const [owner, repo] = config.github.repository.split('/');
-  const deployments = await githubFetch(
-    `/repos/${owner}/${repo}/deployments?environment=staging&sha=${sha}&per_page=10`,
-  );
-  for (const dep of deployments || []) {
-    const statuses = await githubFetch(
-      `/repos/${owner}/${repo}/deployments/${dep.id}/statuses?per_page=5`,
-    );
-    const latest = statuses?.[0];
-    if (latest?.state === 'success') {
-      return { deploymentId: dep.id, state: latest.state, logUrl: latest.log_url, environmentUrl: latest.environment_url };
-    }
-  }
-  return null;
-}
-
-export async function checkPromotionGate(sha) {
-  const manifests = { frontend: false, backend: false, erb: false };
-  const prefix = config.dockerhub.username;
-  for (const image of ['numzfleet-frontend', 'numzfleet-backend', 'numzfleet-erb']) {
-    manifests[image.replace('numzfleet-', '')] = await dockerManifestExists(`${prefix}/${image}`, sha);
-  }
-  const stagingDeployment = await getStagingDeploymentsForSha(sha).catch(() => null);
-  const allManifests = Object.values(manifests).every(Boolean);
-  return {
-    eligible: Boolean(stagingDeployment && allManifests),
-    checks: {
-      stagingDeploymentSuccess: Boolean(stagingDeployment),
-      manifestsPresent: allManifests,
-      manifests,
-    },
-    stagingDeployment,
-  };
-}
-
-async function dockerManifestExists(repository, tag) {
-  const { checkRegistryManifest } = await import('./dockerhub.js');
-  return checkRegistryManifest(repository, tag);
-}
-
 export async function fetchAllLatestWorkflows() {
   const out = {};
-  for (const wf of config.workflows.slice(0, 3)) {
+  for (const wf of config.workflows) {
     try {
       out[wf] = await getLatestWorkflowRun(wf);
     } catch (err) {

@@ -56,7 +56,7 @@ function WorkflowRow({ label, wf }) {
 }
 
 export default function OverviewCards({ overview }) {
-  if (!overview?.staging && !overview?.production) {
+  if (!overview?.production) {
     return (
       <Paper sx={{ p: 3 }}>
         <Typography color="text.secondary">
@@ -66,7 +66,7 @@ export default function OverviewCards({ overview }) {
     );
   }
 
-  const { staging, production, workflows, registry, health, promotionGate, errors } = overview;
+  const { production, workflows, registry, health, errors } = overview;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -81,12 +81,6 @@ export default function OverviewCards({ overview }) {
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <ShaCard
-          title="Staging (NumzLab)"
-          sha={staging?.sha}
-          subtitle={staging?.branchHead ? `develop HEAD · ${staging.branchHead.slice(0, 7)}` : null}
-          envColor="primary.main"
-        />
-        <ShaCard
           title="Production (OCI)"
           sha={production?.sha}
           subtitle={production?.mainSha ? `main · ${production.mainSha.slice(0, 7)}` : null}
@@ -98,15 +92,13 @@ export default function OverviewCards({ overview }) {
       </Box>
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="subtitle1" gutterBottom>Latest GitHub workflows</Typography>
-        <WorkflowRow label="Build" wf={workflows?.build} />
-        <WorkflowRow label="Deploy staging" wf={workflows?.deployStaging} />
-        <WorkflowRow label="Promote production" wf={workflows?.promoteProduction} />
+        <Typography variant="subtitle1" gutterBottom>Latest GitHub workflow</Typography>
+        <WorkflowRow label="Production deploy" wf={workflows?.productionDeploy} />
       </Paper>
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <Paper sx={{ p: 2, flex: 1 }}>
-          <Typography variant="subtitle1" gutterBottom>Docker Hub (staging SHA)</Typography>
+          <Typography variant="subtitle1" gutterBottom>Docker Hub (main HEAD)</Typography>
           {registry ? (
             Object.entries(registry.images || {}).map(([k, ok]) => (
               <Box key={k} sx={{ display: 'flex', gap: 1, py: 0.25 }}>
@@ -114,7 +106,7 @@ export default function OverviewCards({ overview }) {
               </Box>
             ))
           ) : (
-            <Typography variant="body2" color="text.secondary">No staging SHA</Typography>
+            <Typography variant="body2" color="text.secondary">No main SHA</Typography>
           )}
         </Paper>
 
@@ -131,21 +123,6 @@ export default function OverviewCards({ overview }) {
           ))}
         </Paper>
       </Box>
-
-      {promotionGate && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1" gutterBottom>Promotion gate (read-only)</Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <StatusChip ok={promotionGate.checks?.stagingDeploymentSuccess} label="Staging deploy" />
-            <StatusChip ok={promotionGate.checks?.manifestsPresent} label="Manifests" />
-            <Chip
-              size="small"
-              color={promotionGate.eligible ? 'success' : 'default'}
-              label={promotionGate.eligible ? 'Eligible for promotion' : 'Not eligible'}
-            />
-          </Box>
-        </Paper>
-      )}
 
       {overview.collectedAt && (
         <Typography variant="caption" color="text.secondary">

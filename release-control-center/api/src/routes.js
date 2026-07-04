@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { config, isFullSha, shortSha } from './config.js';
+import { config, isFullSha } from './config.js';
 import {
   getLatestOverview,
   listTimeline,
@@ -13,7 +13,6 @@ import { probeNumzLabHealth, probeOciHealth } from './health.js';
 import {
   enqueueJob,
   subscribeJob,
-  buildDeployStagingJob,
   buildVerifyJob,
   buildPromoteJob,
   buildRollbackProductionJob,
@@ -41,11 +40,6 @@ export async function registerRoutes(fastify) {
     return { ...overview, activeJob: activeJob ? mapJob(activeJob) : null };
   });
 
-  fastify.get('/api/v1/state/staging', async () => {
-    const o = getLatestOverview();
-    return o?.staging || {};
-  });
-
   fastify.get('/api/v1/state/production', async () => {
     const o = getLatestOverview();
     return o?.production || {};
@@ -69,7 +63,7 @@ export async function registerRoutes(fastify) {
     return registryForSha(req.params.sha);
   });
 
-  fastify.get('/api/v1/health/numzlab', async () => probeNumzLabHealth(config.staging.healthOrigin));
+  fastify.get('/api/v1/health/numzlab', async () => probeNumzLabHealth(config.numzlab.healthOrigin));
   fastify.get('/api/v1/health/oci', async () => probeOciHealth(config.production.healthOrigin));
 
   fastify.get('/api/v1/timeline', async (req) => ({
@@ -145,24 +139,8 @@ export async function registerRoutes(fastify) {
   }));
 
   // --- Actions ---
-  fastify.post('/api/v1/jobs/deploy-staging', { preHandler: requireRole('operator') }, async (req, reply) => {
-    try {
-      const spec = buildDeployStagingJob(req.body || {}, { ip: getClientIp(req) });
-      spec.actor = req.rccActor;
-      spec.ipAddress = getClientIp(req);
-      const jobId = await enqueueJob(spec);
-      return { jobId, status: 'queued', streamUrl: `/api/v1/jobs/${jobId}/stream` };
-    } catch (err) {
-      if (err.code === 'JOB_LOCK_HELD') return reply.code(409).send({ error: { code: err.code, message: err.message, jobId: err.jobId } });
-      throw err;
-    }
-  });
-
   fastify.post('/api/v1/jobs/verify', { preHandler: requireRole('operator') }, async (req) => {
-    const spec = buildVerifyJob({
-      includePromotionGate: req.body?.includePromotionGate !== false,
-      ip: getClientIp(req),
-    });
+    const spec = buildVerifyJob({ ip: getClientIp(req) });
     spec.actor = req.rccActor;
     spec.ipAddress = getClientIp(req);
     const jobId = await enqueueJob(spec);
@@ -176,13 +154,6 @@ export async function registerRoutes(fastify) {
     }
     if (!isFullSha(promotedSha)) {
       return reply.code(400).send({ error: { message: 'promotedSha must be 40-char SHA' } });
-    }
-    const overview = getLatestOverview();
-    const liveStaging = overview?.staging?.sha;
-    if (liveStaging && liveStaging !== promotedSha) {
-      return reply.code(400).send({
-        error: { message: `Staging SHA mismatch: live=${shortSha(liveStaging)} requested=${shortSha(promotedSha)}` },
-      });
     }
 
     const spec = buildPromoteJob(promotedSha, { confirmPhrase, ip: getClientIp(req) });

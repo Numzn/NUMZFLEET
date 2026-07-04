@@ -1,6 +1,7 @@
 # NUMZFLEET Release Control Center
 
-Operator dashboard for Release Pipeline v3. **Orchestration only** — all deploy logic stays in existing scripts.
+Operator dashboard for the single-branch production pipeline (`.github/workflows/main.yml`).
+**Orchestration only** — all deploy logic stays in existing scripts.
 
 ## Quick start (Dev PC)
 
@@ -30,20 +31,21 @@ Log in with the `RCC_API_TOKEN` from `config/rcc.env`.
 
 ## Actions
 
-**Staging is retired.** See `deployment/STAGING_RETIRED.md`.
+Single branch (`main`), single pipeline: `git push origin main` builds, tests, and deploys automatically.
+The actions below are break-glass / operator controls, not the normal path.
 
 | Action | Command |
 |--------|---------|
 | Dev on NumzLab | `./scripts/dev` |
-| Deploy production | `python deployment/scripts/auto_deploy.py --target production --skip-git --deploy-image-tag <sha>` |
+| Deploy production (break-glass) | `python deployment/scripts/auto_deploy.py --skip-git --deploy-image-tag <sha>` |
 | Health check NumzLab | `./scripts/verify` or `./scripts/numzlab-healthcheck.sh` |
-| Rollback production | SSH OCI `deployment/deploy/rollback.sh` |
+| Rollback production | SSH OCI `deployment/deploy/rollback.sh` (also happens automatically on a failed deploy) |
 
 ## Data sources (live)
 
-- Staging/production SHA via SSH state files on NumzLab and OCI
-- GitHub Actions workflow runs and staging deployments API
-- Docker Hub manifest checks
+- Production SHA via SSH state files on OCI (`.last_deploy`, `.deploy_history`, `.production_deploy_history`)
+- GitHub Actions runs for `.github/workflows/main.yml` ("Production deploy")
+- Docker Hub manifest checks (against `main`'s current HEAD)
 - HTTP health probes (NumzLab Tailscale + OCI public URLs)
 
 ## Requirements
@@ -52,4 +54,4 @@ Log in with the `RCC_API_TOKEN` from `config/rcc.env`.
 - `bash`, `ssh`, `git`, optional `docker` CLI
 - Network: Tailscale to NumzLab, SSH to OCI, GitHub + Docker Hub API
 
-See [RELEASE_PIPELINE_V3.md](../docs/RELEASE_PIPELINE_V3.md) for pipeline rules.
+See [deployment/REGISTRY_DEPLOY.md](../deployment/REGISTRY_DEPLOY.md) for the full pipeline.

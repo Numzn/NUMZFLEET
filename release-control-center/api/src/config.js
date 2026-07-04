@@ -50,13 +50,14 @@ export const config = {
     username: process.env.DOCKERHUB_USERNAME?.trim() || 'numz14',
     token: process.env.DOCKERHUB_TOKEN?.trim() || '',
   },
-  staging: {
-    host: process.env.NUMZFLEET_SSH_HOST_STAGING?.trim() || '100.121.79.2',
-    user: process.env.NUMZFLEET_SSH_USER_STAGING?.trim() || 'numz14',
-    identityFile: expandHome(process.env.NUMZFLEET_SSH_IDENTITY_STAGING?.trim() || '~/.ssh/id_ed25519'),
-    repoPath: process.env.NUMZFLEET_SERVER_REPO_STAGING?.trim() || '/srv/projects/numzfleet',
-    healthOrigin: process.env.NUMZFLEET_STAGING_HEALTH_ORIGIN?.trim() || 'http://100.121.79.2',
-    autoDeployEnv: process.env.AUTO_DEPLOY_ENV_STAGING?.trim() || 'deployment/scripts/auto_deploy.staging.env',
+  // NumzLab dev box (single-branch model: no staging deploy target, just a dev
+  // environment whose health is worth surfacing alongside production).
+  numzlab: {
+    host: process.env.NUMZFLEET_SSH_HOST_NUMZLAB?.trim() || '100.121.79.2',
+    user: process.env.NUMZFLEET_SSH_USER_NUMZLAB?.trim() || 'numz14',
+    identityFile: expandHome(process.env.NUMZFLEET_SSH_IDENTITY_NUMZLAB?.trim() || '~/.ssh/id_ed25519'),
+    repoPath: process.env.NUMZFLEET_SERVER_REPO_NUMZLAB?.trim() || '/srv/projects/numzfleet',
+    healthOrigin: process.env.NUMZFLEET_NUMZLAB_HEALTH_ORIGIN?.trim() || 'http://100.121.79.2',
   },
   production: {
     host: process.env.NUMZFLEET_SSH_HOST_PRODUCTION?.trim() || '129.151.163.95',
@@ -66,12 +67,8 @@ export const config = {
     healthOrigin: process.env.NUMZFLEET_PRODUCTION_HEALTH_ORIGIN?.trim() || 'https://numz.site',
     autoDeployEnv: process.env.AUTO_DEPLOY_ENV_PRODUCTION?.trim() || 'deployment/scripts/auto_deploy.production.env',
   },
-  workflows: [
-    'build-push-numzfleet-images',
-    'deploy-staging',
-    'promote-to-production',
-    'runner-smoke',
-  ],
+  // Single branch, single pipeline: .github/workflows/main.yml ("Production deploy").
+  workflows: ['main'],
   dataDir: path.join(RCC_ROOT, 'data'),
   logsDir: path.join(RCC_ROOT, 'logs', 'jobs'),
   dbPath: path.join(RCC_ROOT, 'data', 'rcc.db'),

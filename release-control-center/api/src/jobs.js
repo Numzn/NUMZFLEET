@@ -13,7 +13,6 @@ import {
 import { sshExec } from './ssh.js';
 import { collectOverview } from './collector.js';
 import { getRegistryStatusForSha } from './dockerhub.js';
-import { getStagingDeploymentsForSha } from './github.js';
 
 const listeners = new Map();
 
@@ -118,9 +117,8 @@ function appendAndEmit(jobId, filePath, line, stream) {
 function projectJobTimeline(jobId, spec, exitCode) {
   const severity = exitCode === 0 ? 'success' : 'error';
   const titles = {
-    deploy_staging: 'RCC: Deploy to NumzLab',
     verify: 'RCC: Verification run',
-    promote: 'RCC: Promote to production',
+    promote: 'RCC: Deploy SHA to production',
     rollback_production: 'RCC: Rollback production',
   };
   upsertTimelineEvent({
@@ -154,69 +152,31 @@ function spawnProcess(cmd, args, { cwd, env, onStdout, onStderr }) {
   });
 }
 
-export function buildDeployStagingJob(body, meta) {
-  const args = ['deployment/scripts/auto_deploy.py', '--target', 'staging'];
-  if (body.skipGit) args.push('--skip-git');
-  if (body.dryRun) args.push('--dry-run');
-  if (body.message) args.push('-m', body.message);
-
-  const command = `python ${args.join(' ')}`;
-  return {
-    action: 'deploy_staging',
-    targetEnv: 'staging',
-    timelineCategory: 'deploy',
-    command,
-    metadata: meta,
-    run: ({ onStdout, onStderr }) =>
-      spawnProcess('python', args, {
-        cwd: config.repoRoot,
-        env: {
-          NUMZFLEET_AUTO_DEPLOY_ENV_FILE: config.staging.autoDeployEnv,
-          GITHUB_TOKEN: config.github.token,
-          GITHUB_REPOSITORY: config.github.repository,
-          DOCKERHUB_USERNAME: config.dockerhub.username,
-          DOCKERHUB_TOKEN: config.dockerhub.token,
-        },
-        onStdout,
-        onStderr,
-      }),
-  };
-}
-
+// Verifies the currently deployed production SHA: NumzLab dev-box health (informational),
+// then production registry manifests + production health for the SHA .last_deploy reports.
 export function buildVerifyJob(meta) {
-  const staging = config.staging;
-  const steps = [
-    `cd ${staging.repoPath} && bash scripts/numzlab-healthcheck.sh`,
-    `cd ${staging.repoPath} && bash deployment/verify/staging-smoke.sh`,
-  ];
+  const numzlab = config.numzlab;
 
   return {
     action: 'verify',
-    targetEnv: 'staging',
+    targetEnv: 'production',
     timelineCategory: 'verify',
-    command: steps.join(' && '),
+    command: `bash scripts/numzlab-healthcheck.sh (NumzLab) && registry/health check (production)`,
     metadata: meta,
     async run({ onStdout, onStderr }) {
-      onStdout('== Step 1: numzlab-healthcheck.sh ==\n');
-      let code = await sshExec(staging, steps[0], { timeoutMs: 180000 })
-        .then((r) => { onStdout(r.stdout + '\n'); return 0; })
-        .catch((e) => { onStderr(e.message + '\n'); return 1; });
-      if (code !== 0) return code;
-
-      onStdout('\n== Step 2: staging-smoke.sh ==\n');
-      code = await sshExec(staging, steps[1], { timeoutMs: 120000 })
-        .then((r) => { onStdout(r.stdout + '\n'); return 0; })
-        .catch((e) => { onStderr(e.message + '\n'); return 1; });
-      if (code !== 0) return code;
+      onStdout('== Step 1: NumzLab dev-box health (informational) ==\n');
+      await sshExec(numzlab, `cd ${numzlab.repoPath} && bash scripts/numzlab-healthcheck.sh`, { timeoutMs: 180000 })
+        .then((r) => onStdout(r.stdout + '\n'))
+        .catch((e) => onStdout(`(NumzLab check skipped: ${e.message})\n`));
 
       const overview = getLatestOverview();
-      const sha = overview?.staging?.sha;
+      const sha = overview?.production?.sha;
       if (!sha || !isFullSha(sha)) {
-        onStderr('Cannot run manifest/gate checks: staging SHA unavailable\n');
+        onStderr('Cannot run manifest check: production SHA unavailable (.last_deploy not read yet)\n');
         return 1;
       }
 
-      onStdout(`\n== Step 3: registry manifest check (${sha.slice(0, 7)}) ==\n`);
+      onStdout(`\n== Step 2: registry manifest check (${sha.slice(0, 7)}) ==\n`);
       const registry = await getRegistryStatusForSha(sha);
       for (const image of ['frontend', 'backend', 'erb']) {
         const ok = registry.images[image];
@@ -229,24 +189,16 @@ export function buildVerifyJob(meta) {
       }
       onStdout('[verify-manifests] All required manifests found\n');
 
-      if (meta.includePromotionGate !== false) {
-        onStdout(`\n== Step 4: verify-staging-promotion (${sha.slice(0, 7)}) ==\n`);
-        try {
-          const deployment = await getStagingDeploymentsForSha(sha);
-          if (!deployment) {
-            onStderr('[verify-staging-promotion] No successful staging deployment found for SHA\n');
-            return 1;
-          }
-          onStdout(
-            `[verify-staging-promotion] deployment id=${deployment.deploymentId} state=${deployment.state}\n`,
-          );
-          onStdout('[verify-staging-promotion] Promotion gate passed\n');
-        } catch (err) {
-          onStderr(`[verify-staging-promotion] ${err.message}\n`);
-          return 1;
-        }
-      }
-      return 0;
+      onStdout('\n== Step 3: production health ==\n');
+      const prod = config.production;
+      let code = await sshExec(
+        prod,
+        `curl -fsS --max-time 15 ${prod.healthOrigin}/health && curl -fsS --max-time 15 ${prod.healthOrigin}/api/health`,
+        { timeoutMs: 30000 },
+      )
+        .then((r) => { onStdout(r.stdout + '\n'); return 0; })
+        .catch((e) => { onStderr(e.message + '\n'); return 1; });
+      return code;
     },
   };
 }

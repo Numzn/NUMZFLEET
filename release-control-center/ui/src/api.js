@@ -30,7 +30,6 @@ export function createClient(getToken) {
     },
     jobs: () => request('/jobs'),
     job: (id) => request(`/jobs/${id}`),
-    deployStaging: (body) => request('/jobs/deploy-staging', { method: 'POST', body: JSON.stringify(body || {}) }),
     verify: (body) => request('/jobs/verify', { method: 'POST', body: JSON.stringify(body || {}) }),
     promote: (body) => request('/jobs/promote', { method: 'POST', body: JSON.stringify(body) }),
     rollbackProduction: (body) => request('/jobs/rollback-production', { method: 'POST', body: JSON.stringify(body) }),

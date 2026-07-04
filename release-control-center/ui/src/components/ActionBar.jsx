@@ -1,20 +1,16 @@
 import React, { useState } from 'react';
 import {
   Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  TextField, Typography, Alert, FormControlLabel, Checkbox,
+  TextField, Typography, Alert,
 } from '@mui/material';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import PublishIcon from '@mui/icons-material/Publish';
 import UndoIcon from '@mui/icons-material/Undo';
 
 export default function ActionBar({ overview, client, onJobStarted, disabled }) {
-  const stagingSha = overview?.staging?.sha;
-  const [deployOpen, setDeployOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [rollbackOpen, setRollbackOpen] = useState(false);
-  const [skipGit, setSkipGit] = useState(false);
-  const [commitMsg, setCommitMsg] = useState('');
+  const [promoteSha, setPromoteSha] = useState('');
   const [confirmPromote, setConfirmPromote] = useState('');
   const [confirmRollback, setConfirmRollback] = useState('');
   const [error, setError] = useState('');
@@ -33,14 +29,6 @@ export default function ActionBar({ overview, client, onJobStarted, disabled }) 
     <Box sx={{ mb: 3 }}>
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
         <Button
-          variant="contained"
-          startIcon={<RocketLaunchIcon />}
-          disabled={disabled}
-          onClick={() => setDeployOpen(true)}
-        >
-          Deploy to NumzLab
-        </Button>
-        <Button
           variant="outlined"
           startIcon={<VerifiedIcon />}
           disabled={disabled}
@@ -52,10 +40,10 @@ export default function ActionBar({ overview, client, onJobStarted, disabled }) 
           variant="contained"
           color="success"
           startIcon={<PublishIcon />}
-          disabled={disabled || !stagingSha || !overview?.promotionGate?.eligible}
+          disabled={disabled}
           onClick={() => setPromoteOpen(true)}
         >
-          Promote to Production
+          Deploy SHA to Production
         </Button>
         <Button
           variant="outlined"
@@ -70,27 +58,15 @@ export default function ActionBar({ overview, client, onJobStarted, disabled }) 
 
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
-      <DeployDialog
-        open={deployOpen}
-        onClose={() => setDeployOpen(false)}
-        skipGit={skipGit}
-        setSkipGit={setSkipGit}
-        commitMsg={commitMsg}
-        setCommitMsg={setCommitMsg}
-        onConfirm={() => run((c) => c.deployStaging({
-          skipGit,
-          message: commitMsg || undefined,
-        }))}
-      />
-
       <PromoteDialog
         open={promoteOpen}
         onClose={() => setPromoteOpen(false)}
-        stagingSha={stagingSha}
+        sha={promoteSha}
+        setSha={setPromoteSha}
         confirm={confirmPromote}
         setConfirm={setConfirmPromote}
         onConfirm={() => run((c) => c.promote({
-          promotedSha: stagingSha,
+          promotedSha: promoteSha,
           confirmPhrase: 'PROMOTE',
         }))}
       />
@@ -107,50 +83,31 @@ export default function ActionBar({ overview, client, onJobStarted, disabled }) 
   );
 }
 
-function DeployDialog({ open, onClose, skipGit, setSkipGit, commitMsg, setCommitMsg, onConfirm }) {
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Deploy to NumzLab</DialogTitle>
-      <DialogContent>
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          Runs <code>auto_deploy.py --target staging</code> (commit/push + CI wait + SSH deploy).
-        </Typography>
-        <FormControlLabel
-          control={<Checkbox checked={skipGit} onChange={(e) => setSkipGit(e.target.checked)} />}
-          label="Skip git commit/push (--skip-git)"
-        />
-        {!skipGit && (
-          <TextField
-            fullWidth
-            label="Commit message (optional)"
-            value={commitMsg}
-            onChange={(e) => setCommitMsg(e.target.value)}
-            sx={{ mt: 1 }}
-          />
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={() => { onConfirm(); onClose(); }}>Deploy</Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
+const SHA_RE = /^[0-9a-fA-F]{40}$/;
 
-function PromoteDialog({ open, onClose, stagingSha, confirm, setConfirm, onConfirm }) {
+function PromoteDialog({ open, onClose, sha, setSha, confirm, setConfirm, onConfirm }) {
+  const shaValid = SHA_RE.test(sha);
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Promote to Production</DialogTitle>
+      <DialogTitle>Deploy SHA to Production</DialogTitle>
       <DialogContent>
         <Alert severity="warning" sx={{ mb: 2 }}>
           Rollback does not revert DB migrations. Restore baseline backup if needed.
         </Alert>
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          SHA: <code>{stagingSha}</code>
-        </Typography>
         <Typography variant="body2" sx={{ mb: 2 }}>
-          Runs <code>auto_deploy.py --target production --promoted-sha … --skip-git</code>
+          Break-glass path: bypasses the normal <code>git push origin main</code> pipeline and directly
+          runs <code>auto_deploy.py --target production --promoted-sha … --skip-git</code> for an
+          already-built SHA (images must already exist in Docker Hub).
         </Typography>
+        <TextField
+          fullWidth
+          label="Full 40-character git SHA"
+          value={sha}
+          onChange={(e) => setSha(e.target.value.trim())}
+          error={sha.length > 0 && !shaValid}
+          helperText={sha.length > 0 && !shaValid ? 'Must be a full 40-character SHA' : ' '}
+          sx={{ mb: 1 }}
+        />
         <TextField
           fullWidth
           label='Type PROMOTE to confirm'
@@ -163,10 +120,10 @@ function PromoteDialog({ open, onClose, stagingSha, confirm, setConfirm, onConfi
         <Button
           variant="contained"
           color="success"
-          disabled={confirm !== 'PROMOTE'}
+          disabled={confirm !== 'PROMOTE' || !shaValid}
           onClick={() => { onConfirm(); onClose(); }}
         >
-          Promote
+          Deploy
         </Button>
       </DialogActions>
     </Dialog>

@@ -13,23 +13,6 @@ function shellQuote(s) {
   return `'${String(s).replace(/'/g, `'\\''`)}'`;
 }
 
-export async function readStagingState(target) {
-  const base = `${target.repoPath}/deployment/deploy`;
-  const current = await readFile(target, `${base}/.last_staging_deploy`);
-  const history = await readFile(target, `${base}/.staging_deploy_history`);
-  const errors = [];
-  if (current.error) errors.push({ file: '.last_staging_deploy', message: current.error });
-  if (history.error) errors.push({ file: '.staging_deploy_history', message: history.error });
-  if (!current.value && !current.error) {
-    errors.push({ file: '.last_staging_deploy', message: 'File not found (no staging deploy recorded yet)' });
-  }
-  return {
-    currentSha: current.value,
-    history: history.value ? history.value.split(/\r?\n/).filter(Boolean) : [],
-    errors,
-  };
-}
-
 export async function readProductionState(target) {
   const base = `${target.repoPath}/deployment/deploy`;
   const current = await readFile(target, `${base}/.last_production_deploy`);
