@@ -34,6 +34,7 @@ const tableSx = {
 const VehicleRegistryTable = ({
   rows,
   loading,
+  hasError = false,
   onOpenWorkspace,
   onChangeDevice,
   onDelete,
@@ -51,7 +52,7 @@ const VehicleRegistryTable = ({
         </TableRow>
       </TableHead>
       <TableBody>
-        {rows.length === 0 && !loading ? (
+        {rows.length === 0 && !loading && !hasError ? (
           <TableRow>
             <TableCell colSpan={6}>
               <Typography variant="body2" sx={{ color: 'var(--color-text-secondary)', py: 1 }}>

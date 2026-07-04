@@ -51,7 +51,9 @@ export default async (input, init = {}) => {
     if (allowRedirect) {
       handleUnauthorized();
     }
-    throw new Error(await response.text());
+    const err = new Error(await response.text());
+    err.status = response.status;
+    throw err;
   }
   return response;
 };

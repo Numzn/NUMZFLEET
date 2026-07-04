@@ -69,6 +69,30 @@ export function fuelApiErrorMessage(thrown, fallback = 'Request failed') {
   return raw.trim() || fallback;
 }
 
+/**
+ * Categorize a fetchOrThrow rejection for list-load UI: distinguishes auth,
+ * rate-limit, server, and network failures from a true empty result, so a
+ * failed request never reads as "no vehicles yet". `thrown.status` is set by
+ * fetchOrThrow for HTTP error responses; its absence means fetch() itself
+ * rejected (offline, DNS, connection refused, CORS), i.e. a network failure.
+ */
+export function vehiclesLoadErrorMessage(thrown) {
+  const status = thrown?.status;
+  if (status === 401) {
+    return 'Your session has expired or you are not signed in. Please sign in again.';
+  }
+  if (status === 429) {
+    return 'Too many requests right now. Please wait a moment and try again.';
+  }
+  if (typeof status === 'number' && status >= 500) {
+    return 'The server had a problem loading vehicles. Please try again shortly.';
+  }
+  if (status == null) {
+    return 'Could not reach the server. Check your connection and try again.';
+  }
+  return fuelApiErrorMessage(thrown, 'Failed to load vehicles');
+}
+
 export async function deleteVehicle(user, vehicleId) {
   await fetchOrThrow(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
     method: 'DELETE',

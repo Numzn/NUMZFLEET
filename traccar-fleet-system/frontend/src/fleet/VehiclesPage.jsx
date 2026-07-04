@@ -40,6 +40,7 @@ import {
   assignVehicleDevice,
   deleteVehicle,
   fuelApiErrorMessage,
+  vehiclesLoadErrorMessage,
 } from './vehiclesApi';
 import VehicleRegistryHeader from './vehicleRegistry/VehicleRegistryHeader';
 import VehicleRegistryCard from './vehicleRegistry/VehicleRegistryCard';
@@ -77,7 +78,7 @@ const VehiclesPage = () => {
       const data = await fetchVehicles(user);
       setRows(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError(e.message || 'Failed to load vehicles');
+      setError(vehiclesLoadErrorMessage(e));
       setRows([]);
     } finally {
       setLoading(false);
@@ -311,7 +312,7 @@ const VehiclesPage = () => {
 
           {isMobile ? (
             <Stack spacing={1.5} sx={{ width: '100%', minWidth: 0 }}>
-              {rows.length === 0 && !loading ? (
+              {rows.length === 0 && !loading && !error ? (
                 <Box
                   sx={{
                     p: 'var(--space-4)',
@@ -340,6 +341,7 @@ const VehiclesPage = () => {
             <VehicleRegistryTable
               rows={rows}
               loading={loading}
+              hasError={Boolean(error)}
               onOpenWorkspace={handleOpenWorkspace}
               onChangeDevice={openAssign}
               onDelete={openDeleteConfirm}
