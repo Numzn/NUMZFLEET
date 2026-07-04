@@ -137,8 +137,13 @@ io.engine.on('upgrade_error', (err) => {
   console.error('Stack:', err.stack);
 });
 
-// Trust Nginx reverse proxy - required for rate-limiter and correct IP detection
-app.set('trust proxy', 1);
+// Trust reverse proxy hops for rate-limiter and correct IP detection.
+// Chain is client -> Caddy (deployment/caddy/Caddyfile) -> nginx (frontend
+// container, traccar-fleet-system/frontend/nginx.conf) -> fuel-api: two hops,
+// not one. With trust proxy=1, Express resolved req.ip to Caddy's container
+// IP (identical for every visitor), collapsing all real clients into one
+// shared rate-limit bucket that any nontrivial traffic exhausts instantly.
+app.set('trust proxy', 2);
 
 // Middleware
 app.use(helmet({
