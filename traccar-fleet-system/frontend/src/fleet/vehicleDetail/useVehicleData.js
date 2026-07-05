@@ -8,6 +8,11 @@ import { normalizePositionTelemetry } from './telemetryUtils.js';
 import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from './vehicleMotionStatus.js';
 import useMotionDurationTick from './useMotionDurationTick.js';
 import { isGeofenceEventType, resolveEventType } from './vehicleAlertUtils.js';
+import useCachedResource from '../../common/cache/useCachedResource.js';
+import { makeResourceKey, setEntryData } from '../../common/cache/resourceCache.js';
+
+const VEHICLE_CACHE_TTL_MS = 120_000;
+const VEHICLE_POLL_MS = 120_000;
 
 const erbFuelKey = (fuelType) => {
   if (!fuelType) return 'diesel';
@@ -70,41 +75,43 @@ export default function useVehicleData(vehicleId) {
   const groupsById = useSelector((s) => s.groups.items);
   const motionNow = useMotionDurationTick();
 
-  const [vehicle, setVehicle] = useState(null);
   const [erbState, setErbState] = useState({
     pricePerL: null,
     fuelKey: 'diesel',
     timestamp: null,
     error: null,
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [historicalEvents, setHistoricalEvents] = useState([]);
 
-  const refresh = useCallback(async () => {
-    if (!vehicleId || !user) return;
-    setError(null);
-    setLoading(true);
+  const cacheKey = user && vehicleId ? makeResourceKey('vehicle', vehicleId) : null;
+
+  const fetchVehicleResource = useCallback(async () => {
     try {
-      const v = await fetchVehicle(user, vehicleId);
-      setVehicle(v);
+      return await fetchVehicle(user, vehicleId);
     } catch (e) {
       const msg = fuelApiErrorMessage(e, 'Failed to load vehicle');
       if (/not found/i.test(msg)) {
-        setError('This vehicle no longer exists in your fleet.');
         window.dispatchEvent(new CustomEvent('numz:fleet-vehicles-changed'));
-      } else {
-        setError(msg);
+        throw new Error('This vehicle no longer exists in your fleet.');
       }
-      setVehicle(null);
-    } finally {
-      setLoading(false);
+      throw new Error(msg);
     }
-  }, [vehicleId, user]);
+  }, [user, vehicleId]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  // Last-known-good + silent-revalidate: shows the previously cached vehicle
+  // (sessionStorage-backed, so it survives a hard refresh too) immediately,
+  // never drops back to null while a fresh fetch is in flight, and is keyed
+  // strictly by vehicleId so switching vehicles can never leak stale data
+  // across ids. See src/common/cache/resourceCache.js.
+  const cached = useCachedResource(cacheKey, fetchVehicleResource, {
+    ttl: VEHICLE_CACHE_TTL_MS,
+    persist: true,
+    revalidateOnMount: true,
+  });
+
+  const vehicle = cached.data ?? null;
+  const loading = cached.loading;
+  const error = cached.error?.message ?? null;
 
   // Canonical activityState/odometer/routineService are resolved and
   // persisted backend-side, not pushed live over the websocket — refresh
@@ -117,11 +124,11 @@ export default function useVehicleData(vehicleId) {
     if (!vehicleId || !user) return undefined;
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
-      fetchVehicle(user, vehicleId).then(setVehicle).catch(() => {});
+      cached.refresh();
     };
-    const id = window.setInterval(tick, 120_000);
+    const id = window.setInterval(tick, VEHICLE_POLL_MS);
     return () => window.clearInterval(id);
-  }, [vehicleId, user]);
+  }, [vehicleId, user, cached.refresh]);
 
   const deviceId = vehicle?.assignment?.deviceId ?? null;
   const livePosition = deviceId != null ? positions[deviceId] : null;
@@ -304,11 +311,19 @@ export default function useVehicleData(vehicleId) {
     async (body) => {
       if (!user || !vehicleId) throw new Error('Not ready');
       const merged = await putVehicleConfig(user, vehicleId, body);
-      setVehicle(merged);
+      // The mutation response is already the fresh, authoritative vehicle —
+      // seed the cache directly instead of refetching.
+      if (cacheKey) setEntryData(cacheKey, merged, { persist: true });
       return merged;
     },
-    [user, vehicleId],
+    [user, vehicleId, cacheKey],
   );
+
+  // `refresh()` is the pre-existing public contract: callers expect a real,
+  // guaranteed-fresh fetch (e.g. after another part of the page mutates
+  // something this vehicle depends on), not one that can dedupe onto a
+  // stale in-flight background poll.
+  const refresh = useCallback(() => cached.invalidate(), [cached.invalidate]);
 
   return {
     vehicle,
@@ -320,6 +335,7 @@ export default function useVehicleData(vehicleId) {
     geofenceAlertsSuppressed,
     loading,
     error,
+    stale: cached.stale,
     refresh,
     saveConfig,
     livePosition,

@@ -42,8 +42,31 @@ function plateInitials(plate, name) {
   return src.slice(0, 2).toUpperCase();
 }
 
-function RoutineServiceStat({ nextService, vehicleId, onConfigure }) {
+function RoutineServiceStat({
+  nextService, nextServiceLoading, vehicleId, onConfigure,
+}) {
   if (!nextService) {
+    // No confirmed schedule yet. Only render "Not configured" once the
+    // engine fetch has actually completed with no schedule — while it's
+    // still in flight (no cached snapshot for this vehicle yet, e.g. a
+    // genuine first-ever visit with nothing in sessionStorage) this would
+    // otherwise misreport a loading gap as a confirmed absence.
+    if (nextServiceLoading) {
+      return (
+        <Box sx={{ minWidth: 0, textAlign: { xs: 'left', sm: 'center' } }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '0.625rem' }}
+          >
+            Routine Service
+          </Typography>
+          <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 0.5 }}>
+            Loading…
+          </Typography>
+        </Box>
+      );
+    }
     return (
       <Box sx={{ minWidth: 0, textAlign: { xs: 'left', sm: 'center' } }}>
         <Typography
@@ -148,6 +171,7 @@ export default function VehicleWorkspaceHero({
   onQuickAction,
   onPhotoUpdated,
   nextService,
+  nextServiceLoading,
 }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -402,6 +426,7 @@ export default function VehicleWorkspaceHero({
         <StatItem label="Driver" value={driverName} />
         <RoutineServiceStat
           nextService={nextService}
+          nextServiceLoading={nextServiceLoading}
           vehicleId={vehicleId}
           onConfigure={openSetup}
         />

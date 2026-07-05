@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { fetchVehicleEngine } from '../../vehiclesApi.js';
+import useCachedResource from '../../../common/cache/useCachedResource.js';
+import { makeResourceKey } from '../../../common/cache/resourceCache.js';
 
 const ENGINE_POLL_MS = 60_000;
 const ENGINE_RELOAD_DEBOUNCE_MS = 5_000;
+const ENGINE_CACHE_TTL_MS = 60_000;
 
 /** Stable fingerprint of mileage evidence on a live Traccar position. */
 export function mileageEvidenceFingerprint(position) {
@@ -88,63 +91,37 @@ export function overviewMetricsFromEngine(snapshot) {
 
 export default function useVehicleEngine(fleetVehicleId, { deviceId = null, livePosition = null } = {}) {
   const user = useSelector((s) => s.session.user);
-  const [snapshot, setSnapshot] = useState(null);
-  const [initialLoading, setInitialLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
-  const reloadRef = useRef(null);
   const lastEvidenceRef = useRef(null);
   const debounceTimerRef = useRef(null);
-  const hasSnapshotRef = useRef(false);
 
-  const reload = useCallback(async ({ silent } = {}) => {
-    if (!user || !fleetVehicleId) {
-      hasSnapshotRef.current = false;
-      setSnapshot(null);
-      setError(null);
-      setInitialLoading(false);
-      setRefreshing(false);
-      return null;
-    }
+  const cacheKey = user && fleetVehicleId ? makeResourceKey('vehicleEngine', fleetVehicleId) : null;
 
-    const isSilent = silent ?? hasSnapshotRef.current;
-    if (isSilent) {
-      setRefreshing(true);
-    } else {
-      setInitialLoading(true);
-    }
-    setError(null);
+  const fetcher = useCallback(
+    () => fetchVehicleEngine(user, fleetVehicleId),
+    [user, fleetVehicleId],
+  );
 
-    try {
-      const data = await fetchVehicleEngine(user, fleetVehicleId);
-      setSnapshot(data);
-      hasSnapshotRef.current = data != null;
-      return data;
-    } catch (err) {
-      if (!isSilent) {
-        hasSnapshotRef.current = false;
-        setSnapshot(null);
-        setError(err?.message || 'Failed to load vehicle engine');
-      }
-      return null;
-    } finally {
-      if (isSilent) {
-        setRefreshing(false);
-      } else {
-        setInitialLoading(false);
-      }
-    }
-  }, [user, fleetVehicleId]);
+  // Last-known-good + silent-revalidate, sessionStorage-backed so a hard
+  // refresh doesn't drop straight to null (this fetch is the heaviest one on
+  // the page — fuel calc, maintenance due-state, compliance — so it used to
+  // resolve visibly later than the lighter vehicle fetch, flashing "Not
+  // configured" for Routine Service before this data arrived). Strictly
+  // keyed by fleetVehicleId — see src/common/cache/resourceCache.js.
+  const cached = useCachedResource(cacheKey, fetcher, {
+    ttl: ENGINE_CACHE_TTL_MS,
+    persist: true,
+    revalidateOnMount: true,
+  });
 
-  reloadRef.current = reload;
+  const cachedRef = useRef(cached);
+  cachedRef.current = cached;
 
-  useEffect(() => {
-    hasSnapshotRef.current = false;
-    setSnapshot(null);
-    setError(null);
-    lastEvidenceRef.current = null;
-    reload({ silent: false });
-  }, [reload]);
+  // `reload` is the pre-existing public contract (poll, telemetry-triggered
+  // debounce, and post-mutation callers all expect a guaranteed-fresh fetch,
+  // not one that can dedupe onto a stale in-flight response). `silent` no
+  // longer changes anything: loading vs. refreshing is now derived
+  // automatically from whether cached data already exists.
+  const reload = useCallback(() => cachedRef.current.invalidate(), []);
 
   // Refresh engine when live tracker mileage evidence changes (debounced).
   useEffect(() => {
@@ -158,7 +135,7 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = window.setTimeout(() => {
-      reloadRef.current?.({ silent: true });
+      reload();
     }, ENGINE_RELOAD_DEBOUNCE_MS);
 
     return () => {
@@ -167,7 +144,7 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
         debounceTimerRef.current = null;
       }
     };
-  }, [deviceId, livePosition]);
+  }, [deviceId, livePosition, reload]);
 
   // Periodic refresh while workspace is open (covers devices that rarely emit
   // distance attrs). Skips while the tab isn't visible — a backgrounded tab
@@ -176,22 +153,24 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
     if (!user || !fleetVehicleId) return undefined;
     const id = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
-      reloadRef.current?.({ silent: true });
+      reload();
     }, ENGINE_POLL_MS);
     return () => window.clearInterval(id);
-  }, [user, fleetVehicleId]);
+  }, [user, fleetVehicleId, reload]);
 
+  const snapshot = cached.data ?? null;
   const maintenanceItems = snapshot?.hub?.maintenance?.schedules ?? [];
   const dueSoonCount = snapshot?.engine?.maintenance?.actionableCount ?? 0;
   const openWorkOrders = snapshot?.hub?.maintenance?.workOrders?.active ?? [];
 
   return {
     snapshot,
-    /** True only on first load for this vehicle (no cached snapshot yet). */
-    loading: initialLoading,
-    initialLoading,
-    refreshing,
-    error,
+    /** True only when no cached snapshot exists yet for this vehicle (real first load). */
+    loading: cached.loading,
+    initialLoading: cached.loading,
+    refreshing: cached.refreshing,
+    stale: cached.stale,
+    error: cached.error?.message ?? null,
     reload,
     registry: snapshot?.registry ?? null,
     odometerKm: snapshot?.registry?.odometerKm ?? null,
@@ -207,7 +186,7 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
     fuelSnapshot: fuelSnapshotFromEngine(snapshot),
     maintenance: {
       items: maintenanceItems,
-      loading: initialLoading,
+      loading: cached.loading,
       dueSoonCount,
       openWorkOrders,
       summary: snapshot?.hub?.maintenance?.workOrders?.summary ?? null,
