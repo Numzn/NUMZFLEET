@@ -109,12 +109,17 @@ export default function useVehicleData(vehicleId) {
   // Canonical activityState/odometer/routineService are resolved and
   // persisted backend-side, not pushed live over the websocket — refresh
   // periodically (silently, no loading flicker) so they don't go stale for
-  // the whole time this page stays open.
+  // the whole time this page stays open. Every open tab/vehicle-view shares
+  // one 300-req/15min-per-IP budget with the rest of the app, so this must
+  // stay cheap: a long interval, and skip entirely while the tab isn't
+  // visible (a backgrounded tab has no reason to keep polling).
   useEffect(() => {
     if (!vehicleId || !user) return undefined;
-    const id = window.setInterval(() => {
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
       fetchVehicle(user, vehicleId).then(setVehicle).catch(() => {});
-    }, 30_000);
+    };
+    const id = window.setInterval(tick, 120_000);
     return () => window.clearInterval(id);
   }, [vehicleId, user]);
 

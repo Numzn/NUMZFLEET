@@ -169,10 +169,13 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
     };
   }, [deviceId, livePosition]);
 
-  // Periodic refresh while workspace is open (covers devices that rarely emit distance attrs).
+  // Periodic refresh while workspace is open (covers devices that rarely emit
+  // distance attrs). Skips while the tab isn't visible — a backgrounded tab
+  // shouldn't keep spending from the shared per-IP request budget.
   useEffect(() => {
     if (!user || !fleetVehicleId) return undefined;
     const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       reloadRef.current?.({ silent: true });
     }, ENGINE_POLL_MS);
     return () => window.clearInterval(id);
