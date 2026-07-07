@@ -72,8 +72,15 @@ export async function getVehicleFuelStatistics(vehicleId, options = {}) {
     (a, b) => new Date(a.sessionDate || a.createdAt) - new Date(b.sessionDate || b.createdAt),
   );
 
-  const last = sorted[sorted.length - 1];
-  const litres = sorted.map((r) => Number(r.actualFuelLitres)).filter((n) => Number.isFinite(n) && n > 0);
+  // Flagged rows (e.g. actualFuelLitres exceeding a verified tank capacity) are excluded
+  // from volume inputs so a single bad entry can't corrupt averageRefillLitres/
+  // lastRefillLitres and, downstream, the Plan forecast. `last` still falls back to the
+  // most recent row overall for date/mileage continuity, but `lastClean` — and therefore
+  // lastRefillLitres — stays null rather than ever surfacing a flagged litres value.
+  const cleanSorted = sorted.filter((r) => r.status !== 'flagged');
+  const lastClean = cleanSorted[cleanSorted.length - 1] ?? null;
+  const last = lastClean ?? sorted[sorted.length - 1];
+  const litres = cleanSorted.map((r) => Number(r.actualFuelLitres)).filter((n) => Number.isFinite(n) && n > 0);
   const avgLitres = mean(litres);
 
   const kmGaps = [];
@@ -108,7 +115,7 @@ export async function getVehicleFuelStatistics(vehicleId, options = {}) {
   return {
     vehicleId: Number(vehicleId),
     lastRefillDate: last.sessionDate || last.createdAt,
-    lastRefillLitres: Number(last.actualFuelLitres),
+    lastRefillLitres: lastClean ? Number(lastClean.actualFuelLitres) : null,
     lastRefillMileage: last.currentMileage != null ? Number(last.currentMileage) : null,
     liveOdometerKm: liveOdometer.odometerKm ?? null,
     liveOdometerConfidence: liveOdometer.odometerConfidence ?? 'unavailable',

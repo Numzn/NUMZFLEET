@@ -7,6 +7,7 @@ const basePrev = {
   odometerConfidenceAtCapture: 'high',
   odometerDriftClassAtCapture: 'excellent',
   isFullTank: true,
+  fillClassification: 'FULL',
 };
 
 const baseCur = {
@@ -15,6 +16,7 @@ const baseCur = {
   odometerConfidenceAtCapture: 'high',
   odometerDriftClassAtCapture: 'excellent',
   isFullTank: true,
+  fillClassification: 'FULL',
 };
 
 test('validateInterval accepts learnable interval', () => {
@@ -42,11 +44,46 @@ test('validateInterval rejects low odometer confidence', () => {
   assert.equal(r.reason, 'low_odometer_confidence');
 });
 
-test('validateInterval stores only partial fill', () => {
+test('validateInterval stores only explicit partial fill on current', () => {
   const r = validateInterval({
     previous: basePrev,
-    current: { ...baseCur, isFullTank: false },
+    current: { ...baseCur, fillClassification: 'PARTIAL', isFullTank: false },
   });
   assert.equal(r.status, INTERVAL_STATUS.STORED_ONLY);
   assert.equal(r.reason, 'partial_fill');
+});
+
+test('validateInterval stores only unclassified fill when legacy false without classification', () => {
+  const r = validateInterval({
+    previous: basePrev,
+    current: { ...baseCur, fillClassification: 'UNKNOWN', isFullTank: false },
+  });
+  assert.equal(r.status, INTERVAL_STATUS.STORED_ONLY);
+  assert.equal(r.reason, 'unclassified_fill');
+});
+
+test('validateInterval stores only when previous was explicit partial fill', () => {
+  const r = validateInterval({
+    previous: { ...basePrev, fillClassification: 'PARTIAL', isFullTank: false },
+    current: baseCur,
+  });
+  assert.equal(r.status, INTERVAL_STATUS.STORED_ONLY);
+  assert.equal(r.reason, 'previous_partial_fill');
+});
+
+test('validateInterval stores only when previous was unclassified', () => {
+  const r = validateInterval({
+    previous: { ...basePrev, fillClassification: 'UNKNOWN', isFullTank: false },
+    current: baseCur,
+  });
+  assert.equal(r.status, INTERVAL_STATUS.STORED_ONLY);
+  assert.equal(r.reason, 'previous_unclassified_fill');
+});
+
+test('validateInterval accepts legacy confirmed full previous with UNKNOWN classification', () => {
+  const r = validateInterval({
+    previous: { ...basePrev, fillClassification: 'UNKNOWN', isFullTank: true },
+    current: baseCur,
+  });
+  assert.equal(r.status, INTERVAL_STATUS.LEARNABLE);
 });

@@ -5,6 +5,20 @@ import { buildRefuelMetricsPatch } from '../intelligence/RefuelEngine.js';
 import { captureRefuelOdometer } from '../vehicleEngine/fuel/captureRefuelOdometer.js';
 import { processFuelLearningOnRefuelComplete } from '../vehicleEngine/fuel/fuelLearningService.js';
 import { findLatestByVehicleId } from '../repositories/operationSessionRefuelRepository.js';
+import {
+  FILL_CLASSIFICATION,
+  toLegacyIsFullTank,
+  assertPhysicalCapacitySanity,
+} from '../vehicleEngine/fuel/fuelFillClassification.js';
+
+/** Lazy-load avoids rare circular-init cases (mirrors operationSessionService.js). */
+let getVehicleSpecFn = null;
+async function loadGetVehicleSpec() {
+  if (typeof getVehicleSpecFn === 'function') return getVehicleSpecFn;
+  const mod = await import('./vehicleSpecService.js');
+  getVehicleSpecFn = mod.getVehicleSpec;
+  return getVehicleSpecFn;
+}
 
 /**
  * Shared refuel completion path: metrics, odometer capture, fuel learning, audit.
@@ -20,13 +34,21 @@ export async function completeRefuelRow({
   tankCapacitySnapshot,
   mileage = null,
   mileageSource = 'manual',
-  isFullTank = false,
+  fillClassification = FILL_CLASSIFICATION.UNKNOWN,
   overrideReason = null,
   exceedsCapacityOverride = false,
   extraPatch = {},
   recordFuelAudit = true,
   transaction,
 }) {
+  const getVehicleSpec = await loadGetVehicleSpec();
+  const vehicleSpec = await getVehicleSpec(refuel.vehicleId);
+  assertPhysicalCapacitySanity({
+    actualFuelLitres,
+    tankCapacitySnapshot,
+    capacityVerified: Boolean(vehicleSpec?.customOverride),
+  });
+
   if (mileage != null) {
     const previous = await findLatestByVehicleId(refuel.vehicleId, { transaction });
     const prevMileage = previous && previous.id !== refuel.id
@@ -74,7 +96,8 @@ export async function completeRefuelRow({
     odometerConfidenceAtCapture: odometerCapture.odometerConfidenceAtCapture,
     odometerResolutionModeAtCapture: odometerCapture.odometerResolutionModeAtCapture,
     odometerDriftClassAtCapture: odometerCapture.odometerDriftClassAtCapture,
-    isFullTank: isFullTank || refuel.isFullTank,
+    fillClassification,
+    isFullTank: toLegacyIsFullTank(fillClassification),
     capturedBy: user.id,
     capturedAt: now,
     erbPricePerLitre: pricePerLitre ?? refuel.erbPricePerLitre,

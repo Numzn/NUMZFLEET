@@ -125,6 +125,12 @@ export default (sequelize) => {
       allowNull: false,
       defaultValue: false,
     },
+    fillClassification: {
+      type: DataTypes.STRING(16),
+      allowNull: false,
+      defaultValue: 'UNKNOWN',
+      field: 'fill_classification',
+    },
     capturedBy: {
       type: DataTypes.INTEGER,
       allowNull: true,

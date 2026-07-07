@@ -134,6 +134,10 @@ export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap
   const vehicleSpecDto = spec
     ? {
         tankCapacity: spec.tankCapacity,
+        // 'verified': a manager entered this value (customOverride). 'default': the
+        // generic fallback (see vehicleSpecService.getDefaultVehicleSpec) — not a
+        // confirmed physical measurement, so callers must not treat it as ground truth.
+        tankCapacitySource: spec.customOverride ? 'verified' : 'default',
         fuelEfficiency: spec.fuelEfficiency,
         fuelType: spec.fuelType,
       }

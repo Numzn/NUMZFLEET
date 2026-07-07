@@ -1,5 +1,5 @@
 import { Box, Chip, Typography } from '@mui/material';
-import { formatLitres, formatZmw } from '../utils/formatters.js';
+import { formatK, formatLitres } from '../utils/formatters.js';
 import { varianceTone } from '../utils/operationDayUtils.js';
 import OperationVehicleLabel from './OperationVehicleLabel.jsx';
 
@@ -30,8 +30,12 @@ export default function CompletedRefuelCard({ refuel }) {
       </Box>
       <Typography variant="body2" color="text.secondary" component="div">
         {formatLitres(refuel.actualFuelLitres)}
-        {' · '}
-        {formatZmw(refuel.actualCost)}
+        {refuel.actualCost != null && (
+          <>
+            {' · '}
+            {formatK(refuel.actualCost)}
+          </>
+        )}
         {refuel.odometerKm != null && (
           <>
             {' · '}

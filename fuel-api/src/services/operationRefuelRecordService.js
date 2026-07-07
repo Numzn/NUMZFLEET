@@ -16,6 +16,7 @@ import {
   finalizeRefuelSession,
   resolveRefuelPricePerLitre,
 } from './completeRefuelHelper.js';
+import { resolveFillClassificationFromPayload } from '../vehicleEngine/fuel/fuelFillClassification.js';
 
 function parsePositiveNumber(value, field) {
   const number = Number(value);
@@ -61,7 +62,7 @@ export async function recordOperationRefuel(user, sessionId, payload = {}, compa
   const actualFuelLitres = parsePositiveNumber(payload.actualFuelLitres, 'actualFuelLitres');
   const mileage = parseOptionalMileage(payload.mileage);
   const mileageSource = payload.mileageSource ? String(payload.mileageSource) : 'manual';
-  const isFullTank = payload.isFullTank === true || payload.isFullTank === 'true';
+  const { classification: fillClassification } = resolveFillClassificationFromPayload(payload);
 
   const result = await sequelize.transaction(async (transaction) => {
     const refuel = await findBySessionAndId(session.id, refuelId, { transaction });
@@ -93,7 +94,7 @@ export async function recordOperationRefuel(user, sessionId, payload = {}, compa
       tankCapacitySnapshot: refuel.tankCapacitySnapshot,
       mileage,
       mileageSource,
-      isFullTank,
+      fillClassification,
       overrideReason: payload.overrideReason,
       recordFuelAudit: true,
       transaction,

@@ -27,5 +27,6 @@ export async function buildFuelEngine(companyId, hub, registry, options = {}) {
     learning,
     fleetDeltaPct,
     fleetEfficiencyAvg,
+    fuelState: options.fuelState ?? null,
   });
 }

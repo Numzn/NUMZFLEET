@@ -121,6 +121,7 @@ export const toRefuelDto = (record, odometerState = null) => ({
   odometerResolutionModeAtCapture: record.odometerResolutionModeAtCapture || null,
   odometerDriftClassAtCapture: record.odometerDriftClassAtCapture || null,
   isFullTank: Boolean(record.isFullTank),
+  fillClassification: record.fillClassification || record.fill_classification || 'UNKNOWN',
   capturedBy: record.capturedBy != null ? Number(record.capturedBy) : null,
   capturedAt: record.capturedAt || null,
   arrivedAt: record.arrivedAt || null,

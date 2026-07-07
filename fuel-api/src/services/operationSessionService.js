@@ -27,6 +27,7 @@ import {
   finalizeRefuelSession,
   resolveRefuelPricePerLitre,
 } from './completeRefuelHelper.js';
+import { resolveFillClassificationFromPayload } from '../vehicleEngine/fuel/fuelFillClassification.js';
 import { rankVehiclesByRefuelUrgency } from '../intelligence/SuggestionEngine.js';
 import {
   assertCanAccessSession,
@@ -301,7 +302,7 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
     });
 
     const mileageProvided = update?.mileage !== undefined && update?.mileage !== '';
-    const isFullTank = update?.isFullTank === true || update?.isFullTank === 'true';
+    const { classification: fillClassification } = resolveFillClassificationFromPayload(update ?? {});
 
     await completeRefuelRow({
       user,
@@ -315,7 +316,7 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
       mileageSource: mileageProvided
         ? (update?.mileageSource ? String(update.mileageSource) : 'manual')
         : 'manual',
-      isFullTank,
+      fillClassification,
       overrideReason: update?.overrideReason,
       exceedsCapacityOverride: exceedsCapacity,
       extraPatch: {

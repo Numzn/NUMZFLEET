@@ -1,4 +1,6 @@
-import { Box, Drawer, IconButton } from '@mui/material';
+import {
+  Box, Drawer, IconButton, Typography,
+} from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import {
   useCallback, useLayoutEffect, useMemo, useRef, useState,
@@ -9,6 +11,7 @@ import { useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import MenuIcon from '@mui/icons-material/Menu';
 import UnifiedSidebar from './UnifiedSidebar';
+import { TopBarTitleProvider, useTopBarTitle } from './TopBarTitleContext';
 import LiveMapTopBar from '../../main/components/LiveMapTopBar';
 import FleetSidebar from '../../main/fleet/FleetSidebar';
 import usePersistedState, { savePersistedState } from '../util/usePersistedState';
@@ -91,6 +94,7 @@ function UnifiedShellContent() {
   const isLive = workspaceType === 'live';
   const isFullscreen = workspaceType === 'fullscreen';
   const { chrome } = useLiveMapChrome();
+  const { title: topBarTitle } = useTopBarTitle();
   const fleetSidebarCollapsed = useSelector((s) => s.fleetInteraction.sidebarCollapsed);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -273,11 +277,18 @@ function UnifiedShellContent() {
     <Box className={classes.mainColumn}>
       {!isLive && (
         <Box ref={topbarRef} sx={{ flexShrink: 0, pt: isFullscreen ? 'env(safe-area-inset-top, 0px)' : 0 }}>
-          {workspaceType === 'default' && !desktop && (
-            <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.5, borderBottom: 1, borderColor: 'divider' }}>
-              <IconButton edge="start" size="small" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
-                <MenuIcon />
-              </IconButton>
+          {workspaceType === 'default' && (!desktop || topBarTitle) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.5, borderBottom: 1, borderColor: 'divider' }}>
+              {!desktop && (
+                <IconButton edge="start" size="small" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+                  <MenuIcon />
+                </IconButton>
+              )}
+              {topBarTitle && (
+                <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ flex: 1 }}>
+                  {topBarTitle}
+                </Typography>
+              )}
             </Box>
           )}
 
@@ -331,7 +342,9 @@ function UnifiedShellContent() {
 
 const UnifiedShell = () => (
   <LiveMapChromeProvider>
-    <UnifiedShellContent />
+    <TopBarTitleProvider>
+      <UnifiedShellContent />
+    </TopBarTitleProvider>
   </LiveMapChromeProvider>
 );
 

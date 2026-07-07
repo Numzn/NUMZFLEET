@@ -51,6 +51,7 @@ export async function buildFuelSnapshot({
   learning = null,
   fleetDeltaPct = null,
   fleetEfficiencyAvg = null,
+  fuelState = null,
 }) {
   const spec = registry?.vehicleSpec ?? {};
   const capacityL = hubFuel.tankCapacity ?? spec.tankCapacity ?? null;
@@ -134,7 +135,13 @@ export async function buildFuelSnapshot({
         confidence: learning.confidence != null ? Number(learning.confidence) : null,
         trend: learning.trend ?? null,
         totalObservations: learning.totalObservations ?? 0,
+        modelMaturity: learning.modelMaturity ?? null,
+        maturitySignals: learning.maturitySignals ?? null,
+        operatingEnvelope: learning.operatingEnvelope ?? null,
       }
       : null,
+    // Shadow-mode Digital Fuel Twin projection (fuelStateService). Modelled balance
+    // lives beside — never replaces — telemetry litresRemaining/tankLevelPct above.
+    fuelState: fuelState ?? null,
   };
 }

@@ -11,6 +11,7 @@ import { buildHealthEngine } from './engine/healthEngine.js';
 import { buildMaintenanceEngine } from './engine/maintenanceEngine.js';
 import { buildFuelEngine } from './engine/fuelEngine.js';
 import { loadFuelLearningState } from './fuel/fuelLearningService.js';
+import { projectFuelState, PROJECTION_MODE } from './fuel/fuelStateService.js';
 import { buildStatusEngine } from './engine/statusEngine.js';
 import { buildIntelligence } from './intelligenceBuilder.js';
 import { buildTimeline } from './timelineBuilder.js';
@@ -54,8 +55,31 @@ export async function getVehicleEngine(fleetVehicleId, companyId) {
     ? await loadFuelLearningState(fleetVehicleId)
     : null;
 
+  // Shadow-mode Fuel State projection. Reuses the registry's odometer resolution so
+  // the modelled balance can never disagree with registry.odometerKm. A projection
+  // failure must never break the engine read.
+  let fuelState;
+  try {
+    fuelState = await projectFuelState(
+      {
+        deviceId,
+        learning,
+        hubFuel: hub.fuel,
+        specEfficiency: hub.fuel?.specEfficiency ?? merged?.vehicleSpec?.fuelEfficiency ?? null,
+      },
+      { resolveOdometer: async () => odometerState },
+    );
+  } catch (error) {
+    fuelState = {
+      available: false,
+      projectionMode: PROJECTION_MODE,
+      source: 'unavailable',
+      diagnostics: [{ code: 'projection_error', message: error?.message ?? 'unknown' }],
+    };
+  }
+
   const [fuelEngine, health, timeline, complianceHub] = await Promise.all([
-    buildFuelEngine(companyId, hub, registry, { learning }),
+    buildFuelEngine(companyId, hub, registry, { learning, fuelState }),
     Promise.resolve(buildHealthEngine({ hub, registry })),
     buildTimeline({ registry, hub, deviceId }),
     buildComplianceHub(companyId, fleetVehicleId),

@@ -5,10 +5,22 @@ import {
 } from '../../models/index.js';
 import { findCompletedRefuelsByVehicleId } from '../../repositories/operationSessionRefuelRepository.js';
 import { getVehicleSpec } from '../../services/vehicleSpecService.js';
-import { validateInterval, INTERVAL_STATUS } from './intervalValidator.js';
-import { buildIntervalFromRefuels, isLearnableInterval } from './intervalBuilder.js';
-import { detectEfficiencyAnomaly } from './anomalyDetector.js';
+import { validateInterval } from './intervalValidator.js';
+import { buildIntervalFromRefuels } from './intervalBuilder.js';
 import { applyLearningUpdate } from './learningEngine.js';
+import { resolveChronologicalPreviousRefuel } from './fuelLearningPairing.js';
+import {
+  gateEfficiencyObservation,
+  classifyEvidence,
+  EVIDENCE_CLASS,
+} from './fuelEvidenceClassifier.js';
+import {
+  ENVELOPE_GATING,
+  REFUEL_PAIRING_LOOKBACK,
+  MATURITY_PARAMS,
+} from './fuelLearningConfig.js';
+import { computeOperatingEnvelope } from './fuelOperatingEnvelope.js';
+import { deriveModelMaturity } from './fuelModelMaturity.js';
 
 export async function resolveFleetVehicleIdForDevice(deviceId) {
   if (deviceId == null) return null;
@@ -24,7 +36,14 @@ export async function loadFuelLearningState(fleetVehicleId) {
   const row = await VehicleFuelLearning.findByPk(fleetVehicleId);
   if (!row) return null;
   const plain = row.get({ plain: true });
-  return {
+
+  const recentIntervals = await VehicleFuelInterval.findAll({
+    where: { fleetVehicleId },
+    order: [['eventAt', 'DESC']],
+    limit: MATURITY_PARAMS.recentWindow ?? 10,
+  });
+
+  const learningState = {
     fleetVehicleId: plain.fleetVehicleId,
     deviceId: plain.deviceId,
     currentEfficiency: plain.currentEfficiency != null ? Number(plain.currentEfficiency) : null,
@@ -35,6 +54,39 @@ export async function loadFuelLearningState(fleetVehicleId) {
     totalDistanceKm: plain.totalDistanceKm != null ? Number(plain.totalDistanceKm) : 0,
     efficiencyHistory: plain.efficiencyHistory ?? [],
     lastIntervalAt: plain.lastIntervalAt ?? null,
+  };
+
+  const envelope = computeOperatingEnvelope(learningState.efficiencyHistory, {
+    method: ENVELOPE_GATING.method,
+    madMultiplier: ENVELOPE_GATING.madMultiplier,
+    minSamples: ENVELOPE_GATING.minSamples,
+  });
+
+  const maturityResult = deriveModelMaturity({
+    learningState,
+    recentIntervals: recentIntervals.map((iv) => ({
+      validationStatus: iv.validationStatus,
+      isAnomalous: iv.isAnomalous,
+      quarantined: iv.isAnomalous || iv.validationStatus === 'STORED_ONLY',
+      envelopeRejected: iv.isAnomalous,
+      accepted: iv.validationStatus === 'LEARNABLE' && !iv.isAnomalous,
+      efficiencyKmL: iv.efficiencyKmL != null ? Number(iv.efficiencyKmL) : null,
+    })),
+    envelope,
+    params: MATURITY_PARAMS,
+  });
+
+  return {
+    ...learningState,
+    modelMaturity: maturityResult.state,
+    maturitySignals: maturityResult.signals,
+    operatingEnvelope: envelope.available ? {
+      center: envelope.center,
+      lowerBound: envelope.lowerBound,
+      upperBound: envelope.upperBound,
+      method: envelope.method,
+      sampleSize: envelope.sampleSize,
+    } : null,
   };
 }
 
@@ -57,12 +109,8 @@ export async function processFuelLearningOnRefuelComplete({
   });
   if (existingInterval) return existingInterval;
 
-  const rows = await findCompletedRefuelsByVehicleId(devId, 10);
-  const sorted = [...rows].sort(
-    (a, b) => new Date(b.sessionDate || b.createdAt) - new Date(a.sessionDate || a.createdAt),
-  );
-  const curIdx = sorted.findIndex((r) => Number(r.id) === Number(refuel.id));
-  const previousRow = curIdx >= 0 ? sorted[curIdx + 1] : sorted[1];
+  const rows = await findCompletedRefuelsByVehicleId(devId, REFUEL_PAIRING_LOOKBACK);
+  const previousRow = resolveChronologicalPreviousRefuel(rows, refuel.id);
 
   if (!previousRow) return null;
 
@@ -75,15 +123,15 @@ export async function processFuelLearningOnRefuelComplete({
   });
 
   const intervalData = buildIntervalFromRefuels(previousRow, refuel, validation);
-  const anomaly = validation.efficiencyKmL != null
-    ? detectEfficiencyAnomaly(validation.efficiencyKmL, [])
-    : { isAnomalous: false };
 
   let learningRow = await VehicleFuelLearning.findByPk(fleetId, { transaction });
   const history = learningRow?.efficiencyHistory ?? [];
-  const anomalyCheck = validation.efficiencyKmL != null
-    ? detectEfficiencyAnomaly(validation.efficiencyKmL, history)
-    : anomaly;
+
+  const gateResult = validation.efficiencyKmL != null
+    ? gateEfficiencyObservation(validation.efficiencyKmL, history, ENVELOPE_GATING)
+    : { isAnomalous: false, reason: null, gate: 'none' };
+
+  const evidence = classifyEvidence({ validation, gateResult });
 
   const interval = await VehicleFuelInterval.create({
     fleetVehicleId: fleetId,
@@ -93,12 +141,11 @@ export async function processFuelLearningOnRefuelComplete({
     litresConsumed: intervalData.litresConsumed,
     efficiencyKmL: intervalData.efficiencyKmL,
     validationStatus: intervalData.validationStatus,
-    isAnomalous: anomalyCheck.isAnomalous,
+    isAnomalous: evidence.evidenceClass === EVIDENCE_CLASS.OUTLIER,
     eventAt: intervalData.eventAt,
   }, { transaction });
 
-  const shouldLearn = isLearnableInterval(validation) && !anomalyCheck.isAnomalous;
-  if (shouldLearn && validation.efficiencyKmL != null) {
+  if (evidence.shouldLearn && validation.efficiencyKmL != null) {
     const priorState = learningRow
       ? {
         currentEfficiency: learningRow.currentEfficiency,
@@ -154,7 +201,13 @@ export async function processFuelLearningOnRefuelComplete({
     }, { transaction });
   }
 
-  return { interval, learning: learningRow, validationStatus: validation.status };
+  return {
+    interval,
+    learning: learningRow,
+    validationStatus: validation.status,
+    evidenceClass: evidence.evidenceClass,
+    gate: gateResult.gate ?? null,
+  };
 }
 
 export default {

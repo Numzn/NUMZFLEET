@@ -1,3 +1,8 @@
+import {
+  isConfirmedFull,
+  isConfirmedPartial,
+} from './fuelFillClassification.js';
+
 const MIN_DISTANCE_KM = 10;
 const PLAUSIBLE_EFFICIENCY_MIN_KM_L = 2;
 const PLAUSIBLE_EFFICIENCY_MAX_KM_L = 25;
@@ -35,6 +40,7 @@ export function validateInterval({
   current,
   tankCapacity = null,
   specEfficiencyKmL = null,
+  checkPreviousFullTank = true,
 }) {
   const prevM = Number(previous?.currentMileage);
   const curM = Number(current?.currentMileage);
@@ -79,12 +85,40 @@ export function validateInterval({
     };
   }
 
-  if (current?.isFullTank === false) {
+  if (isConfirmedPartial(current)) {
     return {
       status: INTERVAL_STATUS.STORED_ONLY,
       reason: 'partial_fill',
       distanceKm,
       fuel,
+    };
+  }
+
+  if (!isConfirmedFull(current)) {
+    return {
+      status: INTERVAL_STATUS.STORED_ONLY,
+      reason: 'unclassified_fill',
+      distanceKm,
+      fuel,
+    };
+  }
+
+  if (checkPreviousFullTank && !isConfirmedFull(previous)) {
+    if (isConfirmedPartial(previous)) {
+      return {
+        status: INTERVAL_STATUS.STORED_ONLY,
+        reason: 'previous_partial_fill',
+        distanceKm,
+        fuel,
+        efficiencyKmL: distanceKm / fuel,
+      };
+    }
+    return {
+      status: INTERVAL_STATUS.STORED_ONLY,
+      reason: 'previous_unclassified_fill',
+      distanceKm,
+      fuel,
+      efficiencyKmL: distanceKm / fuel,
     };
   }
 

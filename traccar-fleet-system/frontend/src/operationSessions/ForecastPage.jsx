@@ -10,10 +10,12 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Divider,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { fetchVehicles, fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
 import { RUNTIME_STACK_GAP_TIGHT } from '../common/styles/runtimeDensity';
 import useTodayOperation from './hooks/useTodayOperation.js';
@@ -25,24 +27,46 @@ import {
   regenerateOperationForecast,
   submitSessionRefuelUpdates,
 } from './api/operationSessionsApi.js';
-import { formatLitres, formatZmw } from './utils/formatters.js';
+import {
+  formatK, formatLitres, tankLabel,
+} from './utils/formatters.js';
 import {
   deriveFuelingDayStatus,
   deriveVehicleWorkflowState,
-  FUELING_DAY_STATUS_LABEL,
-  fuelingDayStatusColor,
+  isRefuelSkipped,
   VEHICLE_STATE_LABEL,
   vehicleStateChipColor,
 } from './utils/operationDayUtils.js';
 import { resolveVehicleDisplayFromFleetRow } from '../fleet/display/resolveVehicleDisplay.js';
 import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
 
-function confidenceColor(level) {
-  const l = String(level || '').toUpperCase();
-  if (l === 'HIGH') return 'success';
-  if (l === 'MEDIUM') return 'warning';
-  return 'default';
-}
+
+const SectionHeading = ({ label, count, action }) => (
+  <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 0.75 }}>
+    <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary' }}>
+      {label}
+    </Typography>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {action}
+      {count != null && (
+        <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary' }}>
+          {count}
+        </Typography>
+      )}
+    </Box>
+  </Box>
+);
+
+const SummaryStat = ({ value, label }) => (
+  <Box sx={{ flex: 1, textAlign: 'center' }}>
+    <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'primary.main', lineHeight: 1.2 }}>
+      {value}
+    </Typography>
+    <Typography variant="caption" sx={{ letterSpacing: 0.4, color: 'text.secondary', textTransform: 'uppercase' }}>
+      {label}
+    </Typography>
+  </Box>
+);
 
 const ForecastPage = () => {
   const navigate = useNavigate();
@@ -62,6 +86,7 @@ const ForecastPage = () => {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [station, setStation] = useState('');
+  const [editingVehicleId, setEditingVehicleId] = useState(null);
 
   const operationId = todayOperation?.id;
   const displayStatus = deriveFuelingDayStatus({ operation: todayOperation, details: todayDetails });
@@ -76,6 +101,15 @@ const ForecastPage = () => {
     }
     return map;
   }, [todayDetails?.refuels]);
+
+  const fleetByDeviceId = useMemo(() => {
+    const map = {};
+    for (const v of fleetVehicles) {
+      const deviceId = v.assignment?.deviceId;
+      if (deviceId != null) map[Number(deviceId)] = v;
+    }
+    return map;
+  }, [fleetVehicles]);
 
   useEffect(() => {
     setStation(todayDetails?.stationName || todayOperation?.stationName || '');
@@ -214,6 +248,7 @@ const ForecastPage = () => {
         plannedFuelLitres: n,
       }]);
       setPlannedById((prev) => ({ ...prev, [vehicleId]: n }));
+      setEditingVehicleId(null);
       await loadForecast();
       await reloadToday();
     } catch (e) {
@@ -239,348 +274,351 @@ const ForecastPage = () => {
 
   const loading = todayLoading || fleetLoading || forecastLoading;
 
+  const vehicleRows = forecast?.vehicles || [];
+  const vehicleCount = vehicleRows.length;
+
+  const plannedLitresFor = useCallback((v) => {
+    const refuel = refuelByVehicleId[v.vehicleId];
+    return refuel?.plannedFuelLitres ?? v.plannedFuelLitres ?? v.predictedLitres;
+  }, [refuelByVehicleId]);
+
+  const totalPlannedLitres = useMemo(
+    () => vehicleRows.reduce((sum, v) => {
+      const n = Number(plannedLitresFor(v));
+      return Number.isFinite(n) ? sum + n : sum;
+    }, 0),
+    [vehicleRows, plannedLitresFor],
+  );
+
+  const readyCount = useMemo(
+    () => vehicleRows.filter((v) => {
+      const refuel = refuelByVehicleId[v.vehicleId];
+      if (isRefuelSkipped(refuel)) return false;
+      return Number(plannedLitresFor(v)) > 0;
+    }).length,
+    [vehicleRows, refuelByVehicleId, plannedLitresFor],
+  );
+
   return (
     <Stack spacing={RUNTIME_STACK_GAP_TIGHT}>
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
 
-          {loading && (
-            <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-              <CircularProgress />
-            </Box>
-          )}
+      {loading && (
+        <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress />
+        </Box>
+      )}
 
-          {!loading && !forecast && (
+      {!loading && !forecast && (
+        <>
+          {(!operationId || canEditPlan) && (
             <>
-              {(!operationId || canEditPlan) && (
-                <>
-                  <Typography variant="subtitle2" fontWeight={800}>Add vehicles</Typography>
-                  <Stack spacing={0.5}>
-                    {fleetOptions.slice(0, 30).map((v) => {
-                      const deviceId = Number(v.assignment.deviceId);
-                      const dev = devicesItems[deviceId];
-                      return (
-                        <Box key={v.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Checkbox
-                            checked={selected.has(deviceId)}
-                            onChange={() => toggleSelect(deviceId)}
-                          />
-                          <Typography variant="body2" sx={{ flex: 1 }}>
-                            {labelForFleetRow(v)}
-                          </Typography>
-                          {selected.has(deviceId) && (
-                            <TextField
-                              size="small"
-                              label="Planned L"
-                              type="number"
-                              value={plannedById[deviceId] ?? 50}
-                              onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
-                              sx={{ width: 120 }}
-                            />
-                          )}
-                        </Box>
-                      );
-                    })}
-                  </Stack>
-                  <Button variant="outlined" onClick={handlePlanSelected} disabled={busy || selected.size === 0}>
-                    Create today&apos;s operation
-                  </Button>
-                </>
-              )}
+              <Typography variant="subtitle2" fontWeight={800}>Add vehicles</Typography>
+              <Stack spacing={0.5}>
+                {fleetOptions.slice(0, 30).map((v) => {
+                  const deviceId = Number(v.assignment.deviceId);
+                  return (
+                    <Box key={v.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Checkbox
+                        checked={selected.has(deviceId)}
+                        onChange={() => toggleSelect(deviceId)}
+                      />
+                      <Typography variant="body2" sx={{ flex: 1 }}>
+                        {labelForFleetRow(v)}
+                      </Typography>
+                      {selected.has(deviceId) && (
+                        <TextField
+                          size="small"
+                          label="Planned L"
+                          type="number"
+                          value={plannedById[deviceId] ?? 50}
+                          onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
+                          sx={{ width: 120 }}
+                        />
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+              <Button variant="outlined" onClick={handlePlanSelected} disabled={busy || selected.size === 0}>
+                Create today&apos;s operation
+              </Button>
             </>
           )}
+        </>
+      )}
 
-          {!loading && forecast && (
-            <>
-              {!isPlanning && (
-                <Alert
-                  severity={displayStatus === 'closed' ? 'info' : 'success'}
-                  action={(
-                    <Button
-                      size="small"
-                      color="inherit"
-                      onClick={() => navigate(
-                        displayStatus === 'closed'
-                          ? '/fleet/operation-sessions/history'
-                          : `/fleet/operation-sessions/fuel/${operationId}`,
-                      )}
-                      sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
-                    >
-                      {displayStatus === 'closed' ? 'View history' : 'Continue fueling'}
-                    </Button>
-                  )}
+      {!loading && forecast && (
+        <>
+          {/* Summary card */}
+          <Card variant="outlined" sx={{ borderRadius: 2 }}>
+            <CardContent sx={{ py: 1.25, '&:last-child': { pb: 1.25 } }}>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 800 }}>
+                  {isPlanning ? "Today's Plan" : 'Fuel Plan'}
+                </Typography>
+                <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary' }}>
+                  {vehicleCount}
+                  {' '}
+                  {vehicleCount === 1 ? 'VEHICLE' : 'VEHICLES'}
+                </Typography>
+              </Box>
+
+              <Divider sx={{ my: 0.75 }} />
+
+              <Box sx={{ display: 'flex' }}>
+                <SummaryStat value={formatLitres(totalPlannedLitres)} label="Planned" />
+                <SummaryStat value={vehicleCount} label="Vehicles" />
+                <SummaryStat value={formatK(forecast.fleetSummary?.estimatedCost)} label="Est. cost" />
+              </Box>
+
+              <Divider sx={{ my: 0.75 }} />
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">Ready</Typography>
+                <Typography variant="body2" fontWeight={800}>
+                  {readyCount}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Vehicle list */}
+          <Box>
+            <SectionHeading
+              label="Vehicles"
+              count={vehicleCount}
+              action={canEditPlan && (
+                <Typography
+                  component="button"
+                  onClick={handleRegenerate}
+                  disabled={busy}
+                  variant="caption"
+                  sx={{
+                    border: 0,
+                    background: 'none',
+                    p: 0,
+                    color: 'text.secondary',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    fontSize: '0.7rem',
+                  }}
                 >
-                  <Typography variant="body2" fontWeight={600} sx={{ mb: 0.25 }}>
-                    {`Fueling Day is ${FUELING_DAY_STATUS_LABEL[displayStatus]}`}
-                  </Typography>
-                  <Typography variant="body2">
-                    The fuel plan below is read-only. Vehicles already fueled show their actual litres and status.
-                  </Typography>
-                </Alert>
-              )}
-
-              {canEditPlan && (
-                <Typography variant="body2" color="text.secondary">
-                  Review the forecast, confirm planned litres for each vehicle, then start the day to open fueling.
+                  Regenerate
                 </Typography>
               )}
+            />
+            <Stack spacing={0}>
+              {vehicleRows.length === 0 && (
+                <Alert severity="info">No vehicles selected yet. Add vehicles below to plan today&apos;s fuel.</Alert>
+              )}
+              {vehicleRows.map((v) => {
+                const dev = devicesItems[v.vehicleId];
+                const refuel = refuelByVehicleId[v.vehicleId];
+                const workflowState = deriveVehicleWorkflowState(refuel || v);
+                const display = getDisplayForDevice(v.vehicleId, dev);
+                const registration = display.secondary || null;
+                const planned = plannedLitresFor(v);
+                const actual = refuel?.actualFuelLitres;
+                const capacityL = fleetByDeviceId[v.vehicleId]?.vehicleSpec?.tankCapacity ?? null;
+                const capacitySource = fleetByDeviceId[v.vehicleId]?.vehicleSpec?.tankCapacitySource ?? 'default';
+                const capacityLabel = tankLabel(Number(capacityL), capacitySource);
+                const isEditing = editingVehicleId === v.vehicleId;
+                const rowKey = v.refuelId || v.vehicleId;
 
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="subtitle2" fontWeight={800}>Fleet forecast</Typography>
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Predicted:
-                    {' '}
-                    {formatLitres(forecast.fleetSummary?.totalPredictedLitres)}
-                    {' · '}
-                    Est. cost:
-                    {' '}
-                    {formatZmw(forecast.fleetSummary?.estimatedCost)}
-                    {' · '}
-                    ERB:
-                    {' '}
-                    {formatZmw(forecast.erbPricePerLitre)}
-                    /L
-                  </Typography>
-                  {canEditPlan && (
-                    <Button size="small" sx={{ mt: 1, textTransform: 'none' }} onClick={handleRegenerate} disabled={busy}>
-                      Regenerate from history
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
+                return (
+                  <Box key={rowKey}>
+                    <Box
+                      role={canEditPlan && v.refuelId ? 'button' : undefined}
+                      tabIndex={canEditPlan && v.refuelId ? 0 : undefined}
+                      onClick={() => {
+                        if (canEditPlan && v.refuelId) {
+                          setEditingVehicleId((prev) => (prev === v.vehicleId ? null : v.vehicleId));
+                        }
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        py: 1.25,
+                        cursor: canEditPlan && v.refuelId ? 'pointer' : 'default',
+                      }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography fontWeight={700} noWrap>{display.primary}</Typography>
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          {registration || '—'}
+                        </Typography>
+                      </Box>
 
-              <Box>
-                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                  Fuel Plan
-                  {(forecast.vehicles || []).length > 0 && (
-                    <Typography component="span" variant="body2" color="text.secondary" fontWeight={400} sx={{ ml: 1 }}>
-                      (
-                      {(forecast.vehicles || []).length}
-                      )
-                    </Typography>
-                  )}
-                </Typography>
-                <Stack spacing={1}>
-                  {(forecast.vehicles || []).length === 0 && (
-                    <Alert severity="info">No vehicles selected yet. Add vehicles below to plan today&apos;s fuel.</Alert>
-                  )}
-                  {(forecast.vehicles || []).map((v) => {
-                    const dev = devicesItems[v.vehicleId];
-                    const refuel = refuelByVehicleId[v.vehicleId];
-                    const workflowState = deriveVehicleWorkflowState(refuel || v);
-                    const display = getDisplayForDevice(v.vehicleId, dev);
-                    const title = display.secondary
-                      ? `${display.primary} (${display.secondary})`
-                      : display.primary;
-                    const planned = refuel?.plannedFuelLitres ?? v.plannedFuelLitres ?? v.predictedLitres;
-                    const actual = refuel?.actualFuelLitres;
-                    return (
-                      <Card key={v.refuelId || v.vehicleId} variant="outlined">
-                        <CardContent sx={{ py: 1.25, '&:last-child': { pb: 1.25 } }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-                            <Typography fontWeight={700}>{title}</Typography>
-                            <Stack direction="row" spacing={0.75} alignItems="center">
-                              {!isPlanning && (
-                                <Chip
-                                  size="small"
-                                  label={VEHICLE_STATE_LABEL[workflowState] || 'Planned'}
-                                  color={vehicleStateChipColor(workflowState)}
-                                  variant="outlined"
-                                />
+                      <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                        {isPlanning ? (
+                          <>
+                            <Typography fontWeight={700}>{formatLitres(v.predictedLitres)}</Typography>
+                            {capacityLabel && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {capacityLabel}
+                              </Typography>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <Typography fontWeight={700}>{formatLitres(actual ?? planned)}</Typography>
+                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                              {capacityLabel && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {capacityLabel}
+                                </Typography>
                               )}
-                              {isPlanning && (
-                                <Chip
-                                  size="small"
-                                  label={v.confidenceLevel || 'LOW'}
-                                  color={confidenceColor(v.confidenceLevel)}
-                                />
-                              )}
-                            </Stack>
-                          </Box>
-                          {isPlanning ? (
-                            <Typography variant="body2" color="text.secondary">
-                              Predicted:
-                              {' '}
-                              {formatLitres(v.predictedLitres)}
-                              {' · '}
-                              Confidence:
-                              {' '}
-                              {v.confidencePercent != null ? `${v.confidencePercent}%` : '—'}
-                            </Typography>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              Planned:
-                              {' '}
-                              {formatLitres(planned)}
-                              {' · '}
-                              Actual:
-                              {' '}
-                              {formatLitres(actual)}
-                              {v.predictedLitres != null && (
-                                <>
-                                  {' · '}
-                                  Predicted:
-                                  {' '}
-                                  {formatLitres(v.predictedLitres)}
-                                </>
-                              )}
-                            </Typography>
-                          )}
-                          {canEditPlan && v.refuelId && (
-                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                              <TextField
+                              <Chip
                                 size="small"
-                                label="Planned L"
-                                type="number"
-                                value={plannedById[v.vehicleId] ?? v.plannedFuelLitres ?? v.predictedLitres ?? ''}
-                                onChange={(e) => setPlannedById((prev) => ({ ...prev, [v.vehicleId]: e.target.value }))}
-                                sx={{ maxWidth: 140 }}
-                              />
-                              <Button
-                                size="small"
+                                label={VEHICLE_STATE_LABEL[workflowState] || 'Planned'}
+                                color={vehicleStateChipColor(workflowState)}
                                 variant="outlined"
-                                disabled={busy}
-                                onClick={() => handleSavePlanned(v.refuelId, v.vehicleId, plannedById[v.vehicleId])}
-                              >
-                                Save
-                              </Button>
+                                sx={{ height: 18, '& .MuiChip-label': { px: 0.75, fontSize: '0.65rem' } }}
+                              />
                             </Stack>
-                          )}
-                        </CardContent>
-                      </Card>
+                          </>
+                        )}
+                      </Box>
+
+                      {canEditPlan && v.refuelId && (
+                        <ChevronRightIcon
+                          fontSize="small"
+                          sx={{
+                            color: 'text.disabled',
+                            flexShrink: 0,
+                            transform: isEditing ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s ease',
+                          }}
+                        />
+                      )}
+                    </Box>
+
+                    {isEditing && (
+                      <Stack direction="row" spacing={1} sx={{ pb: 1.5 }}>
+                        <TextField
+                          size="small"
+                          label="Planned L"
+                          type="number"
+                          value={plannedById[v.vehicleId] ?? v.plannedFuelLitres ?? v.predictedLitres ?? ''}
+                          onChange={(e) => setPlannedById((prev) => ({ ...prev, [v.vehicleId]: e.target.value }))}
+                          sx={{ maxWidth: 140 }}
+                        />
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={busy}
+                          onClick={() => handleSavePlanned(v.refuelId, v.vehicleId, plannedById[v.vehicleId])}
+                        >
+                          Save
+                        </Button>
+                      </Stack>
+                    )}
+
+                    <Divider />
+                  </Box>
+                );
+              })}
+            </Stack>
+
+            {canEditPlan && vehiclesToAdd.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <SectionHeading label="Add more vehicles" />
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Select vehicles from the fleet that are not yet on today&apos;s list.
+                </Typography>
+                <Stack spacing={0.5}>
+                  {vehiclesToAdd.slice(0, 30).map((v) => {
+                    const deviceId = Number(v.assignment.deviceId);
+                    return (
+                      <Box key={v.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Checkbox
+                          checked={selected.has(deviceId)}
+                          onChange={() => toggleSelect(deviceId)}
+                        />
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          {labelForFleetRow(v)}
+                        </Typography>
+                        {selected.has(deviceId) && (
+                          <TextField
+                            size="small"
+                            label="Planned L"
+                            type="number"
+                            value={plannedById[deviceId] ?? 50}
+                            onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
+                            sx={{ width: 120 }}
+                          />
+                        )}
+                      </Box>
                     );
                   })}
                 </Stack>
-
-                {canEditPlan && vehiclesToAdd.length > 0 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-                      Add more vehicles
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Select vehicles from the fleet that are not yet on today&apos;s list.
-                    </Typography>
-                    <Stack spacing={0.5}>
-                      {vehiclesToAdd.slice(0, 30).map((v) => {
-                        const deviceId = Number(v.assignment.deviceId);
-                        return (
-                          <Box key={v.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Checkbox
-                              checked={selected.has(deviceId)}
-                              onChange={() => toggleSelect(deviceId)}
-                            />
-                            <Typography variant="body2" sx={{ flex: 1 }}>
-                              {labelForFleetRow(v)}
-                            </Typography>
-                            {selected.has(deviceId) && (
-                              <TextField
-                                size="small"
-                                label="Planned L"
-                                type="number"
-                                value={plannedById[deviceId] ?? 50}
-                                onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
-                                sx={{ width: 120 }}
-                              />
-                            )}
-                          </Box>
-                        );
-                      })}
-                    </Stack>
-                    <Button
-                      variant="outlined"
-                      sx={{ mt: 1, textTransform: 'none' }}
-                      onClick={handlePlanSelected}
-                      disabled={busy || selected.size === 0}
-                    >
-                      Add to today&apos;s list
-                    </Button>
-                  </Box>
-                )}
+                <Button
+                  variant="outlined"
+                  sx={{ mt: 1, textTransform: 'none' }}
+                  onClick={handlePlanSelected}
+                  disabled={busy || selected.size === 0}
+                >
+                  Add to today&apos;s list
+                </Button>
               </Box>
+            )}
+          </Box>
 
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.5 }}>
-                    {isPlanning ? 'Start Fueling Day' : 'Fueling Day status'}
-                  </Typography>
-                  {canEditPlan && (
-                    <TextField
-                      size="small"
-                      label="Fuel station (optional)"
-                      placeholder="e.g. Puma Cairo Road"
-                      value={station}
-                      onChange={(e) => setStation(e.target.value)}
-                      onBlur={handleSaveStation}
-                      fullWidth
-                      sx={{ mb: 1.5 }}
-                    />
-                  )}
-                  {isPlanning && isManager && canEditPlan ? (
-                    <>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                        This locks planned litres and opens the fueling screen for today.
-                      </Typography>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={handleApprove}
-                        disabled={busy || (forecast.vehicles || []).length === 0}
-                        sx={{ textTransform: 'none' }}
-                      >
-                        Start Fueling Day
-                      </Button>
-                    </>
-                  ) : isPlanning && canEditPlan ? (
-                    <Typography variant="body2" color="text.secondary">
-                      A manager must start the Fueling Day before fueling can begin.
-                    </Typography>
-                  ) : (
-                    <Stack spacing={1.5}>
-                      <Chip
-                        size="small"
-                        label={FUELING_DAY_STATUS_LABEL[displayStatus]}
-                        color={fuelingDayStatusColor(displayStatus)}
-                        sx={{ alignSelf: 'flex-start' }}
-                      />
-                      <Typography variant="body2" color="text.secondary">
-                        {displayStatus === 'closed'
-                          ? 'This Fueling Day is closed. The plan cannot be changed.'
-                          : 'Planning is complete. Continue fueling or review the day summary.'}
-                      </Typography>
-                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                        {displayStatus !== 'closed' && operationId && (
-                          <Button
-                            variant="contained"
-                            onClick={() => navigate(`/fleet/operation-sessions/fuel/${operationId}`)}
-                            sx={{ textTransform: 'none' }}
-                          >
-                            Continue fueling
-                          </Button>
-                        )}
-                        <Button
-                          variant="outlined"
-                          onClick={() => navigate('/fleet/operation-sessions')}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Overview
-                        </Button>
-                        {displayStatus !== 'closed' && (
-                          <Button
-                            variant="outlined"
-                            onClick={() => navigate('/fleet/operation-sessions/review')}
-                            sx={{ textTransform: 'none' }}
-                          >
-                            Close Day
-                          </Button>
-                        )}
-                      </Stack>
-                    </Stack>
-                  )}
-                </CardContent>
-              </Card>
-            </>
+          {/* Bottom CTA / status */}
+          {isPlanning && isManager && canEditPlan ? (
+            <Stack spacing={1.5} sx={{ pt: 1 }}>
+              <TextField
+                size="small"
+                label="Fuel station (optional)"
+                placeholder="e.g. Puma Cairo Road"
+                value={station}
+                onChange={(e) => setStation(e.target.value)}
+                onBlur={handleSaveStation}
+                fullWidth
+              />
+              <Typography variant="caption" color="text.secondary">
+                This locks planned litres, freezes today&apos;s fuel price, and opens the fueling screen.
+              </Typography>
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                fullWidth
+                onClick={handleApprove}
+                disabled={busy || vehicleCount === 0}
+                sx={{ textTransform: 'none', fontWeight: 700, py: 1.25 }}
+              >
+                Start Fueling
+              </Button>
+            </Stack>
+          ) : isPlanning && canEditPlan ? (
+            <Typography variant="body2" color="text.secondary">
+              A manager must start the Fueling Day before fueling can begin.
+            </Typography>
+          ) : (
+            // Plan shows exactly one primary action (Start Fueling / Continue Fueling).
+            // Closing the day belongs to a later stage of the workflow, not here.
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              fullWidth
+              disabled={!operationId}
+              onClick={() => navigate(
+                displayStatus === 'closed'
+                  ? '/fleet/operation-sessions/history'
+                  : `/fleet/operation-sessions/fuel/${operationId}`,
+              )}
+              sx={{ textTransform: 'none', fontWeight: 700, py: 1.25 }}
+            >
+              {displayStatus === 'closed' ? 'View history' : 'Continue fueling'}
+            </Button>
           )}
-        </Stack>
+        </>
+      )}
+    </Stack>
   );
 };
 

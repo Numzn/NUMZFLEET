@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback, useEffect, useMemo, useState,
+} from 'react';
 import { useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
@@ -12,7 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
+import { fetchVehicles, fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
 import {
   fetchOperationSessionDetails,
   recordOperationRefuel,
@@ -28,13 +30,14 @@ import OperationRunHeader from './components/OperationRunHeader.jsx';
 const OperationRunPage = () => {
   const { sessionId } = useParams();
   const user = useSelector((state) => state.session.user);
-  const devicesItems = useSelector((state) => state.devices.items || {});
 
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [completedOpen, setCompletedOpen] = useState(false);
   const [skippedOpen, setSkippedOpen] = useState(false);
+  const [expandedRefuelId, setExpandedRefuelId] = useState(null);
+  const [fleetVehicles, setFleetVehicles] = useState([]);
 
   const loadSession = useCallback(async () => {
     if (!sessionId || !user) {
@@ -57,6 +60,28 @@ const OperationRunPage = () => {
     loadSession();
   }, [loadSession]);
 
+  useEffect(() => {
+    if (!user) return;
+    fetchVehicles(user).then(
+      (data) => setFleetVehicles(Array.isArray(data) ? data : []),
+      () => setFleetVehicles([]),
+    );
+  }, [user]);
+
+  const capacityByDeviceId = useMemo(() => {
+    const map = {};
+    for (const v of fleetVehicles) {
+      const deviceId = v.assignment?.deviceId;
+      if (deviceId != null) {
+        map[Number(deviceId)] = {
+          capacityL: v.vehicleSpec?.tankCapacity ?? null,
+          capacitySource: v.vehicleSpec?.tankCapacitySource ?? 'default',
+        };
+      }
+    }
+    return map;
+  }, [fleetVehicles]);
+
   const effectiveStatus = session?.effectiveStatus || session?.status;
   const isReadOnly = session?.isWritable === false || String(effectiveStatus).toLowerCase() === 'locked';
   const canRecord = session?.canRecordFuel && !isReadOnly;
@@ -66,8 +91,11 @@ const OperationRunPage = () => {
     () => refuels.filter((r) => !isRefuelComplete(r) && !isRefuelSkipped(r)),
     [refuels],
   );
-  const waiting = useMemo(() => active.filter((r) => r.arrivedAt == null), [active]);
-  const atPump = useMemo(() => active.filter((r) => r.arrivedAt != null), [active]);
+  // At-pump vehicles surface first, then the rest of the waiting queue.
+  const queue = useMemo(
+    () => [...active].sort((a, b) => (b.arrivedAt != null) - (a.arrivedAt != null)),
+    [active],
+  );
   const completed = useMemo(() => refuels.filter(isRefuelComplete), [refuels]);
   const skipped = useMemo(() => refuels.filter(isRefuelSkipped), [refuels]);
   const buckets = useMemo(() => summarizeRefuelBuckets(refuels), [refuels]);
@@ -96,6 +124,7 @@ const OperationRunPage = () => {
 
   const submitRefuel = async (payload) => {
     await recordOperationRefuel(user, sessionId, payload);
+    setExpandedRefuelId(null);
     await loadSession();
   };
 
@@ -106,16 +135,13 @@ const OperationRunPage = () => {
 
   const submitSkip = async (refuelId, reason) => {
     await skipOperationVehicle(user, sessionId, { refuelId, reason });
+    setExpandedRefuelId(null);
     await loadSession();
   };
 
   return (
     <>
-      <OperationRunHeader
-        session={session}
-        sessionId={sessionId}
-        buckets={buckets}
-      />
+      <OperationRunHeader session={session} buckets={buckets} />
 
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
 
@@ -143,54 +169,35 @@ const OperationRunPage = () => {
             <Alert severity="success">Every planned vehicle has been fueled or skipped.</Alert>
           )}
 
-          {atPump.length > 0 && (
+          {queue.length > 0 && (
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                At pump
-                <Typography component="span" variant="body2" color="text.secondary" fontWeight={400} sx={{ ml: 1 }}>
-                  ({atPump.length})
-                </Typography>
+              <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                Vehicles
+                {' '}
+                (
+                {queue.length}
+                )
               </Typography>
-              <Stack spacing={1.25}>
-                {atPump.map((refuel) => (
-                  <PendingRefuelCard
-                    key={refuel.id}
-                    refuel={refuel}
-                    device={devicesItems[refuel.vehicleId]}
-                    disabled={!canRecord}
-                    sessionInProgress={canRecord}
-                    previousMileage={previousMileageByVehicle[refuel.vehicleId]}
-                    onDone={submitRefuel}
-                    onArrived={submitArrived}
-                    onSkip={canRecord ? submitSkip : undefined}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          )}
-
-          {waiting.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                Waiting
-                <Typography component="span" variant="body2" color="text.secondary" fontWeight={400} sx={{ ml: 1 }}>
-                  ({waiting.length})
-                </Typography>
-              </Typography>
-              <Stack spacing={1.25}>
-                {waiting.map((refuel) => (
-                  <PendingRefuelCard
-                    key={refuel.id}
-                    refuel={refuel}
-                    device={devicesItems[refuel.vehicleId]}
-                    disabled={!canRecord}
-                    sessionInProgress={canRecord}
-                    previousMileage={previousMileageByVehicle[refuel.vehicleId]}
-                    onDone={submitRefuel}
-                    onArrived={submitArrived}
-                    onSkip={canRecord ? submitSkip : undefined}
-                  />
-                ))}
+              <Stack spacing={0}>
+                {queue.map((refuel) => {
+                  const capacity = capacityByDeviceId[refuel.vehicleId] || {};
+                  return (
+                    <PendingRefuelCard
+                      key={refuel.id}
+                      refuel={refuel}
+                      capacityL={capacity.capacityL}
+                      capacitySource={capacity.capacitySource}
+                      disabled={!canRecord}
+                      sessionInProgress={canRecord}
+                      previousMileage={previousMileageByVehicle[refuel.vehicleId]}
+                      expanded={expandedRefuelId === refuel.id}
+                      onToggleExpand={(id) => setExpandedRefuelId((prev) => (prev === id ? null : id))}
+                      onDone={submitRefuel}
+                      onArrived={submitArrived}
+                      onSkip={canRecord ? submitSkip : undefined}
+                    />
+                  );
+                })}
               </Stack>
             </Box>
           )}
