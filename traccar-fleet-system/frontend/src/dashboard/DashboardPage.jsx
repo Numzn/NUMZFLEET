@@ -425,7 +425,7 @@ const DashboardPage = () => {
                 <Button
                   fullWidth
                   variant="outlined"
-                  onClick={() => navigate('/fleet/operation-sessions')}
+                  onClick={() => navigate('/fleet/operation-sessions/prepare')}
                   startIcon={<PlayCircleOutlineIcon />}
                   sx={{
                     justifyContent: 'flex-start',

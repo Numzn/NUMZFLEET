@@ -404,7 +404,7 @@ const UnifiedSidebar = ({
           children: [
             {
               title: 'Fueling Day',
-              path: '/fleet/operation-sessions',
+              path: '/fleet/operation-sessions/prepare',
               activeMatch: (path) => path.startsWith('/fleet/operation-sessions'),
             },
             { title: 'Driver requests', path: '/fuel-requests', show: features.enableFuelRequests },

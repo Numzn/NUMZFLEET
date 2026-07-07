@@ -20,7 +20,7 @@ export default function FuelRequestsRouteGuard() {
       <Alert
         severity="info"
         action={(
-          <Button color="inherit" size="small" onClick={() => navigate('/fleet/operation-sessions')}>
+          <Button color="inherit" size="small" onClick={() => navigate('/fleet/operation-sessions/prepare')}>
             Daily operations
           </Button>
         )}
