@@ -4,6 +4,8 @@ import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   Chip,
   CircularProgress,
   Divider,
@@ -20,19 +22,30 @@ import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
 import useTodayOperation from './hooks/useTodayOperation.js';
 import { replaceOperationInvoiceFile, uploadOperationInvoice } from './api/operationSessionsApi.js';
 import SmartInvoiceAttachment from './components/SmartInvoiceAttachment.jsx';
-import { formatLitres, formatZmw } from './utils/formatters.js';
-import { deriveInvoiceStage, INVOICE_STAGE_LABEL, invoiceStageColor } from './utils/operationDayUtils.js';
-
-const STATUS_CHIP = {
-  matched: { label: 'Matched', color: 'success' },
-  variance: { label: 'Variance', color: 'error' },
-  pending: { label: 'Pending', color: 'default' },
-};
+import OperationVehicleLabel from './components/OperationVehicleLabel.jsx';
+import { formatK, formatLitres, vehicleCountLabel } from './utils/formatters.js';
+import {
+  deriveInvoiceStage, INVOICE_STAGE_LABEL, invoiceStageColor, isRefuelComplete,
+} from './utils/operationDayUtils.js';
 
 function invoiceTitle(invoice) {
   if (invoice.invoiceNumber) return invoice.invoiceNumber;
   if (invoice.attachmentUrl) return 'Station invoice';
   return 'Smart Invoice';
+}
+
+// Matches the SummaryStat grammar already used by Plan/Fueling/Review summary cards.
+function SummaryStat({ value, label, warn = false }) {
+  return (
+    <Box sx={{ flex: 1, textAlign: 'center' }}>
+      <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: warn ? 'warning.main' : 'primary.main', lineHeight: 1.2 }}>
+        {value}
+      </Typography>
+      <Typography variant="caption" sx={{ letterSpacing: 0.4, color: 'text.secondary', textTransform: 'uppercase' }}>
+        {label}
+      </Typography>
+    </Box>
+  );
 }
 
 export default function SmartInvoicesPage() {
@@ -52,8 +65,12 @@ export default function SmartInvoicesPage() {
     todayDetails?.effectiveStatus || todayOperation?.effectiveStatus || todayOperation?.status || '',
   ).toLowerCase();
   const invoices = todayDetails?.invoices || [];
-  const summary = todayDetails?.invoiceSummary;
-  const sessionActualL = Number(todayDetails?.totalActualFuel || 0);
+  const refuels = todayDetails?.refuels || [];
+  const fueledRefuels = refuels.filter(isRefuelComplete);
+  const refuelsById = new Map(refuels.map((r) => [Number(r.id), r]));
+  const coveredRefuelIdSet = new Set(invoices.flatMap((i) => i.coveredRefuelIds || []).map(Number));
+  const coveredCount = fueledRefuels.filter((r) => coveredRefuelIdSet.has(Number(r.id))).length;
+  const uncoveredCount = fueledRefuels.length - coveredCount;
   const isLocked = status === 'locked';
   const canEdit = isManager && !isLocked && status === 'approved';
 
@@ -105,38 +122,49 @@ export default function SmartInvoicesPage() {
     return <Alert severity="info">Start the Fueling Day before attaching Smart Invoices.</Alert>;
   }
 
-  const summaryChip = summary && summary.count > 0 ? STATUS_CHIP[summary.status] || STATUS_CHIP.pending : null;
-  const awaitingExtraction = (summary?.pendingExtraction || 0) > 0;
+  const coverageChip = fueledRefuels.length === 0
+    ? null
+    : uncoveredCount === 0
+      ? { label: 'All Covered', color: 'success' }
+      : { label: `${uncoveredCount} Uncovered`, color: 'warning' };
 
   return (
     <Stack spacing={RUNTIME_STACK_GAP}>
-      <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <Stack spacing={0.75}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-            <Typography variant="subtitle2" fontWeight={800}>Day reconciliation</Typography>
-            {summaryChip && <Chip size="small" label={summaryChip.label} color={summaryChip.color} />}
+      <Card variant="outlined" sx={{ borderRadius: 2 }}>
+        <CardContent sx={{ py: 1.25, '&:last-child': { pb: 1.25 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 800 }}>
+              Coverage
+            </Typography>
+            {coverageChip && <Chip size="small" label={coverageChip.label} color={coverageChip.color} />}
           </Box>
-          <Typography variant="body2" color="text.secondary">
-            Upload station invoice photos. Litres and cost are extracted automatically when the photo is clear.
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Chip size="small" variant="outlined" label={`Dispensed ${formatLitres(sessionActualL)}`} />
-            <Chip size="small" variant="outlined" label={`Invoiced ${formatLitres(summary?.totalInvoiceLitres || 0)}`} />
-            {summary?.varianceLitres != null && (
-              <Chip
-                size="small"
-                variant="outlined"
-                color={summary.status === 'variance' ? 'error' : 'default'}
-                label={`Variance ${summary.varianceLitres >= 0 ? '+' : ''}${summary.varianceLitres.toFixed(1)} L`}
-              />
-            )}
-            <Chip size="small" variant="outlined" label={`${summary?.count || 0} attachment${(summary?.count || 0) === 1 ? '' : 's'}`} />
-            {awaitingExtraction && (
-              <Chip size="small" variant="outlined" color="warning" label={`${summary.pendingExtraction} awaiting extraction`} />
-            )}
+
+          <Divider sx={{ my: 0.75 }} />
+
+          <Box sx={{ display: 'flex' }}>
+            <SummaryStat value={fueledRefuels.length} label="Fueled" />
+            <SummaryStat value={coveredCount} label="Covered" />
+            <SummaryStat value={invoices.length} label="Attachments" />
           </Box>
-        </Stack>
-      </Paper>
+
+          <Divider sx={{ my: 0.75 }} />
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">Uncovered vehicles</Typography>
+            <Typography
+              variant="body2"
+              fontWeight={800}
+              color={uncoveredCount > 0 ? 'warning.main' : 'text.primary'}
+            >
+              {uncoveredCount}
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Typography variant="body2" color="text.secondary">
+        Attach station receipt photos and select which fueled vehicles each one covers.
+      </Typography>
 
       {canEdit && !adding && (
         <Box>
@@ -156,6 +184,7 @@ export default function SmartInvoicesPage() {
         <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Attach Smart Invoice</Typography>
           <SmartInvoiceAttachment
+            refuels={fueledRefuels}
             saving={saving}
             error={formError}
             onSubmit={handleCreate}
@@ -202,15 +231,37 @@ export default function SmartInvoicesPage() {
             {!invoice.extractionPending && (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 {`Total ${formatLitres(invoice.totalLitres)}`}
-                {invoice.totalCost != null ? ` · ${formatZmw(invoice.totalCost)}` : ''}
+                {invoice.totalCost != null ? ` · ${formatK(invoice.totalCost)}` : ''}
               </Typography>
             )}
+
+            <Box sx={{ mt: 0.75 }}>
+              <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ fontSize: '12px' }}>
+                {`COVERS · ${vehicleCountLabel((invoice.coveredRefuelIds || []).length)}`}
+              </Typography>
+              <Stack sx={{ mt: 0.25 }} spacing={0.25}>
+                {(invoice.coveredRefuelIds || []).map((refuelId) => {
+                  const refuel = refuelsById.get(Number(refuelId));
+                  if (!refuel) return null;
+                  return (
+                    <OperationVehicleLabel
+                      key={refuelId}
+                      deviceId={refuel.vehicleId}
+                      titleVariant="body2"
+                      titleWeight={600}
+                      compact
+                    />
+                  );
+                })}
+              </Stack>
+            </Box>
 
             {isEditing ? (
               <>
                 <Divider sx={{ my: 1.25 }} />
                 <SmartInvoiceAttachment
                   invoice={invoice}
+                  refuels={fueledRefuels}
                   saving={saving}
                   error={formError}
                   onSubmit={(payload) => handleUpdate(invoice.id, payload)}

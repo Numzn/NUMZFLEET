@@ -70,11 +70,21 @@ export async function updateOperationInvoice(user, sessionId, invoiceId, payload
 
 function appendInvoiceFields(formData, fields = {}) {
   if (fields.invoiceNumber) formData.append('invoiceNumber', String(fields.invoiceNumber));
+  if (fields.invoiceDate) formData.append('invoiceDate', String(fields.invoiceDate));
   if (fields.totalLitres != null && fields.totalLitres !== '') {
     formData.append('totalLitres', String(fields.totalLitres));
   }
   if (fields.totalCost != null && fields.totalCost !== '') {
     formData.append('totalCost', String(fields.totalCost));
+  }
+  if (fields.dieselLitres != null && fields.dieselLitres !== '') {
+    formData.append('dieselLitres', String(fields.dieselLitres));
+  }
+  if (fields.petrolLitres != null && fields.petrolLitres !== '') {
+    formData.append('petrolLitres', String(fields.petrolLitres));
+  }
+  if (Array.isArray(fields.refuelIds)) {
+    formData.append('refuelIds', JSON.stringify(fields.refuelIds));
   }
 }
 

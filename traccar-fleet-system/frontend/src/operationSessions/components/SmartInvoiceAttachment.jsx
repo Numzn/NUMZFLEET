@@ -1,23 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
-  LinearProgress,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { extractInvoiceFromImage } from '../utils/extractInvoiceFromImage.js';
+import { formatLitres } from '../utils/formatters.js';
+import OperationVehicleLabel from './OperationVehicleLabel.jsx';
 
 /**
- * Attach a Smart Invoice by uploading a photo or file. OCR extracts litres and cost.
+ * Attach a Smart Invoice: a photo/PDF of the receipt plus which fueled vehicles
+ * (refuel rows) from this session it covers. Evidence only — no OCR, no totals.
  */
 export default function SmartInvoiceAttachment({
   invoice = null,
+  refuels = [],
   disabled = false,
   saving = false,
   error = '',
@@ -28,99 +30,46 @@ export default function SmartInvoiceAttachment({
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [extracting, setExtracting] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrError, setOcrError] = useState('');
-  const [label, setLabel] = useState(invoice?.invoiceNumber || '');
-  const [totalLitres, setTotalLitres] = useState(
-    invoice?.totalLitres != null ? String(invoice.totalLitres) : '',
+  const [selectedRefuelIds, setSelectedRefuelIds] = useState(
+    () => new Set((invoice?.coveredRefuelIds || []).map(Number)),
   );
-  const [totalCost, setTotalCost] = useState(
-    invoice?.totalCost != null ? String(invoice.totalCost) : '',
-  );
-  const [invoiceDate, setInvoiceDate] = useState(
-    invoice?.invoiceDate ? String(invoice.invoiceDate).slice(0, 16) : '',
-  );
-  const [pricePerLitre, setPricePerLitre] = useState(
-    invoice?.pricePerLitre != null ? String(invoice.pricePerLitre) : '',
-  );
-  const [stationName, setStationName] = useState(invoice?.stationName || '');
-  const [dieselLitres, setDieselLitres] = useState(
-    invoice?.dieselLitres != null ? String(invoice.dieselLitres) : '',
-  );
-  const [petrolLitres, setPetrolLitres] = useState(
-    invoice?.petrolLitres != null ? String(invoice.petrolLitres) : '',
-  );
-
-  useEffect(() => () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-  }, [previewUrl]);
 
   const resetInputs = () => {
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleFileSelected = async (selected) => {
+  const handleFileSelected = (selected) => {
     if (!selected) return;
     setFile(selected);
-    setOcrError('');
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(selected));
-
-    if (!/^image\//.test(selected.type)) {
-      setOcrError('PDF uploaded — enter litres and cost manually if needed.');
-      return;
-    }
-
-    setExtracting(true);
-    setOcrProgress(0);
-    try {
-      const extracted = await extractInvoiceFromImage(selected, {
-        onProgress: setOcrProgress,
-      });
-      if (extracted.invoiceNumber && !label) setLabel(extracted.invoiceNumber);
-      if (extracted.totalLitres != null) setTotalLitres(String(extracted.totalLitres));
-      if (extracted.totalCost != null) setTotalCost(String(extracted.totalCost));
-      if (extracted.invoiceDate && !invoiceDate) {
-        setInvoiceDate(String(extracted.invoiceDate).slice(0, 16));
-      }
-      if (extracted.pricePerLitre != null) setPricePerLitre(String(extracted.pricePerLitre));
-      if (extracted.stationName && !stationName) setStationName(extracted.stationName);
-      if (extracted.dieselLitres != null) setDieselLitres(String(extracted.dieselLitres));
-      if (extracted.petrolLitres != null) setPetrolLitres(String(extracted.petrolLitres));
-      if (extracted.totalLitres == null && extracted.totalCost == null) {
-        setOcrError('Could not read totals — check the photo or enter them below.');
-      }
-    } catch {
-      setOcrError('OCR failed — you can still attach the file and enter totals manually.');
-    } finally {
-      setExtracting(false);
-      setOcrProgress(0);
-    }
   };
 
-  const handleSubmit = () => {
-    if (!file) return;
-    onSubmit({
-      file,
-      invoiceNumber: label.trim() || undefined,
-      totalLitres: totalLitres.trim() ? Number(totalLitres) : undefined,
-      totalCost: totalCost.trim() ? Number(totalCost) : undefined,
-      invoiceDate: invoiceDate.trim() || undefined,
-      pricePerLitre: pricePerLitre.trim() ? Number(pricePerLitre) : undefined,
-      stationName: stationName.trim() || undefined,
-      dieselLitres: dieselLitres.trim() ? Number(dieselLitres) : undefined,
-      petrolLitres: petrolLitres.trim() ? Number(petrolLitres) : undefined,
+  const toggleRefuel = (refuelId) => {
+    setSelectedRefuelIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(refuelId)) next.delete(refuelId);
+      else next.add(refuelId);
+      return next;
     });
   };
 
-  const busy = disabled || saving || extracting;
+  const handleSubmit = () => {
+    if (!file || selectedRefuelIds.size === 0) return;
+    onSubmit({
+      file,
+      refuelIds: Array.from(selectedRefuelIds),
+    });
+  };
+
+  const busy = disabled || saving;
+  const canSubmit = !busy && !!file && selectedRefuelIds.size > 0;
 
   return (
     <Stack spacing={1.25}>
       <Typography variant="body2" color="text.secondary">
-        Take a photo of the station invoice or choose a file. Litres and cost are read automatically when possible.
+        Take a photo of the station invoice or choose a file, then select which fueled vehicles it covers.
       </Typography>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
@@ -182,100 +131,51 @@ export default function SmartInvoiceAttachment({
         />
       )}
 
-      {extracting && (
-        <Stack spacing={0.5}>
-          <Typography variant="caption" color="text.secondary">Reading invoice…</Typography>
-          <LinearProgress variant={ocrProgress > 0 ? 'determinate' : 'indeterminate'} value={ocrProgress} />
-        </Stack>
-      )}
-
-      {ocrError && !extracting && (
-        <Alert severity="warning">{ocrError}</Alert>
-      )}
-
-      <TextField
-        label="Receipt label (optional)"
-        placeholder="e.g. Puma receipt #1234"
-        size="small"
-        fullWidth
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        disabled={busy}
-      />
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-        <TextField
-          label="Total litres"
-          type="number"
-          size="small"
-          fullWidth
-          value={totalLitres}
-          onChange={(e) => setTotalLitres(e.target.value)}
-          disabled={busy}
-          inputProps={{ min: 0, step: 0.1 }}
-        />
-        <TextField
-          label="Total cost (ZMW)"
-          type="number"
-          size="small"
-          fullWidth
-          value={totalCost}
-          onChange={(e) => setTotalCost(e.target.value)}
-          disabled={busy}
-          inputProps={{ min: 0, step: 0.01 }}
-        />
-      </Stack>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-        <TextField
-          label="Price per litre"
-          type="number"
-          size="small"
-          fullWidth
-          value={pricePerLitre}
-          onChange={(e) => setPricePerLitre(e.target.value)}
-          disabled={busy}
-          inputProps={{ min: 0, step: 0.01 }}
-        />
-        <TextField
-          label="Invoice date"
-          type="datetime-local"
-          size="small"
-          fullWidth
-          value={invoiceDate}
-          onChange={(e) => setInvoiceDate(e.target.value)}
-          disabled={busy}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Stack>
-      <TextField
-        label="Station name"
-        size="small"
-        fullWidth
-        value={stationName}
-        onChange={(e) => setStationName(e.target.value)}
-        disabled={busy}
-      />
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-        <TextField
-          label="Diesel litres"
-          type="number"
-          size="small"
-          fullWidth
-          value={dieselLitres}
-          onChange={(e) => setDieselLitres(e.target.value)}
-          disabled={busy}
-          inputProps={{ min: 0, step: 0.1 }}
-        />
-        <TextField
-          label="Petrol litres"
-          type="number"
-          size="small"
-          fullWidth
-          value={petrolLitres}
-          onChange={(e) => setPetrolLitres(e.target.value)}
-          disabled={busy}
-          inputProps={{ min: 0, step: 0.1 }}
-        />
-      </Stack>
+      <Box>
+        <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ fontSize: '12px' }}>
+          COVERS
+        </Typography>
+        {refuels.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            No fueled vehicles yet on this Fueling Day.
+          </Typography>
+        ) : (
+          <Stack sx={{ mt: 0.5 }}>
+            {refuels.map((refuel) => (
+              <Box
+                key={refuel.id}
+                onClick={() => (busy ? null : toggleRefuel(refuel.id))}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  py: 0.5,
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  cursor: busy ? 'default' : 'pointer',
+                }}
+              >
+                <Checkbox
+                  checked={selectedRefuelIds.has(refuel.id)}
+                  onChange={() => toggleRefuel(refuel.id)}
+                  disabled={busy}
+                  size="small"
+                />
+                <OperationVehicleLabel
+                  deviceId={refuel.vehicleId}
+                  titleVariant="body2"
+                  titleWeight={700}
+                  secondarySx={{ fontSize: '13px' }}
+                />
+                <Box sx={{ flex: 1 }} />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '12px' }}>
+                  {formatLitres(refuel.actualFuelLitres)}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        )}
+      </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
 
@@ -284,10 +184,10 @@ export default function SmartInvoiceAttachment({
           variant="contained"
           size="small"
           onClick={handleSubmit}
-          disabled={busy || !file}
+          disabled={!canSubmit}
           sx={{ textTransform: 'none' }}
         >
-          {saving ? 'Uploading…' : invoice ? 'Replace invoice' : 'Attach invoice'}
+          {saving ? 'Uploading…' : invoice ? 'Replace invoice' : 'Attach'}
         </Button>
         {saving && <CircularProgress size={18} />}
         {onCancel && (
