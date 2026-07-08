@@ -32,3 +32,9 @@ export function tankLabel(capacityL, source) {
   if (!Number.isFinite(v) || v <= 0) return null;
   return source === 'verified' ? `Tank ${v} L` : `Tank ~${v} L`;
 }
+
+/** "1 VEHICLE" / "2 VEHICLES" — shared count grammar for the Plan/Fueling/Review summary cards. */
+export function vehicleCountLabel(n) {
+  const v = Number(n) || 0;
+  return `${v} ${v === 1 ? 'VEHICLE' : 'VEHICLES'}`;
+}

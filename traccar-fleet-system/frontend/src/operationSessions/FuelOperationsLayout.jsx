@@ -61,11 +61,13 @@ export default function FuelOperationsLayout() {
   const isHistoryRoute = path.startsWith('/fleet/operation-sessions/history');
   const isFuelRoute = path.startsWith('/fleet/operation-sessions/fuel');
   const isPrepareRoute = path.startsWith('/fleet/operation-sessions/prepare');
+  const isReviewRoute = path.startsWith('/fleet/operation-sessions/review');
+  const isInvoiceRoute = path.startsWith('/fleet/operation-sessions/invoices');
   const showSummary = !isTodayRoute && !isHistoryRoute && !isFuelRoute && !isPrepareRoute
+    && !isReviewRoute && !isInvoiceRoute
     && todayOperation?.id && todayDetails;
 
-  const summaryPhase = path.startsWith('/fleet/operation-sessions/review')
-    || path.startsWith('/fleet/operation-sessions/invoices')
+  const summaryPhase = path.startsWith('/fleet/operation-sessions/invoices')
     ? 'closeout'
     : 'inProgress';
 
@@ -78,7 +80,13 @@ export default function FuelOperationsLayout() {
           variant="scrollable"
           scrollButtons="auto"
           allowScrollButtonsMobile
-          sx={{ mb: showSummary ? 1.5 : 2, borderBottom: 1, borderColor: 'divider' }}
+          sx={{
+            mb: showSummary ? 1.5 : 2,
+            borderBottom: 1,
+            borderColor: 'divider',
+            minHeight: { xs: 40, sm: 48 },
+            '& .MuiTabs-scrollButtons': { width: { xs: 24, sm: 40 } },
+          }}
         >
           {TABS.map((tab) => (
             <Tab
@@ -92,6 +100,11 @@ export default function FuelOperationsLayout() {
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,
+                minHeight: { xs: 40, sm: 48 },
+                minWidth: { xs: 62, sm: 90 },
+                px: { xs: 0.75, sm: 2 },
+                fontSize: { xs: '0.7rem', sm: '0.875rem' },
+                whiteSpace: 'nowrap',
                 ...(tab.stepKey && steps?.[tab.stepKey]?.active ? { color: 'primary.main' } : {}),
               }}
             />

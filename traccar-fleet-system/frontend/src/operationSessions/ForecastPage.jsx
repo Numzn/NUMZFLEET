@@ -28,7 +28,7 @@ import {
   submitSessionRefuelUpdates,
 } from './api/operationSessionsApi.js';
 import {
-  formatK, formatLitres, tankLabel,
+  formatK, formatLitres, tankLabel, vehicleCountLabel,
 } from './utils/formatters.js';
 import {
   deriveFuelingDayStatus,
@@ -358,9 +358,7 @@ const ForecastPage = () => {
                   {isPlanning ? "Today's Plan" : 'Fuel Plan'}
                 </Typography>
                 <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary' }}>
-                  {vehicleCount}
-                  {' '}
-                  {vehicleCount === 1 ? 'VEHICLE' : 'VEHICLES'}
+                  {vehicleCountLabel(vehicleCount)}
                 </Typography>
               </Box>
 

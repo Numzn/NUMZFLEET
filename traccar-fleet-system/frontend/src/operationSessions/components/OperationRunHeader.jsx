@@ -1,5 +1,5 @@
 import { Box, Card, CardContent, Divider, Typography } from '@mui/material';
-import { formatK, formatLitres } from '../utils/formatters.js';
+import { formatK, formatLitres, vehicleCountLabel } from '../utils/formatters.js';
 import { deriveFuelingDayStatus, sumPlannedLitres } from '../utils/operationDayUtils.js';
 
 const SummaryStat = ({ value, label, warn = false }) => (
@@ -39,9 +39,7 @@ export default function OperationRunHeader({ session, buckets }) {
             Fueling
           </Typography>
           <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary' }}>
-            {counts.selected}
-            {' '}
-            {counts.selected === 1 ? 'VEHICLE' : 'VEHICLES'}
+            {vehicleCountLabel(counts.selected)}
           </Typography>
         </Box>
 

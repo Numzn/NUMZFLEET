@@ -1,70 +1,57 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   CircularProgress,
-  Paper,
+  Divider,
   Stack,
   Typography,
 } from '@mui/material';
 import { RUNTIME_STACK_GAP } from '../common/styles/runtimeDensity';
-import { useManager } from '../common/util/permissions';
 import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
 import useTodayOperation from './hooks/useTodayOperation.js';
-import { closeOperationSession } from './api/operationSessionsApi.js';
-import { summarizeRefuelBuckets } from './utils/operationDayUtils.js';
-import OperationDaySummary from './components/OperationDaySummary.jsx';
+import { isRefuelComplete, summarizeRefuelBuckets } from './utils/operationDayUtils.js';
+import { formatK, formatLitres, vehicleCountLabel } from './utils/formatters.js';
+import OperationVehicleLabel from './components/OperationVehicleLabel.jsx';
+
+const LABEL_SX = { fontSize: '12px' };
+
+// Matches the SummaryStat grammar already used by the Plan (ForecastPage.jsx) and
+// Fueling (OperationRunHeader.jsx) summary cards, so all three read as one system.
+function SummaryStat({ value, label, warn = false }) {
+  return (
+    <Box sx={{ flex: 1, textAlign: 'center' }}>
+      <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: warn ? 'warning.main' : 'primary.main', lineHeight: 1.2 }}>
+        {value}
+      </Typography>
+      <Typography variant="caption" sx={{ letterSpacing: 0.4, color: 'text.secondary', textTransform: 'uppercase' }}>
+        {label}
+      </Typography>
+    </Box>
+  );
+}
 
 export default function ReviewClosePage() {
   const navigate = useNavigate();
-  const user = useSelector((state) => state.session.user);
-  const isManager = useManager();
   const {
-    todayOperation, todayDetails, loading, error, reload,
+    todayOperation, todayDetails, loading, error,
   } = useTodayOperation();
 
-  const [closing, setClosing] = useState(false);
-  const [closeError, setCloseError] = useState('');
-
   const sessionId = todayOperation?.id;
-  const status = String(
-    todayDetails?.effectiveStatus || todayOperation?.effectiveStatus || todayOperation?.status || '',
-  ).toLowerCase();
-  const isLocked = status === 'locked';
-  const buckets = summarizeRefuelBuckets(todayDetails?.refuels || []);
-  const canClose = isManager && status === 'approved';
+  const refuels = todayDetails?.refuels || [];
+  const buckets = summarizeRefuelBuckets(refuels);
+  const fueledRefuels = refuels.filter(isRefuelComplete);
 
-  const invoiceSummary = todayDetails?.invoiceSummary;
-  const invoiceCount = invoiceSummary?.count || 0;
-  const warnings = [];
-  if (buckets.missing > 0) {
-    warnings.push(`${buckets.missing} vehicle${buckets.missing === 1 ? '' : 's'} not yet fueled`);
-  }
-  if (buckets.skipped > 0) {
-    warnings.push(`${buckets.skipped} vehicle${buckets.skipped === 1 ? '' : 's'} skipped`);
-  }
-  if (invoiceCount === 0) {
-    warnings.push('No Smart Invoices attached');
-  } else if (invoiceSummary?.status === 'variance') {
-    warnings.push('Invoice litres do not match dispensed total');
-  }
-
-  const handleClose = async () => {
-    setClosing(true);
-    setCloseError('');
-    try {
-      await closeOperationSession(user, sessionId);
-      await reload();
-      navigate('/fleet/operation-sessions/history');
-    } catch (e) {
-      setCloseError(fuelApiErrorMessage(e, 'Failed to close Fueling Day'));
-    } finally {
-      setClosing(false);
-    }
-  };
+  const totalSpent = Number(todayDetails?.totalActualCost ?? 0);
+  const totalFuelL = Number(todayDetails?.totalActualFuel ?? 0);
+  const estimatedCost = todayDetails?.totalEstimatedCost != null ? Number(todayDetails.totalEstimatedCost) : null;
+  const varianceCost = todayDetails?.totalVarianceCost != null ? Number(todayDetails.totalVarianceCost) : null;
+  const varianceLabel = varianceCost != null
+    ? `${varianceCost < 0 ? '-' : varianceCost > 0 ? '+' : ''}${formatK(Math.abs(varianceCost))}`
+    : '—';
 
   if (loading && !todayDetails) {
     return (
@@ -84,63 +71,105 @@ export default function ReviewClosePage() {
 
   return (
     <Stack spacing={RUNTIME_STACK_GAP}>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack spacing={1.5}>
-          <Typography variant="subtitle2" fontWeight={800}>Fueling Day summary</Typography>
-          <OperationDaySummary
-            operation={todayOperation}
-            details={todayDetails}
-            variant="full"
-            phase="closeout"
-          />
-          <Typography variant="body2" color="text.secondary">
-            {invoiceCount === 0
-              ? 'No Smart Invoices attached.'
-              : `${invoiceCount} Smart Invoice${invoiceCount === 1 ? '' : 's'} attached.`}
-          </Typography>
-          {warnings.length > 0 && (
-            <Box>
-              <Typography variant="caption" color="text.secondary" fontWeight={700} display="block" sx={{ mb: 0.5 }}>
-                Warnings
-              </Typography>
-              <Stack spacing={0.5}>
-                {warnings.map((warning) => (
-                  <Typography key={warning} variant="body2" color="warning.main">
-                    {warning}
-                  </Typography>
-                ))}
-              </Stack>
-            </Box>
-          )}
-        </Stack>
-      </Paper>
-
-      {isLocked ? (
-        <Alert severity="info">This Fueling Day is closed. Refuel lines and invoices are read-only.</Alert>
-      ) : (
-        <Paper variant="outlined" sx={{ p: 1.5 }}>
-          <Stack spacing={1}>
-            <Typography variant="subtitle2" fontWeight={700}>Close Fueling Day</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Closing locks today&apos;s refuels and invoices. The day also locks automatically at the end of the day.
+      <Card variant="outlined" sx={{ borderRadius: 2 }}>
+        <CardContent sx={{ py: 1.25, '&:last-child': { pb: 1.25 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 800 }}>
+              Review
             </Typography>
-            {closeError && <Alert severity="error">{closeError}</Alert>}
-            {!isManager && (
-              <Alert severity="info">Only managers can close a Fueling Day.</Alert>
-            )}
-            <Box>
-              <Button
-                variant="contained"
-                color="warning"
-                onClick={handleClose}
-                disabled={!canClose || closing}
+            <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary' }}>
+              {vehicleCountLabel(buckets.selected)}
+            </Typography>
+          </Box>
+
+          <Divider sx={{ my: 0.75 }} />
+
+          <Box sx={{ textAlign: 'center', py: 0.25 }}>
+            <Typography sx={{ fontSize: '1.75rem', fontWeight: 800, lineHeight: 1.15 }}>
+              {formatK(totalSpent)}
+            </Typography>
+            <Typography variant="caption" sx={{ letterSpacing: 0.4, color: 'text.secondary', textTransform: 'uppercase' }}>
+              Total Spent
+            </Typography>
+          </Box>
+
+          <Divider sx={{ my: 0.75 }} />
+
+          <Box sx={{ display: 'flex' }}>
+            <SummaryStat value={formatLitres(totalFuelL)} label="Fuel" />
+            <SummaryStat value={buckets.fueled} label="Fueled" />
+            <SummaryStat value={estimatedCost != null ? formatK(estimatedCost) : '—'} label="Estimated" />
+          </Box>
+
+          <Divider sx={{ my: 0.75 }} />
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">Variance vs estimate</Typography>
+            <Typography
+              variant="body2"
+              fontWeight={800}
+              color={varianceCost != null && varianceCost < 0 ? 'error.main' : 'text.primary'}
+            >
+              {varianceLabel}
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Box>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700} sx={LABEL_SX}>
+            FUELED VEHICLES
+          </Typography>
+          <Typography variant="caption" color="text.secondary" fontWeight={700} sx={LABEL_SX}>
+            {buckets.fueled}
+          </Typography>
+        </Stack>
+
+        {fueledRefuels.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No vehicles fueled yet.</Typography>
+        ) : (
+          <Stack>
+            {fueledRefuels.map((refuel) => (
+              <Box
+                key={refuel.id}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  py: 1.5,
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                }}
               >
-                {closing ? 'Closing…' : 'Close Fueling Day'}
-              </Button>
-            </Box>
+                <OperationVehicleLabel
+                  deviceId={refuel.vehicleId}
+                  titleVariant="body2"
+                  titleWeight={700}
+                  secondarySx={{ fontSize: '13px' }}
+                />
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="body2" fontWeight={800}>
+                    {refuel.actualCost != null ? formatK(refuel.actualCost) : '—'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={LABEL_SX}>
+                    {formatLitres(refuel.actualFuelLitres)}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
           </Stack>
-        </Paper>
-      )}
+        )}
+      </Box>
+
+      <Button
+        variant="contained"
+        fullWidth
+        onClick={() => navigate('/fleet/operation-sessions/invoices')}
+        sx={{ mt: 1 }}
+      >
+        Next
+      </Button>
     </Stack>
   );
 }

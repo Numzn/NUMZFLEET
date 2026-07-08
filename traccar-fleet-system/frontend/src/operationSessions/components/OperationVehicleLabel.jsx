@@ -7,6 +7,8 @@ export default function OperationVehicleLabel({
   titleVariant = 'subtitle1',
   titleWeight = 800,
   compact = false,
+  titleSx,
+  secondarySx,
 }) {
   const devicesItems = useSelector((state) => state.devices.items || {});
   const device = devicesItems[deviceId];
@@ -15,11 +17,11 @@ export default function OperationVehicleLabel({
 
   return (
     <Box>
-      <Typography variant={titleVariant} fontWeight={titleWeight} component="div">
+      <Typography variant={titleVariant} fontWeight={titleWeight} component="div" sx={titleSx}>
         {display.primary}
       </Typography>
       {display.secondary && !compact ? (
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={secondarySx}>
           {display.secondary}
         </Typography>
       ) : null}
