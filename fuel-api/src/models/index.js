@@ -9,6 +9,7 @@ import OperationAuditEventModel from './OperationAuditEvent.js';
 import OperationAdjustmentModel from './OperationAdjustment.js';
 import OperationUnlockModel from './OperationUnlock.js';
 import OperationSessionInvoiceModel from './OperationSessionInvoice.js';
+import OperationSessionInvoiceRefuelModel from './OperationSessionInvoiceRefuel.js';
 import UserNotificationModel from './UserNotification.js';
 import VehicleImmobilizationIntentModel from './VehicleImmobilizationIntent.js';
 import CompanyModel, { DEFAULT_COMPANY_ID } from './Company.js';
@@ -33,6 +34,7 @@ const OperationAuditEvent = OperationAuditEventModel(sequelize);
 const OperationAdjustment = OperationAdjustmentModel(sequelize);
 const OperationUnlock = OperationUnlockModel(sequelize);
 const OperationSessionInvoice = OperationSessionInvoiceModel(sequelize);
+const OperationSessionInvoiceRefuel = OperationSessionInvoiceRefuelModel(sequelize);
 const UserNotification = UserNotificationModel(sequelize);
 const VehicleImmobilizationIntent = VehicleImmobilizationIntentModel(sequelize);
 const Company = CompanyModel(sequelize);
@@ -111,6 +113,28 @@ OperationSession.hasMany(OperationSessionInvoice, {
   onDelete: 'CASCADE',
 });
 OperationSessionInvoice.belongsTo(OperationSession, { foreignKey: 'operationId', as: 'operation' });
+
+// Coverage join: one attachment may cover many fueled vehicles (refuel rows), and one
+// refuel row may be referenced by more than one attachment. Real FKs, no scalar/JSON hacks.
+OperationSessionInvoice.belongsToMany(OperationSessionRefuel, {
+  through: OperationSessionInvoiceRefuel,
+  foreignKey: 'invoiceId',
+  otherKey: 'refuelId',
+  as: 'coveredRefuels',
+});
+OperationSessionRefuel.belongsToMany(OperationSessionInvoice, {
+  through: OperationSessionInvoiceRefuel,
+  foreignKey: 'refuelId',
+  otherKey: 'invoiceId',
+  as: 'invoices',
+});
+OperationSessionInvoice.hasMany(OperationSessionInvoiceRefuel, {
+  foreignKey: 'invoiceId',
+  as: 'refuelLinks',
+  onDelete: 'CASCADE',
+});
+OperationSessionInvoiceRefuel.belongsTo(OperationSessionInvoice, { foreignKey: 'invoiceId', as: 'invoice' });
+OperationSessionInvoiceRefuel.belongsTo(OperationSessionRefuel, { foreignKey: 'refuelId', as: 'refuel' });
 
 export const syncDatabase = async (force = false) => {
   try {
@@ -206,6 +230,7 @@ export {
   OperationAdjustment,
   OperationUnlock,
   OperationSessionInvoice,
+  OperationSessionInvoiceRefuel,
   UserNotification,
   VehicleImmobilizationIntent,
   Company,

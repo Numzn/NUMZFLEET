@@ -1,3 +1,4 @@
+import sequelize from '../config/database.js';
 import {
   findById as findSessionById,
 } from '../repositories/operationSessionRepository.js';
@@ -8,6 +9,11 @@ import {
   createForOperation,
   upsertForOperation,
 } from '../repositories/operationSessionInvoiceRepository.js';
+import { OperationSessionRefuel } from '../models/index.js';
+import {
+  setForInvoice as setRefuelCoverageForInvoice,
+  listByInvoiceIds as listInvoiceRefuelLinks,
+} from '../repositories/operationSessionInvoiceRefuelRepository.js';
 import { recordAuditEvent, AUDIT_EVENT_TYPES } from './auditEventService.js';
 import { emitDomainEvent } from '../events/eventBus.js';
 import { EVENT_NAMES } from '../events/eventNames.js';
@@ -66,6 +72,50 @@ function normalizeAttachmentUrl(value) {
     throw error;
   }
 }
+/**
+ * Validate that every selected refuel row is real, belongs to this session, and has
+ * actually been fueled. Rejects cross-session linking outright — an attachment can
+ * only cover refuel rows captured within the same Fueling Day.
+ */
+async function resolveRefuelCoverage(session, refuelIds, { require = true } = {}) {
+  const ids = [...new Set((Array.isArray(refuelIds) ? refuelIds : [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0))];
+
+  if (!ids.length) {
+    if (require) {
+      const error = new Error('Select at least one fueled vehicle this attachment covers');
+      error.statusCode = 400;
+      throw error;
+    }
+    return [];
+  }
+
+  const rows = await OperationSessionRefuel.findAll({ where: { id: ids } });
+  const rowsById = new Map(rows.map((row) => [Number(row.id), row]));
+
+  for (const id of ids) {
+    const row = rowsById.get(id);
+    if (!row) {
+      const error = new Error(`Refuel record ${id} was not found`);
+      error.statusCode = 404;
+      throw error;
+    }
+    if (Number(row.sessionId) !== Number(session.id)) {
+      const error = new Error(`Refuel record ${id} belongs to a different Fueling Day`);
+      error.statusCode = 400;
+      throw error;
+    }
+    if (row.actualFuelLitres == null || Number(row.actualFuelLitres) <= 0) {
+      const error = new Error(`Vehicle for refuel record ${id} has not been fueled yet`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  return ids;
+}
+
 function invoiceLitres(record) {
   if (!hasExtractedLitres(record)) return 0;
   if (record.totalLitres != null) return Number(record.totalLitres);
@@ -133,7 +183,7 @@ export function summarizeInvoices(invoiceRecords = [], { sessionActualLitres = 0
   };
 }
 
-export function toInvoiceDto(record) {
+export function toInvoiceDto(record, coveredRefuelIds = []) {
   if (!record) return null;
   return {
     id: record.id,
@@ -150,9 +200,21 @@ export function toInvoiceDto(record) {
     enteredBy: record.enteredBy != null ? Number(record.enteredBy) : null,
     attachmentUrl: record.attachmentUrl || null,
     extractionPending: !hasExtractedLitres(record),
+    coveredRefuelIds: coveredRefuelIds.map(Number),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
+}
+
+async function coverageMapForInvoiceIds(invoiceIds) {
+  const links = await listInvoiceRefuelLinks(invoiceIds);
+  const map = new Map();
+  for (const link of links) {
+    const key = Number(link.invoiceId);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(Number(link.refuelId));
+  }
+  return map;
 }
 
 /** Build the persisted invoice fields from a payload, reconciled against the day. */
@@ -233,7 +295,8 @@ export async function getInvoiceDtoForSession(sessionId) {
 /** All Smart Invoices + day rollup, used when assembling the session details DTO. */
 export async function getInvoicesForSessionDetails(session) {
   const records = await listByOperationId(session.id);
-  const invoices = records.map(toInvoiceDto);
+  const coverageMap = await coverageMapForInvoiceIds(records.map((r) => r.id));
+  const invoices = records.map((record) => toInvoiceDto(record, coverageMap.get(Number(record.id)) || []));
   const invoiceSummary = summarizeInvoices(records, {
     sessionActualLitres: Number(session.totalActualFuel || 0),
     sessionActualCost: Number(session.totalActualCost || 0),
@@ -255,10 +318,16 @@ export async function createOperationInvoice(user, sessionId, payload = {}, comp
   assertInvoiceWritable(session);
 
   const values = buildInvoiceValues(payload, session, { requireAttachment: true });
-  const record = await createForOperation(session.id, {
-    companyId: session.companyId ?? null,
-    ...values,
-    enteredBy: user.id,
+  const refuelIds = await resolveRefuelCoverage(session, payload.refuelIds);
+
+  const record = await sequelize.transaction(async (transaction) => {
+    const created = await createForOperation(session.id, {
+      companyId: session.companyId ?? null,
+      ...values,
+      enteredBy: user.id,
+    }, { transaction });
+    await setRefuelCoverageForInvoice(created.id, refuelIds, { transaction });
+    return created;
   });
 
   await recordAuditEvent(session.id, AUDIT_EVENT_TYPES.INVOICE_RECONCILED, user.id, {
@@ -269,9 +338,10 @@ export async function createOperationInvoice(user, sessionId, payload = {}, comp
     sessionActualLitres: Number(session.totalActualFuel || 0),
     varianceLitres: values.varianceLitres,
     reconciliationStatus: values.reconciliationStatus,
+    coveredRefuelIds: refuelIds,
   });
 
-  const dto = toInvoiceDto(record);
+  const dto = toInvoiceDto(record, refuelIds);
   emitDomainEvent(EVENT_NAMES.OPERATION_INVOICE_RECONCILED, {
     session,
     user,
@@ -305,7 +375,18 @@ export async function updateOperationInvoice(user, sessionId, invoiceId, payload
     totalLitres: payload.totalLitres !== undefined ? payload.totalLitres : record.totalLitres,
     totalCost: payload.totalCost !== undefined ? payload.totalCost : record.totalCost,
   }, session);
-  await record.update({ ...values, enteredBy: user.id });
+
+  const replacingCoverage = payload.refuelIds !== undefined;
+  const refuelIds = replacingCoverage
+    ? await resolveRefuelCoverage(session, payload.refuelIds)
+    : (await coverageMapForInvoiceIds([record.id])).get(Number(record.id)) || [];
+
+  await sequelize.transaction(async (transaction) => {
+    await record.update({ ...values, enteredBy: user.id }, { transaction });
+    if (replacingCoverage) {
+      await setRefuelCoverageForInvoice(record.id, refuelIds, { transaction });
+    }
+  });
 
   await recordAuditEvent(session.id, AUDIT_EVENT_TYPES.INVOICE_RECONCILED, user.id, {
     invoiceId: record.id,
@@ -315,9 +396,10 @@ export async function updateOperationInvoice(user, sessionId, invoiceId, payload
     sessionActualLitres: Number(session.totalActualFuel || 0),
     varianceLitres: values.varianceLitres,
     reconciliationStatus: values.reconciliationStatus,
+    coveredRefuelIds: refuelIds,
   });
 
-  const dto = toInvoiceDto(record);
+  const dto = toInvoiceDto(record, refuelIds);
   emitDomainEvent(EVENT_NAMES.OPERATION_INVOICE_RECONCILED, {
     session,
     user,
@@ -332,7 +414,10 @@ export async function updateOperationInvoice(user, sessionId, invoiceId, payload
 export async function getOperationInvoice(user, sessionId, companyId = null) {
   const session = await findSessionById(sessionId);
   assertCanAccessSession(session, user, companyId);
-  return toInvoiceDto(await findByOperationId(session.id));
+  const record = await findByOperationId(session.id);
+  if (!record) return null;
+  const coverage = (await coverageMapForInvoiceIds([record.id])).get(Number(record.id)) || [];
+  return toInvoiceDto(record, coverage);
 }
 
 /** Back-compat single-invoice upsert kept for the legacy PUT /:id/invoice route. */

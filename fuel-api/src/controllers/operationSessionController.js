@@ -29,6 +29,22 @@ import {
 } from '../services/operationReportingService.js';
 import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
+function parseRefuelIds(value) {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return trimmed.split(',').map((v) => v.trim()).filter(Boolean);
+    }
+  }
+  return [value];
+}
+
 function handleError(res, error, logLabel, fallback) {
   const status = error.statusCode || 500;
   if (status >= 500) {
@@ -210,7 +226,10 @@ export const listInvoices = async (req, res) => {
 
 export const postInvoice = async (req, res) => {
   try {
-    const invoice = await createOperationInvoice(req.user, req.params.id, req.body || {}, req.auth?.companyId);
+    const invoice = await createOperationInvoice(req.user, req.params.id, {
+      ...(req.body || {}),
+      refuelIds: parseRefuelIds(req.body?.refuelIds),
+    }, req.auth?.companyId);
     return res.status(201).json(invoice);
   } catch (error) {
     return handleError(res, error, 'Create operation invoice error', 'Failed to create invoice');
@@ -227,8 +246,12 @@ export const postInvoiceUpload = async (req, res) => {
     const invoice = await createOperationInvoice(req.user, req.params.id, {
       attachmentUrl,
       invoiceNumber: req.body?.invoiceNumber,
+      invoiceDate: req.body?.invoiceDate,
       totalLitres: req.body?.totalLitres,
       totalCost: req.body?.totalCost,
+      dieselLitres: req.body?.dieselLitres,
+      petrolLitres: req.body?.petrolLitres,
+      refuelIds: parseRefuelIds(req.body?.refuelIds),
     }, req.auth?.companyId);
     return res.status(201).json(invoice);
   } catch (error) {
@@ -250,8 +273,12 @@ export const patchInvoiceUpload = async (req, res) => {
       {
         attachmentUrl,
         invoiceNumber: req.body?.invoiceNumber,
+        invoiceDate: req.body?.invoiceDate,
         totalLitres: req.body?.totalLitres,
         totalCost: req.body?.totalCost,
+        dieselLitres: req.body?.dieselLitres,
+        petrolLitres: req.body?.petrolLitres,
+        refuelIds: parseRefuelIds(req.body?.refuelIds),
       },
       req.auth?.companyId,
     );
@@ -281,7 +308,10 @@ export const patchInvoice = async (req, res) => {
       req.user,
       req.params.id,
       req.params.invoiceId,
-      req.body || {},
+      {
+        ...(req.body || {}),
+        refuelIds: parseRefuelIds(req.body?.refuelIds),
+      },
       req.auth?.companyId,
     );
     return res.json(invoice);

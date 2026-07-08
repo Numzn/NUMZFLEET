@@ -31,3 +31,4 @@
 20260704_service_record_schedule_reset_status.sql
 20260704_vehicle_activity_state.sql
 20260705_refuel_fill_classification.sql
+20260707_invoice_refuel_coverage.sql
