@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Alert,
@@ -24,15 +25,28 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { RUNTIME_STACK_GAP } from '../common/styles/runtimeDensity';
 import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
+import { vehicleWorkspacePath } from '../fleet/vehicleRegistry/vehicleRegistryUtils.js';
 import { fetchDailyOperationReports, fetchOperationSessionDetails } from './api/operationSessionsApi.js';
 import { formatK, formatLitres } from './utils/formatters.js';
 import {
   getTodayKeyInTimeZone,
   isRefuelComplete,
+  relativeDayLabel,
   resolveFleetTimezone,
+  varianceTone,
 } from './utils/operationDayUtils.js';
 import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
 import OperationVehicleLabel from './components/OperationVehicleLabel.jsx';
+
+const FUEL_TYPE_LABEL = { diesel: 'Diesel', petrol: 'Petrol' };
+const VARIANCE_COLOR = { warning: 'warning.main', error: 'error.main' };
+
+function predictedLitres(refuel) {
+  const planned = refuel.plannedFuelLitres != null ? Number(refuel.plannedFuelLitres) : null;
+  if (planned != null && Number.isFinite(planned) && planned > 0) return planned;
+  const estimated = refuel.estimatedFuelLitres != null ? Number(refuel.estimatedFuelLitres) : null;
+  return Number.isFinite(estimated) ? estimated : null;
+}
 
 const INVOICE_LABEL = { matched: 'Matched', variance: 'Variance', pending: 'Pending' };
 const INVOICE_COLOR = { matched: 'success', variance: 'error', pending: 'default' };
@@ -73,30 +87,49 @@ function InvoiceChip({ row }) {
 }
 
 /** Real session record: fueled vehicles (OperationSessionRefuel) + attachments and their coverage. */
-function SessionRecordDetail({ detail, loading, error }) {
+function SessionRecordDetail({
+  row, detail, loading, error,
+}) {
+  const navigate = useNavigate();
   const devicesItems = useSelector((state) => state.devices.items || {});
   const { getDisplayForDevice } = useVehicleDisplayContext();
+  const vehicleName = (vehicleId) => getDisplayForDevice(vehicleId, devicesItems[vehicleId])?.primary || `Vehicle ${vehicleId}`;
 
-  if (loading) {
-    return (
-      <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress size={20} />
+  const goToVehicleFuel = (vehicleId) => {
+    const fleetVehicleId = getDisplayForDevice(vehicleId, devicesItems[vehicleId])?.fleetVehicleId;
+    if (!fleetVehicleId) return;
+    navigate(`${vehicleWorkspacePath(fleetVehicleId)}?tab=fuel`);
+  };
+
+  return (
+    <Box sx={{ py: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 0.75, mb: 1 }}>
+        <Typography variant="body2" fontWeight={700}>{formatK(row.actualCost)}</Typography>
+        <Typography variant="caption" color="text.secondary">· {formatLitres(row.actualLitres)}</Typography>
+        <Chip size="small" label={historyStatusLabel(row.status)} color={historyStatusColor(row.status)} />
       </Box>
-    );
-  }
-  if (error) {
-    return <Alert severity="error" sx={{ my: 1 }}>{error}</Alert>;
-  }
-  if (!detail) return null;
 
+      {loading && (
+        <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress size={20} />
+        </Box>
+      )}
+      {error && <Alert severity="error" sx={{ my: 1 }}>{error}</Alert>}
+      {!loading && !error && detail && (
+        <SessionRecordVehiclesAndAttachments detail={detail} vehicleName={vehicleName} onVehicleClick={goToVehicleFuel} />
+      )}
+    </Box>
+  );
+}
+
+function SessionRecordVehiclesAndAttachments({ detail, vehicleName, onVehicleClick }) {
   const refuels = detail.refuels || [];
   const fueledRefuels = refuels.filter(isRefuelComplete);
   const invoices = detail.invoices || [];
   const refuelsById = new Map(refuels.map((r) => [Number(r.id), r]));
-  const vehicleName = (vehicleId) => getDisplayForDevice(vehicleId, devicesItems[vehicleId])?.primary || `Vehicle ${vehicleId}`;
 
   return (
-    <Box sx={{ py: 1 }}>
+    <>
       <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ letterSpacing: 0.4 }}>
         VEHICLES
       </Typography>
@@ -106,32 +139,57 @@ function SessionRecordDetail({ detail, loading, error }) {
         </Typography>
       ) : (
         <Stack sx={{ mt: 0.5, mb: 1.5 }}>
-          {fueledRefuels.map((refuel) => (
-            <Box
-              key={refuel.id}
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                py: 0.75,
-                borderBottom: 1,
-                borderColor: 'divider',
-              }}
-            >
-              <OperationVehicleLabel
-                deviceId={refuel.vehicleId}
-                titleVariant="body2"
-                titleWeight={700}
-                secondarySx={{ fontSize: '12px' }}
-              />
-              <Box sx={{ textAlign: 'right' }}>
-                <Typography variant="body2" fontWeight={700}>{formatLitres(refuel.actualFuelLitres)}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {refuel.actualCost != null ? formatK(refuel.actualCost) : '—'}
-                </Typography>
+          {fueledRefuels.map((refuel) => {
+            const predicted = predictedLitres(refuel);
+            const actual = refuel.actualFuelLitres != null ? Number(refuel.actualFuelLitres) : null;
+            const tone = varianceTone(predicted, actual);
+            const showVariance = (tone === 'warning' || tone === 'error') && predicted != null && actual != null;
+            const variance = showVariance ? actual - predicted : null;
+            const fuelType = FUEL_TYPE_LABEL[String(refuel.fuelTypeSnapshot || '').toLowerCase()];
+            return (
+              <Box
+                key={refuel.id}
+                onClick={() => onVehicleClick(refuel.vehicleId)}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  py: 0.75,
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  cursor: 'pointer',
+                }}
+              >
+                <Box>
+                  <OperationVehicleLabel
+                    deviceId={refuel.vehicleId}
+                    titleVariant="body2"
+                    titleWeight={700}
+                    secondarySx={{ fontSize: '12px' }}
+                  />
+                  {fuelType && (
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px' }}>
+                      {fuelType}
+                    </Typography>
+                  )}
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="body2" fontWeight={700}>
+                    {refuel.actualCost != null ? formatK(refuel.actualCost) : '—'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {formatLitres(actual)}
+                    {predicted != null && ` / ${formatLitres(predicted)} predicted`}
+                  </Typography>
+                  {showVariance && (
+                    <Typography variant="caption" fontWeight={700} sx={{ color: VARIANCE_COLOR[tone] }}>
+                      {`${variance >= 0 ? '+' : ''}${variance.toFixed(1)} L ${variance >= 0 ? '↑' : '↓'}`}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
-            </Box>
-          ))}
+            );
+          })}
         </Stack>
       )}
 
@@ -177,7 +235,7 @@ function SessionRecordDetail({ detail, loading, error }) {
           })}
         </Stack>
       )}
-    </Box>
+    </>
   );
 }
 
@@ -265,7 +323,6 @@ const OperationHistoryPage = () => {
         <Stack spacing={0}>
           {sortedRows.map((row) => {
             const variance = row.varianceLitres != null ? Number(row.varianceLitres) : null;
-            const isToday = String(row.calendarDate).slice(0, 10) === todayKey;
             const expanded = expandedId === row.operationId;
             return (
               <Box key={row.operationId} sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -279,12 +336,7 @@ const OperationHistoryPage = () => {
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2" fontWeight={700}>
-                        {row.calendarDate}
-                        {isToday && (
-                          <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 0.5 }}>
-                            Today
-                          </Typography>
-                        )}
+                        {relativeDayLabel(row.calendarDate, todayKey)}
                       </Typography>
                       <Chip size="small" label={historyStatusLabel(row.status)} color={historyStatusColor(row.status)} />
                     </Box>
@@ -311,6 +363,7 @@ const OperationHistoryPage = () => {
                 <Collapse in={expanded} unmountOnExit>
                   <Box sx={{ pl: 4, pr: 1 }}>
                     <SessionRecordDetail
+                      row={row}
                       detail={detailsById[row.operationId]}
                       loading={expanded && detailLoadingId === row.operationId}
                       error={expanded ? detailErrorId : null}
@@ -342,7 +395,6 @@ const OperationHistoryPage = () => {
             <TableBody>
               {sortedRows.map((row) => {
                 const variance = row.varianceLitres != null ? Number(row.varianceLitres) : null;
-                const isToday = String(row.calendarDate).slice(0, 10) === todayKey;
                 const expanded = expandedId === row.operationId;
                 return (
                   <Fragment key={row.operationId}>
@@ -357,12 +409,7 @@ const OperationHistoryPage = () => {
                         </IconButton>
                       </TableCell>
                       <TableCell>
-                        {row.calendarDate}
-                        {isToday && (
-                          <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 1 }}>
-                            Today
-                          </Typography>
-                        )}
+                        {relativeDayLabel(row.calendarDate, todayKey)}
                       </TableCell>
                       <TableCell>{row.reference || row.operationId}</TableCell>
                       <TableCell>
@@ -381,6 +428,7 @@ const OperationHistoryPage = () => {
                         <Collapse in={expanded} unmountOnExit>
                           <Box sx={{ px: 2, py: 0.5 }}>
                             <SessionRecordDetail
+                              row={row}
                               detail={detailsById[row.operationId]}
                               loading={expanded && detailLoadingId === row.operationId}
                               error={expanded ? detailErrorId : null}

@@ -42,6 +42,24 @@ export function getTodayKeyInTimeZone(timeZone, date = new Date()) {
   }
 }
 
+const WEEKDAY_FORMATTER = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' });
+
+/** "Today" / "Yesterday" / weekday name / "Last week" — falls back to the raw calendarDate beyond 2 weeks. */
+export function relativeDayLabel(calendarDate, todayKey) {
+  if (!calendarDate) return '';
+  const [y, m, d] = String(calendarDate).split('-').map(Number);
+  const [ty, tm, td] = String(todayKey || '').split('-').map(Number);
+  if (!y || !m || !d || !ty || !tm || !td) return calendarDate;
+  const rowUtc = Date.UTC(y, m - 1, d);
+  const todayUtc = Date.UTC(ty, tm - 1, td);
+  const diffDays = Math.round((todayUtc - rowUtc) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays > 1 && diffDays < 7) return WEEKDAY_FORMATTER.format(new Date(rowUtc));
+  if (diffDays >= 7 && diffDays < 14) return 'Last week';
+  return calendarDate;
+}
+
 /** First fleet timezone snapshotted on the operation rows, if any. */
 export function resolveFleetTimezone(sessions = []) {
   for (const s of sessions) {
