@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Button,
-  Chip,
   Stack,
   Typography,
   useMediaQuery,
@@ -12,32 +11,47 @@ import { alpha } from '@mui/material/styles';
 import { useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
-import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import DirectionsCarFilledOutlinedIcon from '@mui/icons-material/DirectionsCarFilledOutlined';
 import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
-import KPICards from './components/KPICards';
+import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
+import FleetStatusRow from './components/FleetStatusRow';
+import NeedsAttentionList from './components/NeedsAttentionList';
+import TodayOperationsCard from './components/TodayOperationsCard';
+import LiveFleetList from './components/LiveFleetList';
 import ErbPricesCard from './components/ErbPricesCard';
 import useFilter from '../main/useFilter';
 import usePersistedState from '../common/util/usePersistedState';
 import { fuelApiAuthHeaders } from '../config/fuelApiAuth.js';
+import { useManager } from '../common/util/permissions';
 import useTodayOperation from '../operationSessions/hooks/useTodayOperation';
-import { deriveFuelingDayStatus, FUELING_DAY_STATUS_LABEL, isRefuelComplete } from '../operationSessions/utils/operationDayUtils.js';
 import { isPendingFuelStatus } from '../fuelRequests/fuelRequestStatus';
 import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
+import { fetchMaintenanceDashboard } from '../maintenance/maintenanceApi.js';
+import getOperationalIndicators from '../main/fleet/vehicleOperationalIndicators.js';
+
+const SECTION_LABEL_SX = {
+  fontWeight: 800,
+  fontSize: '0.72rem',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'text.secondary',
+  mb: 1,
+};
 
 const DashboardPage = () => {
   const theme = useTheme();
   const location = useLocation();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
+  const isManager = useManager();
   const positions = useSelector((state) => state.session.positions);
   const events = useSelector((state) => state.events.items);
   const fuelRequests = useSelector((state) => state.fuelRequests?.items || {});
   const user = useSelector((state) => state.session.user);
   const [commandCenter, setCommandCenter] = useState(null);
+  const [maintenanceDashboard, setMaintenanceDashboard] = useState(null);
   const [filteredPositions, setFilteredPositions] = useState([]);
   const [filteredDevices, setFilteredDevices] = useState([]);
 
@@ -68,6 +82,19 @@ const DashboardPage = () => {
     return () => { cancelled = true; };
   }, [user]);
 
+  // Service-due counts for Needs Attention — manager-only endpoint; silently
+  // omit the category for non-managers rather than erroring the page.
+  useEffect(() => {
+    if (!user || !isManager) return undefined;
+    let cancelled = false;
+    fetchMaintenanceDashboard(user)
+      .then((data) => {
+        if (!cancelled) setMaintenanceDashboard(data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user, isManager]);
+
   useEffect(() => {
     const h = (location.hash || '').replace(/^#/, '');
     if (h !== 'dashboard-erb') return;
@@ -79,102 +106,114 @@ const DashboardPage = () => {
     }
   }, [location.hash]);
 
-  const dashboardSummary = useMemo(() => {
-    // Fallback only (used before commandCenter resolves, or if it errors) —
-    // canonical activity state, same field KPICards/map/fleet list read, not
-    // a separate "does a position exist" heuristic.
-    const onlineCount = filteredDevices.filter((device) => (
-      (getDisplayForDevice(device.id, device).activityState?.state ?? 'offline') !== 'offline'
-    )).length;
-    const urgentAlerts = Object.values(events).filter((event) => (
-      event.type === 'alarm' || event.type === 'panic'
-    )).length;
-    const pendingFuelRequests = Object.values(fuelRequests)
-      .filter((request) => isPendingFuelStatus(request.status)).length;
-
+  // One pass per device: canonical activity state + operational problem flags.
+  // Fleet Status, Needs Attention (offline count), and Live Fleet all read
+  // from this single computation instead of three separate recomputations.
+  const vehicleRows = useMemo(() => filteredDevices.map((device) => {
+    const display = getDisplayForDevice(device.id, device);
+    const position = positions[device.id];
+    const state = display.activityState?.state ?? 'offline';
+    const hasAlarm = Object.values(events).some((event) => (
+      (event.type === 'alarm' || event.type === 'panic') && Number(event.deviceId) === Number(device.id)
+    ));
+    const indicators = getOperationalIndicators(device, position);
+    const hasProblem = hasAlarm || indicators.some((indicator) => indicator.color === 'error');
     return {
-      totalFleet: commandCenter?.registeredVehicles ?? filteredDevices.length,
-      onlineCount: commandCenter?.trackersOnline ?? onlineCount,
-      offlineCount: Math.max((commandCenter?.trackersTotal ?? filteredDevices.length) - (commandCenter?.trackersOnline ?? onlineCount), 0),
-      urgentAlerts,
-      pendingFuelRequests: commandCenter?.pendingFuelRequests ?? pendingFuelRequests,
-      activeOperations: commandCenter?.activeOperations ?? 0,
+      device, position, display, state, hasProblem, activityState: display.activityState,
     };
-  }, [events, filteredDevices, fuelRequests, commandCenter, getDisplayForDevice]);
+  }), [filteredDevices, positions, getDisplayForDevice, events]);
 
-  const todayOpSummary = useMemo(() => {
-    if (!todayOperation?.id) return 'None today';
-    const displayStatus = deriveFuelingDayStatus({ operation: todayOperation, details: todayDetails });
-    const refuels = todayDetails?.refuels || [];
-    const total = refuels.length;
-    const done = refuels.filter(isRefuelComplete).length;
-    const label = FUELING_DAY_STATUS_LABEL[displayStatus] || 'Planning';
-    return total > 0 ? `${label} ${done}/${total}` : label;
-  }, [todayOperation, todayDetails]);
+  const fleetStatus = useMemo(() => {
+    const total = commandCenter?.trackersTotal ?? vehicleRows.length;
+    const online = commandCenter?.trackersOnline ?? vehicleRows.filter((v) => v.state !== 'offline').length;
+    const moving = vehicleRows.filter((v) => v.state === 'moving').length;
+    return { total, online, moving, offline: Math.max(total - online, 0) };
+  }, [vehicleRows, commandCenter]);
 
-  const quickStats = [
-    {
-      label: 'Connected now',
-      value: `${dashboardSummary.onlineCount}/${dashboardSummary.totalFleet || 0}`,
-      tone: '#67e8f9',
-      icon: <DirectionsCarFilledOutlinedIcon sx={{ fontSize: '1rem' }} />,
-    },
-    {
-      label: 'Fuel approvals',
-      value: `${dashboardSummary.pendingFuelRequests}`,
-      tone: '#fbbf24',
-      icon: <LocalGasStationOutlinedIcon sx={{ fontSize: '1rem' }} />,
-    },
-    {
-      label: 'Fueling Day',
-      value: todayOpSummary,
-      tone: '#86efac',
-      icon: <PlayCircleOutlineIcon sx={{ fontSize: '1rem' }} />,
-    },
-    {
-      label: 'Urgent alerts',
-      value: `${dashboardSummary.urgentAlerts}`,
-      tone: '#fda4af',
-      icon: <WarningAmberRoundedIcon sx={{ fontSize: '1rem' }} />,
-    },
-  ];
+  const urgentAlerts = useMemo(() => Object.values(events).filter((event) => (
+    event.type === 'alarm' || event.type === 'panic'
+  )).length, [events]);
 
-  const handleFuelQueueJump = () => navigate('/fuel-requests');
+  const pendingFuelRequests = useMemo(() => {
+    const live = Object.values(fuelRequests).filter((request) => isPendingFuelStatus(request.status)).length;
+    return commandCenter?.pendingFuelRequests ?? live;
+  }, [fuelRequests, commandCenter]);
 
-  const exceptionCards = useMemo(() => {
-    const cards = [];
-    if (dashboardSummary.offlineCount > 0) {
-      cards.push({
-        key: 'offline',
-        label: 'Trackers offline',
-        value: dashboardSummary.offlineCount,
-        tone: '#fbbf24',
-        icon: <DirectionsCarFilledOutlinedIcon sx={{ fontSize: '1.1rem' }} />,
-        onClick: () => navigate('/map'),
-      });
-    }
-    if (dashboardSummary.urgentAlerts > 0) {
-      cards.push({
+  const serviceDue = useMemo(() => {
+    const kpis = maintenanceDashboard?.kpis;
+    if (!kpis) return 0;
+    return Number(kpis.overdue || 0) + Number(kpis.dueToday || 0);
+  }, [maintenanceDashboard]);
+
+  // Severity-ordered, zero-value categories dropped — the only categories
+  // this screen ever shows are ones that warrant a click.
+  const attentionItems = useMemo(() => {
+    const items = [];
+    if (urgentAlerts > 0) {
+      items.push({
         key: 'alerts',
         label: 'Urgent alerts',
-        value: dashboardSummary.urgentAlerts,
-        tone: '#fda4af',
-        icon: <WarningAmberRoundedIcon sx={{ fontSize: '1.1rem' }} />,
+        value: urgentAlerts,
+        tone: theme.palette.error.main,
+        icon: <WarningAmberRoundedIcon sx={{ fontSize: '1rem' }} />,
         onClick: () => navigate('/map'),
       });
     }
-    if (dashboardSummary.pendingFuelRequests > 0) {
-      cards.push({
-        key: 'fuel',
-        label: 'Fuel approvals waiting',
-        value: dashboardSummary.pendingFuelRequests,
-        tone: '#67e8f9',
-        icon: <LocalGasStationOutlinedIcon sx={{ fontSize: '1.1rem' }} />,
-        onClick: handleFuelQueueJump,
+    if (fleetStatus.offline > 0) {
+      items.push({
+        key: 'offline',
+        label: 'Trackers offline',
+        value: fleetStatus.offline,
+        tone: theme.palette.warning.main,
+        icon: <DirectionsCarFilledOutlinedIcon sx={{ fontSize: '1rem' }} />,
+        onClick: () => navigate('/map'),
       });
     }
-    return cards;
-  }, [dashboardSummary, navigate]);
+    if (serviceDue > 0) {
+      items.push({
+        key: 'service',
+        label: 'Service due',
+        value: serviceDue,
+        tone: theme.palette.warning.main,
+        icon: <BuildOutlinedIcon sx={{ fontSize: '1rem' }} />,
+        onClick: () => navigate('/maintenance'),
+      });
+    }
+    if (pendingFuelRequests > 0) {
+      items.push({
+        key: 'fuel',
+        label: 'Fuel approvals waiting',
+        value: pendingFuelRequests,
+        tone: theme.palette.info.main,
+        icon: <LocalGasStationOutlinedIcon sx={{ fontSize: '1rem' }} />,
+        onClick: () => navigate('/fuel-requests'),
+      });
+    }
+    return items;
+  }, [urgentAlerts, fleetStatus.offline, serviceDue, pendingFuelRequests, theme, navigate]);
+
+  // Live Fleet ordering: problems first, then moving, then recently-idle
+  // ("recently active"), then offline ("parked") — most-recent state change
+  // first within a tier so the list favors what's likely still relevant.
+  const liveFleetRows = useMemo(() => {
+    const tier = (row) => {
+      if (row.hasProblem) return 0;
+      if (row.state === 'moving') return 1;
+      if (row.state === 'idle') return 2;
+      return 3;
+    };
+    return [...vehicleRows]
+      .sort((a, b) => {
+        const diff = tier(a) - tier(b);
+        if (diff !== 0) return diff;
+        const at = a.activityState?.stateEnteredAt ? new Date(a.activityState.stateEnteredAt).getTime() : 0;
+        const bt = b.activityState?.stateEnteredAt ? new Date(b.activityState.stateEnteredAt).getTime() : 0;
+        return bt - at;
+      })
+      .slice(0, 5);
+  }, [vehicleRows]);
+
+  const handleFuelQueueJump = () => navigate('/fuel-requests');
 
   return (
       <Box sx={{
@@ -189,395 +228,82 @@ const DashboardPage = () => {
         maxWidth: '100%',
         boxSizing: 'border-box',
       }}>
+        {/* Compact hero: title + primary actions only — status/alerts live in the sections below, not duplicated here. */}
         <Box
           sx={{
             position: 'relative',
             overflow: 'hidden',
-            mb: { xs: 3, md: 4 },
-            p: { xs: 2, sm: 2.5, md: 2.75 },
-            borderRadius: { xs: '16px', md: '16px' },
+            mb: 2.5,
+            p: { xs: 1.5, sm: 2 },
+            borderRadius: '16px',
             border: `1px solid ${alpha('#9be7f5', theme.palette.mode === 'dark' ? 0.18 : 0.28)}`,
             background: theme.palette.mode === 'dark'
               ? 'linear-gradient(135deg, rgba(4, 15, 28, 0.94) 0%, rgba(8, 34, 56, 0.92) 55%, rgba(10, 79, 98, 0.9) 100%)'
               : 'linear-gradient(135deg, rgba(8, 28, 46, 0.96) 0%, rgba(10, 69, 96, 0.92) 58%, rgba(13, 138, 165, 0.88) 100%)',
-            boxShadow: theme.palette.mode === 'dark'
-              ? '0 18px 48px rgba(0, 0, 0, 0.32)'
-              : '0 18px 50px rgba(6, 37, 64, 0.16)',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: '-28%',
-              right: '-10%',
-              width: { xs: 170, md: 210 },
-              height: { xs: 170, md: 210 },
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(103, 232, 249, 0.18) 0%, rgba(103, 232, 249, 0) 72%)',
-            },
-            '&::after': {
-              content: '""',
-              position: 'absolute',
-              left: { xs: '-18%', md: '-10%' },
-              bottom: '-55%',
-              width: { xs: 160, md: 200 },
-              height: { xs: 160, md: 200 },
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(251, 191, 36, 0.12) 0%, rgba(251, 191, 36, 0) 72%)',
-            },
           }}
         >
           <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={{ xs: 2, md: 2.5 }}
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1.25}
             justifyContent="space-between"
-            alignItems={{ xs: 'stretch', md: 'center' }}
-            sx={{ position: 'relative', zIndex: 1 }}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
           >
-            <Box sx={{ maxWidth: 720 }}>
-              <Chip
-                label="Fleet command center"
-                sx={{
-                  display: { xs: 'none', sm: 'inline-flex' },
-                  mb: 1,
-                  height: { xs: 24, sm: 26, md: 28 },
-                  color: '#dffbff',
-                  fontWeight: 700,
-                  fontSize: { xs: '0.65rem', sm: '0.7rem', md: '0.75rem' },
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  '& .MuiChip-label': {
-                    px: { xs: 0.75, sm: 1, md: 1.25 },
-                  },
-                }}
-              />
-              <Typography
-                sx={{
-                  fontSize: { xs: '1.25rem', sm: '1.8rem', md: '2rem' },
-                  lineHeight: 1.08,
-                  fontWeight: 800,
-                  letterSpacing: '-0.035em',
-                  color: '#f8fdff',
-                  maxWidth: 640,
-                }}
-              >
-                {isMobile
-                  ? 'Fleet Dashboard'
-                  : 'Fleet Dashboard with a cleaner control surface for live ops and mobile review.'}
-              </Typography>
-              <Typography
-                sx={{
-                  display: { xs: 'none', sm: 'block' },
-                  mt: 0.85,
-                  maxWidth: 560,
-                  color: 'rgba(232, 246, 252, 0.72)',
-                  fontSize: { xs: '0.9rem', sm: '0.95rem' },
-                  lineHeight: 1.5,
-                }}
-              >
-                Live fleet health, fuel queue, and urgent alerts in one compact top section.
-              </Typography>
-
-              <Stack
-                direction="row"
-                spacing={1}
-                useFlexGap
-                flexWrap="wrap"
-                sx={{ mt: 1.75, display: { xs: 'none', sm: 'flex' } }}
-              >
-                {quickStats.map((stat) => (
-                  <Box
-                    key={stat.label}
-                    sx={{
-                      minWidth: { xs: 'calc(50% - 4px)', sm: 150 },
-                      flex: { xs: '1 1 calc(50% - 4px)', sm: '0 1 auto' },
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: { xs: 0.8, sm: 1 },
-                      px: { xs: 0.85, sm: 1.15 },
-                      py: { xs: 0.7, sm: 0.95 },
-                      borderRadius: { xs: '14px', sm: '16px' },
-                      backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      backdropFilter: 'blur(12px)',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: { xs: 26, sm: 30 },
-                        height: { xs: 26, sm: 30 },
-                        display: 'grid',
-                        placeItems: 'center',
-                        borderRadius: '9px',
-                        color: stat.tone,
-                        backgroundColor: alpha(stat.tone, 0.14),
-                        boxShadow: `0 0 0 1px ${alpha(stat.tone, 0.18)}`,
-                        fontSize: { xs: '0.85rem', sm: '1rem' },
-                      }}
-                    >
-                      {stat.icon}
-                    </Box>
-                    <Box>
-                      <Typography sx={{ 
-                        color: '#ffffff', 
-                        fontWeight: 800, 
-                        lineHeight: 1.1, 
-                        fontSize: { xs: '0.8rem', sm: '0.96rem' },
-                        display: '-webkit-box',
-                        overflow: 'hidden',
-                      }}>
-                        {stat.value}
-                      </Typography>
-                      <Typography sx={{ 
-                        color: 'rgba(226, 241, 248, 0.72)', 
-                        fontSize: { xs: '0.65rem', sm: '0.72rem' },
-                        lineHeight: 1.1,
-                      }}>
-                        {stat.label}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
-
-            <Stack
-              spacing={1}
-              sx={{
-                width: { xs: '100%', md: 290 },
-                alignSelf: { xs: 'stretch', md: 'center' },
-              }}
-            >
-              <Chip
-                label={dashboardSummary.offlineCount > 0 ? `${dashboardSummary.offlineCount} offline right now` : 'All visible right now'}
+            <Typography sx={{ fontSize: { xs: '1.05rem', sm: '1.15rem' }, fontWeight: 800, color: '#f8fdff' }}>
+              Fleet Dashboard
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Button
                 size="small"
+                onClick={() => navigate('/map')}
+                startIcon={<MapOutlinedIcon />}
                 sx={{
-                  display: { xs: 'none', sm: 'inline-flex' },
-                  alignSelf: { xs: 'flex-start', md: 'flex-end' },
-                  height: { xs: 22, sm: 24 },
-                  fontSize: { xs: '0.65rem', sm: '0.75rem' },
-                  color: '#f8fdff',
                   fontWeight: 700,
-                  backgroundColor: dashboardSummary.offlineCount > 0
-                    ? 'rgba(251, 191, 36, 0.16)'
-                    : 'rgba(52, 211, 153, 0.16)',
-                  border: dashboardSummary.offlineCount > 0
-                    ? '1px solid rgba(251, 191, 36, 0.2)'
-                    : '1px solid rgba(52, 211, 153, 0.18)',
-                  '& .MuiChip-label': {
-                    px: { xs: 0.75, sm: 1 },
-                  },
+                  color: '#02131e',
+                  background: 'linear-gradient(135deg, #9be7f5 0%, #67e8f9 100%)',
+                  '&:hover': { background: 'linear-gradient(135deg, #b2eff8 0%, #7deaf9 100%)' },
                 }}
-              />
-              <Stack direction={{ xs: 'column', sm: 'row', md: 'column' }} spacing={1}>
-                <Button
-                  fullWidth
-                  onClick={() => navigate('/map')}
-                  endIcon={<ArrowOutwardIcon />}
-                  startIcon={<MapOutlinedIcon />}
-                  sx={{
-                    justifyContent: 'space-between',
-                    px: { xs: 1, sm: 1.35 },
-                    py: { xs: 0.8, sm: 1 },
-                    borderRadius: { xs: '12px', sm: '12px' },
-                    fontWeight: 700,
-                    fontSize: { xs: '0.85rem', sm: '0.95rem' },
-                    color: '#02131e',
-                    background: 'linear-gradient(135deg, #9be7f5 0%, #67e8f9 100%)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #b2eff8 0%, #7deaf9 100%)',
-                    },
-                    '& .MuiButton-startIcon': {
-                      marginRight: { xs: 0.5, sm: 0.75 },
-                    },
-                    '& .MuiButton-endIcon': {
-                      marginLeft: 'auto',
-                    },
-                  }}
-                >
-                  Open live map
-                </Button>
-
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={handleFuelQueueJump}
-                  startIcon={<LocalGasStationOutlinedIcon />}
-                  sx={{
-                    justifyContent: 'flex-start',
-                    px: { xs: 1, sm: 1.35 },
-                    py: { xs: 0.8, sm: 1 },
-                    borderRadius: { xs: '12px', sm: '12px' },
-                    fontWeight: 700,
-                    fontSize: { xs: '0.85rem', sm: '0.95rem' },
-                    color: '#f8fdff',
-                    borderColor: 'rgba(255, 255, 255, 0.16)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.24)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    },
-                  }}
-                >
-                  Jump to fuel queue
-                </Button>
-
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={() => navigate('/fleet/operation-sessions/prepare')}
-                  startIcon={<PlayCircleOutlineIcon />}
-                  sx={{
-                    justifyContent: 'flex-start',
-                    px: { xs: 1, sm: 1.35 },
-                    py: { xs: 0.8, sm: 1 },
-                    borderRadius: { xs: '12px', sm: '12px' },
-                    fontWeight: 700,
-                    fontSize: { xs: '0.85rem', sm: '0.95rem' },
-                    color: '#f8fdff',
-                    borderColor: 'rgba(255, 255, 255, 0.16)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.24)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    },
-                  }}
-                >
-                  Today&apos;s Fueling Day
-                </Button>
-              </Stack>
-              <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={() => navigate('/reports/combined')}
-                  startIcon={<AssessmentOutlinedIcon />}
-                  sx={{
-                    justifyContent: 'flex-start',
-                    px: { xs: 0.9, sm: 1.25 },
-                    py: { xs: 0.75, sm: 0.9 },
-                    minWidth: 0,
-                    borderRadius: { xs: '12px', sm: '12px' },
-                    fontSize: { xs: '0.8rem', sm: '0.85rem' },
-                    fontWeight: 600,
-                    color: 'rgba(234, 245, 250, 0.92)',
-                    borderColor: 'rgba(255, 255, 255, 0.12)',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.22)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                    },
-                  }}
-                >
-                  Reports
-                </Button>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={() => navigate('/fleet/vehicles')}
-                  startIcon={<DirectionsCarFilledOutlinedIcon />}
-                  sx={{
-                    justifyContent: 'flex-start',
-                    px: { xs: 0.9, sm: 1.25 },
-                    py: { xs: 0.75, sm: 0.9 },
-                    minWidth: 0,
-                    borderRadius: { xs: '12px', sm: '12px' },
-                    fontSize: { xs: '0.8rem', sm: '0.85rem' },
-                    fontWeight: 600,
-                    color: 'rgba(234, 245, 250, 0.92)',
-                    borderColor: 'rgba(255, 255, 255, 0.12)',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.22)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                    },
-                  }}
-                >
-                  Devices
-                </Button>
-              </Stack>
+              >
+                Live map
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={handleFuelQueueJump}
+                startIcon={<LocalGasStationOutlinedIcon />}
+                sx={{ color: '#f8fdff', borderColor: 'rgba(255,255,255,0.16)' }}
+              >
+                Fuel queue
+              </Button>
             </Stack>
           </Stack>
         </Box>
 
-        {/* Exception cards — only surface when something needs attention */}
-        {exceptionCards.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            <Typography
-              sx={{
-                fontWeight: 800,
-                fontSize: '0.72rem',
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color: 'text.secondary',
-                mb: 1,
-              }}
-            >
-              Needs attention
-            </Typography>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
-                gap: { xs: 1, sm: 1.5 },
-              }}
-            >
-              {exceptionCards.map((card) => (
-                <Box
-                  key={card.key}
-                  role="button"
-                  tabIndex={0}
-                  onClick={card.onClick}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    px: 1.25,
-                    py: 1,
-                    borderRadius: '14px',
-                    cursor: 'pointer',
-                    border: `1px solid ${alpha(card.tone, 0.3)}`,
-                    backgroundColor: alpha(card.tone, 0.08),
-                    transition: 'background-color 120ms ease',
-                    '&:hover': { backgroundColor: alpha(card.tone, 0.16) },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 34,
-                      height: 34,
-                      display: 'grid',
-                      placeItems: 'center',
-                      borderRadius: '10px',
-                      color: card.tone,
-                      backgroundColor: alpha(card.tone, 0.16),
-                      flexShrink: 0,
-                    }}
-                  >
-                    {card.icon}
-                  </Box>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 800, lineHeight: 1.1, fontSize: '1.05rem' }}>
-                      {card.value}
-                    </Typography>
-                    <Typography
-                      noWrap
-                      sx={{ color: 'text.secondary', fontSize: '0.7rem', lineHeight: 1.15 }}
-                    >
-                      {card.label}
-                    </Typography>
-                  </Box>
-                </Box>
-              ))}
-            </Box>
-          </Box>
-        )}
-
-        {/* Fleet KPI cards */}
-        <Box sx={{ mb: 4 }}>
-          <KPICards devices={filteredDevices} compactMobile={isMobile} />
+        {/* 1. Fleet Status */}
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={SECTION_LABEL_SX}>Fleet Status</Typography>
+          <FleetStatusRow online={fleetStatus.online} moving={fleetStatus.moving} offline={fleetStatus.offline} />
         </Box>
 
-        {/* ERB Fuel Prices */}
-        <Box id="dashboard-erb" sx={{ mb: 4, scrollMarginTop: 96 }}>
+        {/* 2. Needs Attention */}
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={SECTION_LABEL_SX}>Needs Attention</Typography>
+          <NeedsAttentionList items={attentionItems} />
+        </Box>
+
+        {/* 3. Today's Operations */}
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={SECTION_LABEL_SX}>Today&apos;s Operations</Typography>
+          <TodayOperationsCard todayOperation={todayOperation} todayDetails={todayDetails} />
+        </Box>
+
+        {/* 4. Live Fleet */}
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={SECTION_LABEL_SX}>Live Fleet</Typography>
+          <LiveFleetList rows={liveFleetRows} />
+        </Box>
+
+        {/* 5. Fuel Prices */}
+        <Box id="dashboard-erb" sx={{ mb: 1, scrollMarginTop: 96 }}>
           <ErbPricesCard />
         </Box>
 
@@ -586,4 +312,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-

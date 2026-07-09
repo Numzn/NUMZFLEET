@@ -12,11 +12,15 @@ import { alpha } from '@mui/material/styles';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 
-const FUEL_ITEMS = [
+const PRIMARY_FUEL_ITEMS = [
   { key: 'petrol',   label: 'Petrol',   color: '#67e8f9' },
   { key: 'diesel',   label: 'Diesel',   color: '#fbbf24' },
+];
+const MORE_FUEL_ITEMS = [
   { key: 'kerosene', label: 'Kerosene', color: '#86efac' },
   { key: 'jetA1',    label: 'Jet A-1',  color: '#c4b5fd' },
 ];
@@ -64,6 +68,7 @@ const ErbPricesCard = () => {
   const [timestamp, setTimestamp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,141 +184,103 @@ const ErbPricesCard = () => {
     ? 'linear-gradient(135deg, rgba(4,15,28,0.94) 0%, rgba(8,34,56,0.92) 55%, rgba(10,79,98,0.9) 100%)'
     : 'linear-gradient(135deg, rgba(8,28,46,0.96) 0%, rgba(10,69,96,0.92) 58%, rgba(13,138,165,0.88) 100%)';
 
+  const renderPrice = (key, label, color, compact = false) => (
+    <Box
+      key={key}
+      sx={{
+        px: 1.25,
+        py: compact ? 0.75 : 1,
+        borderRadius: '10px',
+        backgroundColor: alpha(color, 0.08),
+        border: `1px solid ${alpha(color, 0.18)}`,
+      }}
+    >
+      <Typography sx={{ color: alpha(color, 0.82), fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.25 }}>
+        {label}
+      </Typography>
+      {loading ? (
+        <Skeleton variant="text" width="60%" sx={{ bgcolor: alpha(color, 0.12) }} />
+      ) : error ? (
+        <Typography sx={{ color: alpha('#fda4af', 0.8), fontSize: '0.78rem', fontWeight: 700 }}>—</Typography>
+      ) : (
+        <Typography sx={{ color: '#f8fdff', fontSize: compact ? '0.95rem' : '1.05rem', fontWeight: 800, lineHeight: 1 }}>
+          {formatPrice(prices?.[key]) ?? '—'}
+          <Typography component="span" sx={{ color: alpha('#f8fdff', 0.55), fontSize: '0.6rem', fontWeight: 600, ml: 0.35 }}>
+            ZMW/L
+          </Typography>
+        </Typography>
+      )}
+    </Box>
+  );
+
   return (
     <Box
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        p: { xs: 2, sm: 2.5 },
-        borderRadius: { xs: '16px', md: '16px' },
+        p: 1.5,
+        borderRadius: '14px',
         border: `1px solid ${alpha('#9be7f5', dark ? 0.18 : 0.28)}`,
         background: cardBg,
         boxShadow: dark
           ? '0 12px 36px rgba(0,0,0,0.28)'
           : '0 12px 38px rgba(6,37,64,0.14)',
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: '-30%',
-          right: '-8%',
-          width: 160,
-          height: 160,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(103,232,249,0.14) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        },
       }}
     >
       {/* Header row */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2, position: 'relative', zIndex: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Box
-            sx={{
-              width: 34,
-              height: 34,
-              display: 'grid',
-              placeItems: 'center',
-              borderRadius: '10px',
-              backgroundColor: alpha('#67e8f9', 0.14),
-              boxShadow: `0 0 0 1px ${alpha('#67e8f9', 0.2)}`,
-            }}
-          >
-            <LocalGasStationIcon sx={{ fontSize: '1.1rem', color: '#67e8f9' }} />
-          </Box>
-          <Box>
-            <Typography sx={{ color: '#f8fdff', fontWeight: 700, fontSize: { xs: '0.9rem', sm: '0.95rem' }, lineHeight: 1.15 }}>
-              ERB Fuel Prices
-            </Typography>
-            <Typography sx={{ color: 'rgba(226,241,248,0.55)', fontSize: '0.68rem', lineHeight: 1.2 }}>
-              Regulated pump prices · Zambia
-            </Typography>
-          </Box>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position: 'relative', zIndex: 1 }}>
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          <LocalGasStationIcon sx={{ fontSize: '1rem', color: '#67e8f9' }} />
+          <Typography sx={{ color: '#f8fdff', fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.15 }}>
+            Fuel Prices
+          </Typography>
         </Stack>
-        <Chip
-          label="Live"
-          size="small"
-          sx={{
-            height: 22,
-            fontSize: '0.65rem',
-            fontWeight: 700,
-            backgroundColor: alpha('#67e8f9', 0.12),
-            border: `1px solid ${alpha('#67e8f9', 0.22)}`,
-            color: '#9be7f5',
-            '& .MuiChip-label': { px: 1 },
-          }}
-        />
+        {MORE_FUEL_ITEMS.length > 0 && (
+          <Chip
+            label={expanded ? 'Less' : 'More'}
+            size="small"
+            icon={expanded ? <ExpandLessIcon sx={{ fontSize: '0.9rem !important' }} /> : <ExpandMoreIcon sx={{ fontSize: '0.9rem !important' }} />}
+            onClick={() => setExpanded((v) => !v)}
+            sx={{
+              height: 22,
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              backgroundColor: alpha('#67e8f9', 0.1),
+              border: `1px solid ${alpha('#67e8f9', 0.2)}`,
+              color: '#9be7f5',
+              '& .MuiChip-icon': { color: '#9be7f5' },
+            }}
+          />
+        )}
       </Stack>
 
-      {/* Price grid */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
-          gap: { xs: 1, sm: 1.25 },
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        {FUEL_ITEMS.map(({ key, label, color }) => (
-          <Box
-            key={key}
-            sx={{
-              px: { xs: 1.25, sm: 1.5 },
-              py: { xs: 1, sm: 1.25 },
-              borderRadius: '12px',
-              backgroundColor: alpha(color, 0.08),
-              border: `1px solid ${alpha(color, 0.18)}`,
-            }}
-          >
-            <Typography
-              sx={{
-                color: alpha(color, 0.82),
-                fontSize: { xs: '0.62rem', sm: '0.68rem' },
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                mb: 0.5,
-              }}
-            >
-              {label}
-            </Typography>
-            {loading ? (
-              <Skeleton variant="text" width="60%" sx={{ bgcolor: alpha(color, 0.12) }} />
-            ) : error ? (
-              <Typography sx={{ color: alpha('#fda4af', 0.8), fontSize: '0.78rem', fontWeight: 700 }}>
-                —
-              </Typography>
-            ) : (
-              <Typography sx={{ color: '#f8fdff', fontSize: { xs: '1.1rem', sm: '1.2rem' }, fontWeight: 800, lineHeight: 1 }}>
-                {formatPrice(prices?.[key]) ?? '—'}
-                <Typography component="span" sx={{ color: alpha('#f8fdff', 0.55), fontSize: '0.68rem', fontWeight: 600, ml: 0.4 }}>
-                  ZMW/L
-                </Typography>
-              </Typography>
-            )}
-          </Box>
-        ))}
+      {/* Primary: Petrol + Diesel */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1, position: 'relative', zIndex: 1 }}>
+        {PRIMARY_FUEL_ITEMS.map(({ key, label, color }) => renderPrice(key, label, color))}
       </Box>
 
+      {/* Secondary: expand for the rest */}
+      {expanded && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1, mt: 1, position: 'relative', zIndex: 1 }}>
+          {MORE_FUEL_ITEMS.map(({ key, label, color }) => renderPrice(key, label, color, true))}
+        </Box>
+      )}
+
       {/* Footer */}
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={0.75}
-        sx={{ mt: 1.5, position: 'relative', zIndex: 1 }}
-      >
+      <Stack direction="row" alignItems="center" spacing={0.6} sx={{ mt: 1, position: 'relative', zIndex: 1 }}>
         {error ? (
           <>
-            <ErrorOutlineIcon sx={{ fontSize: '0.8rem', color: '#fda4af' }} />
-            <Typography sx={{ color: '#fda4af', fontSize: '0.7rem' }}>
-              Could not load prices — {error}
+            <ErrorOutlineIcon sx={{ fontSize: '0.75rem', color: '#fda4af' }} />
+            <Typography noWrap sx={{ color: '#fda4af', fontSize: '0.65rem' }}>
+              {error}
             </Typography>
           </>
         ) : (
           <>
-            <AccessTimeIcon sx={{ fontSize: '0.8rem', color: 'rgba(226,241,248,0.45)' }} />
-            <Typography sx={{ color: 'rgba(226,241,248,0.45)', fontSize: '0.7rem' }}>
-              {loading ? 'Loading…' : `Scraped from erb.org.zm · ${formatTimestamp(timestamp) || 'Unknown time'}`}
+            <AccessTimeIcon sx={{ fontSize: '0.75rem', color: 'rgba(226,241,248,0.45)' }} />
+            <Typography noWrap sx={{ color: 'rgba(226,241,248,0.45)', fontSize: '0.65rem' }}>
+              {loading ? 'Loading…' : (formatTimestamp(timestamp) || 'Unknown time')}
             </Typography>
           </>
         )}
