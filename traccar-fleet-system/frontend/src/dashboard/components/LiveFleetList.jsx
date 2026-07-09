@@ -8,6 +8,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from '../../fleet/vehicleDetail/vehicleMotionStatus.js';
 import useMotionDurationTick from '../../fleet/vehicleDetail/useMotionDurationTick.js';
 import { vehicleWorkspacePath } from '../../fleet/vehicleRegistry/vehicleRegistryUtils.js';
+import { STALE_FIX_MS } from '../../main/fleet/vehicleOperationalIndicators.js';
 
 dayjs.extend(relativeTime);
 
@@ -25,10 +26,23 @@ function VehicleRow({ row }) {
         ? theme.palette.warning.main
         : theme.palette.text.disabled;
 
-  const speedKmh = position && state === 'moving' ? Math.round(Number(position.speed || 0) * 1.852) : null;
+  // position.attributes (ignition/speed) only updates when a new fix lands —
+  // it can be arbitrarily older than the device's own online heartbeat, so
+  // don't present it as current without checking fixTime age (same
+  // STALE_FIX_MS threshold already used for the "stale fix" indicator).
+  const fixAgeMs = position?.fixTime ? now - new Date(position.fixTime).getTime() : null;
+  const isFixFresh = fixAgeMs != null && fixAgeMs <= STALE_FIX_MS;
+
+  const speedKmh = position && state === 'moving' && isFixFresh
+    ? Math.round(Number(position.speed || 0) * 1.852)
+    : null;
   const durationLabel = getMotionDurationLabel(row.activityState, now);
-  const motionLabel = getMotionLabel(row.activityState);
-  const ignition = state !== 'offline' ? getIgnitionPhrase(position?.attributes) : null;
+  // Label always reflects the live-computed state (row.state), never the
+  // possibly-stale persisted record — a synthetic { state } avoids relying
+  // on activityState here, since DashboardPage nulls it out on mismatch.
+  const motionLabel = getMotionLabel({ state });
+  const ignition = state !== 'offline' && isFixFresh ? getIgnitionPhrase(position?.attributes) : null;
+  const staleTelemetry = state !== 'offline' && !isFixFresh;
   const lastSeen = state === 'offline' && row.device?.lastUpdate
     ? `Last seen ${dayjs(row.device.lastUpdate).fromNow()}`
     : null;
@@ -38,6 +52,7 @@ function VehicleRow({ row }) {
   if (durationLabel) parts.push(`${motionLabel} ${durationLabel}`);
   else parts.push(motionLabel);
   if (ignition) parts.push(ignition);
+  if (staleTelemetry) parts.push('Stale GPS fix');
   if (lastSeen) parts.push(lastSeen);
 
   const clickable = Boolean(display.fleetVehicleId);

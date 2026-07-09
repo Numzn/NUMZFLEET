@@ -30,6 +30,7 @@ import { isPendingFuelStatus } from '../fuelRequests/fuelRequestStatus';
 import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
 import { fetchMaintenanceDashboard } from '../maintenance/maintenanceApi.js';
 import getOperationalIndicators from '../main/fleet/vehicleOperationalIndicators.js';
+import { resolveLiveActivityState } from '../fleet/vehicleDetail/resolveLiveActivityState.js';
 
 const SECTION_LABEL_SX = {
   fontWeight: 800,
@@ -106,29 +107,45 @@ const DashboardPage = () => {
     }
   }, [location.hash]);
 
-  // One pass per device: canonical activity state + operational problem flags.
-  // Fleet Status, Needs Attention (offline count), and Live Fleet all read
-  // from this single computation instead of three separate recomputations.
+  // One pass per device: state is computed live from Redux (Traccar's own
+  // WebSocket feed — real-time, available to every authenticated user), not
+  // from the persisted `activityState` registry, which is manager-gated and
+  // only refreshed when a manager's browser happens to call GET /api/vehicles
+  // (no background job re-evaluates it). Confirmed in production: a vehicle
+  // moving right now still showed "idle" from a persisted row over 2 days
+  // stale. The persisted record is kept only as duration context, and only
+  // trusted when it agrees with the live-computed state (see liveState
+  // reconciliation below) — never trusted for moving/idle/offline itself.
   const vehicleRows = useMemo(() => filteredDevices.map((device) => {
     const display = getDisplayForDevice(device.id, device);
     const position = positions[device.id];
-    const state = display.activityState?.state ?? 'offline';
+    const state = resolveLiveActivityState({
+      deviceStatus: device.status,
+      deviceLastUpdate: device.lastUpdate,
+      positionSpeed: position?.speed != null ? Number(position.speed) : null,
+    });
     const hasAlarm = Object.values(events).some((event) => (
       (event.type === 'alarm' || event.type === 'panic') && Number(event.deviceId) === Number(device.id)
     ));
     const indicators = getOperationalIndicators(device, position);
     const hasProblem = hasAlarm || indicators.some((indicator) => indicator.color === 'error');
+    // Persisted stateEnteredAt is only meaningful (and only shown) when the
+    // persisted state still agrees with what's live right now — otherwise
+    // the transition just happened and we don't know when, so show nothing
+    // rather than a stale duration paired with a corrected live state.
+    const persistedState = display.activityState;
+    const activityState = persistedState?.state === state ? persistedState : null;
     return {
-      device, position, display, state, hasProblem, activityState: display.activityState,
+      device, position, display, state, hasProblem, activityState,
     };
   }), [filteredDevices, positions, getDisplayForDevice, events]);
 
   const fleetStatus = useMemo(() => {
-    const total = commandCenter?.trackersTotal ?? vehicleRows.length;
-    const online = commandCenter?.trackersOnline ?? vehicleRows.filter((v) => v.state !== 'offline').length;
+    const total = vehicleRows.length;
+    const online = vehicleRows.filter((v) => v.state !== 'offline').length;
     const moving = vehicleRows.filter((v) => v.state === 'moving').length;
     return { total, online, moving, offline: Math.max(total - online, 0) };
-  }, [vehicleRows, commandCenter]);
+  }, [vehicleRows]);
 
   const urgentAlerts = useMemo(() => Object.values(events).filter((event) => (
     event.type === 'alarm' || event.type === 'panic'

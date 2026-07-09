@@ -1,5 +1,5 @@
 /** GPS data older than this (ms) while device is online → “stale fix” chip */
-const STALE_FIX_MS = 25 * 60 * 1000;
+export const STALE_FIX_MS = 25 * 60 * 1000;
 
 /**
  * Rule-based operational chips for fleet list cards (geofence/fuel hooks later).
