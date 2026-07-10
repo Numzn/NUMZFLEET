@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import dayjs from 'dayjs';
+import { resolveLiveActivityState } from '../fleet/vehicleDetail/resolveLiveActivityState.js';
 
 /**
  * @param {unknown} keyword
@@ -43,26 +44,35 @@ export default (
       return groupIds;
     };
 
+    // Same live authority as the rest of the fleet UI (see
+    // resolveLiveActivityState.js) — one evaluation timestamp per filter
+    // pass so every device in this pass is judged consistently.
+    const now = Date.now();
     const fleetTabFilters = (device) => {
+      if (fleetTab === 'alerts') {
+        if (!alertDeviceIds || alertDeviceIds.size === 0) return false;
+        const idNum = Number(device.id);
+        return alertDeviceIds.has(device.id) || alertDeviceIds.has(idNum);
+      }
+      if (fleetTab !== 'online' && fleetTab !== 'offline' && fleetTab !== 'moving' && fleetTab !== 'idle') {
+        return true;
+      }
+      const p = safePositions[device.id];
+      const state = resolveLiveActivityState({
+        deviceStatus: device.status,
+        deviceLastUpdate: device.lastUpdate,
+        positionSpeed: p?.speed != null ? Number(p.speed) : null,
+        now,
+      });
       switch (fleetTab) {
         case 'online':
-          return device.status === 'online';
+          return state !== 'offline';
         case 'offline':
-          return device.status === 'offline';
-        case 'moving': {
-          const p = safePositions[device.id];
-          return Boolean(p && Number(p.speed) > 0);
-        }
-        case 'idle': {
-          if (device.status !== 'online') return false;
-          const p = safePositions[device.id];
-          return !p || Number(p.speed) <= 0;
-        }
-        case 'alerts': {
-          if (!alertDeviceIds || alertDeviceIds.size === 0) return false;
-          const idNum = Number(device.id);
-          return alertDeviceIds.has(device.id) || alertDeviceIds.has(idNum);
-        }
+          return state === 'offline';
+        case 'moving':
+          return state === 'moving';
+        case 'idle':
+          return state === 'idle';
         default:
           return true;
       }

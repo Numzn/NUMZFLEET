@@ -12,9 +12,11 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { devicesActions } from '../../store';
 import DeviceQuickActions from './DeviceQuickActions';
 import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from '../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import { resolveLiveActivityState } from '../../fleet/vehicleDetail/resolveLiveActivityState.js';
 import useMotionDurationTick from '../../fleet/vehicleDetail/useMotionDurationTick.js';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 import VehicleLocationLine from '../../common/components/VehicleLocationLine';
+import { STALE_FIX_MS } from './vehicleOperationalIndicators.js';
 
 dayjs.extend(relativeTime);
 
@@ -54,17 +56,31 @@ const VehicleListItem = ({
   const display = getDisplayForDevice(device.id, device);
   const motionNow = useMotionDurationTick();
 
-  // Canonical, backend-persisted state — same field the fleet counts and
-  // map markers read, so this dot/label can't disagree with them.
-  const activityState = display.activityState;
-  const isOffline = (activityState?.state ?? 'offline') === 'offline';
-  const speedKmh = position ? Math.round(Number(position.speed || 0) * 1.852) : null;
+  // Live state is the current-state authority (see resolveLiveActivityState.js
+  // for why the persisted activityState record can drift arbitrarily far from
+  // reality). The persisted record is only used below for duration, and only
+  // when it still agrees with this live state.
+  const liveState = resolveLiveActivityState({
+    deviceStatus: device.status,
+    deviceLastUpdate: device.lastUpdate,
+    positionSpeed: position?.speed != null ? Number(position.speed) : null,
+    now: motionNow,
+  });
+  const isOffline = liveState === 'offline';
+  const persistedState = display.activityState;
+  const durationState = persistedState?.state === liveState ? persistedState : null;
+  // position.attributes (ignition/speed) only updates when a new fix lands —
+  // gate on the same STALE_FIX_MS threshold used elsewhere so an old fix
+  // isn't presented as current telemetry.
+  const fixAgeMs = position?.fixTime ? motionNow - new Date(position.fixTime).getTime() : null;
+  const isFixFresh = fixAgeMs != null && fixAgeMs <= STALE_FIX_MS;
+  const speedKmh = position && isFixFresh ? Math.round(Number(position.speed || 0) * 1.852) : null;
   const motionDotColor = isOffline
     ? theme.palette.error.main
-    : (activityState?.state === 'moving' ? theme.palette.success.main : theme.palette.warning.main);
+    : (liveState === 'moving' ? theme.palette.success.main : theme.palette.warning.main);
 
-  const motionLabel = getMotionLabel(activityState);
-  const motionDuration = getMotionDurationLabel(activityState, motionNow);
+  const motionLabel = getMotionLabel({ state: liveState });
+  const motionDuration = getMotionDurationLabel(durationState, motionNow);
   const motionDisplay = motionDuration ? `${motionLabel} ${motionDuration}` : motionLabel;
 
   const fixRel = position?.fixTime ? dayjs(position.fixTime).fromNow() : null;
@@ -72,13 +88,14 @@ const VehicleListItem = ({
   const odometerInsight = formatOdometerInsight(display.odometerKm);
 
   const hasFix = position?.latitude != null && position?.longitude != null;
-  const ign = !isOffline ? getIgnitionPhrase(position?.attributes) : null;
+  const ign = !isOffline && isFixFresh ? getIgnitionPhrase(position?.attributes) : null;
 
   const telemetryParts = [];
   if (!isOffline) {
     if (speedKmh != null) telemetryParts.push(`${speedKmh} km/h`);
     if (ign) telemetryParts.push(ign);
     if (fixRel) telemetryParts.push(fixRel);
+    if (!isFixFresh && position) telemetryParts.push('Stale GPS fix');
   } else {
     telemetryParts.push('Offline');
   }

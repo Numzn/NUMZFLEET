@@ -5,8 +5,8 @@ import { useVehicleDisplayContext } from '../../../fleet/display/VehicleDisplayR
 import {
   getMotionDurationLabel,
   getMotionLabel,
-  getVehicleStatusKey,
 } from '../../../fleet/vehicleDetail/vehicleMotionStatus.js';
+import { resolveLiveActivityState } from '../../../fleet/vehicleDetail/resolveLiveActivityState.js';
 import useMotionDurationTick from '../../../fleet/vehicleDetail/useMotionDurationTick.js';
 import { STATUS_TINT } from './fleetMobileCardSx';
 
@@ -22,12 +22,22 @@ const FleetVehicleListRow = ({
   const display = getDisplayForDevice(device.id, device);
   const motionNow = useMotionDurationTick();
 
-  const activityState = display.activityState;
-  const key = getVehicleStatusKey(activityState);
+  // Live state is the current-state authority (see resolveLiveActivityState.js
+  // for why the persisted activityState record can drift arbitrarily far from
+  // reality). The persisted record is only used below for duration, and only
+  // when it still agrees with this live state.
+  const key = resolveLiveActivityState({
+    deviceStatus: device.status,
+    deviceLastUpdate: device.lastUpdate,
+    positionSpeed: position?.speed != null ? Number(position.speed) : null,
+    now: motionNow,
+  });
   const tint = STATUS_TINT[key];
 
-  const motionLabel = getMotionLabel(activityState);
-  const motionDuration = getMotionDurationLabel(activityState, motionNow);
+  const persistedState = display.activityState;
+  const durationState = persistedState?.state === key ? persistedState : null;
+  const motionLabel = getMotionLabel({ state: key });
+  const motionDuration = getMotionDurationLabel(durationState, motionNow);
 
   let statusText = motionDuration ? `${motionLabel} • ${motionDuration}` : motionLabel;
   if (key === 'offline' && device.lastUpdate) {
