@@ -234,7 +234,9 @@ const DashboardPage = () => {
 
   return (
       <Box sx={{
-        px: 0,
+        // Shell renders the dashboard full-bleed (no main gutter); the page owns
+        // its own inner inset so content doesn't sit flush against the screen edge.
+        px: { xs: 1.5, sm: 2 },
         py: { xs: 1.25, sm: 1.5, md: 2 },
         pb: 'calc(var(--app-bottomnav-height, 0px) + env(safe-area-inset-bottom, 0px) + 28px)',
         background: theme.palette.mode === 'dark'

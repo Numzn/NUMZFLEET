@@ -91,6 +91,8 @@ function UnifiedShellContent() {
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const location = useLocation();
   const workspaceType = getWorkspaceType(location.pathname);
+  // Dashboard is the index route ('/'); it renders full-bleed (no outer main gutter).
+  const isDashboard = location.pathname === '/';
   const isLive = workspaceType === 'live';
   const isFullscreen = workspaceType === 'fullscreen';
   const { chrome } = useLiveMapChrome();
@@ -306,9 +308,16 @@ function UnifiedShellContent() {
         component="main"
         className={classes.main}
         sx={{
-          pb: mainPaddingBottom,
-          pt: workspaceType === 'default' ? RUNTIME_WORKSPACE_PT : 0,
-          px: workspaceType === 'default' ? RUNTIME_WORKSPACE_PX : 0,
+          // Dashboard supplies its own py/pb, and the live map is a full-bleed
+          // canvas whose floating sheets handle their own safe-area insets —
+          // shell stays at 0 for both to avoid a dead gap at the bottom.
+          pb: (isDashboard || isLive) ? 0 : mainPaddingBottom,
+          pt: workspaceType === 'default'
+            ? (isDashboard ? 0 : RUNTIME_WORKSPACE_PT)
+            : 0,
+          px: workspaceType === 'default'
+            ? (isDashboard ? 0 : RUNTIME_WORKSPACE_PX)
+            : 0,
         }}
       >
         <Outlet />
