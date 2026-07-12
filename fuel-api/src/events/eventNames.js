@@ -18,4 +18,7 @@ export const EVENT_NAMES = {
 
   // ERB fuel price feed
   ERB_PRICES_UPDATED: 'erb.prices.updated',
+
+  // Vehicle activity state (telemetry ingestion)
+  VEHICLE_STATE_CHANGED: 'vehicle.state.changed',
 };

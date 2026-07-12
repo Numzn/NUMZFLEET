@@ -32,3 +32,4 @@
 20260704_vehicle_activity_state.sql
 20260705_refuel_fill_classification.sql
 20260707_invoice_refuel_coverage.sql
+20260712_telemetry_processed_events.sql

@@ -41,4 +41,13 @@
     <entry key='meiligao.port'>5009</entry>
     <entry key='h02.port'>5013</entry>
     <entry key='gpsgate.port'>5020</entry>
+
+    <!-- Telemetry Ingestion: push every event to fuel-api's activity-state pipeline
+         in near real time (see fuel-api/src/routes/telemetryIngestion.js). The header
+         value must match TELEMETRY_INGEST_SECRET in backend/.env on this server —
+         same convention as database.password above. "backend" is the fuel-api
+         service's docker-compose hostname, reachable only on the internal network. -->
+    <entry key='event.forward.enable'>true</entry>
+    <entry key='event.forward.url'>http://backend:3000/internal/telemetry/traccar-events</entry>
+    <entry key='event.forward.header'>x-telemetry-secret: REPLACE_WITH_TELEMETRY_INGEST_SECRET</entry>
 </properties>

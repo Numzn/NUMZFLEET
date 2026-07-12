@@ -22,6 +22,7 @@ import serviceRecordsRouter from './routes/serviceRecords.js';
 import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
 import reportsRouter from './reports/routes/reports.js';
 import notificationsRouter from './modules/notifications/routes.js';
+import telemetryIngestionRouter from './routes/telemetryIngestion.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
 import { setNotificationIo } from './notifications/notificationContext.js';
@@ -30,6 +31,7 @@ import { startImmobilizationEvaluatorScheduler } from './jobs/immobilizationEval
 import { startTrackingNotificationBridgeScheduler } from './jobs/trackingNotificationBridgeScheduler.js';
 import { startOperationLockNotificationScheduler } from './jobs/operationLockNotificationScheduler.js';
 import { startComplianceNotificationScheduler } from './jobs/complianceNotificationScheduler.js';
+import { startTelemetryReconciliationScheduler } from './jobs/telemetryReconciliationScheduler.js';
 import {
   reconcileStuckExecuting,
   shouldReconcileOnStartup,
@@ -397,6 +399,11 @@ app.get('/api/operation-sessions/suggestions/vehicles', authenticate, requireAut
 app.use('/api/operation-sessions', operationSessionsRouter);
 app.use('/api/service-records', serviceRecordsRouter);
 app.use('/api/reports', reportsRouter);
+// Server-to-server only (Traccar event.forward.url) — deliberately outside /api
+// so it's never touched by the browser-oriented /api rate limiters or nginx's
+// public /api proxy; reachable only on the docker-internal network. Auth is
+// the shared-secret header, not a session (see middleware/telemetrySharedSecret.js).
+app.use('/internal/telemetry', telemetryIngestionRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -444,6 +451,7 @@ let stopImmobilizationEvaluatorScheduler = () => {};
 let stopTrackingNotificationBridgeScheduler = () => {};
 let stopOperationLockNotificationScheduler = () => {};
 let stopComplianceNotificationScheduler = () => {};
+let stopTelemetryReconciliationScheduler = () => {};
 
 async function runImmobilizationStartupReconcile() {
   if (!shouldReconcileOnStartup()) return;
@@ -562,8 +570,9 @@ const startServer = async () => {
       });
       stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
       stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
+      stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
     });
-    
+
     return; // Exit early (sync already attempted if Postgres was reachable)
   }
 
@@ -595,6 +604,7 @@ const startServer = async () => {
     });
     stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
     stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
+    stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
     reconcileDeviceAssignmentLabels()
       .then((stats) => {
         if (process.env.NODE_ENV === 'development') {
@@ -626,6 +636,7 @@ process.on('SIGTERM', () => {
   stopTrackingNotificationBridgeScheduler();
   stopOperationLockNotificationScheduler();
   stopComplianceNotificationScheduler();
+  stopTelemetryReconciliationScheduler();
   httpServer.close(() => {
     if (isDev) {
       console.log('✅ Server closed');
