@@ -1,13 +1,14 @@
 import { Box, Button, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from '../../fleet/vehicleDetail/vehicleMotionStatus.js';
 import useMotionDurationTick from '../../fleet/vehicleDetail/useMotionDurationTick.js';
-import { vehicleWorkspacePath } from '../../fleet/vehicleRegistry/vehicleRegistryUtils.js';
+import { devicesActions } from '../../store';
 import { STALE_FIX_MS } from '../../main/fleet/vehicleOperationalIndicators.js';
 
 dayjs.extend(relativeTime);
@@ -15,6 +16,7 @@ dayjs.extend(relativeTime);
 function VehicleRow({ row }) {
   const theme = useTheme();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const now = useMotionDurationTick();
   const { display, position, state, hasProblem } = row;
 
@@ -55,11 +57,16 @@ function VehicleRow({ row }) {
   if (staleTelemetry) parts.push('Stale GPS fix');
   if (lastSeen) parts.push(lastSeen);
 
-  const clickable = Boolean(display.fleetVehicleId);
+  const deviceId = row.device?.id;
+  const clickable = Boolean(deviceId);
+  const openOnMap = () => {
+    dispatch(devicesActions.selectId(deviceId));
+    navigate('/map');
+  };
 
   return (
     <Box
-      onClick={clickable ? () => navigate(vehicleWorkspacePath(display.fleetVehicleId)) : undefined}
+      onClick={clickable ? openOnMap : undefined}
       sx={{
         display: 'flex',
         alignItems: 'center',
