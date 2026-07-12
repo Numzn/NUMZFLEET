@@ -9,6 +9,7 @@ import { useAttributePreference } from '../../common/util/preferences';
 import { useCatchCallback } from '../../reactHelper';
 import { findFonts } from '../core/mapUtil';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
+import { resolveLiveActivityState } from '../../fleet/vehicleDetail/resolveLiveActivityState.js';
 
 const LERP_DURATION = 1450;
 const STYLE_TRANSITION_MS = 480;
@@ -57,9 +58,15 @@ const EnhancedMarkers = ({
     const displayName = display.secondary
       ? `${display.primary} (${display.secondary})`
       : display.primary;
-    // Canonical, backend-persisted state — same field the fleet list and
-    // KPI counts read, so the marker color can't disagree with them.
-    const state = display.activityState?.state ?? 'offline';
+    // Live state is the current-state authority (see resolveLiveActivityState.js
+    // for why the persisted activityState record can drift arbitrarily far from
+    // reality) — same rule Dashboard/Fleet sidebar/filters already use, so the
+    // marker color can't disagree with them.
+    const state = resolveLiveActivityState({
+      deviceStatus: device?.status,
+      deviceLastUpdate: device?.lastUpdate,
+      positionSpeed: position?.speed != null ? Number(position.speed) : null,
+    });
     const isOnline = state !== 'offline';
     const isMoving = state === 'moving';
     const isSelected = selectedPositionId === position.id;

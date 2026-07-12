@@ -6,10 +6,12 @@ import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 import { fetchVehicle, updateVehicleConfig as putVehicleConfig, fuelApiErrorMessage } from '../vehiclesApi.js';
 import { normalizePositionTelemetry } from './telemetryUtils.js';
 import { getIgnitionPhrase, getMotionDurationLabel, getMotionLabel } from './vehicleMotionStatus.js';
+import { resolveLiveActivityState } from './resolveLiveActivityState.js';
 import useMotionDurationTick from './useMotionDurationTick.js';
 import { isGeofenceEventType, resolveEventType } from './vehicleAlertUtils.js';
 import useCachedResource from '../../common/cache/useCachedResource.js';
 import { makeResourceKey, setEntryData } from '../../common/cache/resourceCache.js';
+import { STALE_FIX_MS } from '../../main/fleet/vehicleOperationalIndicators.js';
 
 const VEHICLE_CACHE_TTL_MS = 120_000;
 const VEHICLE_POLL_MS = 120_000;
@@ -289,23 +291,42 @@ export default function useVehicleData(vehicleId) {
     return groupsById[gid]?.name ?? null;
   }, [devicesById, groupsById, deviceId]);
 
+  // Live state is the current-state authority (see resolveLiveActivityState.js
+  // for why the persisted activityState record can drift arbitrarily far from
+  // reality) — computed from the same Redux devices/positions every other
+  // fleet surface now reads, not the manager-gated cached `vehicle` DTO.
+  const liveState = useMemo(() => {
+    const device = deviceId != null ? devicesById[deviceId] : null;
+    return resolveLiveActivityState({
+      deviceStatus: device?.status,
+      deviceLastUpdate: device?.lastUpdate,
+      positionSpeed: livePosition?.speed != null ? Number(livePosition.speed) : null,
+      now: motionNow,
+    });
+  }, [devicesById, deviceId, livePosition?.speed, motionNow]);
+
+  const isFixFresh = useMemo(() => {
+    if (!livePosition?.fixTime) return false;
+    return (motionNow - new Date(livePosition.fixTime).getTime()) <= STALE_FIX_MS;
+  }, [livePosition?.fixTime, motionNow]);
+
   const motionLabel = useMemo(
-    () => getMotionLabel(vehicle?.activityState),
-    [vehicle?.activityState],
+    () => getMotionLabel({ state: liveState }),
+    [liveState],
   );
 
   const ignitionPhrase = useMemo(
-    () =>
-      vehicle?.device?.status === 'online'
-        ? getIgnitionPhrase(livePosition?.attributes)
-        : null,
-    [vehicle?.device?.status, livePosition?.attributes],
+    () => (liveState !== 'offline' && isFixFresh ? getIgnitionPhrase(livePosition?.attributes) : null),
+    [liveState, isFixFresh, livePosition?.attributes],
   );
 
-  const motionDurationLabel = useMemo(
-    () => getMotionDurationLabel(vehicle?.activityState, motionNow),
-    [vehicle?.activityState, motionNow],
-  );
+  // Persisted stateEnteredAt is only meaningful when the persisted record
+  // still agrees with the live-computed state — otherwise the transition
+  // just happened and duration is unknown, not stale-but-close-enough.
+  const motionDurationLabel = useMemo(() => {
+    const persisted = vehicle?.activityState;
+    return persisted?.state === liveState ? getMotionDurationLabel(persisted, motionNow) : null;
+  }, [vehicle?.activityState, liveState, motionNow]);
 
   const saveConfig = useCallback(
     async (body) => {
