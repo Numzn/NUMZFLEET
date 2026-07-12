@@ -19,17 +19,26 @@ function toIso(value) {
 
 /**
  * Traccar tc_events for one device in a time window.
- * @param {{ deviceId: number, from: Date, to: Date, limit?: number }}
+ *
+ * order defaults to ASC (chronological, for feed-style callers). A busy
+ * device can have far more than `limit` events in a wide window, so ASC +
+ * LIMIT returns the *oldest* events in range, not the ones nearest `to` —
+ * callers that want "the most recent matching event" (e.g. reconstructing
+ * when a state transition actually happened) must pass order: 'DESC' and
+ * read from the front of the result, not ASC + take-the-last-match.
+ *
+ * @param {{ deviceId: number, from: Date, to: Date, limit?: number, order?: 'ASC'|'DESC' }}
  */
-export async function fetchDeviceEvents({ deviceId, from, to, limit = 250 }) {
+export async function fetchDeviceEvents({ deviceId, from, to, limit = 250, order = 'ASC' }) {
   if (deviceId == null) return [];
   const cap = Math.min(Math.max(1, limit), 500);
+  const direction = order === 'DESC' ? 'DESC' : 'ASC';
   const pool = getTraccarPool();
   const [rows] = await pool.execute(
     `SELECT id, type, eventtime, attributes
      FROM tc_events
      WHERE deviceid = ? AND eventtime >= ? AND eventtime <= ?
-     ORDER BY eventtime ASC
+     ORDER BY eventtime ${direction}
      LIMIT ${cap}`,
     [Number(deviceId), from, to],
   );

@@ -21,14 +21,18 @@ async function resolveStateEnteredAt({ deviceId, state, deviceLastUpdate, now })
   const eventType = EVENT_TYPE_FOR_STATE[state];
   if (eventType && deviceId != null) {
     try {
+      // DESC: the closest matching event to `now`, not the oldest one within
+      // the truncated top of a 48h window — a busy device easily has more
+      // than 50 events in that window, and ASC + take-last would silently
+      // return an arbitrarily old match once truncation kicks in.
       const events = await fetchDeviceEvents({
         deviceId,
         from: new Date(now - RECONSTRUCT_LOOKBACK_MS),
         to: new Date(now),
         limit: 50,
+        order: 'DESC',
       });
-      const matches = events.filter((e) => String(e.type || '').toLowerCase() === eventType);
-      const latest = matches[matches.length - 1];
+      const latest = events.find((e) => String(e.type || '').toLowerCase() === eventType);
       if (latest?.occurredAt) {
         return { at: new Date(latest.occurredAt), source: 'reconstructed' };
       }
