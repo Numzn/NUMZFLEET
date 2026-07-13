@@ -17,6 +17,7 @@ import { listAssignedDeviceIdsForCompany } from './vehicleFleetService.js';
 import { predictForVehicle } from '../intelligence/PredictionEngine.js';
 import { getVehicleFuelStatistics } from './vehicleFuelStatisticsService.js';
 import { loadPredictionEngineContextWithSpec } from './predictionEngineContext.js';
+import { getVehicleSpec } from './vehicleSpecService.js';
 
 const DEFAULT_PLANNED_LITRES = 50;
 
@@ -30,20 +31,37 @@ function buildFuelingDayReference(calendarDate, sequence) {
   return `FD-${compactDate}-${String(sequence).padStart(3, '0')}`;
 }
 
-async function suggestedPlannedLitres(deviceId) {
-  const prediction = await predictForVehicle(deviceId, getVehicleFuelStatistics, {
-    loadEngineContext: loadPredictionEngineContextWithSpec,
-  });
-  const litres = Number(prediction?.predictedLitres);
-  if (Number.isFinite(litres) && litres > 0) {
-    return litres;
+/**
+ * Canonical planned-litres fallback, shared by every planning path
+ * (auto-seed, forecast regenerate). Priority:
+ *   1. A valid historical prediction, if one was computed.
+ *   2. The vehicle's configured tank capacity, if no prediction exists.
+ *   3. DEFAULT_PLANNED_LITRES, only if neither is available.
+ */
+export async function resolvePlannedLitresFallback(deviceId, predictedLitres) {
+  const predicted = Number(predictedLitres);
+  if (Number.isFinite(predicted) && predicted > 0) {
+    return predicted;
+  }
+  const spec = await getVehicleSpec(deviceId);
+  const tankCapacity = Number(spec?.tankCapacity);
+  if (Number.isFinite(tankCapacity) && tankCapacity > 0) {
+    return tankCapacity;
   }
   return DEFAULT_PLANNED_LITRES;
 }
 
+async function suggestedPlannedLitres(deviceId) {
+  const prediction = await predictForVehicle(deviceId, getVehicleFuelStatistics, {
+    loadEngineContext: loadPredictionEngineContextWithSpec,
+  });
+  return resolvePlannedLitresFallback(deviceId, prediction?.predictedLitres);
+}
+
 /**
  * When a draft Fuel Day has no refuel rows yet, plan every fleet vehicle with an active
- * device assignment (predicted litres from history, else 50 L). Idempotent.
+ * device assignment (predicted litres from history, else tank capacity, else
+ * DEFAULT_PLANNED_LITRES — see resolvePlannedLitresFallback). Idempotent.
  */
 export async function ensureAssignedVehiclesSeededForDraft(user, session, options = {}) {
   if (!session?.id || session.status !== 'draft') {
@@ -104,21 +122,26 @@ export async function ensureAssignedVehiclesSeededForDraft(user, session, option
   return { session: updated, vehiclesAdded: vehiclePlans.length };
 }
 
-export async function findOrCreateTodayOperation(user, calendarDate = null, options = {}) {
+/**
+ * Find or create today's session row only — no auto-seeding of default
+ * vehicles. Callers that want to control exactly which vehicles end up
+ * planned (e.g. planOperationVehicles, where the caller supplies an explicit
+ * vehicle list) must use this instead of findOrCreateTodayOperation, whose
+ * auto-seed step would otherwise add every assigned vehicle before the
+ * caller's own selection logic ever runs.
+ */
+async function findOrCreateTodayOperationRecord(user, calendarDate = null, options = {}) {
   const tz = getFleetTimezone();
   const cal = calendarDate || getTodayCalendarDate(tz);
   const existing = await findByUserIdAndCalendarDate(user.id, cal, options);
-  if (existing) {
-    const { session } = await ensureAssignedVehiclesSeededForDraft(user, existing, options);
-    return session;
-  }
+  if (existing) return existing;
 
   const companyId = options.companyId || null;
   const priorCount = await countByCompanyAndCalendarDate(companyId, cal, options);
   const reference = buildFuelingDayReference(cal, priorCount + 1);
 
   const dayStart = calendarDateStart(cal, tz);
-  const created = await createSessionRecord({
+  return createSessionRecord({
     userId: user.id,
     companyId,
     calendarDate: cal,
@@ -129,8 +152,11 @@ export async function findOrCreateTodayOperation(user, calendarDate = null, opti
     status: 'draft',
     notes: null,
   }, options);
+}
 
-  const { session } = await ensureAssignedVehiclesSeededForDraft(user, created, options);
+export async function findOrCreateTodayOperation(user, calendarDate = null, options = {}) {
+  const record = await findOrCreateTodayOperationRecord(user, calendarDate, options);
+  const { session } = await ensureAssignedVehiclesSeededForDraft(user, record, options);
   return session;
 }
 
@@ -144,7 +170,7 @@ export async function planOperationVehicles(user, payload = {}) {
   }
 
   const { updated, vehiclesAdded } = await sequelize.transaction(async (transaction) => {
-    const operation = await findOrCreateTodayOperation(user, null, { transaction, companyId });
+    const operation = await findOrCreateTodayOperationRecord(user, null, { transaction, companyId });
     const fresh = await findSessionById(operation.id, { transaction, lock: transaction.LOCK.UPDATE });
 
     const { assertOperationWritable, maybePersistLock } = await import('./operationLockHelper.js');

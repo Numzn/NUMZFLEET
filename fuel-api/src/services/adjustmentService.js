@@ -9,7 +9,9 @@ export async function createAdjustment({
   newValue,
   reason,
   userId,
-}) {
+}, options = {}) {
+  const createOptions = options.transaction ? { transaction: options.transaction } : {};
+
   const row = await OperationAdjustment.create({
     operationId: Number(operationId),
     refuelId: refuelId != null ? Number(refuelId) : null,
@@ -18,7 +20,7 @@ export async function createAdjustment({
     newValue: String(newValue),
     reason: reason || null,
     userId: Number(userId),
-  });
+  }, createOptions);
 
   await recordAuditEvent(operationId, AUDIT_EVENT_TYPES.ADJUSTMENT_CREATED, userId, {
     adjustmentId: row.id,
@@ -27,7 +29,7 @@ export async function createAdjustment({
     originalValue,
     newValue,
     reason,
-  });
+  }, options);
 
   return row;
 }

@@ -48,8 +48,13 @@ function predictedLitres(refuel) {
   return Number.isFinite(estimated) ? estimated : null;
 }
 
-const INVOICE_LABEL = { matched: 'Matched', variance: 'Variance', pending: 'Pending' };
-const INVOICE_COLOR = { matched: 'success', variance: 'error', pending: 'default' };
+// 'pending' from the backend means "not yet reconciled" — it's returned
+// identically whether no invoice exists at all or one is attached but its
+// litres/cost were never entered (no OCR/reconciliation is wired up today).
+// Disambiguate using invoiceCount so the badge reflects the real document
+// state (Missing/Attached) instead of implying a processing step is pending.
+const INVOICE_LABEL = { matched: 'Matched', variance: 'Variance' };
+const INVOICE_COLOR = { matched: 'success', variance: 'error' };
 
 // History rows carry only the stored status (no per-vehicle detail), so map the
 // database lifecycle directly to operations language.
@@ -71,17 +76,20 @@ function varianceLabel(variance) {
 }
 
 function InvoiceChip({ row }) {
-  if (!row.invoiceStatus) return '—';
+  // Backend sends invoiceStatus: null when invoiceCount is 0 (see
+  // operationReportingService.js) — that's a genuinely missing document,
+  // distinct from an attached-but-unreconciled one.
+  if (!row.invoiceCount) {
+    return <Chip size="small" variant="outlined" label="Missing" color="default" />;
+  }
+  const label = INVOICE_LABEL[row.invoiceStatus] || 'Attached';
+  const color = INVOICE_COLOR[row.invoiceStatus] || 'info';
   return (
     <Chip
       size="small"
       variant="outlined"
-      label={
-        row.invoiceCount > 1
-          ? `${INVOICE_LABEL[row.invoiceStatus] || row.invoiceStatus} (${row.invoiceCount})`
-          : (INVOICE_LABEL[row.invoiceStatus] || row.invoiceStatus)
-      }
-      color={INVOICE_COLOR[row.invoiceStatus] || 'default'}
+      label={row.invoiceCount > 1 ? `${label} (${row.invoiceCount})` : label}
+      color={color}
     />
   );
 }

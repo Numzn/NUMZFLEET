@@ -5,7 +5,7 @@ const STEPS = [
   { key: 'prepare', label: 'Plan' },
   { key: 'fuel', label: 'Fuel' },
   { key: 'invoice', label: 'Invoices' },
-  { key: 'review', label: 'Close Day' },
+  { key: 'review', label: 'Review' },
 ];
 
 export default function OperationStepIndicator({ steps, loading = false, onStepClick }) {

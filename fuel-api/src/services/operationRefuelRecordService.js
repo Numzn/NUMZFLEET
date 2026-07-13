@@ -9,6 +9,7 @@ import { EVENT_NAMES } from '../events/eventNames.js';
 import {
   assertCanAccessSession,
   toRefuelDtoEnriched,
+  refreshSessionTotals,
 } from './operationSessionCore.js';
 import { assertOperationWritable, maybePersistLock, enrichOperationMeta } from './operationLockHelper.js';
 import {
@@ -72,11 +73,12 @@ export async function recordOperationRefuel(user, sessionId, payload = {}, compa
       throw error;
     }
 
-    if (refuel.locked) {
-      const error = new Error('This refuel line is locked');
-      error.statusCode = 403;
-      throw error;
-    }
+    // refuel.locked is only ever set by the two session-wide bulk-lock call
+    // sites (maybePersistLock, closeOperationSession) — it has no meaning
+    // independent of the session's own writability, which the meta.canRecordFuel
+    // check above (correctly accounting for an active unlock) already enforces.
+    // A row can show locked:true while the session is genuinely writable again
+    // right after an unlock is granted; blocking on it here would be stale.
 
     const plannedBaseline = refuel.plannedFuelLitres != null && Number(refuel.plannedFuelLitres) > 0
       ? Number(refuel.plannedFuelLitres)
@@ -205,6 +207,7 @@ export async function skipRefuel(user, sessionId, payload = {}, companyId = null
       vehicleId: refuel.vehicleId,
       reason,
     });
+    await refreshSessionTotals(session.id);
   }
 
   const dto = await toRefuelDtoEnriched(refuel);
@@ -245,6 +248,7 @@ export async function unskipRefuel(user, sessionId, payload = {}, companyId = nu
       refuelId,
       vehicleId: refuel.vehicleId,
     });
+    await refreshSessionTotals(session.id);
   }
 
   return toRefuelDtoEnriched(refuel);

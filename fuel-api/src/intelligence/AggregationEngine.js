@@ -17,9 +17,15 @@ function plannedOrEstimatedFuel(row) {
 
 export function summarizeTotalsFromRefuels(refuels = []) {
   return refuels.reduce((acc, row) => {
-    acc.totalEstimatedFuel += plannedOrEstimatedFuel(row);
+    // A skipped vehicle was never fueled, so it shouldn't still contribute
+    // its planned/estimated litres to what the day "should have" cost —
+    // that made actual-vs-estimated variance look like an under-fueling
+    // shortfall for a vehicle that was intentionally excluded, not missed.
+    if (row.skippedAt == null) {
+      acc.totalEstimatedFuel += plannedOrEstimatedFuel(row);
+      acc.totalEstimatedCost += toNumber(row.estimatedCost);
+    }
     acc.totalActualFuel += toNumber(row.actualFuelLitres ?? row.fuelAmount);
-    acc.totalEstimatedCost += toNumber(row.estimatedCost);
     acc.totalActualCost += toNumber(row.actualCost ?? row.fuelCost);
     return acc;
   }, {
@@ -49,7 +55,9 @@ export function summarizeByFuelType(refuels = []) {
   for (const row of refuels) {
     const key = row.fuelTypeSnapshot === 'petrol' ? 'petrol' : 'diesel';
     const bucket = out[key];
-    bucket.plannedL += plannedOrEstimatedFuel(row);
+    if (row.skippedAt == null) {
+      bucket.plannedL += plannedOrEstimatedFuel(row);
+    }
     bucket.actualL += toNumber(row.actualFuelLitres ?? row.fuelAmount);
     bucket.cost += toNumber(row.actualCost ?? row.fuelCost);
   }

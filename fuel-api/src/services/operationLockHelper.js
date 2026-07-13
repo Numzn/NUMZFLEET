@@ -28,10 +28,15 @@ export async function getActiveUnlock(operationId, now = new Date()) {
 
 export async function isOperationWritable(operation, now = new Date()) {
   if (!operation) return false;
-  if (operation.status === 'locked') return false;
 
+  // Check for an active unlock before the persisted-lock short-circuit —
+  // otherwise a session whose status has already been lazily flipped to
+  // 'locked' (which happens on virtually any read once past its cutoff)
+  // can never become writable again, defeating the unlock feature.
   const unlock = await getActiveUnlock(operation.id, now);
   if (unlock) return true;
+
+  if (operation.status === 'locked') return false;
 
   const tz = operation.fleetTimezone || getFleetTimezone();
   const cal = operation.calendarDate
@@ -45,10 +50,16 @@ export async function isOperationWritable(operation, now = new Date()) {
 
 export async function effectiveOperationStatus(operation, now = new Date()) {
   if (!operation) return 'locked';
-  if (operation.status === 'locked') return 'locked';
 
   const writable = await isOperationWritable(operation, now);
   if (!writable) return 'locked';
+
+  if (operation.status === 'locked') {
+    // Writable only because of an active unlock. No separate column stores
+    // the pre-lock status, but approvedAt already tells us whether the
+    // operation had been approved before it locked.
+    return operation.approvedAt ? 'approved' : 'draft';
+  }
   return operation.status;
 }
 
@@ -70,8 +81,8 @@ export async function enrichOperationMeta(operation, now = new Date()) {
     locksAt: locksAt.toISOString(),
     effectiveStatus,
     isWritable,
-    canRecordFuel: isWritable && operation.status === 'approved',
-    canEditForecast: isWritable && operation.status === 'draft',
+    canRecordFuel: isWritable && effectiveStatus === 'approved',
+    canEditForecast: isWritable && effectiveStatus === 'draft',
   };
 }
 

@@ -8,6 +8,11 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   Link,
   Paper,
@@ -20,12 +25,14 @@ import { RUNTIME_STACK_GAP } from '../common/styles/runtimeDensity';
 import { useManager } from '../common/util/permissions';
 import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
 import useTodayOperation from './hooks/useTodayOperation.js';
-import { replaceOperationInvoiceFile, uploadOperationInvoice } from './api/operationSessionsApi.js';
+import {
+  closeOperationSession, replaceOperationInvoiceFile, uploadOperationInvoice,
+} from './api/operationSessionsApi.js';
 import SmartInvoiceAttachment from './components/SmartInvoiceAttachment.jsx';
 import OperationVehicleLabel from './components/OperationVehicleLabel.jsx';
 import { formatK, formatLitres, vehicleCountLabel } from './utils/formatters.js';
 import {
-  deriveInvoiceStage, INVOICE_STAGE_LABEL, invoiceStageColor, isRefuelComplete,
+  deriveInvoiceStage, INVOICE_STAGE_LABEL, invoiceStageColor, isRefuelComplete, summarizeRefuelBuckets,
 } from './utils/operationDayUtils.js';
 
 function invoiceTitle(invoice) {
@@ -59,6 +66,9 @@ export default function SmartInvoicesPage() {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState('');
 
   const sessionId = todayOperation?.id;
   const status = String(
@@ -73,6 +83,25 @@ export default function SmartInvoicesPage() {
   const uncoveredCount = fueledRefuels.length - coveredCount;
   const isLocked = status === 'locked';
   const canEdit = isManager && !isLocked && status === 'approved';
+
+  const buckets = summarizeRefuelBuckets(refuels);
+  const invoiceSummary = todayDetails?.invoiceSummary;
+  const canComplete = isManager && Boolean(todayDetails?.isWritable) && todayDetails?.status === 'approved';
+
+  const handleConfirmComplete = async () => {
+    if (!sessionId) return;
+    setCompleting(true);
+    setCompleteError('');
+    try {
+      await closeOperationSession(user, sessionId);
+      setCompleteDialogOpen(false);
+      await reload();
+    } catch (e) {
+      setCompleteError(fuelApiErrorMessage(e, 'Failed to complete Fueling Day'));
+    } finally {
+      setCompleting(false);
+    }
+  };
 
   const handleCreate = useCallback(async (payload) => {
     setSaving(true);
@@ -284,6 +313,57 @@ export default function SmartInvoicesPage() {
           </Paper>
         );
       })}
+
+      {canComplete && (
+        <Button
+          variant="contained"
+          color="warning"
+          fullWidth
+          onClick={() => setCompleteDialogOpen(true)}
+          sx={{ mt: 1 }}
+        >
+          Complete Fueling Day
+        </Button>
+      )}
+
+      <Dialog
+        open={completeDialogOpen}
+        onClose={() => (completing ? null : setCompleteDialogOpen(false))}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Complete Fueling Day</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 1.5, fontSize: '0.85rem' }}>
+            Completing locks every vehicle&apos;s refuel record for today. This can&apos;t be undone
+            without a manager unlock.
+          </DialogContentText>
+          <Stack spacing={1}>
+            {completeError && <Alert severity="error">{completeError}</Alert>}
+            {buckets.missing > 0 && (
+              <Alert severity="warning">
+                {buckets.missing} vehicle{buckets.missing === 1 ? '' : 's'} still not fueled or
+                skipped. Completing will lock {buckets.missing === 1 ? 'it' : 'them'} as-is.
+              </Alert>
+            )}
+            {invoiceSummary && invoiceSummary.count > 0 && invoiceSummary.status === 'variance' && (
+              <Alert severity="warning">
+                Attached invoice(s) show a variance against actual dispensed fuel. You can still
+                fix this after completing.
+              </Alert>
+            )}
+            {invoiceSummary && invoiceSummary.count === 0 && (
+              <Alert severity="info">No invoice attached yet. You can still attach one after completing.</Alert>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCompleteDialogOpen(false)} disabled={completing}>Cancel</Button>
+          <Button variant="contained" color="warning" onClick={handleConfirmComplete} disabled={completing}>
+            {completing ? 'Completing…' : 'Complete Fueling Day'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

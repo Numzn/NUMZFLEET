@@ -33,6 +33,7 @@ import {
 import {
   deriveFuelingDayStatus,
   deriveVehicleWorkflowState,
+  isRefuelComplete,
   isRefuelSkipped,
   VEHICLE_STATE_LABEL,
   vehicleStateChipColor,
@@ -202,7 +203,10 @@ const ForecastPage = () => {
       .filter((id) => !existingVehicleIds.has(Number(id)))
       .map((deviceId) => ({
         vehicleId: Number(deviceId),
-        plannedLitres: Number(plannedById[deviceId]) || Number(forecast?.vehicles?.find((v) => v.vehicleId === deviceId)?.predictedLitres) || 50,
+        plannedLitres: Number(plannedById[deviceId])
+          || Number(forecast?.vehicles?.find((v) => v.vehicleId === deviceId)?.predictedLitres)
+          || Number(fleetByDeviceId[deviceId]?.vehicleSpec?.tankCapacity)
+          || 50,
       }));
     if (!vehicles.length) {
       setError('Select new vehicles to add.');
@@ -276,6 +280,13 @@ const ForecastPage = () => {
 
   const vehicleRows = forecast?.vehicles || [];
   const vehicleCount = vehicleRows.length;
+  // Fueled vehicles stay part of the session (totals/budget below are computed
+  // from the full vehicleRows), but the active Planning list should only show
+  // vehicles that still need attention today.
+  const activeVehicleRows = useMemo(
+    () => vehicleRows.filter((v) => !isRefuelComplete(refuelByVehicleId[v.vehicleId])),
+    [vehicleRows, refuelByVehicleId],
+  );
 
   const plannedLitresFor = useCallback((v) => {
     const refuel = refuelByVehicleId[v.vehicleId];
@@ -331,7 +342,7 @@ const ForecastPage = () => {
                           size="small"
                           label="Planned L"
                           type="number"
-                          value={plannedById[deviceId] ?? 50}
+                          value={plannedById[deviceId] ?? fleetByDeviceId[deviceId]?.vehicleSpec?.tankCapacity ?? 50}
                           onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
                           sx={{ width: 120 }}
                         />
@@ -350,6 +361,52 @@ const ForecastPage = () => {
 
       {!loading && forecast && (
         <>
+          {/* Vehicle Selection — the operator's first decision each day, so it
+              stays the first section on the page regardless of what's already
+              been planned (e.g. via auto-seeded defaults). */}
+          {canEditPlan && vehiclesToAdd.length > 0 && (
+            <Box>
+              <SectionHeading label="Vehicle Selection" />
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Select which vehicles need fuel today.
+              </Typography>
+              <Stack spacing={0.5}>
+                {vehiclesToAdd.slice(0, 30).map((v) => {
+                  const deviceId = Number(v.assignment.deviceId);
+                  return (
+                    <Box key={v.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Checkbox
+                        checked={selected.has(deviceId)}
+                        onChange={() => toggleSelect(deviceId)}
+                      />
+                      <Typography variant="body2" sx={{ flex: 1 }}>
+                        {labelForFleetRow(v)}
+                      </Typography>
+                      {selected.has(deviceId) && (
+                        <TextField
+                          size="small"
+                          label="Planned L"
+                          type="number"
+                          value={plannedById[deviceId] ?? fleetByDeviceId[deviceId]?.vehicleSpec?.tankCapacity ?? 50}
+                          onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
+                          sx={{ width: 120 }}
+                        />
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+              <Button
+                variant="outlined"
+                sx={{ mt: 1, textTransform: 'none' }}
+                onClick={handlePlanSelected}
+                disabled={busy || selected.size === 0}
+              >
+                Add to today&apos;s list
+              </Button>
+            </Box>
+          )}
+
           {/* Summary card */}
           <Card variant="outlined" sx={{ borderRadius: 2 }}>
             <CardContent sx={{ py: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -381,11 +438,13 @@ const ForecastPage = () => {
             </CardContent>
           </Card>
 
-          {/* Vehicle list */}
+          {/* Vehicle list — active/remaining vehicles only; fueled vehicles
+              stay part of the session and its totals but drop out of this
+              working list once done. */}
           <Box>
             <SectionHeading
               label="Vehicles"
-              count={vehicleCount}
+              count={activeVehicleRows.length}
               action={canEditPlan && (
                 <Typography
                   component="button"
@@ -410,7 +469,10 @@ const ForecastPage = () => {
               {vehicleRows.length === 0 && (
                 <Alert severity="info">No vehicles selected yet. Add vehicles below to plan today&apos;s fuel.</Alert>
               )}
-              {vehicleRows.map((v) => {
+              {vehicleRows.length > 0 && activeVehicleRows.length === 0 && (
+                <Alert severity="success">Every vehicle has been fueled or skipped.</Alert>
+              )}
+              {activeVehicleRows.map((v) => {
                 const dev = devicesItems[v.vehicleId];
                 const refuel = refuelByVehicleId[v.vehicleId];
                 const workflowState = deriveVehicleWorkflowState(refuel || v);
@@ -519,49 +581,6 @@ const ForecastPage = () => {
                 );
               })}
             </Stack>
-
-            {canEditPlan && vehiclesToAdd.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <SectionHeading label="Add more vehicles" />
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  Select vehicles from the fleet that are not yet on today&apos;s list.
-                </Typography>
-                <Stack spacing={0.5}>
-                  {vehiclesToAdd.slice(0, 30).map((v) => {
-                    const deviceId = Number(v.assignment.deviceId);
-                    return (
-                      <Box key={v.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Checkbox
-                          checked={selected.has(deviceId)}
-                          onChange={() => toggleSelect(deviceId)}
-                        />
-                        <Typography variant="body2" sx={{ flex: 1 }}>
-                          {labelForFleetRow(v)}
-                        </Typography>
-                        {selected.has(deviceId) && (
-                          <TextField
-                            size="small"
-                            label="Planned L"
-                            type="number"
-                            value={plannedById[deviceId] ?? 50}
-                            onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
-                            sx={{ width: 120 }}
-                          />
-                        )}
-                      </Box>
-                    );
-                  })}
-                </Stack>
-                <Button
-                  variant="outlined"
-                  sx={{ mt: 1, textTransform: 'none' }}
-                  onClick={handlePlanSelected}
-                  disabled={busy || selected.size === 0}
-                >
-                  Add to today&apos;s list
-                </Button>
-              </Box>
-            )}
           </Box>
 
           {/* Bottom CTA / status */}
@@ -585,7 +604,7 @@ const ForecastPage = () => {
                 size="large"
                 fullWidth
                 onClick={handleApprove}
-                disabled={busy || vehicleCount === 0}
+                disabled={busy || vehicleCount === 0 || readyCount === 0}
                 sx={{ textTransform: 'none', fontWeight: 700, py: 1.25 }}
               >
                 Start Fueling

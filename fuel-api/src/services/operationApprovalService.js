@@ -26,8 +26,18 @@ export async function approveOperation(user, sessionId, companyId = null) {
   }
 
   const dto = await sequelize.transaction(async (transaction) => {
-    await refreshSessionTotals(session.id, transaction);
-    const refuels = await listBySessionId(session.id, { transaction });
+    // Re-fetch under a row lock (same pattern as planOperationVehicles) so two
+    // concurrent approve calls can't both pass the draft-status check above
+    // and both write — the second one re-validates against the locked row.
+    const fresh = await findSessionById(sessionId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (fresh.status !== 'draft') {
+      const error = new Error('Only draft operations can be approved');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    await refreshSessionTotals(fresh.id, transaction);
+    const refuels = await listBySessionId(fresh.id, { transaction });
 
     if (!refuels.length) {
       const error = new Error('Add at least one vehicle before approving');
@@ -43,6 +53,12 @@ export async function approveOperation(user, sessionId, companyId = null) {
     };
 
     const approvedLitres = refuels.reduce((sum, r) => sum + plannedFor(r), 0);
+    if (approvedLitres <= 0) {
+      const error = new Error('Cannot approve a Fueling Day with zero total planned litres — set a planned amount for at least one vehicle first');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const approvedBudget = Number(refuels.reduce((sum, r) => {
       const price = priceFor(r.fuelTypeSnapshot) ?? 0;
       return sum + plannedFor(r) * price;
@@ -52,7 +68,7 @@ export async function approveOperation(user, sessionId, companyId = null) {
     const petrolPrice = prices.petrol ?? null;
     const now = new Date();
 
-    await session.update({
+    await fresh.update({
       status: 'approved',
       approvedBy: user.id,
       approvedAt: now,
@@ -63,15 +79,15 @@ export async function approveOperation(user, sessionId, companyId = null) {
       approvedLitres: Number(approvedLitres.toFixed(2)),
     }, { transaction });
 
-    await recordAuditEvent(session.id, AUDIT_EVENT_TYPES.FORECAST_APPROVED, user.id, {
+    await recordAuditEvent(fresh.id, AUDIT_EVENT_TYPES.FORECAST_APPROVED, user.id, {
       approvedLitres,
       approvedBudget,
       approvedDieselPrice: dieselPrice,
       approvedPetrolPrice: petrolPrice,
     }, { transaction });
 
-    const fresh = await findSessionById(session.id, { transaction });
-    return toSessionDto(fresh);
+    const updated = await findSessionById(fresh.id, { transaction });
+    return toSessionDto(updated);
   });
 
   await notifyOperationApproved(session, user.id);

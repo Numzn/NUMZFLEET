@@ -37,7 +37,19 @@ export function predictRefuelQuantity(stats, engineContext = null) {
   }
 
   if (!Number.isFinite(predicted) || predicted <= 0) {
-    predicted = last > 0 ? last : 50;
+    if (last > 0) {
+      predicted = last;
+    } else {
+      // No usable computed prediction and no last-refill fallback either —
+      // report "no prediction" rather than substituting an arbitrary
+      // constant. Callers resolve the actual planning fallback themselves
+      // (see operationDayService.js::resolvePlannedLitresFallback).
+      return {
+        predictedLitres: null,
+        confidencePercent: 0,
+        confidenceLevel: 'LOW',
+      };
+    }
   }
 
   let confidencePercent = Math.min(100, Math.max(0, Number(stats.confidenceScore || 0)));

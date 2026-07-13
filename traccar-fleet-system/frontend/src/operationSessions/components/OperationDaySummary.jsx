@@ -40,10 +40,13 @@ function Stat({ label, value, warn = false }) {
   );
 }
 
+// 'pending' means "not yet reconciled" (no OCR/reconciliation is wired up
+// today) — this chip only renders when invoiceSummary.count > 0, so at this
+// call site 'pending' always means a document is attached, just not reconciled.
 const INVOICE_LABEL = {
   matched: 'Invoices matched',
   variance: 'Invoice variance',
-  pending: 'Invoice pending',
+  pending: 'Attached',
 };
 
 /**

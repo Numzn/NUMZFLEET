@@ -10,7 +10,7 @@ import { getVehicleFuelStatistics } from './vehicleFuelStatisticsService.js';
 import { predictForVehicle } from '../intelligence/PredictionEngine.js';
 import { loadPredictionEngineContextWithSpec } from './predictionEngineContext.js';
 import { recordAuditEvent, AUDIT_EVENT_TYPES } from './auditEventService.js';
-import { ensureAssignedVehiclesSeededForDraft } from './operationDayService.js';
+import { ensureAssignedVehiclesSeededForDraft, resolvePlannedLitresFallback } from './operationDayService.js';
 import {
   assertCanAccessSession,
   refreshSessionTotals,
@@ -92,9 +92,8 @@ export async function regenerateOperationForecast(user, sessionId) {
       const prediction = await predictForVehicle(refuel.vehicleId, getVehicleFuelStatistics, {
         loadEngineContext: loadPredictionEngineContextWithSpec,
       });
-      if (prediction.predictedLitres != null) {
-        await refuel.update({ plannedFuelLitres: prediction.predictedLitres }, { transaction });
-      }
+      const plannedFuelLitres = await resolvePlannedLitresFallback(refuel.vehicleId, prediction.predictedLitres);
+      await refuel.update({ plannedFuelLitres }, { transaction });
     }
     await refreshSessionTotals(session.id, transaction);
     const fresh = await findSessionById(session.id, { transaction });

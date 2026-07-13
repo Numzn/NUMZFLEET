@@ -200,11 +200,11 @@ async function applySessionRefuelUpdates(user, session, updates = [], transactio
       error.statusCode = 404;
       throw error;
     }
-    if (refuel.locked) {
-      const error = new Error('Cannot update locked refuel lines');
-      error.statusCode = 403;
-      throw error;
-    }
+    // refuel.locked mirrors the session-wide lock (set only by
+    // maybePersistLock/closeOperationSession) and has no independent meaning.
+    // assertOperationWritable above already enforces real writability,
+    // including an active unlock — a row can still show locked:true right
+    // after an unlock is granted, so blocking on it here would be stale.
 
     let tankCap = refuel.tankCapacitySnapshot;
     if (update?.tankCapacitySnapshot !== undefined && update?.tankCapacitySnapshot !== '') {
@@ -362,6 +362,22 @@ export async function createSessionRefuels(user, sessionId, payload = {}, compan
   return sequelize.transaction(async (transaction) => applySessionRefuelUpdates(user, session, payload.updates, transaction));
 }
 
+// Fields a "Report correction" adjustment is actually allowed to change on a
+// refuel row — mirrors CorrectionDialog.jsx's FIELD_OPTIONS. Restricting to
+// this allowlist (rather than trusting an arbitrary client-supplied field
+// name) is required now that the adjustment writes the value, not just audits it.
+const CORRECTABLE_REFUEL_FIELDS = new Set(['actualFuelLitres', 'currentMileage', 'actualCost']);
+
+function parseCorrectionNumber(value, field) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    const error = new Error(`${field} correction must be a valid non-negative number`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return number;
+}
+
 export async function createOperationAdjustment(user, sessionId, payload = {}, companyId = null) {
   const session = await findSessionById(sessionId);
   assertCanAccessSession(session, user, companyId);
@@ -389,26 +405,47 @@ export async function createOperationAdjustment(user, sessionId, payload = {}, c
     error.statusCode = 400;
     throw error;
   }
+  if (!refuelId || !CORRECTABLE_REFUEL_FIELDS.has(field)) {
+    const error = new Error(`field must be one of: ${[...CORRECTABLE_REFUEL_FIELDS].join(', ')}, and refuelId is required`);
+    error.statusCode = 400;
+    throw error;
+  }
 
-  let originalValue = null;
-  if (refuelId) {
-    const refuel = await findBySessionAndId(session.id, refuelId);
+  const row = await sequelize.transaction(async (transaction) => {
+    const refuel = await findBySessionAndId(session.id, refuelId, { transaction });
     if (!refuel) {
       const error = new Error('Refuel not found');
       error.statusCode = 404;
       throw error;
     }
-    originalValue = refuel[field] != null ? String(refuel[field]) : null;
-  }
+    const originalValue = refuel[field] != null ? String(refuel[field]) : null;
+    const parsedValue = parseCorrectionNumber(newValue, field);
 
-  const row = await createAdjustment({
-    operationId: session.id,
-    refuelId,
-    field,
-    originalValue,
-    newValue,
-    reason,
-    userId: user.id,
+    if (field === 'actualFuelLitres') {
+      const patch = buildRefuelMetricsPatch({
+        actualFuelLitres: parsedValue,
+        estimatedFuelLitres: refuel.plannedFuelLitres != null && Number(refuel.plannedFuelLitres) > 0
+          ? Number(refuel.plannedFuelLitres)
+          : Number(refuel.estimatedFuelLitres || 0),
+        pricePerLitre: refuel.erbPricePerLitre != null ? Number(refuel.erbPricePerLitre) : null,
+        tankCapacitySnapshot: refuel.tankCapacitySnapshot,
+      });
+      await refuel.update(patch, { transaction });
+    } else {
+      await refuel.update({ [field]: parsedValue }, { transaction });
+    }
+
+    await refreshSessionTotals(session.id, transaction);
+
+    return createAdjustment({
+      operationId: session.id,
+      refuelId,
+      field,
+      originalValue,
+      newValue,
+      reason,
+      userId: user.id,
+    }, { transaction });
   });
 
   return {
