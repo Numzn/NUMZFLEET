@@ -45,6 +45,12 @@ services:
     environment:
       TRACCAR_DATABASE_URL: jdbc:mysql://traccar-mysql:3306/traccar?useSSL=false&allowPublicKeyRetrieval=true
       TRACCAR_DATABASE_USER: traccar
+      # Real value lives only in deployment/.env (gitignored) — never in the
+      # committed traccar.xml. Compose tracks this like any other service
+      # config, so a value change here triggers a real recreate on the next
+      # `docker compose up`, unlike editing the bind-mounted XML file
+      # directly, which Compose has no way to detect.
+      TRACCAR_EVENT_FORWARD_HEADER: "x-telemetry-secret: ${TELEMETRY_INGEST_SECRET}"
     volumes:
       - ../../backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
     # Bound to loopback so only Caddy (80/443) is the public entry; ops can still

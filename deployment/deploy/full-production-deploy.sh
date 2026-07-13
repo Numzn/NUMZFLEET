@@ -83,6 +83,24 @@ curl_required() {
   curl -fsS --max-time 15 "$url" >/dev/null || fail "$label is unhealthy or unreachable: $url"
 }
 
+# Verifies a runtime-config-dependent feature is actually configured, not just
+# that its process is up. A wrong-secret POST to the telemetry ingestion
+# endpoint must come back 401 (secret configured, request correctly rejected)
+# — a 503 here means TELEMETRY_INGEST_SECRET never made it into this
+# deployment, which the 2026-07-12 incident showed can otherwise ship "green"
+# and sit silently broken for days before anyone notices.
+curl_expect_status() {
+  local label="$1"
+  local expected="$2"
+  local url="$3"
+  shift 3
+
+  log "Checking $label: $url (expect HTTP $expected)"
+  local actual
+  actual="$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$@" "$url" || echo "curl_failed")"
+  [[ "$actual" == "$expected" ]] || fail "$label returned HTTP $actual, expected $expected: $url"
+}
+
 verify_containers() {
   local container state health restarting restarts
 
@@ -130,6 +148,11 @@ post_deploy_verify() {
   curl_required "backend health" "http://127.0.0.1:3000/health"
   curl_required "frontend health" "http://127.0.0.1:3002/health"
   curl_required "traccar" "http://127.0.0.1:8082"
+
+  log "VERIFY: telemetry ingestion is actually configured (not just running)"
+  curl_expect_status "telemetry ingestion auth" 401 \
+    "http://127.0.0.1:3000/internal/telemetry/traccar-events" \
+    -X POST -H "Content-Type: application/json" -H "x-telemetry-secret: deploy-verify-wrong-secret" -d '{}'
 
   log "VERIFY: public health checks"
   curl_required "public edge health" "$PUBLIC_BASE_URL/health"
