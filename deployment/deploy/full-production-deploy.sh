@@ -234,6 +234,14 @@ main() {
     printf '\n[full-deploy] SHA deployed: %s\n' "$sha"
     printf '[full-deploy] Deployment status: SUCCESS\n'
     printf '[full-deploy] Services health summary: all required containers running; internal and public health checks passed; recent logs clean.\n'
+
+    # Retention cleanup only after a confirmed-successful deploy, and never
+    # allowed to fail the deploy itself — a pruning hiccup is not a reason to
+    # report an otherwise-successful deployment as failed.
+    if ! bash "$ROOT_DIR/deployment/deploy/prune-old-images.sh"; then
+      printf '[full-deploy] WARNING: image retention cleanup failed (non-fatal, deploy still successful)\n' >&2
+    fi
+
     return 0
   fi
 
