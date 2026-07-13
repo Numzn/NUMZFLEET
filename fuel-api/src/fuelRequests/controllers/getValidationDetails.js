@@ -1,6 +1,6 @@
 import { findFuelRequestScoped } from '../scopeFuelRequest.js';
 import { getTraccarPosition } from '../../config/traccar.js';
-import { getVehicleSpec } from '../../services/vehicleSpecService.js';
+import { getVehicleSpec, getTankCapacitySource } from '../../services/vehicleSpecService.js';
 import { validateFuelRequest } from '../services/fuelValidationService.js';
 
 /**
@@ -39,6 +39,7 @@ export const getValidationDetails = async (req, res) => {
       },
       vehicleSpec: {
         tankCapacity: vehicleSpec.tankCapacity,
+        tankCapacitySource: getTankCapacitySource(vehicleSpec),
         fuelEfficiency: vehicleSpec.fuelEfficiency,
         fuelType: vehicleSpec.fuelType
       },

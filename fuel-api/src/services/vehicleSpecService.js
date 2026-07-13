@@ -24,8 +24,10 @@ export const getVehicleSpec = async (deviceId) => {
       where: { deviceId }
     });
 
-    // If not found or not synced from Traccar, sync from Traccar
-    if (!vehicleSpec || !vehicleSpec.syncedFromTraccar) {
+    // Sync from Traccar only for specs that have never been manually
+    // configured. A manager override (customOverride: true) must never be
+    // silently re-synced back to defaults, regardless of syncedFromTraccar.
+    if (!vehicleSpec || (!vehicleSpec.customOverride && !vehicleSpec.syncedFromTraccar)) {
       vehicleSpec = await syncFromTraccar(deviceId);
     }
 
@@ -44,6 +46,13 @@ export const getVehicleSpec = async (deviceId) => {
     return getDefaultVehicleSpec(deviceId);
   }
 };
+
+/**
+ * Provenance for a spec's tankCapacity: 'verified' when a manager has
+ * explicitly overridden it, 'default' when it's still the Traccar-synced
+ * or hardcoded fallback value.
+ */
+export const getTankCapacitySource = (spec) => (spec?.customOverride ? 'verified' : 'default');
 
 /**
  * Sync vehicle specifications from Traccar device attributes

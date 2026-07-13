@@ -14,6 +14,7 @@ import { assertVehicleInTenant } from './vehicleFleetService.js';
 import { applyObservation } from '../vehicleEngine/odometer/applyObservation.js';
 import { notifyRoutineServiceCompleted } from '../notifications/maintenanceNotificationService.js';
 import { resetMaintenanceScheduleAfterCompletion } from '../maintenance/routineServiceTraccarService.js';
+import { VEHICLE_IDENTITY_ATTRIBUTES } from '../utils/vehicleIdentityAttributes.js';
 
 function badRequest(message) {
   const error = new Error(message);
@@ -263,7 +264,7 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
   if (patch.status === 'completed' && !wasCompleted && record.maintenanceId != null) {
     try {
       const vehicle = await Vehicle.findByPk(String(fleetVehicleId), {
-        attributes: ['id', 'name', 'plateNumber'],
+        attributes: VEHICLE_IDENTITY_ATTRIBUTES,
       });
       await notifyRoutineServiceCompleted({
         record: dto,

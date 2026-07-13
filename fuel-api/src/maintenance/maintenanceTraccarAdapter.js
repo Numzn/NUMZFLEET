@@ -2,6 +2,7 @@ import traccar, { getTraccarLatestPositionsByDeviceIds } from '../config/traccar
 import { CompanyDevice, DeviceAssignment, Vehicle } from '../models/index.js';
 import { Op } from 'sequelize';
 import { resolveOdometerForDevice } from '../vehicleEngine/odometer/resolveVehicleOdometer.js';
+import { VEHICLE_IDENTITY_ATTRIBUTES } from '../utils/vehicleIdentityAttributes.js';
 import {
   computeDue,
   classifyDueBucket,
@@ -77,7 +78,7 @@ async function loadFleetVehicleMap(companyId, deviceIds) {
     include: [{
       model: Vehicle,
       where: { companyId: String(companyId) },
-      attributes: ['id', 'name', 'plateNumber'],
+      attributes: VEHICLE_IDENTITY_ATTRIBUTES,
       required: true,
     }],
   });
@@ -181,7 +182,7 @@ export async function loadVehicleMaintenanceDueState(companyId, fleetVehicleId) 
     include: [{
       model: Vehicle,
       where: { companyId: String(companyId) },
-      attributes: ['id', 'name', 'plateNumber'],
+      attributes: VEHICLE_IDENTITY_ATTRIBUTES,
       required: true,
     }],
   });

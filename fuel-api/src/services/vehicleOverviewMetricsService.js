@@ -1,8 +1,9 @@
 import { Op } from 'sequelize';
 import { ServiceRecord } from '../models/index.js';
+import { resolveCostAmount } from '../maintenance/maintenanceCostService.js';
 
 function sumCosts(rows) {
-  return rows.reduce((s, r) => s + (Number(r.cost) || 0), 0);
+  return rows.reduce((s, r) => s + resolveCostAmount(r), 0);
 }
 
 export async function aggregateMaintenanceCosts(companyId, fleetVehicleId) {
@@ -14,7 +15,7 @@ export async function aggregateMaintenanceCosts(companyId, fleetVehicleId) {
 
   const rows = await ServiceRecord.findAll({
     where,
-    attributes: ['cost', 'completedAt', 'createdAt'],
+    attributes: ['cost', 'actualCost', 'completedAt', 'createdAt'],
     order: [['completedAt', 'ASC']],
   });
 

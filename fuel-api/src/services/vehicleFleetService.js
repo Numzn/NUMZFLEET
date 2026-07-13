@@ -19,7 +19,7 @@ import {
   parseDeviceFleetConfig,
   mergeFleetConfigFromBody,
 } from '../utils/fleetConfigUtils.js';
-import { updateVehicleSpec, getVehicleSpec } from './vehicleSpecService.js';
+import { updateVehicleSpec, getVehicleSpec, getTankCapacitySource } from './vehicleSpecService.js';
 import { summarizeForVehicle } from '../repositories/serviceRecordRepository.js';
 import { buildVehicleAttachmentPath } from '../middleware/vehicleUpload.js';
 import { loadCompanyMaintenanceDueState, loadVehicleMaintenanceDueState } from '../maintenance/maintenanceTraccarAdapter.js';
@@ -134,10 +134,7 @@ export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap
   const vehicleSpecDto = spec
     ? {
         tankCapacity: spec.tankCapacity,
-        // 'verified': a manager entered this value (customOverride). 'default': the
-        // generic fallback (see vehicleSpecService.getDefaultVehicleSpec) — not a
-        // confirmed physical measurement, so callers must not treat it as ground truth.
-        tankCapacitySource: spec.customOverride ? 'verified' : 'default',
+        tankCapacitySource: getTankCapacitySource(spec),
         fuelEfficiency: spec.fuelEfficiency,
         fuelType: spec.fuelType,
       }
