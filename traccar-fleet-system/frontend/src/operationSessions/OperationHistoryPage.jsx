@@ -1,14 +1,18 @@
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   Chip,
   CircularProgress,
   Collapse,
+  Divider,
   IconButton,
+  MenuItem,
   Paper,
   Stack,
   Table,
@@ -16,6 +20,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -23,8 +28,13 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
+import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
+import DirectionsCarFilledOutlinedIcon from '@mui/icons-material/DirectionsCarFilledOutlined';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import { RUNTIME_STACK_GAP } from '../common/styles/runtimeDensity';
-import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
+import { fetchVehicles, fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
+import { resolveVehicleDisplayFromFleetRow } from '../fleet/display/resolveVehicleDisplay.js';
 import { vehicleWorkspacePath } from '../fleet/vehicleRegistry/vehicleRegistryUtils.js';
 import { fetchDailyOperationReports, fetchOperationSessionDetails } from './api/operationSessionsApi.js';
 import { formatK, formatLitres } from './utils/formatters.js';
@@ -69,10 +79,102 @@ function invoiceTitle(invoice) {
   return 'Smart Invoice';
 }
 
+function formatDateTime(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString([], {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function formatPricePerLitre(detail) {
+  const single = detail?.approvedFuelPrice;
+  if (single != null) return formatK(single);
+  const diesel = detail?.approvedDieselPrice;
+  const petrol = detail?.approvedPetrolPrice;
+  if (diesel != null && petrol != null) return `${formatK(diesel)} D / ${formatK(petrol)} P`;
+  if (diesel != null) return formatK(diesel);
+  if (petrol != null) return formatK(petrol);
+  return null;
+}
+
 function varianceLabel(variance) {
   return variance != null && Number.isFinite(variance)
     ? `${variance >= 0 ? '+' : ''}${variance.toFixed(1)} L`
     : '—';
+}
+
+// Compact summary card for the History Summary strip: tinted icon badge,
+// bold value, uppercase caption label — the History-scale sibling of the
+// dashboard's ModernKPICard, restyled with plain theme colors so it sits
+// naturally on this page.
+function KpiCard({ icon, label, value, tone = 'primary' }) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
+      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 }, display: 'flex', alignItems: 'center', gap: 1.25 }}>
+        <Box
+          sx={{
+            width: 34,
+            height: 34,
+            borderRadius: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            bgcolor: (theme) => theme.palette[tone].main + '22',
+            color: `${tone}.main`,
+            '& svg': { fontSize: '1.15rem' },
+          }}
+        >
+          {icon}
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              fontWeight: 700,
+              letterSpacing: 0.5,
+              fontSize: '0.62rem',
+              color: 'text.secondary',
+              textTransform: 'uppercase',
+            }}
+          >
+            {label}
+          </Typography>
+          <Typography variant="body1" fontWeight={800} noWrap>{value}</Typography>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Uppercase label / normal-case value pairing, used on mobile session cards so
+// field names (STATUS, FORECAST, ACTUAL...) scan quickly while the values
+// themselves — the numbers operators actually need to read — stay easy to read.
+function StatCell({ label, value }) {
+  return (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography
+        variant="caption"
+        sx={{
+          display: 'block',
+          fontWeight: 700,
+          letterSpacing: 0.5,
+          fontSize: '0.65rem',
+          color: 'text.secondary',
+          textTransform: 'uppercase',
+          mb: 0.25,
+        }}
+      >
+        {label}
+      </Typography>
+      {typeof value === 'string' || typeof value === 'number' ? (
+        <Typography variant="body2" fontWeight={700} noWrap>{value}</Typography>
+      ) : value}
+    </Box>
+  );
 }
 
 function InvoiceChip({ row }) {
@@ -109,12 +211,36 @@ function SessionRecordDetail({
     navigate(`${vehicleWorkspacePath(fleetVehicleId)}?tab=fuel`);
   };
 
+  const fueledCount = detail
+    ? (detail.refuels || []).filter(isRefuelComplete).length
+    : row.vehiclesFueled;
+  const pricePerLitre = formatPricePerLitre(detail);
+  const attendants = [...new Set(
+    (detail?.refuels || []).map((r) => String(r.attendant || '').trim()).filter(Boolean),
+  )];
+  const completedAt = formatDateTime(detail?.lockedAt);
+  const stats = [
+    { label: 'Fuel Cost', value: formatK(detail?.totalActualCost ?? row.actualCost) },
+    pricePerLitre != null && { label: 'Price / Litre', value: pricePerLitre },
+    fueledCount != null && { label: 'Vehicles Fueled', value: fueledCount },
+    (detail?.stationName || row.stationName) && { label: 'Station', value: detail?.stationName || row.stationName },
+    attendants.length > 0 && { label: 'Recorded By', value: attendants.join(', ') },
+    completedAt && { label: 'Completed At', value: completedAt },
+  ].filter(Boolean);
+
   return (
     <Box sx={{ py: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 0.75, mb: 1 }}>
-        <Typography variant="body2" fontWeight={700}>{formatK(row.actualCost)}</Typography>
-        <Typography variant="caption" color="text.secondary">· {formatLitres(row.actualLitres)}</Typography>
-        <Chip size="small" label={historyStatusLabel(row.status)} color={historyStatusColor(row.status)} />
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', sm: '1fr 1fr 1fr' },
+          gap: 1.5,
+          mb: 1.5,
+        }}
+      >
+        {stats.map((stat) => (
+          <StatCell key={stat.label} label={stat.label} value={stat.value} />
+        ))}
       </Box>
 
       {loading && (
@@ -256,6 +382,14 @@ const OperationHistoryPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Date range filters via the backend's existing from/to params; vehicle and
+  // station narrow the already-fetched rows client-side.
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [vehicleFilter, setVehicleFilter] = useState('');
+  const [stationFilter, setStationFilter] = useState('');
+  const [fleetVehicles, setFleetVehicles] = useState([]);
+
   const [expandedId, setExpandedId] = useState(null);
   const [detailsById, setDetailsById] = useState({});
   const [detailLoadingId, setDetailLoadingId] = useState(null);
@@ -266,18 +400,72 @@ const OperationHistoryPage = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await fetchDailyOperationReports(user, {});
+      const query = {};
+      if (fromDate) query.from = fromDate;
+      if (toDate) query.to = toDate;
+      const data = await fetchDailyOperationReports(user, query);
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(fuelApiErrorMessage(err, 'Failed to load operation history'));
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, fromDate, toDate]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchVehicles(user).then(
+      (data) => setFleetVehicles(Array.isArray(data) ? data : []),
+      () => setFleetVehicles([]),
+    );
+  }, [user]);
+
+  const vehicleOptions = useMemo(
+    () => fleetVehicles
+      .filter((v) => v.assignment?.deviceId != null)
+      .map((v) => {
+        const display = resolveVehicleDisplayFromFleetRow(v);
+        return {
+          deviceId: Number(v.assignment.deviceId),
+          label: display.secondary ? `${display.primary} (${display.secondary})` : display.primary,
+        };
+      }),
+    [fleetVehicles],
+  );
+
+  const stationOptions = useMemo(
+    () => [...new Set(rows.map((r) => String(r.stationName || '').trim()).filter(Boolean))].sort(),
+    [rows],
+  );
+
+  const filteredRows = useMemo(() => rows.filter((row) => {
+    if (vehicleFilter !== '' && !(row.fueledVehicleIds || []).includes(Number(vehicleFilter))) return false;
+    if (stationFilter !== '' && String(row.stationName || '').trim() !== stationFilter) return false;
+    return true;
+  }), [rows, vehicleFilter, stationFilter]);
+
+  // History Summary aggregates — computed from the filtered rows so the cards
+  // and the timeline always describe the same set of sessions.
+  const summary = useMemo(() => {
+    const vehicleIds = new Set();
+    let totalSpend = 0;
+    let totalLitres = 0;
+    for (const row of filteredRows) {
+      totalSpend += Number(row.actualCost || 0);
+      totalLitres += Number(row.actualLitres || 0);
+      for (const id of row.fueledVehicleIds || []) vehicleIds.add(Number(id));
+    }
+    return {
+      totalSpend,
+      totalLitres,
+      vehiclesFueled: vehicleIds.size,
+      sessions: filteredRows.length,
+    };
+  }, [filteredRows]);
 
   const toggleRow = useCallback((operationId) => {
     setExpandedId((current) => (current === operationId ? null : operationId));
@@ -304,15 +492,80 @@ const OperationHistoryPage = () => {
     return () => { cancelled = true; };
   }, [expandedId, detailsById, user]);
 
-  const sortedRows = [...rows].sort((a, b) => String(b.calendarDate).localeCompare(String(a.calendarDate)));
+  const sortedRows = [...filteredRows].sort((a, b) => String(b.calendarDate).localeCompare(String(a.calendarDate)));
   const todayKey = getTodayKeyInTimeZone(resolveFleetTimezone(rows));
+  const hasActiveFilters = Boolean(fromDate || toDate || vehicleFilter !== '' || stationFilter !== '');
 
   return (
     <Stack spacing={RUNTIME_STACK_GAP}>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button size="small" variant="outlined" onClick={load} disabled={loading}>
-          Refresh
-        </Button>
+      {/* History Summary — aggregates of the filtered sessions below */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
+          gap: 1.25,
+        }}
+      >
+        <KpiCard icon={<PaymentsOutlinedIcon />} label="Total Spend" value={formatK(summary.totalSpend)} tone="success" />
+        <KpiCard icon={<LocalGasStationOutlinedIcon />} label="Total Litres" value={formatLitres(summary.totalLitres)} tone="info" />
+        <KpiCard icon={<DirectionsCarFilledOutlinedIcon />} label="Vehicles Fueled" value={summary.vehiclesFueled} tone="secondary" />
+        <KpiCard icon={<ReceiptLongOutlinedIcon />} label="Sessions" value={summary.sessions} tone="warning" />
+      </Box>
+
+      {/* Filters — date range refetches (backend from/to); vehicle and station filter client-side */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr) auto' },
+          gap: 1,
+          alignItems: 'center',
+        }}
+      >
+        <TextField
+          size="small"
+          label="From"
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+        />
+        <TextField
+          size="small"
+          label="To"
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+        />
+        <TextField
+          size="small"
+          select
+          label="Vehicle"
+          value={vehicleFilter}
+          onChange={(e) => setVehicleFilter(e.target.value)}
+        >
+          <MenuItem value="">All vehicles</MenuItem>
+          {vehicleOptions.map((option) => (
+            <MenuItem key={option.deviceId} value={option.deviceId}>{option.label}</MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          size="small"
+          select
+          label="Station"
+          value={stationFilter}
+          onChange={(e) => setStationFilter(e.target.value)}
+        >
+          <MenuItem value="">All stations</MenuItem>
+          {stationOptions.map((station) => (
+            <MenuItem key={station} value={station}>{station}</MenuItem>
+          ))}
+        </TextField>
+        <Box sx={{ gridColumn: { xs: '1 / -1', sm: 'auto' }, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button size="small" variant="outlined" onClick={load} disabled={loading}>
+            Refresh
+          </Button>
+        </Box>
       </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -324,52 +577,59 @@ const OperationHistoryPage = () => {
       )}
 
       {!loading && sortedRows.length === 0 && (
-        <Alert severity="info">No fueling days yet.</Alert>
+        <Alert severity="info">
+          {hasActiveFilters ? 'No fueling days match the current filters.' : 'No fueling days yet.'}
+        </Alert>
       )}
 
       {!loading && sortedRows.length > 0 && isMobile && (
-        <Stack spacing={0}>
+        <Stack spacing={1.25}>
           {sortedRows.map((row) => {
             const variance = row.varianceLitres != null ? Number(row.varianceLitres) : null;
             const expanded = expandedId === row.operationId;
             return (
-              <Box key={row.operationId} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Card key={row.operationId} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
                 <Box
                   onClick={() => toggleRow(row.operationId)}
-                  sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, py: 1, cursor: 'pointer' }}
+                  sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, p: 1.5, cursor: 'pointer' }}
                 >
-                  <IconButton size="small" sx={{ mt: -0.25 }}>
+                  <IconButton size="small" sx={{ mt: -0.25, ml: -0.75 }}>
                     {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                   </IconButton>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="body2" fontWeight={700}>
-                        {relativeDayLabel(row.calendarDate, todayKey)}
-                      </Typography>
-                      <Chip size="small" label={historyStatusLabel(row.status)} color={historyStatusColor(row.status)} />
-                    </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight={800}
+                      sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}
+                    >
+                      {relativeDayLabel(row.calendarDate, todayKey)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
                       {row.reference || row.operationId}
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Forecast {formatLitres(row.forecastLitres)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Actual {formatLitres(row.actualLitres)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {varianceLabel(variance)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {row.forecastAccuracyPercent != null ? `${row.forecastAccuracyPercent}%` : '—'}
-                      </Typography>
-                      <InvoiceChip row={row} />
+
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <StatCell
+                        label="Status"
+                        value={<Chip size="small" label={historyStatusLabel(row.status)} color={historyStatusColor(row.status)} />}
+                      />
+                      <StatCell label="Forecast" value={formatLitres(row.forecastLitres)} />
+                      <StatCell label="Actual" value={formatLitres(row.actualLitres)} />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 2, mt: 1.5 }}>
+                      <StatCell label="Variance" value={varianceLabel(variance)} />
+                      <StatCell
+                        label="Accuracy"
+                        value={row.forecastAccuracyPercent != null ? `${row.forecastAccuracyPercent}%` : '—'}
+                      />
+                      <StatCell label="Invoice" value={<InvoiceChip row={row} />} />
                     </Box>
                   </Box>
                 </Box>
                 <Collapse in={expanded} unmountOnExit>
-                  <Box sx={{ pl: 4, pr: 1 }}>
+                  <Divider />
+                  <Box sx={{ pl: 5, pr: 1.5, py: 1 }}>
                     <SessionRecordDetail
                       row={row}
                       detail={detailsById[row.operationId]}
@@ -378,7 +638,7 @@ const OperationHistoryPage = () => {
                     />
                   </Box>
                 </Collapse>
-              </Box>
+              </Card>
             );
           })}
         </Stack>

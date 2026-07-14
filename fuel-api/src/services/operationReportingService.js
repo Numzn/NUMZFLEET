@@ -3,6 +3,21 @@ import { OperationSession, OperationSessionRefuel, OperationSessionInvoice } fro
 import { listByUser } from '../repositories/operationSessionRepository.js';
 import { summarizeInvoices } from './invoiceReconciliationService.js';
 import { resolveOdometerMapForDevices } from './operationSessionCore.js';
+import { getLocksAt } from './operationLockHelper.js';
+import { getFleetTimezone } from '../config/operationConfig.js';
+
+// Reporting reads the raw `status` column, which only flips to 'locked' lazily
+// (the next time some other endpoint happens to touch that session — see
+// operationLockHelper.maybePersistLock). A session nobody revisits after its
+// cutoff stays 'approved' in the DB indefinitely, so History must derive the
+// display status from the lock cutoff rather than trusting the stored value.
+function effectiveHistoryStatus(session, now) {
+  if (session.status === 'locked') return 'locked';
+  if (!session.calendarDate) return session.status;
+  const tz = session.fleetTimezone || getFleetTimezone();
+  const locksAt = getLocksAt(session.calendarDate, tz).getTime();
+  return now.getTime() > locksAt ? 'locked' : session.status;
+}
 
 function pctAccuracy(forecast, actual) {
   const f = Number(forecast);
@@ -28,17 +43,29 @@ export async function getDailyOperationKpis(user, query = {}, companyId = null) 
   }
 
   const invoicesByOperation = new Map();
+  const fueledVehiclesByOperation = new Map();
   if (filtered.length > 0) {
+    const sessionIds = filtered.map((s) => s.id);
     const invoices = await OperationSessionInvoice.findAll({
-      where: { operationId: { [Op.in]: filtered.map((s) => s.id) } },
+      where: { operationId: { [Op.in]: sessionIds } },
     });
     for (const inv of invoices) {
       const list = invoicesByOperation.get(inv.operationId) || [];
       list.push(inv);
       invoicesByOperation.set(inv.operationId, list);
     }
+    const fueledRefuels = await OperationSessionRefuel.findAll({
+      where: { sessionId: { [Op.in]: sessionIds }, actualFuelLitres: { [Op.gt]: 0 } },
+      attributes: ['sessionId', 'vehicleId'],
+    });
+    for (const r of fueledRefuels) {
+      const set = fueledVehiclesByOperation.get(r.sessionId) || new Set();
+      set.add(Number(r.vehicleId));
+      fueledVehiclesByOperation.set(r.sessionId, set);
+    }
   }
 
+  const now = new Date();
   return filtered.map((s) => {
     const forecast = s.approvedLitres != null ? Number(s.approvedLitres) : Number(s.totalEstimatedFuel || 0);
     const actual = Number(s.totalActualFuel || 0);
@@ -49,11 +76,14 @@ export async function getDailyOperationKpis(user, query = {}, companyId = null) 
       sessionActualLitres: actual,
       sessionActualCost: actualCost,
     });
+    const fueledVehicleIds = [...(fueledVehiclesByOperation.get(s.id) || [])];
     return {
+      fueledVehicleIds,
+      vehiclesFueled: fueledVehicleIds.length,
       operationId: s.id,
       reference: s.reference || null,
       calendarDate: s.calendarDate,
-      status: s.status,
+      status: effectiveHistoryStatus(s, now),
       stationName: s.stationName || null,
       forecastLitres: forecast,
       actualLitres: actual,
