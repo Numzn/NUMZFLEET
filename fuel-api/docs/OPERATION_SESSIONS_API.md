@@ -8,6 +8,8 @@ Operational days replace manual active/closed sessions. One operation per user p
 |----------|---------|-------------|
 | `FLEET_TIMEZONE` | `Africa/Lusaka` | IANA timezone for day boundaries; snapshotted on each row as `fleetTimezone` |
 | `OPERATION_LOCK_GRACE_MINUTES` | `15` | Minutes after midnight before an operation locks |
+| `OPERATION_AUTO_CLOSE` | `1` | Set to `0` to disable the background sweep that persists `status: 'locked'` on sessions past their cutoff (see below) |
+| `OPERATION_AUTO_CLOSE_POLL_MS` | `300000` | Poll interval (ms, min 60000) for the auto-close sweep |
 
 ## Status model
 
@@ -18,6 +20,8 @@ Operational days replace manual active/closed sessions. One operation per user p
 | `locked` | Time-derived (next day 00:00 + grace) or persisted; read-only |
 
 Response DTOs include: `reference`, `effectiveStatus`, `isWritable`, `locksAt`, `canRecordFuel`, `canEditForecast`, `calendarDate`, `fleetTimezone`.
+
+`effectiveStatus` is always computed live and correct on any read. The underlying `status` DB column, however, only flips to `locked` when some request happens to touch that specific session past its cutoff (`operationLockHelper.maybePersistLock`) — a session nobody revisits stays `approved` in the DB indefinitely. A background sweep (`jobs/operationAutoCloseScheduler.js`, `OPERATION_AUTO_CLOSE_POLL_MS`) proactively persists the lock on lapsed `draft`/`approved` sessions so raw-`status` consumers (e.g. `reports/daily`) stay accurate without waiting for a live touch.
 
 Every Fuel Day is assigned a human-friendly `reference` (e.g. `FD-20260621-001`), sequenced per fleet and calendar day. The UI shows the reference instead of the numeric `id`.
 

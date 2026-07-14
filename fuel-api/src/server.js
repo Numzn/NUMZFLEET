@@ -30,6 +30,7 @@ import { startErbLoginInsightScheduler } from './jobs/erbLoginInsightScheduler.j
 import { startImmobilizationEvaluatorScheduler } from './jobs/immobilizationEvaluatorScheduler.js';
 import { startTrackingNotificationBridgeScheduler } from './jobs/trackingNotificationBridgeScheduler.js';
 import { startOperationLockNotificationScheduler } from './jobs/operationLockNotificationScheduler.js';
+import { startOperationAutoCloseScheduler } from './jobs/operationAutoCloseScheduler.js';
 import { startComplianceNotificationScheduler } from './jobs/complianceNotificationScheduler.js';
 import { startTelemetryReconciliationScheduler } from './jobs/telemetryReconciliationScheduler.js';
 import {
@@ -450,6 +451,7 @@ let stopErbLoginInsightScheduler = () => {};
 let stopImmobilizationEvaluatorScheduler = () => {};
 let stopTrackingNotificationBridgeScheduler = () => {};
 let stopOperationLockNotificationScheduler = () => {};
+let stopOperationAutoCloseScheduler = () => {};
 let stopComplianceNotificationScheduler = () => {};
 let stopTelemetryReconciliationScheduler = () => {};
 
@@ -569,6 +571,7 @@ const startServer = async () => {
         stopTrackingNotificationBridgeScheduler = startTrackingNotificationBridgeScheduler(io);
       });
       stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
+      stopOperationAutoCloseScheduler = startOperationAutoCloseScheduler();
       stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
       stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
     });
@@ -603,6 +606,7 @@ const startServer = async () => {
       stopTrackingNotificationBridgeScheduler = startTrackingNotificationBridgeScheduler(io);
     });
     stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
+    stopOperationAutoCloseScheduler = startOperationAutoCloseScheduler();
     stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
     stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
     reconcileDeviceAssignmentLabels()
@@ -635,6 +639,7 @@ process.on('SIGTERM', () => {
   stopImmobilizationEvaluatorScheduler();
   stopTrackingNotificationBridgeScheduler();
   stopOperationLockNotificationScheduler();
+  stopOperationAutoCloseScheduler();
   stopComplianceNotificationScheduler();
   stopTelemetryReconciliationScheduler();
   httpServer.close(() => {
