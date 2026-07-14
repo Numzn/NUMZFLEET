@@ -88,6 +88,7 @@ const ForecastPage = () => {
   const [busy, setBusy] = useState(false);
   const [station, setStation] = useState('');
   const [editingVehicleId, setEditingVehicleId] = useState(null);
+  const [addingVehicles, setAddingVehicles] = useState(false);
 
   const operationId = todayOperation?.id;
   const displayStatus = deriveFuelingDayStatus({ operation: todayOperation, details: todayDetails });
@@ -171,6 +172,12 @@ const ForecastPage = () => {
     if (operationId) loadForecast();
   }, [operationId, loadForecast]);
 
+  // A freshly-loaded session should always open on Today's Plan, never mid-selection.
+  useEffect(() => {
+    setAddingVehicles(false);
+    setSelected(new Set());
+  }, [operationId]);
+
   const fleetOptions = useMemo(() => fleetVehicles.filter((v) => v.assignment?.deviceId), [fleetVehicles]);
 
   const labelForFleetRow = useCallback((row) => {
@@ -197,7 +204,7 @@ const ForecastPage = () => {
     });
   };
 
-  const handlePlanSelected = async () => {
+  const handlePlanSelected = async ({ closeAfter = false } = {}) => {
     if (!user) return;
     const vehicles = [...selected]
       .filter((id) => !existingVehicleIds.has(Number(id)))
@@ -219,6 +226,7 @@ const ForecastPage = () => {
       setSelected(new Set());
       await reloadToday();
       await loadForecast();
+      if (closeAfter) setAddingVehicles(false);
     } catch (e) {
       setError(fuelApiErrorMessage(e, 'Failed to plan vehicles'));
     } finally {
@@ -359,54 +367,74 @@ const ForecastPage = () => {
         </>
       )}
 
-      {!loading && forecast && (
-        <>
-          {/* Vehicle Selection — the operator's first decision each day, so it
-              stays the first section on the page regardless of what's already
-              been planned (e.g. via auto-seeded defaults). */}
-          {canEditPlan && vehiclesToAdd.length > 0 && (
-            <Box>
-              <SectionHeading label="Vehicle Selection" />
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Select which vehicles need fuel today.
-              </Typography>
-              <Stack spacing={0.5}>
-                {vehiclesToAdd.slice(0, 30).map((v) => {
-                  const deviceId = Number(v.assignment.deviceId);
-                  return (
-                    <Box key={v.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Checkbox
-                        checked={selected.has(deviceId)}
-                        onChange={() => toggleSelect(deviceId)}
-                      />
-                      <Typography variant="body2" sx={{ flex: 1 }}>
-                        {labelForFleetRow(v)}
-                      </Typography>
-                      {selected.has(deviceId) && (
-                        <TextField
-                          size="small"
-                          label="Planned L"
-                          type="number"
-                          value={plannedById[deviceId] ?? fleetByDeviceId[deviceId]?.vehicleSpec?.tankCapacity ?? 50}
-                          onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
-                          sx={{ width: 120 }}
-                        />
-                      )}
-                    </Box>
-                  );
-                })}
-              </Stack>
-              <Button
-                variant="outlined"
-                sx={{ mt: 1, textTransform: 'none' }}
-                onClick={handlePlanSelected}
-                disabled={busy || selected.size === 0}
+      {!loading && forecast && addingVehicles && (
+        <Box>
+          <SectionHeading
+            label="Add Vehicles"
+            action={(
+              <Typography
+                component="button"
+                onClick={() => { setAddingVehicles(false); setSelected(new Set()); }}
+                variant="caption"
+                sx={{
+                  border: 0,
+                  background: 'none',
+                  p: 0,
+                  color: 'text.secondary',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  fontSize: '0.7rem',
+                }}
               >
-                Add to today&apos;s list
-              </Button>
-            </Box>
-          )}
+                Back to plan
+              </Typography>
+            )}
+          />
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Select which additional vehicles need fuel today.
+          </Typography>
+          <Stack spacing={0.5}>
+            {vehiclesToAdd.slice(0, 30).map((v) => {
+              const deviceId = Number(v.assignment.deviceId);
+              return (
+                <Box key={v.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Checkbox
+                    checked={selected.has(deviceId)}
+                    onChange={() => toggleSelect(deviceId)}
+                  />
+                  <Typography variant="body2" sx={{ flex: 1 }}>
+                    {labelForFleetRow(v)}
+                  </Typography>
+                  {selected.has(deviceId) && (
+                    <TextField
+                      size="small"
+                      label="Planned L"
+                      type="number"
+                      value={plannedById[deviceId] ?? fleetByDeviceId[deviceId]?.vehicleSpec?.tankCapacity ?? 50}
+                      onChange={(e) => setPlannedById((prev) => ({ ...prev, [deviceId]: e.target.value }))}
+                      sx={{ width: 120 }}
+                    />
+                  )}
+                </Box>
+              );
+            })}
+            {vehiclesToAdd.length === 0 && (
+              <Alert severity="info">Every fleet vehicle is already on today&apos;s plan.</Alert>
+            )}
+          </Stack>
+          <Button
+            variant="outlined"
+            sx={{ mt: 1, textTransform: 'none' }}
+            onClick={() => handlePlanSelected({ closeAfter: true })}
+            disabled={busy || selected.size === 0}
+          >
+            Add to today&apos;s list
+          </Button>
+        </Box>
+      )}
 
+      {!loading && forecast && !addingVehicles && (
+        <>
           {/* Summary card */}
           <Card variant="outlined" sx={{ borderRadius: 2 }}>
             <CardContent sx={{ py: 1.25, '&:last-child': { pb: 1.25 } }}>
@@ -446,23 +474,43 @@ const ForecastPage = () => {
               label="Vehicles"
               count={activeVehicleRows.length}
               action={canEditPlan && (
-                <Typography
-                  component="button"
-                  onClick={handleRegenerate}
-                  disabled={busy}
-                  variant="caption"
-                  sx={{
-                    border: 0,
-                    background: 'none',
-                    p: 0,
-                    color: 'text.secondary',
-                    textDecoration: 'underline',
-                    cursor: 'pointer',
-                    fontSize: '0.7rem',
-                  }}
-                >
-                  Regenerate
-                </Typography>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  {vehiclesToAdd.length > 0 && (
+                    <Typography
+                      component="button"
+                      onClick={() => setAddingVehicles(true)}
+                      variant="caption"
+                      sx={{
+                        border: 0,
+                        background: 'none',
+                        p: 0,
+                        color: 'text.secondary',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontSize: '0.7rem',
+                      }}
+                    >
+                      Add vehicles
+                    </Typography>
+                  )}
+                  <Typography
+                    component="button"
+                    onClick={handleRegenerate}
+                    disabled={busy}
+                    variant="caption"
+                    sx={{
+                      border: 0,
+                      background: 'none',
+                      p: 0,
+                      color: 'text.secondary',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      fontSize: '0.7rem',
+                    }}
+                  >
+                    Regenerate
+                  </Typography>
+                </Stack>
               )}
             />
             <Stack spacing={0}>
