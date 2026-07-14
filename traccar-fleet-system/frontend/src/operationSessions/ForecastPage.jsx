@@ -95,6 +95,9 @@ const ForecastPage = () => {
   const isPlanning = displayStatus === 'planning';
   // Prefer session details over the list row so Plan never shows edit controls after the day starts.
   const canEditPlan = isPlanning && Boolean(todayDetails?.canEditForecast);
+  // Vehicles can be added any time the day is writable (draft or approved/in-progress),
+  // not only while still in draft — the backend supports appending post-approval.
+  const canAddVehicles = Boolean(operationId) && todayDetails?.isWritable !== false;
 
   const refuelByVehicleId = useMemo(() => {
     const map = {};
@@ -473,9 +476,9 @@ const ForecastPage = () => {
             <SectionHeading
               label="Vehicles"
               count={activeVehicleRows.length}
-              action={canEditPlan && (
+              action={(canAddVehicles || canEditPlan) && (
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  {vehiclesToAdd.length > 0 && (
+                  {canAddVehicles && vehiclesToAdd.length > 0 && (
                     <Typography
                       component="button"
                       onClick={() => setAddingVehicles(true)}
@@ -493,23 +496,25 @@ const ForecastPage = () => {
                       Add vehicles
                     </Typography>
                   )}
-                  <Typography
-                    component="button"
-                    onClick={handleRegenerate}
-                    disabled={busy}
-                    variant="caption"
-                    sx={{
-                      border: 0,
-                      background: 'none',
-                      p: 0,
-                      color: 'text.secondary',
-                      textDecoration: 'underline',
-                      cursor: 'pointer',
-                      fontSize: '0.7rem',
-                    }}
-                  >
-                    Regenerate
-                  </Typography>
+                  {canEditPlan && (
+                    <Typography
+                      component="button"
+                      onClick={handleRegenerate}
+                      disabled={busy}
+                      variant="caption"
+                      sx={{
+                        border: 0,
+                        background: 'none',
+                        p: 0,
+                        color: 'text.secondary',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontSize: '0.7rem',
+                      }}
+                    >
+                      Regenerate
+                    </Typography>
+                  )}
                 </Stack>
               )}
             />
