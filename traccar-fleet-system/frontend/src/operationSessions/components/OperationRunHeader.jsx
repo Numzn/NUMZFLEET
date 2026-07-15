@@ -20,16 +20,18 @@ const SummaryStat = ({ value, label, warn = false }) => (
   </Box>
 );
 
-export default function OperationRunHeader({ session, buckets }) {
+export default function OperationRunHeader({ session, buckets, pendingTotals }) {
   const effectiveStatus = session?.effectiveStatus || session?.status;
   const isDraft = String(effectiveStatus).toLowerCase() === 'draft';
   const displayStatus = deriveFuelingDayStatus({ operation: session, details: session });
   const plannedL = sumPlannedLitres(session?.refuels || []);
   const counts = buckets || {
-    selected: 0, arrived: 0, fueled: 0, skipped: 0, missing: 0,
+    selected: 0, arrived: 0, fueled: 0, skipped: 0, missing: 0, pendingFueled: 0, pendingRemaining: 0,
   };
+  const dispensedL = pendingTotals?.litres;
+  const spentCost = pendingTotals?.cost;
   // Only show a spend figure once something real has been dispensed — never a fake K0.
-  const hasSpend = counts.fueled > 0 && session?.totalActualCost != null;
+  const hasSpend = counts.pendingFueled > 0 && spentCost != null;
 
   return (
     <Card variant="outlined" sx={{ borderRadius: 2, mb: 1.5 }}>
@@ -39,7 +41,7 @@ export default function OperationRunHeader({ session, buckets }) {
             Fueling
           </Typography>
           <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary' }}>
-            {vehicleCountLabel(counts.selected)}
+            {vehicleCountLabel(counts.pendingRemaining)}
           </Typography>
         </Box>
 
@@ -53,9 +55,9 @@ export default function OperationRunHeader({ session, buckets }) {
         ) : (
           <>
             <Box sx={{ display: 'flex' }}>
-              <SummaryStat value={counts.fueled} label="Fueled" />
-              <SummaryStat value={counts.missing} label="Remaining" warn={counts.missing > 0} />
-              <SummaryStat value={formatLitres(session?.totalActualFuel)} label="Dispensed" />
+              <SummaryStat value={counts.pendingFueled} label="Fueled" />
+              <SummaryStat value={counts.pendingRemaining} label="Remaining" warn={counts.pendingRemaining > 0} />
+              <SummaryStat value={formatLitres(dispensedL)} label="Dispensed" />
             </Box>
             {(hasSpend || displayStatus !== 'planning') && (
               <>
@@ -63,7 +65,7 @@ export default function OperationRunHeader({ session, buckets }) {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="body2" color="text.secondary">Spent</Typography>
                   <Typography variant="body2" fontWeight={800}>
-                    {hasSpend ? formatK(session.totalActualCost) : '—'}
+                    {hasSpend ? formatK(spentCost) : '—'}
                   </Typography>
                 </Box>
               </>

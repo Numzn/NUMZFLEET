@@ -32,7 +32,12 @@ import SmartInvoiceAttachment from './components/SmartInvoiceAttachment.jsx';
 import OperationVehicleLabel from './components/OperationVehicleLabel.jsx';
 import { formatK, formatLitres, vehicleCountLabel } from './utils/formatters.js';
 import {
-  deriveInvoiceStage, INVOICE_STAGE_LABEL, invoiceStageColor, isRefuelComplete, summarizeRefuelBuckets,
+  deriveInvoiceStage,
+  INVOICE_STAGE_LABEL,
+  invoiceStageColor,
+  isRefuelComplete,
+  partitionFueledByCoverage,
+  summarizeRefuelBuckets,
 } from './utils/operationDayUtils.js';
 
 function invoiceTitle(invoice) {
@@ -78,9 +83,12 @@ export default function SmartInvoicesPage() {
   const refuels = todayDetails?.refuels || [];
   const fueledRefuels = refuels.filter(isRefuelComplete);
   const refuelsById = new Map(refuels.map((r) => [Number(r.id), r]));
-  const coveredRefuelIdSet = new Set(invoices.flatMap((i) => i.coveredRefuelIds || []).map(Number));
-  const coveredCount = fueledRefuels.filter((r) => coveredRefuelIdSet.has(Number(r.id))).length;
-  const uncoveredCount = fueledRefuels.length - coveredCount;
+  // "pending" here means "still awaiting an invoice" — offered to the new-invoice
+  // picker below. Editing an *existing* invoice still needs the whole-fueled set
+  // (fueledRefuels) so it can show/retain the vehicles that invoice already covers.
+  const { pending: uncoveredRefuels, invoiced: coveredRefuels } = partitionFueledByCoverage(refuels, invoices);
+  const coveredCount = coveredRefuels.length;
+  const uncoveredCount = uncoveredRefuels.length;
   const isLocked = status === 'locked';
   const canEdit = isManager && !isLocked && status === 'approved';
 
@@ -163,7 +171,7 @@ export default function SmartInvoicesPage() {
         <CardContent sx={{ py: 1.25, '&:last-child': { pb: 1.25 } }}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
             <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 800 }}>
-              Coverage
+              Invoice Progress
             </Typography>
             {coverageChip && <Chip size="small" label={coverageChip.label} color={coverageChip.color} />}
           </Box>
@@ -171,7 +179,7 @@ export default function SmartInvoicesPage() {
           <Divider sx={{ my: 0.75 }} />
 
           <Box sx={{ display: 'flex' }}>
-            <SummaryStat value={fueledRefuels.length} label="Fueled" />
+            <SummaryStat value={fueledRefuels.length} label="Total Fueled" />
             <SummaryStat value={coveredCount} label="Covered" />
             <SummaryStat value={invoices.length} label="Attachments" />
           </Box>
@@ -179,7 +187,7 @@ export default function SmartInvoicesPage() {
           <Divider sx={{ my: 0.75 }} />
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body2" color="text.secondary">Uncovered vehicles</Typography>
+            <Typography variant="body2" color="text.secondary">Remaining to invoice</Typography>
             <Typography
               variant="body2"
               fontWeight={800}
@@ -213,7 +221,7 @@ export default function SmartInvoicesPage() {
         <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Attach Smart Invoice</Typography>
           <SmartInvoiceAttachment
-            refuels={fueledRefuels}
+            refuels={uncoveredRefuels}
             saving={saving}
             error={formError}
             onSubmit={handleCreate}

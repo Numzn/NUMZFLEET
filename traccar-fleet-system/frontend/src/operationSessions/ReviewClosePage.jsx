@@ -13,7 +13,9 @@ import {
 import { RUNTIME_STACK_GAP } from '../common/styles/runtimeDensity';
 import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
 import useTodayOperation from './hooks/useTodayOperation.js';
-import { isRefuelComplete, summarizeRefuelBuckets } from './utils/operationDayUtils.js';
+import {
+  filterUninvoiced, isRefuelComplete, sumActualFuelAndCost, sumEstimatedFuelAndCost, summarizeRefuelBuckets,
+} from './utils/operationDayUtils.js';
 import { formatK, formatLitres, vehicleCountLabel } from './utils/formatters.js';
 import OperationVehicleLabel from './components/OperationVehicleLabel.jsx';
 
@@ -42,16 +44,18 @@ export default function ReviewClosePage() {
 
   const sessionId = todayOperation?.id;
   const refuels = todayDetails?.refuels || [];
-  const buckets = summarizeRefuelBuckets(refuels);
-  const fueledRefuels = refuels.filter(isRefuelComplete);
+  const invoices = todayDetails?.invoices || [];
+  // The active queue: every vehicle still awaiting its journey's end (invoicing),
+  // regardless of whether it's been fueled yet — this is what "Estimated" sums
+  // over, so it shrinks alongside "Fueled"/"Total Spent" as vehicles are invoiced.
+  const pendingRefuels = filterUninvoiced(refuels, invoices);
+  const buckets = summarizeRefuelBuckets(refuels, invoices);
+  const fueledRefuels = pendingRefuels.filter(isRefuelComplete);
 
-  const totalSpent = Number(todayDetails?.totalActualCost ?? 0);
-  const totalFuelL = Number(todayDetails?.totalActualFuel ?? 0);
-  const estimatedCost = todayDetails?.totalEstimatedCost != null ? Number(todayDetails.totalEstimatedCost) : null;
-  const varianceCost = todayDetails?.totalVarianceCost != null ? Number(todayDetails.totalVarianceCost) : null;
-  const varianceLabel = varianceCost != null
-    ? `${varianceCost < 0 ? '-' : varianceCost > 0 ? '+' : ''}${formatK(Math.abs(varianceCost))}`
-    : '—';
+  const { litres: totalFuelL, cost: totalSpent } = sumActualFuelAndCost(fueledRefuels);
+  const { cost: estimatedCost } = sumEstimatedFuelAndCost(pendingRefuels);
+  const varianceCost = totalSpent - estimatedCost;
+  const varianceLabel = `${varianceCost < 0 ? '-' : varianceCost > 0 ? '+' : ''}${formatK(Math.abs(varianceCost))}`;
 
   if (loading && !todayDetails) {
     return (
@@ -78,7 +82,7 @@ export default function ReviewClosePage() {
               Review
             </Typography>
             <Typography variant="overline" sx={{ letterSpacing: 0.6, fontWeight: 700, color: 'text.secondary' }}>
-              {vehicleCountLabel(buckets.selected)}
+              {vehicleCountLabel(buckets.pendingRemaining)}
             </Typography>
           </Box>
 
@@ -97,8 +101,8 @@ export default function ReviewClosePage() {
 
           <Box sx={{ display: 'flex' }}>
             <SummaryStat value={formatLitres(totalFuelL)} label="Fuel" />
-            <SummaryStat value={buckets.fueled} label="Fueled" />
-            <SummaryStat value={estimatedCost != null ? formatK(estimatedCost) : '—'} label="Estimated" />
+            <SummaryStat value={buckets.pendingFueled} label="Fueled" />
+            <SummaryStat value={formatK(estimatedCost)} label="Estimated" />
           </Box>
 
           <Divider sx={{ my: 0.75 }} />
@@ -122,12 +126,16 @@ export default function ReviewClosePage() {
             FUELED VEHICLES
           </Typography>
           <Typography variant="caption" color="text.secondary" fontWeight={700} sx={LABEL_SX}>
-            {buckets.fueled}
+            {buckets.pendingFueled}
           </Typography>
         </Stack>
 
         {fueledRefuels.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No vehicles fueled yet.</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {refuels.filter(isRefuelComplete).length > 0
+              ? 'All fueled vehicles have been invoiced.'
+              : 'No vehicles fueled yet.'}
+          </Typography>
         ) : (
           <Stack>
             {fueledRefuels.map((refuel) => (

@@ -21,7 +21,14 @@ import {
   markRefuelArrived,
   skipOperationVehicle,
 } from './api/operationSessionsApi';
-import { isRefuelComplete, isRefuelSkipped, summarizeRefuelBuckets } from './utils/operationDayUtils.js';
+import {
+  isRefuelComplete,
+  isRefuelSkipped,
+  partitionFueledByCoverage,
+  summarizeRefuelBuckets,
+  sumActualFuelAndCost,
+} from './utils/operationDayUtils.js';
+import { OPERATION_SESSION_SOCKET_EVENT } from './utils/operationSessionSocketBridge.js';
 import PendingRefuelCard from './components/PendingRefuelCard.jsx';
 import CompletedRefuelCard from './components/CompletedRefuelCard.jsx';
 import OperationVehicleRow from './components/OperationVehicleRow.jsx';
@@ -68,6 +75,21 @@ const OperationRunPage = () => {
     );
   }, [user]);
 
+  // This page fetches independently of useTodayOperation, so it needs its own
+  // live-update listener: an invoice created from another tab/page should drop
+  // the newly-invoiced vehicle out of the Completed list here too.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !sessionId) return undefined;
+    const onSocketUpdate = (event) => {
+      const { sessionId: eventSessionId, type } = event.detail || {};
+      if (type !== 'invoice.reconciled') return;
+      if (Number(eventSessionId) !== Number(sessionId)) return;
+      loadSession();
+    };
+    window.addEventListener(OPERATION_SESSION_SOCKET_EVENT, onSocketUpdate);
+    return () => window.removeEventListener(OPERATION_SESSION_SOCKET_EVENT, onSocketUpdate);
+  }, [sessionId, loadSession]);
+
   const capacityByDeviceId = useMemo(() => {
     const map = {};
     for (const v of fleetVehicles) {
@@ -86,6 +108,7 @@ const OperationRunPage = () => {
   const isReadOnly = session?.isWritable === false || String(effectiveStatus).toLowerCase() === 'locked';
   const canRecord = session?.canRecordFuel && !isReadOnly;
   const refuels = session?.refuels || [];
+  const invoices = session?.invoices || [];
 
   const active = useMemo(
     () => refuels.filter((r) => !isRefuelComplete(r) && !isRefuelSkipped(r)),
@@ -96,9 +119,16 @@ const OperationRunPage = () => {
     () => [...active].sort((a, b) => (b.arrivedAt != null) - (a.arrivedAt != null)),
     [active],
   );
-  const completed = useMemo(() => refuels.filter(isRefuelComplete), [refuels]);
+  // A fueled vehicle's journey through the active queue ends once it's invoiced,
+  // so "Completed" here means "fueled but still awaiting invoice" — invoiced
+  // vehicles drop out immediately (they remain visible on Invoice/History).
+  const completed = useMemo(
+    () => partitionFueledByCoverage(refuels, invoices).pending,
+    [refuels, invoices],
+  );
   const skipped = useMemo(() => refuels.filter(isRefuelSkipped), [refuels]);
-  const buckets = useMemo(() => summarizeRefuelBuckets(refuels), [refuels]);
+  const buckets = useMemo(() => summarizeRefuelBuckets(refuels, invoices), [refuels, invoices]);
+  const pendingTotals = useMemo(() => sumActualFuelAndCost(completed), [completed]);
 
   const lockBanner = useMemo(() => {
     if (!session?.locksAt) return null;
@@ -114,13 +144,17 @@ const OperationRunPage = () => {
     return null;
   }, [session?.locksAt, isReadOnly]);
 
+  // Mileage prefill needs every fueled vehicle today, invoiced or not — sourced
+  // separately from `completed` so a same-day double-refuel doesn't lose its
+  // prior mileage once the first fill gets invoiced.
+  const allFueledToday = useMemo(() => refuels.filter(isRefuelComplete), [refuels]);
   const previousMileageByVehicle = useMemo(() => {
     const map = {};
-    for (const r of completed) {
+    for (const r of allFueledToday) {
       if (r.currentMileage != null) map[r.vehicleId] = Number(r.currentMileage);
     }
     return map;
-  }, [completed]);
+  }, [allFueledToday]);
 
   const submitRefuel = async (payload) => {
     await recordOperationRefuel(user, sessionId, payload);
@@ -141,7 +175,7 @@ const OperationRunPage = () => {
 
   return (
     <>
-      <OperationRunHeader session={session} buckets={buckets} />
+      <OperationRunHeader session={session} buckets={buckets} pendingTotals={pendingTotals} />
 
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
 

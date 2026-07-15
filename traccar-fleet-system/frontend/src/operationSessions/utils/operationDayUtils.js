@@ -173,8 +173,12 @@ export function isRefuelException(refuel) {
  *  - fueled: fuel recorded
  *  - skipped: explicitly skipped for the day
  *  - missing: planned but neither fueled nor skipped (still needs attention)
+ *  - invoicedCount / pendingFueled / pendingRemaining: only meaningful once
+ *    `invoices` is passed — see coveredRefuelIdSet(). A vehicle's active-queue
+ *    journey (planned -> fueled -> invoiced) only ends once invoiced or skipped,
+ *    so pendingRemaining is the true shrinking work queue, not just "not yet fueled."
  */
-export function summarizeRefuelBuckets(refuels = []) {
+export function summarizeRefuelBuckets(refuels = [], invoices = []) {
   const selected = refuels.length;
   const fueled = refuels.filter(isRefuelComplete).length;
   const skipped = refuels.filter(isRefuelSkipped).length;
@@ -182,9 +186,65 @@ export function summarizeRefuelBuckets(refuels = []) {
     (r) => !isRefuelSkipped(r) && (r?.arrivedAt != null || isRefuelComplete(r)),
   ).length;
   const missing = Math.max(0, selected - fueled - skipped);
+
+  const covered = coveredRefuelIdSet(invoices);
+  const invoicedCount = refuels.filter((r) => isRefuelComplete(r) && covered.has(Number(r.id))).length;
+  const pendingFueled = fueled - invoicedCount;
+  const pendingRemaining = Math.max(0, selected - skipped - invoicedCount);
+
   return {
-    selected, arrived, fueled, skipped, missing,
+    selected, arrived, fueled, skipped, missing, invoicedCount, pendingFueled, pendingRemaining,
   };
+}
+
+/** Set of refuel ids covered by any invoice. */
+export function coveredRefuelIdSet(invoices = []) {
+  return new Set(invoices.flatMap((i) => i.coveredRefuelIds || []).map(Number));
+}
+
+/** Any refuel-shaped rows (fueled or not) still in the active queue — i.e. not yet invoiced. */
+export function filterUninvoiced(rows = [], invoices = [], idKey = 'id') {
+  const covered = coveredRefuelIdSet(invoices);
+  return rows.filter((r) => !covered.has(Number(r[idKey])));
+}
+
+/**
+ * Splits fueled refuels into pending (not yet invoiced) vs invoiced.
+ * Only fueled rows are considered — skipped/planned/arrived rows can't be invoiced.
+ */
+export function partitionFueledByCoverage(refuels = [], invoices = []) {
+  const covered = coveredRefuelIdSet(invoices);
+  const fueled = refuels.filter(isRefuelComplete);
+  return {
+    pending: fueled.filter((r) => !covered.has(Number(r.id))),
+    invoiced: fueled.filter((r) => covered.has(Number(r.id))),
+  };
+}
+
+/** Sum of actualFuelLitres/actualCost over a refuel subset. */
+export function sumActualFuelAndCost(refuels = []) {
+  return refuels.reduce((acc, r) => {
+    const l = Number(r.actualFuelLitres);
+    const c = Number(r.actualCost);
+    return { litres: acc.litres + (Number.isFinite(l) ? l : 0), cost: acc.cost + (Number.isFinite(c) ? c : 0) };
+  }, { litres: 0, cost: 0 });
+}
+
+/**
+ * Sum of planned/estimated litres + estimatedCost over a refuel subset, mirroring
+ * the backend's AggregationEngine.summarizeTotalsFromRefuels exactly (prefers
+ * plannedFuelLitres over estimatedFuelLitres, excludes skipped rows) so pending
+ * and whole-day estimates are computed identically.
+ */
+export function sumEstimatedFuelAndCost(refuels = []) {
+  return refuels.reduce((acc, r) => {
+    if (r.skippedAt != null) return acc;
+    const planned = r.plannedFuelLitres != null ? Number(r.plannedFuelLitres) : null;
+    const litres = (planned != null && Number.isFinite(planned) && planned > 0)
+      ? planned : (Number(r.estimatedFuelLitres) || 0);
+    const c = Number(r.estimatedCost);
+    return { litres: acc.litres + litres, cost: acc.cost + (Number.isFinite(c) ? c : 0) };
+  }, { litres: 0, cost: 0 });
 }
 
 /**

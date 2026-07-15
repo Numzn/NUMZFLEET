@@ -33,6 +33,7 @@ import {
 import {
   deriveFuelingDayStatus,
   deriveVehicleWorkflowState,
+  filterUninvoiced,
   isRefuelComplete,
   isRefuelSkipped,
   VEHICLE_STATE_LABEL,
@@ -289,14 +290,21 @@ const ForecastPage = () => {
 
   const loading = todayLoading || fleetLoading || forecastLoading;
 
+  const invoices = todayDetails?.invoices || [];
   const vehicleRows = forecast?.vehicles || [];
-  const vehicleCount = vehicleRows.length;
-  // Fueled vehicles stay part of the session (totals/budget below are computed
-  // from the full vehicleRows), but the active Planning list should only show
-  // vehicles that still need attention today.
+  // A vehicle's journey through the active queue ends once it's invoiced — from
+  // that point it's no longer part of "today's plan" anywhere on this page.
+  const pendingVehicleRows = useMemo(
+    () => filterUninvoiced(vehicleRows, invoices, 'refuelId'),
+    [vehicleRows, invoices],
+  );
+  const vehicleCount = pendingVehicleRows.length;
+  // Fueled-but-uninvoiced vehicles stay part of the pending plan (totals/budget
+  // below are computed from pendingVehicleRows), but the active Planning list
+  // should only show vehicles that still need attention today.
   const activeVehicleRows = useMemo(
-    () => vehicleRows.filter((v) => !isRefuelComplete(refuelByVehicleId[v.vehicleId])),
-    [vehicleRows, refuelByVehicleId],
+    () => pendingVehicleRows.filter((v) => !isRefuelComplete(refuelByVehicleId[v.vehicleId])),
+    [pendingVehicleRows, refuelByVehicleId],
   );
 
   const plannedLitresFor = useCallback((v) => {
@@ -305,20 +313,20 @@ const ForecastPage = () => {
   }, [refuelByVehicleId]);
 
   const totalPlannedLitres = useMemo(
-    () => vehicleRows.reduce((sum, v) => {
+    () => pendingVehicleRows.reduce((sum, v) => {
       const n = Number(plannedLitresFor(v));
       return Number.isFinite(n) ? sum + n : sum;
     }, 0),
-    [vehicleRows, plannedLitresFor],
+    [pendingVehicleRows, plannedLitresFor],
   );
 
   const readyCount = useMemo(
-    () => vehicleRows.filter((v) => {
+    () => pendingVehicleRows.filter((v) => {
       const refuel = refuelByVehicleId[v.vehicleId];
       if (isRefuelSkipped(refuel)) return false;
       return Number(plannedLitresFor(v)) > 0;
     }).length,
-    [vehicleRows, refuelByVehicleId, plannedLitresFor],
+    [pendingVehicleRows, refuelByVehicleId, plannedLitresFor],
   );
 
   return (
@@ -455,7 +463,7 @@ const ForecastPage = () => {
               <Box sx={{ display: 'flex' }}>
                 <SummaryStat value={formatLitres(totalPlannedLitres)} label="Planned" />
                 <SummaryStat value={vehicleCount} label="Vehicles" />
-                <SummaryStat value={formatK(forecast.fleetSummary?.estimatedCost)} label="Est. cost" />
+                <SummaryStat value={formatK(totalPlannedLitres * (forecast.erbPricePerLitre || 0))} label="Est. cost" />
               </Box>
 
               <Divider sx={{ my: 0.75 }} />

@@ -46,12 +46,18 @@ export default function useTodayOperation() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const onSocketUpdate = (event) => {
-      const { sessionId, refuel, type } = event.detail || {};
+      const { sessionId, refuel, invoice, type } = event.detail || {};
       if (!sessionId) return;
       setTodayDetails((prev) => {
         if (!prev || Number(prev.id) !== Number(sessionId)) return prev;
         if (type === 'invoice.reconciled') {
-          return { ...prev, invoices: prev.invoices ? [...prev.invoices] : prev.invoices };
+          if (!invoice?.id) return prev;
+          const existing = Array.isArray(prev.invoices) ? prev.invoices : [];
+          const idx = existing.findIndex((i) => Number(i.id) === Number(invoice.id));
+          const invoices = idx >= 0
+            ? existing.map((i, k) => (k === idx ? invoice : i))
+            : [...existing, invoice];
+          return { ...prev, invoices };
         }
         if (!refuel?.id || !Array.isArray(prev.refuels)) return prev;
         const refuels = prev.refuels.map((r) => (
