@@ -14,7 +14,7 @@ import { RUNTIME_STACK_GAP } from '../common/styles/runtimeDensity';
 import { fuelApiErrorMessage } from '../fleet/vehiclesApi.js';
 import useTodayOperation from './hooks/useTodayOperation.js';
 import {
-  filterUninvoiced, isRefuelComplete, sumActualFuelAndCost, sumEstimatedFuelAndCost, summarizeRefuelBuckets,
+  isRefuelComplete, partitionFueledByCoverage, sumActualFuelAndCost, sumEstimatedFuelAndCost, summarizeRefuelBuckets,
 } from './utils/operationDayUtils.js';
 import { formatK, formatLitres, vehicleCountLabel } from './utils/formatters.js';
 import OperationVehicleLabel from './components/OperationVehicleLabel.jsx';
@@ -45,15 +45,15 @@ export default function ReviewClosePage() {
   const sessionId = todayOperation?.id;
   const refuels = todayDetails?.refuels || [];
   const invoices = todayDetails?.invoices || [];
-  // The active queue: every vehicle still awaiting its journey's end (invoicing),
-  // regardless of whether it's been fueled yet — this is what "Estimated" sums
-  // over, so it shrinks alongside "Fueled"/"Total Spent" as vehicles are invoiced.
-  const pendingRefuels = filterUninvoiced(refuels, invoices);
   const buckets = summarizeRefuelBuckets(refuels, invoices);
-  const fueledRefuels = pendingRefuels.filter(isRefuelComplete);
+  // Fueled-but-not-yet-invoiced vehicles — the same population backs every stat
+  // below, so "Estimated" and "Total Spent" stay apples-to-apples: a vehicle not
+  // yet fueled (still elsewhere in the active queue) doesn't inflate the estimate
+  // side while contributing nothing to the actual side.
+  const fueledRefuels = partitionFueledByCoverage(refuels, invoices).pending;
 
   const { litres: totalFuelL, cost: totalSpent } = sumActualFuelAndCost(fueledRefuels);
-  const { cost: estimatedCost } = sumEstimatedFuelAndCost(pendingRefuels);
+  const { cost: estimatedCost } = sumEstimatedFuelAndCost(fueledRefuels);
   const varianceCost = totalSpent - estimatedCost;
   const varianceLabel = `${varianceCost < 0 ? '-' : varianceCost > 0 ? '+' : ''}${formatK(Math.abs(varianceCost))}`;
 
