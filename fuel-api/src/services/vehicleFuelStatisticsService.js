@@ -150,10 +150,11 @@ export async function getVehicleFuelHistory(vehicleId, options = {}) {
     specEfficiencyKmL,
   });
   const economyByRefuelId = new Map();
+  const distanceByRefuelId = new Map();
   for (const interval of intervals) {
-    if (interval.refuelId != null && interval.kmPerLitre != null) {
-      economyByRefuelId.set(interval.refuelId, interval.kmPerLitre);
-    }
+    if (interval.refuelId == null) continue;
+    if (interval.kmPerLitre != null) economyByRefuelId.set(interval.refuelId, interval.kmPerLitre);
+    if (interval.distanceKm != null) distanceByRefuelId.set(interval.refuelId, interval.distanceKm);
   }
 
   const sorted = [...rows].sort(
@@ -169,6 +170,7 @@ export async function getVehicleFuelHistory(vehicleId, options = {}) {
     pricePerLitre: row.erbPricePerLitre != null ? Number(row.erbPricePerLitre) : null,
     totalCost: row.actualCost != null ? Number(row.actualCost) : null,
     economyKmPerL: economyByRefuelId.get(row.id) ?? null,
+    distanceSinceLastKm: distanceByRefuelId.get(row.id) ?? null,
     status: row.status,
   }));
 }
