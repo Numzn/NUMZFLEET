@@ -31,6 +31,10 @@ import { startImmobilizationEvaluatorScheduler } from './jobs/immobilizationEval
 import { startTrackingNotificationBridgeScheduler } from './jobs/trackingNotificationBridgeScheduler.js';
 import { startOperationLockNotificationScheduler } from './jobs/operationLockNotificationScheduler.js';
 import { startOperationAutoCloseScheduler } from './jobs/operationAutoCloseScheduler.js';
+import {
+  startVehicleStateReconciliationScheduler,
+  runVehicleStateStartupReconcile,
+} from './jobs/vehicleStateReconciliationScheduler.js';
 import { startComplianceNotificationScheduler } from './jobs/complianceNotificationScheduler.js';
 import { startTelemetryReconciliationScheduler } from './jobs/telemetryReconciliationScheduler.js';
 import {
@@ -452,6 +456,7 @@ let stopImmobilizationEvaluatorScheduler = () => {};
 let stopTrackingNotificationBridgeScheduler = () => {};
 let stopOperationLockNotificationScheduler = () => {};
 let stopOperationAutoCloseScheduler = () => {};
+let stopVehicleStateReconciliationScheduler = () => {};
 let stopComplianceNotificationScheduler = () => {};
 let stopTelemetryReconciliationScheduler = () => {};
 
@@ -574,6 +579,9 @@ const startServer = async () => {
       stopOperationAutoCloseScheduler = startOperationAutoCloseScheduler();
       stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
       stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
+      void runVehicleStateStartupReconcile().finally(() => {
+        stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
+      });
     });
 
     return; // Exit early (sync already attempted if Postgres was reachable)
@@ -609,6 +617,9 @@ const startServer = async () => {
     stopOperationAutoCloseScheduler = startOperationAutoCloseScheduler();
     stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
     stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
+    void runVehicleStateStartupReconcile().finally(() => {
+      stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
+    });
     reconcileDeviceAssignmentLabels()
       .then((stats) => {
         if (process.env.NODE_ENV === 'development') {
@@ -642,6 +653,7 @@ process.on('SIGTERM', () => {
   stopOperationAutoCloseScheduler();
   stopComplianceNotificationScheduler();
   stopTelemetryReconciliationScheduler();
+  stopVehicleStateReconciliationScheduler();
   httpServer.close(() => {
     if (isDev) {
       console.log('✅ Server closed');

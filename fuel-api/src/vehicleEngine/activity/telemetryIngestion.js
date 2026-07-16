@@ -2,8 +2,9 @@ import { QueryTypes } from 'sequelize';
 import sequelize from '../../config/database.js';
 import { DeviceAssignment, VehicleActivityState } from '../../models/index.js';
 import { normalizeTraccarEvent } from './telemetryNormalize.js';
-import { evaluateStateTransition } from './vehicleStateEngine.js';
+import { evaluateAndHeal } from './evaluateAndHeal.js';
 import { persistActivityState } from './activityStateService.js';
+import { recordVehicleStateCorrection } from './vehicleStateAuditService.js';
 import { emitDomainEvent } from '../../events/eventBus.js';
 import { EVENT_NAMES } from '../../events/eventNames.js';
 
@@ -105,7 +106,7 @@ export async function processTelemetryEvent(rawEvent) {
       let transition;
       try {
         const existing = await VehicleActivityState.findOne({ where: { vehicleId } });
-        transition = await evaluateStateTransition({
+        transition = await evaluateAndHeal({
           vehicleId,
           deviceId,
           deviceStatus,
@@ -113,7 +114,7 @@ export async function processTelemetryEvent(rawEvent) {
           positionSpeed,
           existing,
           now: eventTime.getTime(),
-        });
+        }, { source: 'webhook' });
 
         await persistActivityState({
           vehicleId,
@@ -122,6 +123,19 @@ export async function processTelemetryEvent(rawEvent) {
           stateEnteredAt: transition.stateEnteredAt,
           stateSource: transition.stateSource,
         }, new Date());
+
+        if (transition.isCorrection) {
+          await recordVehicleStateCorrection({
+            vehicleId,
+            previousState: transition.previousState,
+            correctedState: transition.state,
+            previousStateEnteredAt: transition.previousStateEnteredAt,
+            correctedStateEnteredAt: transition.stateEnteredAt,
+            reason: transition.reason,
+            source: 'webhook',
+            payload: { deviceId, eventType, issues: transition.issues },
+          });
+        }
       } catch (err) {
         await recordOutcome(eventId, { deviceId, eventType, vehicleId, outcome: 'error' });
         throw err;

@@ -1,7 +1,8 @@
 import { Op } from 'sequelize';
 import { VehicleActivityState } from '../../models/index.js';
 import sequelize from '../../config/database.js';
-import { evaluateStateTransition } from './vehicleStateEngine.js';
+import { evaluateAndHeal } from './evaluateAndHeal.js';
+import { recordVehicleStateCorrection } from './vehicleStateAuditService.js';
 
 /**
  * Evaluate canonical activity state for a batch of vehicles and persist any
@@ -29,7 +30,7 @@ export async function evaluateAndPersistActivityStates(rows) {
   const toUpsert = [];
   for (const row of rows) {
     const existing = existingByVehicle.get(String(row.vehicleId)) ?? null;
-    const { state, stateEnteredAt, stateSource } = await evaluateStateTransition({
+    const transition = await evaluateAndHeal({
       vehicleId: row.vehicleId,
       deviceId: row.deviceId,
       deviceStatus: row.deviceStatus,
@@ -37,7 +38,8 @@ export async function evaluateAndPersistActivityStates(rows) {
       positionSpeed: row.positionSpeed,
       existing,
       now,
-    });
+    }, { source: 'on_demand' });
+    const { state, stateEnteredAt, stateSource } = transition;
 
     results.set(String(row.vehicleId), { state, stateEnteredAt, stateSource });
     toUpsert.push({
@@ -47,6 +49,19 @@ export async function evaluateAndPersistActivityStates(rows) {
       stateEnteredAt,
       stateSource,
     });
+
+    if (transition.isCorrection) {
+      await recordVehicleStateCorrection({
+        vehicleId: row.vehicleId,
+        previousState: transition.previousState,
+        correctedState: transition.state,
+        previousStateEnteredAt: transition.previousStateEnteredAt,
+        correctedStateEnteredAt: transition.stateEnteredAt,
+        reason: transition.reason,
+        source: 'on_demand',
+        payload: { deviceId: row.deviceId, issues: transition.issues },
+      });
+    }
   }
 
   await batchUpsert(toUpsert, new Date(now));
