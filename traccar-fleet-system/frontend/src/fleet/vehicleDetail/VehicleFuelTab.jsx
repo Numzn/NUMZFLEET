@@ -3,6 +3,7 @@ import FuelCard from './FuelCard.jsx';
 import ErbInsightCard from './ErbInsightCard.jsx';
 import VehicleFuelColumn from './VehicleFuelColumn.jsx';
 import RecentFuelHistoryCard from './RecentFuelHistoryCard.jsx';
+import FuelIntelligenceCard from './FuelIntelligenceCard.jsx';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 
 export default function VehicleFuelTab({
@@ -39,6 +40,7 @@ export default function VehicleFuelTab({
         odometerConfidence={vehicleEngine?.registry?.odometerConfidence ?? null}
         intelligence={vehicleEngine?.intelligence}
       />
+      <FuelIntelligenceCard fuel={fuel} intelligence={vehicleEngine?.intelligence} />
       <RecentFuelHistoryCard deviceId={deviceId} />
     </Box>
   );
