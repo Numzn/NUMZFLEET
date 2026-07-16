@@ -2,6 +2,7 @@ import { Box, Typography } from '@mui/material';
 import FuelCard from './FuelCard.jsx';
 import ErbInsightCard from './ErbInsightCard.jsx';
 import VehicleFuelColumn from './VehicleFuelColumn.jsx';
+import RecentFuelHistoryCard from './RecentFuelHistoryCard.jsx';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 
 export default function VehicleFuelTab({
@@ -38,6 +39,7 @@ export default function VehicleFuelTab({
         odometerConfidence={vehicleEngine?.registry?.odometerConfidence ?? null}
         intelligence={vehicleEngine?.intelligence}
       />
+      <RecentFuelHistoryCard deviceId={deviceId} />
     </Box>
   );
 }

@@ -1,6 +1,7 @@
 import { resolveOdometerForDevice } from '../vehicleEngine/odometer/resolveVehicleOdometer.js';
 import { findCompletedRefuelsByVehicleId } from '../repositories/operationSessionRefuelRepository.js';
 import {
+  buildValidatedIntervals,
   calculateTankToTankEfficiency,
   DEFAULT_WINDOW_DAYS,
   scoreFuelConfidence,
@@ -127,4 +128,47 @@ export async function getVehicleFuelStatistics(vehicleId, options = {}) {
     sampleCount,
     fuelPerformance,
   };
+}
+
+/**
+ * Recent fueling sessions for one vehicle, newest first, each row annotated
+ * with the tank-to-tank economy calculated against the *previous* refuel
+ * (when that interval is learnable). Powers the Fuel tab's history list.
+ */
+export async function getVehicleFuelHistory(vehicleId, options = {}) {
+  const limit = Math.min(Math.max(Number(options.limit) || 10, 1), 50);
+  // Fetch a wider window than requested so the oldest displayed row still has
+  // a learnable interval against the refuel just before it.
+  const rows = await findCompletedRefuelsByVehicleId(vehicleId, Math.max(limit + 5, 20));
+  const vehicleSpec = await getVehicleSpec(Number(vehicleId));
+  const tankCapacity = vehicleSpec?.tankCapacity ?? null;
+  const specEfficiencyKmL = vehicleSpec?.fuelEfficiency ?? null;
+
+  const intervals = buildValidatedIntervals(rows, {
+    windowDays: null,
+    tankCapacity,
+    specEfficiencyKmL,
+  });
+  const economyByRefuelId = new Map();
+  for (const interval of intervals) {
+    if (interval.refuelId != null && interval.kmPerLitre != null) {
+      economyByRefuelId.set(interval.refuelId, interval.kmPerLitre);
+    }
+  }
+
+  const sorted = [...rows].sort(
+    (a, b) => new Date(b.sessionDate || b.createdAt) - new Date(a.sessionDate || a.createdAt),
+  );
+
+  return sorted.slice(0, limit).map((row) => ({
+    refuelId: row.id,
+    sessionId: row.sessionId,
+    date: row.sessionDate || row.createdAt,
+    litres: row.actualFuelLitres != null ? Number(row.actualFuelLitres) : null,
+    odometerKm: row.currentMileage != null ? Number(row.currentMileage) : null,
+    pricePerLitre: row.erbPricePerLitre != null ? Number(row.erbPricePerLitre) : null,
+    totalCost: row.actualCost != null ? Number(row.actualCost) : null,
+    economyKmPerL: economyByRefuelId.get(row.id) ?? null,
+    status: row.status,
+  }));
 }

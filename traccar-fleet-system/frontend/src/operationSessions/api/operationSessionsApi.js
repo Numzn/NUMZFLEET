@@ -261,6 +261,16 @@ export async function fetchVehicleOperationReports(user, query = {}) {
   return response.json();
 }
 
+export async function fetchVehicleFuelHistory(user, vehicleId, query = {}) {
+  const params = new URLSearchParams();
+  if (query.limit != null) params.set('limit', String(query.limit));
+  const qs = params.toString();
+  const response = await fetchOrThrow(`/api/operation-sessions/vehicles/${vehicleId}/history${qs ? `?${qs}` : ''}`, {
+    headers: fuelApiAuthHeaders(user),
+  });
+  return response.json();
+}
+
 export async function fetchManagementOperationReports(user, query = {}) {
   const params = new URLSearchParams();
   if (query.month) params.set('month', query.month);

@@ -10,6 +10,7 @@ import {
   updateOperationDetails,
 } from '../services/operationSessionService.js';
 import { getOperationForecast, regenerateOperationForecast, getVehicleFuelProfile } from '../services/operationForecastService.js';
+import { getVehicleFuelHistory } from '../services/vehicleFuelStatisticsService.js';
 import { approveOperation } from '../services/operationApprovalService.js';
 import {
   recordOperationRefuel, markRefuelArrived, skipRefuel, unskipRefuel,
@@ -335,6 +336,15 @@ export const getVehicleStatistics = async (req, res) => {
     return res.json(profile);
   } catch (error) {
     return handleError(res, error, 'Vehicle fuel profile error', 'Failed to get vehicle fuel profile');
+  }
+};
+
+export const getVehicleHistory = async (req, res) => {
+  try {
+    const history = await getVehicleFuelHistory(req.params.vehicleId, req.query || {});
+    return res.json({ vehicleId: Number(req.params.vehicleId), history });
+  } catch (error) {
+    return handleError(res, error, 'Vehicle fuel history error', 'Failed to get vehicle fuel history');
   }
 };
 
