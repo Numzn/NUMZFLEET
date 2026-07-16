@@ -271,6 +271,13 @@ export async function fetchVehicleFuelHistory(user, vehicleId, query = {}) {
   return response.json();
 }
 
+export async function fetchVehicleFuelTrends(user, vehicleId) {
+  const response = await fetchOrThrow(`/api/operation-sessions/vehicles/${vehicleId}/trends`, {
+    headers: fuelApiAuthHeaders(user),
+  });
+  return response.json();
+}
+
 export async function fetchManagementOperationReports(user, query = {}) {
   const params = new URLSearchParams();
   if (query.month) params.set('month', query.month);

@@ -7,7 +7,7 @@ import {
   scoreFuelConfidence,
 } from '../utils/fuelEfficiencyUtils.js';
 import { getVehicleSpec } from './vehicleSpecService.js';
-import { odometerConfidenceToNumeric } from '../vehicleEngine/fuel/intervalValidator.js';
+import { INTERVAL_STATUS, odometerConfidenceToNumeric } from '../vehicleEngine/fuel/intervalValidator.js';
 
 function daysBetween(a, b) {
   const ms = Math.abs(new Date(b).getTime() - new Date(a).getTime());
@@ -171,4 +171,52 @@ export async function getVehicleFuelHistory(vehicleId, options = {}) {
     economyKmPerL: economyByRefuelId.get(row.id) ?? null,
     status: row.status,
   }));
+}
+
+/**
+ * Compact KPI set for the Fuel Trends section: monthly spend, average
+ * economy, average litres per fill, cost per km, and average distance
+ * between refuels. Cost-per-km pairs each learnable interval's distance
+ * with the cost of the refuel that closed it (the fill that covered that
+ * distance) — an approximation, not an accounting-grade allocation.
+ */
+export async function getVehicleFuelTrends(vehicleId) {
+  const stats = await getVehicleFuelStatistics(vehicleId);
+  const rows = await findCompletedRefuelsByVehicleId(vehicleId, 48);
+
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  let costSum = 0;
+  let costDistanceKm = 0;
+  for (const interval of stats.fuelPerformance?.intervals ?? []) {
+    if (interval.status !== INTERVAL_STATUS.LEARNABLE) continue;
+    const currentRow = rowById.get(interval.refuelId);
+    const cost = currentRow?.actualCost != null ? Number(currentRow.actualCost) : null;
+    if (cost != null && interval.distanceKm > 0) {
+      costSum += cost;
+      costDistanceKm += interval.distanceKm;
+    }
+  }
+  const costPerKmZmw = costDistanceKm > 0 ? Number((costSum / costDistanceKm).toFixed(2)) : null;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthlyCosts = rows
+    .filter((r) => {
+      const d = new Date(r.sessionDate || r.createdAt);
+      return !Number.isNaN(d.getTime()) && d >= monthStart;
+    })
+    .map((r) => Number(r.actualCost))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const monthlySpendZmw = monthlyCosts.length
+    ? Number(monthlyCosts.reduce((s, v) => s + v, 0).toFixed(2))
+    : null;
+
+  return {
+    vehicleId: Number(vehicleId),
+    monthlySpendZmw,
+    averageEconomyKmPerL: stats.fuelPerformance?.kmPerLitre ?? null,
+    averageLitresPerFill: stats.averageRefillLitres,
+    costPerKmZmw,
+    averageDistanceBetweenRefuelsKm: stats.averageKmBetweenRefills,
+  };
 }

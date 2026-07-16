@@ -17,6 +17,7 @@ import {
   getVehicleHistory,
   getVehicleReports,
   getVehicleStatistics,
+  getVehicleTrends,
   putInvoice,
   listInvoices,
   postInvoice,
@@ -44,6 +45,7 @@ router.get('/reports/vehicles', requireAuth, getVehicleReports);
 router.get('/reports/management', requireAuth, getManagementReports);
 router.get('/vehicles/:vehicleId/statistics', requireAuth, getVehicleStatistics);
 router.get('/vehicles/:vehicleId/history', requireAuth, getVehicleHistory);
+router.get('/vehicles/:vehicleId/trends', requireAuth, getVehicleTrends);
 router.get('/attachments/:fileId', requireAuth, getInvoiceAttachment);
 
 router.get('/', requireAuth, listSessions);

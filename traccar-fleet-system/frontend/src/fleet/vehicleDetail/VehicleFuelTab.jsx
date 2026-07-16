@@ -4,6 +4,7 @@ import ErbInsightCard from './ErbInsightCard.jsx';
 import VehicleFuelColumn from './VehicleFuelColumn.jsx';
 import RecentFuelHistoryCard from './RecentFuelHistoryCard.jsx';
 import FuelIntelligenceCard from './FuelIntelligenceCard.jsx';
+import FuelTrendsCard from './FuelTrendsCard.jsx';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 
 export default function VehicleFuelTab({
@@ -41,6 +42,7 @@ export default function VehicleFuelTab({
         intelligence={vehicleEngine?.intelligence}
       />
       <FuelIntelligenceCard fuel={fuel} intelligence={vehicleEngine?.intelligence} />
+      <FuelTrendsCard deviceId={deviceId} />
       <RecentFuelHistoryCard deviceId={deviceId} />
     </Box>
   );
