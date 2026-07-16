@@ -1,4 +1,5 @@
 import { Box, Typography } from '@mui/material';
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import { useNavigate } from 'react-router-dom';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import useVehicleFuelHistory from './hooks/useVehicleFuelHistory.js';
@@ -21,8 +22,9 @@ export default function RecentFuelHistoryCard({ deviceId }) {
 
   return (
     <Box sx={vehicleWorkspaceCardSx}>
-      <Box sx={{ mb: 1.5 }}>
-        <Typography variant="subtitle1" fontWeight={700}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+        <HistoryOutlinedIcon color="primary" fontSize="small" />
+        <Typography variant="subtitle1" fontWeight={600}>
           Recent Fuel History
         </Typography>
       </Box>

@@ -1,5 +1,6 @@
 import { Box, Button, Typography } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
 import { vehicleModuleSx } from './dashboardCardSx.js';
 
 const formatErbTime = (iso) => {
@@ -14,14 +15,17 @@ const formatErbTime = (iso) => {
 export default function ErbInsightCard({ erb, vehicleSpec, estimatedFillCostZmw = null }) {
   return (
     <Box sx={vehicleModuleSx}>
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-        Fuel price (ERB)
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <PaidOutlinedIcon color="primary" fontSize="small" />
+        <Typography variant="subtitle1" fontWeight={600}>
+          Fuel price (ERB)
+        </Typography>
+      </Box>
       <Typography variant="body2" color="text.secondary" gutterBottom>
         Energy Regulation Board snapshot ({vehicleSpec?.fuelType || erb.fuelKey})
       </Typography>
       {erb.pricePerL != null ? (
-        <Typography variant="h5" fontWeight={700} sx={{ my: 1 }}>
+        <Typography variant="h4" fontWeight={700} sx={{ my: 1 }}>
           ZMW {erb.pricePerL.toFixed(2)} /L
         </Typography>
       ) : (

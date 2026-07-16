@@ -1,4 +1,5 @@
 import { Box, Button, Typography } from '@mui/material';
+import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
 import { useNavigate } from 'react-router-dom';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import useVehicleFuelRequests from './hooks/useVehicleFuelRequests.js';
@@ -19,9 +20,12 @@ export default function VehicleFuelColumn({ deviceId }) {
 
   return (
     <Box sx={vehicleWorkspaceCardSx}>
-      <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
-        Today&apos;s Operations
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+        <EventAvailableOutlinedIcon color="primary" fontSize="small" />
+        <Typography variant="subtitle1" fontWeight={600}>
+          Today&apos;s Operations
+        </Typography>
+      </Box>
 
       <Box sx={{ mb: 2 }}>
         {todayLoading && (

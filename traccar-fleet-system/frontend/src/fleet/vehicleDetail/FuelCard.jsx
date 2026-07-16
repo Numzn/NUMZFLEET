@@ -1,5 +1,5 @@
 import { Box, Typography, LinearProgress, Chip } from '@mui/material';
-import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
+import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
 import { vehicleModuleSx } from './dashboardCardSx.js';
@@ -12,7 +12,7 @@ export default function FuelCard({ fuel }) {
   return (
     <Box sx={vehicleModuleSx}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <LocalGasStationIcon color="primary" fontSize="small" />
+        <LocalGasStationOutlinedIcon color="primary" fontSize="small" />
         <Typography variant="subtitle1" fontWeight={600}>
           Fuel
         </Typography>
