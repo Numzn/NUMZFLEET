@@ -73,7 +73,6 @@ export default function FuelCard({ fuel }) {
       {sourceLabel && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
           {sourceLabel}
-          {fuel?.confidence != null ? ` · ${Math.round(fuel.confidence)}% confidence` : ''}
           {fuel?.intervalCount > 0 ? ` · ${fuel.intervalCount} intervals` : ''}
         </Typography>
       )}

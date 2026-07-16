@@ -14,8 +14,6 @@ export default function VehicleFuelTab({
   fuel,
   erb,
   deviceId,
-  fuelPerformance,
-  fuelPerformanceLoading,
   vehicleEngine,
   lastRefill,
 }) {
@@ -48,16 +46,7 @@ export default function VehicleFuelTab({
           estimatedFillCostZmw={fuel?.estimatedFillCostZmw ?? vehicleEngine?.fuelSnapshot?.estimatedFillCostZmw}
         />
       </Box>
-      <VehicleFuelColumn
-        deviceId={deviceId}
-        fuel={fuel}
-        erb={erb}
-        fuelPerformance={fuelPerformance}
-        fuelPerformanceLoading={fuelPerformanceLoading}
-        odometerKm={vehicleEngine?.registry?.odometerKm ?? vehicleEngine?.odometerKm ?? null}
-        odometerConfidence={vehicleEngine?.registry?.odometerConfidence ?? null}
-        intelligence={vehicleEngine?.intelligence}
-      />
+      <VehicleFuelColumn deviceId={deviceId} />
       <FuelIntelligenceCard fuel={fuel} intelligence={vehicleEngine?.intelligence} />
       <FuelTrendsCard deviceId={deviceId} />
       <RecentFuelHistoryCard deviceId={deviceId} />
