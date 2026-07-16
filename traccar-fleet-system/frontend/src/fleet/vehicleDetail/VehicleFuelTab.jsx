@@ -5,6 +5,7 @@ import VehicleFuelColumn from './VehicleFuelColumn.jsx';
 import RecentFuelHistoryCard from './RecentFuelHistoryCard.jsx';
 import FuelIntelligenceCard from './FuelIntelligenceCard.jsx';
 import FuelTrendsCard from './FuelTrendsCard.jsx';
+import FuelReportExportButton from './FuelReportExportButton.jsx';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 
 export default function VehicleFuelTab({
@@ -15,14 +16,26 @@ export default function VehicleFuelTab({
   fuelPerformance,
   fuelPerformanceLoading,
   vehicleEngine,
+  lastRefill,
 }) {
   const { sectionGap } = useVehicleWorkspaceDensity();
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: sectionGap }}>
-      <Typography variant="h2" sx={{ color: 'var(--color-text-primary)' }}>
-        Fuel
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+        <Typography variant="h2" sx={{ color: 'var(--color-text-primary)' }}>
+          Fuel
+        </Typography>
+        <FuelReportExportButton
+          vehicle={vehicle}
+          fuel={fuel}
+          intelligence={vehicleEngine?.intelligence}
+          odometerKm={vehicleEngine?.registry?.odometerKm ?? vehicleEngine?.odometerKm ?? null}
+          odometerConfidence={vehicleEngine?.registry?.odometerConfidence ?? null}
+          lastRefill={lastRefill}
+          deviceId={deviceId}
+        />
+      </Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
         <FuelCard fuel={fuel} />
         <ErbInsightCard

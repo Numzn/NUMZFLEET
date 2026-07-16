@@ -135,6 +135,7 @@ export default function VehicleWorkspaceTabs(props) {
             fuelPerformance={fuelPerformance}
             fuelPerformanceLoading={fuelPerformanceLoading}
             vehicleEngine={vehicleEngine}
+            lastRefill={lastRefill}
           />
         );
 

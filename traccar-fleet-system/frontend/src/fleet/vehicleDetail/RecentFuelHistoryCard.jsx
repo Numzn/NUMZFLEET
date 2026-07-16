@@ -67,7 +67,7 @@ export default function RecentFuelHistoryCard({ deviceId }) {
                   {formatLitres(row.litres)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {formatZmw(row.totalCost)}
+                  {row.totalCost != null ? formatZmw(row.totalCost) : '—'}
                   {row.economyKmPerL != null ? ` · ${row.economyKmPerL.toFixed(1)} km/L` : ''}
                 </Typography>
               </Box>
