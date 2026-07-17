@@ -44,14 +44,18 @@ services:
     image: traccar/traccar:latest
     container_name: numzfleet-dev-traccar
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "/traccar-entrypoint.sh"]
     depends_on:
       traccar-mysql:
         condition: service_healthy
     environment:
       TRACCAR_DATABASE_URL: jdbc:mysql://traccar-mysql:3306/traccar?useSSL=false&allowPublicKeyRetrieval=true
       TRACCAR_DATABASE_USER: traccar
+    env_file:
+      - ../../backend/.env
     volumes:
-      - ../../backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+      - ../../backend/conf/traccar.xml.template:/opt/traccar/conf/traccar.xml.template:ro
+      - ../../backend/conf/traccar-entrypoint.sh:/traccar-entrypoint.sh:ro
     # Raw GPS TCP ports must match backend/conf/traccar.xml (*.port). Not behind HTTP gateway.
     ports:
       - "8082:8082"

@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+<properties>
+    <!-- Database Configuration -->
+    <!-- Keep password aligned with MYSQL_PASSWORD in backend/.env on the server. -->
+    <entry key='database.driver'>com.mysql.cj.jdbc.Driver</entry>
+    <entry key='database.url'>jdbc:mysql://traccar-mysql:3306/traccar?serverTimezone=UTC&amp;useSSL=false&amp;allowPublicKeyRetrieval=true&amp;allowMultiQueries=true&amp;autoReconnect=true&amp;useUnicode=yes&amp;characterEncoding=UTF-8</entry>
+    <entry key='database.user'>traccar</entry>
+    <entry key='database.password'>traccar_pass</entry>
+
+    <!-- Web Server Configuration -->
+    <entry key='web.port'>8082</entry>
+    <entry key='web.address'>0.0.0.0</entry>
+
+    <!-- CORS and Security -->
+    <entry key='web.origin'>https://app.numz.site</entry>
+    <entry key='web.allowOrigin'>true</entry>
+    <entry key='web.timeout'>0</entry>
+
+    <!-- User Registration (set to true to allow public user registration) -->
+    <!-- WARNING: Only enable in development. Disable in production for security. -->
+    <entry key='server.registration'>false</entry>
+
+    <!-- GPS Accuracy Improvements (Safe Settings) -->
+    <entry key='filter.enable'>true</entry>
+    <entry key='filter.invalid'>true</entry>
+    <entry key='filter.duplicate'>true</entry>
+    <entry key='filter.accuracy'>200</entry>
+
+    <!-- Enable GPS Protocol Ports for Mobile Apps -->
+    <!-- OsmAnd Protocol (HTTP) - Recommended for React Native/Mobile Apps -->
+    <entry key='osmand.port'>5055</entry>
+
+    <!-- Additional Common Protocols -->
+    <entry key='gps103.port'>5001</entry>
+    <entry key='tk103.port'>5002</entry>
+    <entry key='gl200.port'>5003</entry>
+    <entry key='gl100.port'>5004</entry>
+    <entry key='t55.port'>5005</entry>
+    <entry key='teltonika.port'>5006</entry>
+    <entry key='meiligao.port'>5009</entry>
+    <entry key='h02.port'>5013</entry>
+    <entry key='gpsgate.port'>5020</entry>
+
+    <!-- Telemetry Ingestion: push every event to fuel-api's activity-state pipeline
+         in near real time (see fuel-api/src/routes/telemetryIngestion.js). "backend"
+         is the fuel-api service's docker-compose hostname, reachable only on the
+         internal network.
+
+         The __EVENT_FORWARD_HEADER__ placeholder below is substituted by
+         conf/traccar-entrypoint.sh at container start, from TELEMETRY_INGEST_SECRET
+         (same value fuel-api's requireTelemetrySecret middleware checks against —
+         both containers read it from the same backend/.env, so they can't drift).
+
+         This file is a TEMPLATE, not the config Traccar actually loads — the
+         entrypoint script renders it into conf/traccar.xml.generated. Do not bind-mount
+         this file directly as conf/traccar.xml; the placeholder would be sent to
+         fuel-api literally and every request would be rejected with 401.
+
+         Historical note: this used to rely on a TRACCAR_EVENT_FORWARD_HEADER
+         environment variable, on the assumption that the traccar/traccar Docker
+         image translates TRACCAR_*-prefixed env vars into config overrides. It
+         doesn't — this image's entrypoint is a bare `java -jar tracker-server.jar`
+         with no such translation, so that env var was silently inert and Traccar's
+         forward requests never carried the secret. See
+         docs/architecture/vehicle-state-engine.md for the investigation. -->
+    <entry key='event.forward.enable'>true</entry>
+    <entry key='event.forward.url'>http://backend:3000/internal/telemetry/traccar-events</entry>
+    <entry key='event.forward.header'>__EVENT_FORWARD_HEADER__</entry>
+</properties>

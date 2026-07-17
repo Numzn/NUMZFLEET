@@ -39,20 +39,27 @@ services:
     image: traccar/traccar:latest
     container_name: numzfleet-prod-traccar
     restart: unless-stopped
+    # Renders conf/traccar.xml.template with TELEMETRY_INGEST_SECRET substituted
+    # into event.forward.header before starting Traccar. Needed because the
+    # traccar/traccar image does not translate TRACCAR_*-prefixed env vars into
+    # config overrides (bare `java -jar` entrypoint, no wrapper script) — the
+    # previous TRACCAR_EVENT_FORWARD_HEADER var below was silently inert, so
+    # Traccar's forward webhook never carried the shared secret and every
+    # request was rejected with 401 before reaching fuel-api's telemetry
+    # ingestion logging. See docs/architecture/vehicle-state-engine.md and
+    # backend/conf/traccar.xml.template for the investigation and fix.
+    entrypoint: ["/bin/sh", "/traccar-entrypoint.sh"]
     depends_on:
       traccar-mysql:
         condition: service_healthy
     environment:
       TRACCAR_DATABASE_URL: jdbc:mysql://traccar-mysql:3306/traccar?useSSL=false&allowPublicKeyRetrieval=true
       TRACCAR_DATABASE_USER: traccar
-      # Real value lives only in deployment/.env (gitignored) — never in the
-      # committed traccar.xml. Compose tracks this like any other service
-      # config, so a value change here triggers a real recreate on the next
-      # `docker compose up`, unlike editing the bind-mounted XML file
-      # directly, which Compose has no way to detect.
-      TRACCAR_EVENT_FORWARD_HEADER: "x-telemetry-secret: ${TELEMETRY_INGEST_SECRET}"
+    env_file:
+      - ../../backend/.env
     volumes:
-      - ../../backend/conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+      - ../../backend/conf/traccar.xml.template:/opt/traccar/conf/traccar.xml.template:ro
+      - ../../backend/conf/traccar-entrypoint.sh:/traccar-entrypoint.sh:ro
     # Bound to loopback so only Caddy (80/443) is the public entry; ops can still
     # reach Traccar admin via SSH tunnel: ssh -L 8082:127.0.0.1:8082 <host>.
     # Raw GPS TCP ports below must match backend/conf/traccar.xml (*.port). Do not
