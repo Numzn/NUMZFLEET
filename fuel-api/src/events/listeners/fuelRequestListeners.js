@@ -1,20 +1,15 @@
 import eventBus from '../eventBus.js';
 import { EVENT_NAMES } from '../eventNames.js';
 import { withSafeListener } from '../safeListener.js';
-import {
-  emitFuelRequestCreated,
-  emitFuelRequestUpdated,
-  emitFuelRequestCancelled,
-} from '../../fuelRequests/handlers/socketEvents.js';
 import { persistFuelSocketEvent } from '../../modules/notifications/notificationService.js';
 
 /**
  * Register all listeners for the fuel request state machine.
  *
  * Each state transition has listeners for:
- *   1. socket-notify  — pushes the change to affected rooms via Socket.IO
- *   2. audit-log      — writes a structured log entry for the transition
- *   3. persist-notification — stores rows for notification center (PostgreSQL)
+ *   1. audit-log      — writes a structured log entry for the transition
+ *   2. persist-notification — stores rows for notification center (PostgreSQL),
+ *      which also drives the canonical notification.created socket delivery
  *
  * Listeners are wrapped in withSafeListener so a failure in one (e.g. a broken
  * socket) cannot crash the API response or prevent the audit log from running.
@@ -22,13 +17,6 @@ import { persistFuelSocketEvent } from '../../modules/notifications/notification
 export const registerFuelRequestListeners = (io) => {
 
   // ─── fuel.request.created ────────────────────────────────────────────────
-
-  eventBus.on(
-    EVENT_NAMES.FUEL_REQUEST_CREATED,
-    withSafeListener(EVENT_NAMES.FUEL_REQUEST_CREATED, 'socket-notify-managers', ({ request, actorUserId }) => {
-      emitFuelRequestCreated(io, request, actorUserId);
-    }),
-  );
 
   eventBus.on(
     EVENT_NAMES.FUEL_REQUEST_CREATED,
@@ -64,13 +52,6 @@ export const registerFuelRequestListeners = (io) => {
   );
 
   // ─── fuel.request.approved ───────────────────────────────────────────────
-
-  eventBus.on(
-    EVENT_NAMES.FUEL_REQUEST_APPROVED,
-    withSafeListener(EVENT_NAMES.FUEL_REQUEST_APPROVED, 'socket-notify', ({ request, previousStatus, actorUserId, message }) => {
-      emitFuelRequestUpdated(io, request, 'approved', previousStatus, actorUserId, message);
-    }),
-  );
 
   eventBus.on(
     EVENT_NAMES.FUEL_REQUEST_APPROVED,
@@ -117,13 +98,6 @@ export const registerFuelRequestListeners = (io) => {
 
   eventBus.on(
     EVENT_NAMES.FUEL_REQUEST_FULFILLED,
-    withSafeListener(EVENT_NAMES.FUEL_REQUEST_FULFILLED, 'socket-notify', ({ request, previousStatus, actorUserId }) => {
-      emitFuelRequestUpdated(io, request, 'fulfilled', previousStatus, actorUserId);
-    }),
-  );
-
-  eventBus.on(
-    EVENT_NAMES.FUEL_REQUEST_FULFILLED,
     withSafeListener(EVENT_NAMES.FUEL_REQUEST_FULFILLED, 'audit-log', ({ request, previousStatus, actorUserId }) => {
       console.log('[audit] fuel.request.fulfilled', {
         requestId: request.id,
@@ -166,13 +140,6 @@ export const registerFuelRequestListeners = (io) => {
 
   eventBus.on(
     EVENT_NAMES.FUEL_REQUEST_REJECTED,
-    withSafeListener(EVENT_NAMES.FUEL_REQUEST_REJECTED, 'socket-notify', ({ request, previousStatus, actorUserId, message }) => {
-      emitFuelRequestUpdated(io, request, 'rejected', previousStatus, actorUserId, message);
-    }),
-  );
-
-  eventBus.on(
-    EVENT_NAMES.FUEL_REQUEST_REJECTED,
     withSafeListener(EVENT_NAMES.FUEL_REQUEST_REJECTED, 'audit-log', ({ request, previousStatus, actorUserId }) => {
       console.log('[audit] fuel.request.rejected', {
         requestId: request.id,
@@ -206,13 +173,6 @@ export const registerFuelRequestListeners = (io) => {
   );
 
   // ─── fuel.request.cancelled ──────────────────────────────────────────────
-
-  eventBus.on(
-    EVENT_NAMES.FUEL_REQUEST_CANCELLED,
-    withSafeListener(EVENT_NAMES.FUEL_REQUEST_CANCELLED, 'socket-notify', ({ request, previousStatus, actorUserId }) => {
-      emitFuelRequestCancelled(io, request, previousStatus, actorUserId);
-    }),
-  );
 
   eventBus.on(
     EVENT_NAMES.FUEL_REQUEST_CANCELLED,

@@ -5,8 +5,6 @@ import { upsertTraccarDeviceAttribute } from '../../config/traccar.js';
 import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
 import { vehicleAssignmentPolicy } from '../../notifications/policies/notificationPolicyRegistry.js';
 
-const SOCKET_EVENT_NAME = 'vehicle-assignment-updated';
-
 const registerTraccarSyncListener = () => {
   eventBus.on(
     EVENT_NAMES.VEHICLE_ASSIGNED,
@@ -21,31 +19,6 @@ const registerTraccarSyncListener = () => {
 
         await upsertTraccarDeviceAttribute(Number(deviceId), 'vehicleName', vehicleName);
         await upsertTraccarDeviceAttribute(Number(deviceId), 'fleetVehicleId', String(vehicleId));
-      },
-    ),
-  );
-};
-
-const registerSocketBroadcastListener = (io) => {
-  eventBus.on(
-    EVENT_NAMES.VEHICLE_ASSIGNED,
-    withSafeListener(
-      EVENT_NAMES.VEHICLE_ASSIGNED,
-      'emit-manager-socket-update',
-      ({ vehicleId, deviceId, vehicleName, previousDeviceId, assignedAt, actorUserId }) => {
-        if (!io?.sockets) {
-          return;
-        }
-
-        io.to('managers').emit(SOCKET_EVENT_NAME, {
-          event: EVENT_NAMES.VEHICLE_ASSIGNED,
-          vehicleId,
-          deviceId,
-          vehicleName,
-          previousDeviceId,
-          assignedAt,
-          changedBy: actorUserId,
-        });
       },
     ),
   );
@@ -109,7 +82,6 @@ const registerPersistNotificationListener = (io) => {
 
 export const registerVehicleAssignedListeners = (io) => {
   registerTraccarSyncListener();
-  registerSocketBroadcastListener(io);
   registerPersistNotificationListener(io);
   registerAuditLogListener();
 };

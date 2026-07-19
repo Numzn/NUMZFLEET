@@ -4,7 +4,6 @@ import {
   severityForStatus,
   titleForIntent,
   PUBLISH_STATUS,
-  REALTIME_STATUS,
 } from './immobilizationNotificationService.js';
 
 describe('severityForStatus', () => {
@@ -45,8 +44,3 @@ describe('PUBLISH_STATUS', () => {
   });
 });
 
-describe('REALTIME_STATUS', () => {
-  it('still includes expired (unchanged — it already got the live socket ping)', () => {
-    assert.ok(REALTIME_STATUS.includes('expired'));
-  });
-});

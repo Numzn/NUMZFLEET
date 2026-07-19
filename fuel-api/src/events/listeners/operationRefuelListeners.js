@@ -1,11 +1,7 @@
 import eventBus from '../eventBus.js';
 import { EVENT_NAMES } from '../eventNames.js';
 import { withSafeListener } from '../safeListener.js';
-import {
-  emitOperationRefuelEvent,
-  emitOperationInvoiceReconciled,
-  emitVehicleDocumentOcrCompleted,
-} from '../../operations/handlers/operationSocketEvents.js';
+import { emitVehicleDocumentOcrCompleted } from '../../operations/handlers/operationSocketEvents.js';
 import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
 import {
   operationRefuelRecordedPolicy,
@@ -163,22 +159,8 @@ export const registerOperationRefuelListeners = (io) => {
 
   eventBus.on(
     EVENT_NAMES.OPERATION_REFUEL_RECORDED,
-    withSafeListener(EVENT_NAMES.OPERATION_REFUEL_RECORDED, 'socket-notify', (payload) => {
-      emitOperationRefuelEvent(io, 'operation-refuel-recorded', payload);
-    }),
-  );
-
-  eventBus.on(
-    EVENT_NAMES.OPERATION_REFUEL_RECORDED,
     withSafeListener(EVENT_NAMES.OPERATION_REFUEL_RECORDED, 'persist-notification', async (payload) => {
       await notifyRefuelRecorded(payload);
-    }),
-  );
-
-  eventBus.on(
-    EVENT_NAMES.OPERATION_REFUEL_ARRIVED,
-    withSafeListener(EVENT_NAMES.OPERATION_REFUEL_ARRIVED, 'socket-notify', (payload) => {
-      emitOperationRefuelEvent(io, 'operation-refuel-arrived', payload);
     }),
   );
 
@@ -191,22 +173,8 @@ export const registerOperationRefuelListeners = (io) => {
 
   eventBus.on(
     EVENT_NAMES.OPERATION_REFUEL_SKIPPED,
-    withSafeListener(EVENT_NAMES.OPERATION_REFUEL_SKIPPED, 'socket-notify', (payload) => {
-      emitOperationRefuelEvent(io, 'operation-refuel-skipped', payload);
-    }),
-  );
-
-  eventBus.on(
-    EVENT_NAMES.OPERATION_REFUEL_SKIPPED,
     withSafeListener(EVENT_NAMES.OPERATION_REFUEL_SKIPPED, 'persist-notification', async (payload) => {
       await notifyRefuelSkipped({ ...payload, io });
-    }),
-  );
-
-  eventBus.on(
-    EVENT_NAMES.OPERATION_INVOICE_RECONCILED,
-    withSafeListener(EVENT_NAMES.OPERATION_INVOICE_RECONCILED, 'socket-notify', (payload) => {
-      emitOperationInvoiceReconciled(io, payload);
     }),
   );
 

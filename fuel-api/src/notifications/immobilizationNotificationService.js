@@ -22,9 +22,6 @@ export function titleForIntent(intent, status) {
 /** Statuses that get a persisted, inbox-visible notification. */
 export const PUBLISH_STATUS = ['completed', 'failed', 'blocked', 'cancelled', 'expired'];
 
-/** Statuses that also get a live 'immobilization.updated' socket ping. */
-export const REALTIME_STATUS = ['completed', 'failed', 'cancelled', 'expired'];
-
 /**
  * @param {object} intent serialized or row-like
  * @param {{ status?: string, executionError?: string|null }} [extra]
@@ -32,7 +29,7 @@ export const REALTIME_STATUS = ['completed', 'failed', 'cancelled', 'expired'];
 export async function notifyImmobilizationTransition(intent, extra = {}) {
   if (!intent?.id) return;
   const status = extra.status || intent.status;
-  if (!PUBLISH_STATUS.includes(status) && !REALTIME_STATUS.includes(status)) return;
+  if (!PUBLISH_STATUS.includes(status)) return;
 
   const title = titleForIntent(intent, status);
   const message = extra.executionError
@@ -65,15 +62,5 @@ export async function notifyImmobilizationTransition(intent, extra = {}) {
       clientDedupKey: policy.clientDedupKey,
       channels: policy.channels,
     }, { io });
-  }
-
-  if (REALTIME_STATUS.includes(status) && io) {
-    io.to('managers').emit('immobilization.updated', {
-      intentId: intent.id,
-      vehicleId: intent.vehicleId,
-      status,
-      confidence: intent.confidence,
-      updatedAt: intent.updatedAt || at,
-    });
   }
 }

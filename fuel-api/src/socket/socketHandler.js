@@ -167,10 +167,6 @@ export const initializeSocket = (io) => {
   return io;
 };
 
-// NOTE: Event emission functions have been moved to fuelRequests/handlers/socketEvents.js
-// These functions are kept here for backward compatibility but should use socketEvents.js instead
-// The actual implementations with proper logging are in socketEvents.js
-
 export default initializeSocket;
 
 
