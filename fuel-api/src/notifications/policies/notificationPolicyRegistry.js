@@ -156,6 +156,58 @@ export function operationRefuelRecordedPolicy({ sessionId, refuelId, driverId })
 }
 
 // ---------------------------------------------------------------------------
+// #4b Operation refuel arrived / skipped / invoice reconciled, vehicle
+// document OCR completed (operationRefuelListeners.js) — Phase 2 additions.
+// These previously only fired a raw socket emit with no persisted inbox
+// row; this closes that gap. Not carried over from Phase 1 (that phase's
+// inventory covered only the 11 producers already persisting).
+// ---------------------------------------------------------------------------
+
+export function operationRefuelArrivedPolicy({ sessionId, refuelId, driverId }) {
+  return {
+    type: 'operation.refuel.arrived',
+    entityType: 'fuel',
+    severity: 'info',
+    audience: { includeDriverWithManagers: true, driverId: Number(driverId) },
+    channels: STANDARD_CHANNELS,
+    clientDedupKey: `operation:${sessionId}:refuel:${refuelId}:arrived`,
+  };
+}
+
+export function operationRefuelSkippedPolicy({ sessionId, refuelId, driverId }) {
+  return {
+    type: 'operation.refuel.skipped',
+    entityType: 'fuel',
+    severity: 'warning',
+    audience: { includeDriverWithManagers: true, driverId: Number(driverId) },
+    channels: STANDARD_CHANNELS,
+    clientDedupKey: `operation:${sessionId}:refuel:${refuelId}:skipped`,
+  };
+}
+
+export function operationInvoiceReconciledPolicy({ sessionId, invoiceId, driverId }) {
+  return {
+    type: 'operation.invoice.reconciled',
+    entityType: 'fuel',
+    severity: 'success',
+    audience: { includeDriverWithManagers: true, driverId: Number(driverId) },
+    channels: STANDARD_CHANNELS,
+    clientDedupKey: `operation:${sessionId}:invoice:${invoiceId}:reconciled`,
+  };
+}
+
+export function vehicleDocumentOcrCompletedPolicy({ fleetVehicleId, documentId }) {
+  return {
+    type: 'vehicle.document.ocr.completed',
+    entityType: 'vehicle',
+    severity: 'info',
+    audience: { managers: true },
+    channels: STANDARD_CHANNELS,
+    clientDedupKey: `vehicle:${fleetVehicleId}:document:${documentId}:ocr-completed`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // #5 Vehicle assignment (vehicleAssignedListeners.js)
 // ---------------------------------------------------------------------------
 
