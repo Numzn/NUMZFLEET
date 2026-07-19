@@ -2,6 +2,7 @@
  * WebSocket handler for real-time fuel request updates
  */
 import { validateSessionToken } from '../services/sessionService.js';
+import { roleFlagsFromTraccar } from '../services/userService.js';
 
 const getSessionTokenFromCookieHeader = (cookieHeader) => {
   if (!cookieHeader || typeof cookieHeader !== 'string') {
@@ -37,13 +38,20 @@ export const initializeSocket = (io) => {
       if (user) {
         socket.data.userId = user.id || null;
         socket.data.administrator = !!user.administrator;
+        socket.data.isManager = roleFlagsFromTraccar(user).isManager;
       } else if (isDev && socket.handshake?.auth?.userId != null) {
         const authUserId = Number(socket.handshake.auth.userId);
         socket.data.userId = Number.isFinite(authUserId) ? authUserId : null;
         socket.data.administrator = !!socket.handshake.auth.administrator;
+        socket.data.isManager = roleFlagsFromTraccar({
+          administrator: socket.handshake.auth.administrator,
+          attributes: socket.handshake.auth.attributes,
+          isManager: socket.handshake.auth.isManager,
+        }).isManager;
       } else {
         socket.data.userId = null;
         socket.data.administrator = false;
+        socket.data.isManager = false;
       }
 
       if (!user && isDev) {
@@ -59,6 +67,7 @@ export const initializeSocket = (io) => {
       socket.data = socket.data || {};
       socket.data.userId = null;
       socket.data.administrator = false;
+      socket.data.isManager = false;
       next();
     }
   });
@@ -72,11 +81,13 @@ export const initializeSocket = (io) => {
       
       const userId = socket.data?.userId;
       const isAdministrator = socket.data?.administrator || false;
-      
+      const isManager = socket.data?.isManager || false;
+
       if (isDev) {
         console.log(`✅ [Socket] Client connected: ${socket.id}`, {
           userId,
           administrator: isAdministrator,
+          isManager,
           handshake: {
             auth: socket.handshake.auth,
             headers: Object.keys(socket.handshake.headers),
@@ -86,7 +97,7 @@ export const initializeSocket = (io) => {
 
       // ========== Auto-join rooms with error handling ==========
       try {
-        if (isAdministrator) {
+        if (isManager) {
           socket.join('managers');
           if (isDev) {
             console.log(`✅ [Socket] ${socket.id} joined managers room`);
