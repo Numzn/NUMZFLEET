@@ -239,6 +239,28 @@ export const getManagerUserIds = async () => {
 };
 
 /**
+ * Look up a single Traccar user's phone number (tc_users.phone) — this is
+ * the "normal profile" NUMZFLEET users already have today (Traccar's own
+ * user settings), reused as-is; no new phone-number storage is introduced.
+ * Never throws: returns null if the user doesn't exist, is disabled, has no
+ * phone set, or the lookup itself fails — callers must treat null as
+ * "skip this recipient", not as an error to propagate.
+ */
+export const getUserPhoneNumber = async (userId) => {
+  try {
+    const pool = getTraccarPool();
+    const [rows] = await pool.execute(
+      'SELECT phone FROM tc_users WHERE id = ? AND disabled = 0',
+      [userId],
+    );
+    return rows[0]?.phone || null;
+  } catch (error) {
+    console.error('[userService] Error getting user phone number:', error);
+    return null;
+  }
+};
+
+/**
  * Get device by ID from Traccar
  */
 export const getTraccarDevice = async (deviceId) => {
@@ -266,5 +288,6 @@ export default {
   getTraccarUserBySessionViaAPI,
   getTraccarDevice,
   getManagerUserIds,
+  getUserPhoneNumber,
   testTraccarConnection,
 };
