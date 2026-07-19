@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { isGeofenceTrackingEvent } from './audienceResolver.js';
+import { isGeofenceTrackingEvent } from './deviceAudienceResolver.js';
 
 describe('isGeofenceTrackingEvent', () => {
   it('matches geofence event types regardless of casing', () => {

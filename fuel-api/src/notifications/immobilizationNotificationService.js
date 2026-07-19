@@ -1,15 +1,15 @@
 import { publishNotification } from './orchestrator/publishNotification.js';
-import { CHANNELS } from './contracts/notificationContract.js';
 import { getNotificationIo } from './notificationContext.js';
+import { immobilizationTransitionPolicy } from './policies/notificationPolicyRegistry.js';
 
-function severityForStatus(status) {
+export function severityForStatus(status) {
   if (status === 'completed') return 'success';
   if (status === 'failed') return 'critical';
   if (status === 'blocked' || status === 'cancelled' || status === 'expired') return 'warning';
   return 'info';
 }
 
-function titleForIntent(intent, status) {
+export function titleForIntent(intent, status) {
   const action = intent.action === 'mobilize' ? 'Mobilize' : 'Immobilize';
   if (status === 'completed') return `${action} command sent`;
   if (status === 'failed') return `${action} command failed`;
@@ -19,6 +19,12 @@ function titleForIntent(intent, status) {
   return `${action} update`;
 }
 
+/** Statuses that get a persisted, inbox-visible notification. */
+export const PUBLISH_STATUS = ['completed', 'failed', 'blocked', 'cancelled', 'expired'];
+
+/** Statuses that also get a live 'immobilization.updated' socket ping. */
+export const REALTIME_STATUS = ['completed', 'failed', 'cancelled', 'expired'];
+
 /**
  * @param {object} intent serialized or row-like
  * @param {{ status?: string, executionError?: string|null }} [extra]
@@ -26,11 +32,8 @@ function titleForIntent(intent, status) {
 export async function notifyImmobilizationTransition(intent, extra = {}) {
   if (!intent?.id) return;
   const status = extra.status || intent.status;
-  const publishStatus = ['completed', 'failed', 'blocked', 'cancelled'];
-  const realtimeStatus = ['completed', 'failed', 'cancelled', 'expired'];
-  if (!publishStatus.includes(status) && !realtimeStatus.includes(status)) return;
+  if (!PUBLISH_STATUS.includes(status) && !REALTIME_STATUS.includes(status)) return;
 
-  const severity = severityForStatus(status);
   const title = titleForIntent(intent, status);
   const message = extra.executionError
     || intent.executionError
@@ -39,16 +42,17 @@ export async function notifyImmobilizationTransition(intent, extra = {}) {
   const at = new Date().toISOString();
   const io = getNotificationIo();
 
-  if (publishStatus.includes(status)) {
+  if (PUBLISH_STATUS.includes(status)) {
+    const policy = immobilizationTransitionPolicy({ intentId: intent.id, status });
     await publishNotification({
-      type: `immobilization.${status}`,
-      entityType: 'security',
+      type: policy.type,
+      entityType: policy.entityType,
       entityId: String(intent.id),
-      severity,
+      severity: policy.severity,
       title,
       message: String(message),
       source: 'fuel-api',
-      audience: { managers: true },
+      audience: policy.audience,
       metadata: {
         intentId: intent.id,
         vehicleId: intent.vehicleId,
@@ -58,12 +62,12 @@ export async function notifyImmobilizationTransition(intent, extra = {}) {
         confidence: intent.confidence,
         changedAt: at,
       },
-      clientDedupKey: `immobilization:${intent.id}:${status}`,
-      channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+      clientDedupKey: policy.clientDedupKey,
+      channels: policy.channels,
     }, { io });
   }
 
-  if (realtimeStatus.includes(status) && io) {
+  if (REALTIME_STATUS.includes(status) && io) {
     io.to('managers').emit('immobilization.updated', {
       intentId: intent.id,
       vehicleId: intent.vehicleId,

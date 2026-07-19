@@ -345,7 +345,7 @@ directly. It:
 4. Anything the reconciliation/startup sweep has to fix is a correction by
    definition (normal live traffic missed it). Routine transitions via the
    webhook or an on-demand read are not — those stay covered by the existing
-   `telemetry.ingest.processed` log line and `VEHICLE_STATE_CHANGED` event.
+   `telemetry.ingest.processed` log line.
 
 **`vehicle_state_audit_events`** table (migration `20260716_vehicle_state_audit_events.sql`,
 model `VehicleStateAuditEvent`) — one row per genuine correction: vehicle id,

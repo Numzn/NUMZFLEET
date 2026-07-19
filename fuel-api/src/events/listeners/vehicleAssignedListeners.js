@@ -3,7 +3,7 @@ import { EVENT_NAMES } from '../eventNames.js';
 import { withSafeListener } from '../safeListener.js';
 import { upsertTraccarDeviceAttribute } from '../../config/traccar.js';
 import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
-import { CHANNELS } from '../../notifications/contracts/notificationContract.js';
+import { vehicleAssignmentPolicy } from '../../notifications/policies/notificationPolicyRegistry.js';
 
 const SOCKET_EVENT_NAME = 'vehicle-assignment-updated';
 
@@ -79,29 +79,28 @@ const registerPersistNotificationListener = (io) => {
       EVENT_NAMES.VEHICLE_ASSIGNED,
       'persist-notification',
       async ({ vehicleId, deviceId, vehicleName, previousDeviceId, assignedAt, actorUserId }) => {
-        const at = assignedAt || new Date().toISOString();
-        const entityId = String(vehicleId);
+        const policy = vehicleAssignmentPolicy({ vehicleId, deviceId, assignedAt });
         await publishNotification({
-          type: 'assignment.vehicle.updated',
-          entityType: 'assignment',
-          entityId,
-          severity: 'info',
+          type: policy.type,
+          entityType: policy.entityType,
+          entityId: String(vehicleId),
+          severity: policy.severity,
           title: 'Vehicle assignment updated',
           message: vehicleName
             ? `${vehicleName} assigned to device ${deviceId}`
             : `Vehicle ${vehicleId} assigned to device ${deviceId}`,
           source: 'fuel-api',
-          audience: { managers: true },
+          audience: policy.audience,
           metadata: {
             vehicleId,
             deviceId,
             vehicleName,
             previousDeviceId,
-            assignedAt: at,
+            assignedAt: policy.resolvedAssignedAt,
             actorUserId,
           },
-          clientDedupKey: `assignment:${vehicleId}:${deviceId}:${at}`,
-          channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+          clientDedupKey: policy.clientDedupKey,
+          channels: policy.channels,
         }, { io });
       },
     ),

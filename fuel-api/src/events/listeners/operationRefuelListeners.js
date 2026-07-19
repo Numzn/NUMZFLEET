@@ -7,21 +7,26 @@ import {
   emitVehicleDocumentOcrCompleted,
 } from '../../operations/handlers/operationSocketEvents.js';
 import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
-import { CHANNELS } from '../../notifications/contracts/notificationContract.js';
+import { operationRefuelRecordedPolicy } from '../../notifications/policies/notificationPolicyRegistry.js';
 
 async function notifyRefuelRecorded({ session, refuel, actorUserId, io }) {
   const litres = refuel?.actualFuelLitres;
+  const policy = operationRefuelRecordedPolicy({
+    sessionId: session?.id,
+    refuelId: refuel?.id,
+    driverId: session?.userId,
+  });
   await publishNotification({
     source: 'fuel-api',
-    entityType: 'fuel',
-    type: 'operation.refuel.recorded',
-    severity: 'info',
+    entityType: policy.entityType,
+    type: policy.type,
+    severity: policy.severity,
     title: 'Refuel recorded',
     message: `Vehicle ${refuel?.vehicleId} — ${litres != null ? `${litres} L` : 'fuel captured'}`,
-    audience: { includeDriverWithManagers: true, driverId: Number(session?.userId) },
+    audience: policy.audience,
     entityId: String(session?.id),
-    clientDedupKey: `operation:${session?.id}:refuel:${refuel?.id}:recorded`,
-    channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+    clientDedupKey: policy.clientDedupKey,
+    channels: policy.channels,
     metadata: {
       operationId: session?.id,
       sessionId: session?.id,

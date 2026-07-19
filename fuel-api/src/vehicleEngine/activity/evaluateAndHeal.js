@@ -26,10 +26,9 @@ const REPAIR_TRIGGERING_ISSUES = new Set([
  *
  * Routine transitions detected via the live webhook or an on-demand read are
  * NOT corrections — that's the system working as designed, already covered
- * by the existing telemetry.ingest.processed log line and the
- * VEHICLE_STATE_CHANGED domain event. Anything the reconciliation/startup
- * sweep has to fix IS a correction by definition — normal live traffic
- * missed it, which is exactly the "recovery mechanism after crashes,
+ * by the existing telemetry.ingest.processed log line. Anything the
+ * reconciliation/startup sweep has to fix IS a correction by definition —
+ * normal live traffic missed it, which is exactly the "recovery mechanism after crashes,
  * deployments, missed webhook events, or historical bugs" this exists for.
  *
  * A forced repair only ever counts as a correction (and only ever gets

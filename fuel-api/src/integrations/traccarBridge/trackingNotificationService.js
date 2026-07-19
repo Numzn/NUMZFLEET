@@ -7,7 +7,7 @@ import {
 } from '../../notifications/policies/notificationPolicyService.js';
 import { fetchTraccarEventsAfterCursor } from './traccarEventQuery.js';
 import { getBridgeCursor, setBridgeCursor } from './bridgeStateRepository.js';
-import { resolveTrackingEventAudience } from './audienceResolver.js';
+import { resolveTrackingEventAudience } from './deviceAudienceResolver.js';
 
 function envEnabled() {
   const raw = process.env.TRACKING_NOTIFICATION_BRIDGE;

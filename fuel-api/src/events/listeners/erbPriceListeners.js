@@ -14,7 +14,7 @@ import eventBus from '../eventBus.js';
 import { EVENT_NAMES } from '../eventNames.js';
 import { withSafeListener } from '../safeListener.js';
 import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
-import { CHANNELS } from '../../notifications/contracts/notificationContract.js';
+import { erbPricesPolicy } from '../../notifications/policies/notificationPolicyRegistry.js';
 
 export const registerErbPriceListeners = (io) => {
 
@@ -47,23 +47,22 @@ export const registerErbPriceListeners = (io) => {
   eventBus.on(
     EVENT_NAMES.ERB_PRICES_UPDATED,
     withSafeListener(EVENT_NAMES.ERB_PRICES_UPDATED, 'persist-notification', async (payload) => {
-      const at = payload.timestamp || new Date().toISOString();
-      const entityId = `erb:${at}`;
+      const policy = erbPricesPolicy({ timestamp: payload.timestamp });
       await publishNotification({
-        type: 'erb.prices.updated',
-        entityType: 'system',
-        entityId,
-        severity: 'info',
+        type: policy.type,
+        entityType: policy.entityType,
+        entityId: policy.clientDedupKey,
+        severity: policy.severity,
         title: 'ERB fuel prices updated',
         message: 'Latest ERB prices are available',
         source: 'erb',
-        audience: { managers: true },
+        audience: policy.audience,
         metadata: {
           prices: payload.prices,
           trigger: payload.trigger,
         },
-        clientDedupKey: entityId,
-        channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+        clientDedupKey: policy.clientDedupKey,
+        channels: policy.channels,
       }, { io });
     }),
   );

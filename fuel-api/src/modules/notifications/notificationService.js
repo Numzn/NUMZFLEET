@@ -1,14 +1,22 @@
 import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
-import { CHANNELS } from '../../notifications/contracts/notificationContract.js';
+import { fuelRequestPolicy, escalationPolicy } from '../../notifications/policies/notificationPolicyRegistry.js';
 import * as repo from './notificationRepository.js';
 
-function mapFuelSeverity(changeType, request) {
-  if (changeType === 'created') {
-    return request?.urgency === 'emergency' ? 'critical' : 'warning';
-  }
-  if (changeType === 'approved' || changeType === 'fulfilled') return 'success';
-  if (changeType === 'rejected' || changeType === 'cancelled') return 'warning';
-  return 'info';
+/** Stable per-transition dedup key — same (requestId, changeType) always
+ * collapses to one notification, regardless of when it's built.
+ * Kept here (not moved) because notificationPolicyRegistry.js imports this
+ * exact binding — see that file's header comment. */
+export function buildFuelDedupKey(requestId, changeType) {
+  return `fuel-api:${requestId}:${changeType}`;
+}
+
+/** A real alertId identifies a specific Traccar alarm — stable, collapses
+ * repeats. A manual escalation (no alertId) has no stable identifier and is
+ * intentionally never deduped — every call gets a fresh key. */
+export function buildEscalationDedupKey(deviceId, alertId) {
+  return alertId
+    ? `escalate:${deviceId}:${alertId}`
+    : `escalate:${deviceId}:manual:${Date.now()}`;
 }
 
 function buildFuelTitleMessage(changeType, request, change) {
@@ -44,36 +52,31 @@ export async function persistFuelSocketEvent({ kind, request, change, actorUserI
 
   const changeType = change?.type || (kind === 'created' ? 'created' : 'updated');
   const { title, message } = buildFuelTitleMessage(changeType, request, change);
-  const severity = mapFuelSeverity(changeType, request);
   const changedAt = change?.changedAt || new Date().toISOString();
 
-  const audience = kind === 'created'
-    ? { managers: true }
-    : { includeDriverWithManagers: true, driverId: Number(request.userId) };
-
-  const dedupKey = `fuel-api:${request.id}:${changeType}`;
+  const policy = fuelRequestPolicy({ kind, changeType, request });
   const metadata = {
     requestId: request.id,
     deviceId: request.deviceId,
     actorUserId: actorUserId ?? null,
     changeType,
     changedAt,
-    dedupKey,
+    dedupKey: policy.clientDedupKey,
   };
 
   try {
     await publishNotification({
-      type: `fuel.request.${changeType}`,
-      entityType: 'fuel',
+      type: policy.type,
+      entityType: policy.entityType,
       entityId: String(request.id),
-      severity,
+      severity: policy.severity,
       title,
       message,
       source: 'fuel-api',
-      audience,
+      audience: policy.audience,
       metadata,
-      clientDedupKey: `fuel-api:${request.id}:${changeType}:${changedAt}`,
-      channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+      clientDedupKey: policy.clientDedupKey,
+      channels: policy.channels,
     }, { io });
   } catch (e) {
     console.error('[notifications] persistFuelSocketEvent failed', e?.message || e);
@@ -112,24 +115,24 @@ export async function escalateVehicleAlert(req) {
     err.statusCode = 400;
     throw err;
   }
-  const dedupKey = `escalate:${deviceId}:${alertId || 'manual'}:${Date.now()}`;
+  const policy = escalationPolicy({ deviceId, alertId });
   await publishNotification({
-    type: 'tracking.alert.escalated',
-    entityType: 'tracking',
+    type: policy.type,
+    entityType: policy.entityType,
     entityId: String(alertId || deviceId),
-    severity: 'critical',
+    severity: policy.severity,
     title: title || 'Vehicle alert escalated',
     message: message || `Alert escalated for device ${deviceId}`,
     source: 'fuel-api',
-    audience: { managers: true },
+    audience: policy.audience,
     metadata: {
       deviceId: Number(deviceId),
       alertId: alertId ?? null,
       escalatedBy: userId,
-      dedupKey,
+      dedupKey: policy.clientDedupKey,
     },
-    clientDedupKey: dedupKey,
-    channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.PUSH],
+    clientDedupKey: policy.clientDedupKey,
+    channels: policy.channels,
   }, { io: req.io });
   return { ok: true };
 }

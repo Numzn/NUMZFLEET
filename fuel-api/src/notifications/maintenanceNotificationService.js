@@ -1,8 +1,7 @@
 import { publishNotification } from './orchestrator/publishNotification.js';
-import { CHANNELS } from './contracts/notificationContract.js';
 import { getNotificationIo } from './notificationContext.js';
 import { ROUTINE_SERVICE_LABEL } from '../maintenance/routineServiceStatus.js';
-import { localDateString } from '../utils/businessDay.js';
+import { maintenanceCompletedPolicy, maintenanceRoutineStatePolicy } from './policies/notificationPolicyRegistry.js';
 
 function vehicleLabel(vehicle) {
   if (!vehicle) return 'Vehicle';
@@ -44,23 +43,23 @@ export async function notifyRoutineServiceCompleted({
 
   const label = vehicleLabel(vehicle);
   const odometer = formatOdometer(record.odometerKm);
-  const completedAt = record.completedAt || new Date().toISOString();
   const message = odometer
     ? `${label} — ${ROUTINE_SERVICE_LABEL} completed at ${odometer}`
     : `${label} — ${ROUTINE_SERVICE_LABEL} completed`;
 
   const io = getNotificationIo();
+  const policy = maintenanceCompletedPolicy({ recordId: record.id, completedAt: record.completedAt });
 
   await publishNotification({
-    type: 'maintenance.routine.completed',
-    entityType: 'maintenance',
+    type: policy.type,
+    entityType: policy.entityType,
     entityId: String(record.maintenanceId),
-    severity: 'success',
+    severity: policy.severity,
     title: `${ROUTINE_SERVICE_LABEL} completed`,
     message,
     source: 'fuel-api',
     companyId,
-    audience: { managers: true },
+    audience: policy.audience,
     metadata: {
       serviceRecordId: record.id,
       fleetVehicleId: record.fleetVehicleId,
@@ -69,11 +68,11 @@ export async function notifyRoutineServiceCompleted({
       plateNumber: vehicle?.plateNumber ?? null,
       odometerKm: record.odometerKm ?? null,
       vendor: record.vendor ?? null,
-      completedAt,
+      completedAt: policy.resolvedCompletedAt,
       actorUserId,
     },
-    clientDedupKey: `routine-service:${record.id}:completed:${completedAt}`,
-    channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+    clientDedupKey: policy.clientDedupKey,
+    channels: policy.channels,
   }, { io });
 }
 
@@ -95,23 +94,19 @@ export async function notifyRoutineServiceState({
   const message = dueLabel
     ? `${label} — ${ROUTINE_SERVICE_LABEL}: ${dueLabel}`
     : `${label} — ${ROUTINE_SERVICE_LABEL} needs attention`;
-  const severity = mappedType === 'overdue' ? 'warning' : 'info';
-  // Africa/Lusaka business day, not UTC calendar day — same fix already
-  // applied to complianceNotificationService.js, reusing the same helper
-  // rather than a second timezone implementation.
-  const dayStamp = localDateString(new Date());
   const io = getNotificationIo();
+  const policy = maintenanceRoutineStatePolicy({ fleetVehicleId, mappedType });
 
   await publishNotification({
-    type: `maintenance.routine.${mappedType}`,
-    entityType: 'maintenance',
+    type: policy.type,
+    entityType: policy.entityType,
     entityId: String(nextService.maintenanceId),
-    severity,
+    severity: policy.severity,
     title: routineTitleForType(mappedType),
     message,
     source: 'fuel-api',
     companyId,
-    audience: { managers: true },
+    audience: policy.audience,
     metadata: {
       fleetVehicleId,
       maintenanceId: nextService.maintenanceId,
@@ -123,7 +118,7 @@ export async function notifyRoutineServiceState({
       vehicleName: vehicle?.name ?? null,
       observedAt: new Date().toISOString(),
     },
-    clientDedupKey: `routine-service:${fleetVehicleId}:${mappedType}:${dayStamp}`,
-    channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+    clientDedupKey: policy.clientDedupKey,
+    channels: policy.channels,
   }, { io });
 }

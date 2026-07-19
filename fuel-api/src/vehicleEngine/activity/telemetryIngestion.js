@@ -5,8 +5,6 @@ import { normalizeTraccarEvent } from './telemetryNormalize.js';
 import { evaluateAndHeal } from './evaluateAndHeal.js';
 import { persistActivityState } from './activityStateService.js';
 import { recordVehicleStateCorrection } from './vehicleStateAuditService.js';
-import { emitDomainEvent } from '../../events/eventBus.js';
-import { EVENT_NAMES } from '../../events/eventNames.js';
 
 function logTelemetry(event, fields = {}) {
   console.log(JSON.stringify({ event, ...fields, ts: new Date().toISOString() }));
@@ -153,15 +151,6 @@ export async function processTelemetryEvent(rawEvent) {
         changed: transition.changed,
       });
 
-      if (transition.changed) {
-        emitDomainEvent(EVENT_NAMES.VEHICLE_STATE_CHANGED, {
-          vehicleId,
-          deviceId,
-          state: transition.state,
-          stateEnteredAt: transition.stateEnteredAt,
-          stateSource: transition.stateSource,
-        });
-      }
     });
   } catch (err) {
     logTelemetry('telemetry.ingest.error', {
