@@ -6,21 +6,26 @@ import {
   Drawer,
   List,
   ListItemButton,
-  ListItemText,
   Typography,
   Box,
   Button,
   Divider,
-  Chip,
+  Menu,
+  MenuItem,
+  ListSubheader,
+  ToggleButtonGroup,
+  ToggleButton,
+  Tooltip,
   CircularProgress,
   useMediaQuery,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { useTheme, alpha } from '@mui/material/styles';
 import NotificationsIcon from '@mui/icons-material/Notifications';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
+import TuneIcon from '@mui/icons-material/Tune';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
+import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -55,13 +60,28 @@ const SEVERITY_COLORS = {
   info: '#3b82f6',
 };
 
-function SeverityIcon({ severity }) {
+const CATEGORY_OPTIONS = ['', 'fuel', 'tracking', 'maintenance', 'compliance', 'system', 'assignment'];
+const SEVERITY_OPTIONS = ['', 'info', 'success', 'warning', 'critical'];
+const GROUP_OPTIONS = [
+  { key: 'day', label: 'Day' },
+  { key: 'category', label: 'Category' },
+  { key: 'vehicle', label: 'Vehicle' },
+];
+
+function SeverityDot({ severity }) {
   const color = SEVERITY_COLORS[severity] || SEVERITY_COLORS.info;
-  const sx = { fontSize: 18, color, mt: 0.25 };
-  if (severity === 'critical') return <ErrorOutlineIcon sx={sx} />;
-  if (severity === 'warning') return <WarningAmberIcon sx={sx} />;
-  if (severity === 'success') return <CheckCircleOutlineIcon sx={sx} />;
-  return <InfoOutlinedIcon sx={sx} />;
+  return (
+    <Box
+      sx={{
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        bgcolor: color,
+        flexShrink: 0,
+        mt: '6px',
+      }}
+    />
+  );
 }
 
 function NotificationRow({
@@ -77,39 +97,66 @@ function NotificationRow({
       disableRipple={!n.metadata?.deepLink}
       onClick={n.metadata?.deepLink ? () => onOpenNotification(n) : undefined}
       sx={{
-        borderRadius: 1,
-        mb: 0.5,
-        pl: 1,
-        borderLeft: `3px solid ${SEVERITY_COLORS[n.severity] || SEVERITY_COLORS.info}`,
-        bgcolor: n.read ? 'transparent' : 'action.hover',
+        borderRadius: 1.5,
+        mb: 0.25,
+        py: 1,
+        gap: 1,
+        bgcolor: n.read ? 'transparent' : (theme) => alpha(theme.palette.primary.main, 0.06),
         cursor: n.metadata?.deepLink ? 'pointer' : 'default',
+        '&:hover .notif-actions': { opacity: 1 },
       }}
     >
-      <SeverityIcon severity={n.severity} />
-      <Box sx={{ flex: 1, minWidth: 0, ml: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>
+      <SeverityDot severity={n.severity} />
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+          <Typography
+            variant="body2"
+            fontWeight={n.read ? 500 : 700}
+            sx={{ flex: 1, lineHeight: 1.35 }}
+          >
             {n.title}
           </Typography>
           {n.category && (
-            <Chip size="small" label={n.category} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.65rem', flexShrink: 0 }}
+            >
+              {n.category}
+            </Typography>
           )}
         </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, lineHeight: 1.4 }}>
           {n.message}
         </Typography>
-        <Box sx={{ display: 'flex', gap: 0.5, mt: 0.75, flexWrap: 'wrap' }}>
+
+        <Box
+          className="notif-actions"
+          sx={{
+            display: 'flex',
+            gap: 0.25,
+            mt: 0.5,
+            opacity: { xs: 1, sm: 0 },
+            transition: 'opacity 0.12s ease',
+          }}
+        >
           {!n.read && (
-            <Button size="small" onClick={(e) => { e.stopPropagation(); onMarkRead(n.id, n); }}>
-              Read
-            </Button>
+            <Tooltip title="Mark as read">
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onMarkRead(n.id, n); }}>
+                <DoneAllIcon fontSize="inherit" />
+              </IconButton>
+            </Tooltip>
           )}
-          <Button size="small" onClick={(e) => { e.stopPropagation(); onAcknowledge(n.id); }}>
-            Acknowledge
-          </Button>
-          <Button size="small" color="inherit" onClick={(e) => { e.stopPropagation(); onArchive(n.id); }}>
-            Archive
-          </Button>
+          <Tooltip title="Acknowledge">
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onAcknowledge(n.id); }}>
+              <TaskAltOutlinedIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Archive">
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onArchive(n.id); }}>
+              <Inventory2OutlinedIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
     </ListItemButton>
@@ -122,6 +169,7 @@ const NotificationCenter = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
   const [filters, setFilters] = useState(defaultFilters);
   const [groupMode, setGroupMode] = useState('day');
   const [loading, setLoading] = useState(false);
@@ -161,6 +209,8 @@ const NotificationCenter = () => {
   const readItems = useMemo(() => filtered.filter((n) => n.read), [filtered]);
   const unreadItems = useMemo(() => filtered.filter((n) => !n.read), [filtered]);
 
+  const activeFilterCount = (filters.category ? 1 : 0) + (filters.severity ? 1 : 0) + (filters.archived ? 1 : 0);
+
   const open = Boolean(anchorEl) || (isMobile && anchorEl === document.body);
 
   const loadServerPage = useCallback(async (before) => {
@@ -198,6 +248,7 @@ const NotificationCenter = () => {
 
   const handleClose = () => {
     setAnchorEl(null);
+    setFilterMenuAnchor(null);
   };
 
   const onMarkRead = async (id, entity) => {
@@ -258,158 +309,196 @@ const NotificationCenter = () => {
   };
 
   const panelContent = (
-    <Box sx={{ p: 2, pb: 1, width: isMobile ? '100%' : 480, maxHeight: isMobile ? '100vh' : 640, overflow: 'auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-        <Typography variant="h6" fontWeight={700}>
+    <Box sx={{ width: isMobile ? '100%' : 400, maxHeight: isMobile ? '100vh' : 600, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, pt: 2, pb: 1.5 }}>
+        <Typography variant="subtitle1" fontWeight={700}>
           Notifications
         </Typography>
         {unread > 0 && (
-          <Button size="small" onClick={onMarkAllRead}>
+          <Button size="small" onClick={onMarkAllRead} sx={{ textTransform: 'none', fontWeight: 500 }}>
             Mark all read
           </Button>
         )}
       </Box>
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-        {[
-          { key: 'day', label: 'By day' },
-          { key: 'category', label: 'By category' },
-          { key: 'vehicle', label: 'By vehicle' },
-        ].map(({ key, label }) => (
-          <Chip
-            key={key}
-            size="small"
-            label={label}
-            color={groupMode === key ? 'primary' : 'default'}
-            onClick={() => setGroupMode(key)}
-          />
-        ))}
-      </Box>
-
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-        {['', 'fuel', 'tracking', 'maintenance', 'compliance', 'system', 'assignment'].map((c) => (
-          <Chip
-            key={c || 'all'}
-            size="small"
-            label={c || 'All categories'}
-            color={filters.category === c ? 'primary' : 'default'}
-            onClick={() => setFilters((f) => ({ ...f, category: c }))}
-          />
-        ))}
-      </Box>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-        {['', 'info', 'success', 'warning', 'critical'].map((s) => (
-          <Chip
-            key={s || 'all-sev'}
-            size="small"
-            label={s || 'All severity'}
-            color={filters.severity === s ? 'secondary' : 'default'}
-            onClick={() => setFilters((f) => ({ ...f, severity: s }))}
-          />
-        ))}
-      </Box>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-        {[
-          { key: 'all', label: 'All' },
-          { key: 'unread', label: 'Unread' },
-          { key: 'read', label: 'Read' },
-        ].map(({ key, label }) => (
-          <Chip
-            key={key}
-            size="small"
-            label={label}
-            variant={filters.read === key ? 'filled' : 'outlined'}
-            onClick={() => setFilters((f) => ({ ...f, read: key }))}
-          />
-        ))}
-        <Chip
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, pb: 1.5 }}>
+        <ToggleButtonGroup
           size="small"
-          label="Archived"
-          variant={filters.archived ? 'filled' : 'outlined'}
-          onClick={() => setFilters((f) => ({ ...f, archived: !f.archived, read: 'all' }))}
-        />
+          exclusive
+          value={filters.archived ? 'archived' : filters.read}
+          onChange={(_e, value) => {
+            if (value == null) return;
+            if (value === 'archived') {
+              setFilters((f) => ({ ...f, archived: true, read: 'all' }));
+            } else {
+              setFilters((f) => ({ ...f, archived: false, read: value }));
+            }
+          }}
+          sx={{
+            '& .MuiToggleButton-root': {
+              textTransform: 'none',
+              px: 1.25,
+              py: 0.25,
+              fontSize: '0.8rem',
+              border: 'none',
+              borderRadius: 999,
+              color: 'text.secondary',
+              '&.Mui-selected': {
+                bgcolor: 'action.selected',
+                color: 'text.primary',
+                fontWeight: 600,
+              },
+            },
+          }}
+        >
+          <ToggleButton value="all">All</ToggleButton>
+          <ToggleButton value="unread">Unread</ToggleButton>
+          <ToggleButton value="archived">Archived</ToggleButton>
+        </ToggleButtonGroup>
+
+        <Box sx={{ flex: 1 }} />
+
+        <Tooltip title="Filters">
+          <IconButton
+            size="small"
+            onClick={(e) => setFilterMenuAnchor(e.currentTarget)}
+            sx={{ color: activeFilterCount ? 'primary.main' : 'text.secondary' }}
+          >
+            <Badge variant="dot" color="primary" invisible={!activeFilterCount}>
+              <TuneIcon fontSize="small" />
+            </Badge>
+          </IconButton>
+        </Tooltip>
       </Box>
 
-      <Divider sx={{ my: 1 }} />
+      <Menu
+        anchorEl={filterMenuAnchor}
+        open={Boolean(filterMenuAnchor)}
+        onClose={() => setFilterMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{ sx: { bgcolor: (t) => alpha(t.palette.background.paper, 1) } }}
+      >
+        <ListSubheader disableSticky sx={{ lineHeight: 2.5 }}>Group by</ListSubheader>
+        {GROUP_OPTIONS.map(({ key, label }) => (
+          <MenuItem key={key} selected={groupMode === key} onClick={() => setGroupMode(key)}>
+            {label}
+          </MenuItem>
+        ))}
 
-      {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-          <CircularProgress size={28} />
-        </Box>
-      )}
+        <Divider sx={{ my: 0.5 }} />
 
-      {!loading && filtered.length === 0 && (
-        <Box sx={{ textAlign: 'center', py: 4 }}>
-          <NotificationsIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-          <Typography color="text.secondary">No notifications</Typography>
-        </Box>
-      )}
+        <ListSubheader disableSticky sx={{ lineHeight: 2.5 }}>Category</ListSubheader>
+        {CATEGORY_OPTIONS.map((c) => (
+          <MenuItem
+            key={c || 'all-cat'}
+            selected={filters.category === c}
+            onClick={() => setFilters((f) => ({ ...f, category: c }))}
+            sx={{ textTransform: c ? 'capitalize' : 'none' }}
+          >
+            {c || 'All categories'}
+          </MenuItem>
+        ))}
 
-      {!loading && filters.read !== 'read' && unreadItems.length > 0 && groupMode === 'day' && (
-        <Box sx={{ mb: 1 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ px: 1, fontWeight: 600 }}>
-            Unread
-          </Typography>
-          <List dense disablePadding>
-            {unreadItems.slice(0, 20).map((n) => (
-              <NotificationRow
-                key={n.id}
-                n={n}
-                onOpenNotification={onOpenNotification}
-                onMarkRead={onMarkRead}
-                onAcknowledge={onAcknowledge}
-                onArchive={onArchive}
-              />
-            ))}
-          </List>
-        </Box>
-      )}
+        <Divider sx={{ my: 0.5 }} />
 
-      {!loading && sortedGroupKeys.map((groupKey) => (
-        <Box key={groupKey} sx={{ mb: 1 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ px: 1, fontWeight: 600 }}>
-            {groupKey}
-          </Typography>
-          <List dense disablePadding>
-            {(grouped[groupKey] || []).map((n) => (
-              <NotificationRow
-                key={n.id}
-                n={n}
-                onOpenNotification={onOpenNotification}
-                onMarkRead={onMarkRead}
-                onAcknowledge={onAcknowledge}
-                onArchive={onArchive}
-              />
-            ))}
-          </List>
-        </Box>
-      ))}
+        <ListSubheader disableSticky sx={{ lineHeight: 2.5 }}>Severity</ListSubheader>
+        {SEVERITY_OPTIONS.map((s) => (
+          <MenuItem
+            key={s || 'all-sev'}
+            selected={filters.severity === s}
+            onClick={() => setFilters((f) => ({ ...f, severity: s }))}
+            sx={{ textTransform: s ? 'capitalize' : 'none' }}
+          >
+            {s || 'All severity'}
+          </MenuItem>
+        ))}
+      </Menu>
 
-      {!loading && filters.read !== 'unread' && readItems.length > 0 && groupMode === 'day' && (
-        <Box sx={{ mb: 1, opacity: 0.85 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
-            Earlier (read)
-          </Typography>
-          <List dense disablePadding>
-            {readItems.slice(0, 10).map((n) => (
-              <NotificationRow
-                key={n.id}
-                n={n}
-                onOpenNotification={onOpenNotification}
-                onMarkRead={onMarkRead}
-                onAcknowledge={onAcknowledge}
-                onArchive={onArchive}
-              />
-            ))}
-          </List>
-        </Box>
-      )}
+      <Divider />
 
-      {persistence && nextBefore && (
-        <Button fullWidth size="small" onClick={() => loadServerPage(nextBefore)} sx={{ mt: 1 }}>
-          Load more
-        </Button>
-      )}
+      <Box sx={{ overflow: 'auto', px: 1, py: 1, flex: 1 }}>
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size={24} thickness={4} />
+          </Box>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <Box sx={{ textAlign: 'center', py: 6 }}>
+            <NotificationsNoneOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">
+              {filters.archived ? 'No archived notifications' : "You're all caught up"}
+            </Typography>
+          </Box>
+        )}
+
+        {!loading && filters.read !== 'read' && unreadItems.length > 0 && groupMode === 'day' && (
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ px: 1, fontWeight: 600 }}>
+              Unread
+            </Typography>
+            <List dense disablePadding>
+              {unreadItems.slice(0, 20).map((n) => (
+                <NotificationRow
+                  key={n.id}
+                  n={n}
+                  onOpenNotification={onOpenNotification}
+                  onMarkRead={onMarkRead}
+                  onAcknowledge={onAcknowledge}
+                  onArchive={onArchive}
+                />
+              ))}
+            </List>
+          </Box>
+        )}
+
+        {!loading && sortedGroupKeys.map((groupKey) => (
+          <Box key={groupKey} sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ px: 1, fontWeight: 600 }}>
+              {groupKey}
+            </Typography>
+            <List dense disablePadding>
+              {(grouped[groupKey] || []).map((n) => (
+                <NotificationRow
+                  key={n.id}
+                  n={n}
+                  onOpenNotification={onOpenNotification}
+                  onMarkRead={onMarkRead}
+                  onAcknowledge={onAcknowledge}
+                  onArchive={onArchive}
+                />
+              ))}
+            </List>
+          </Box>
+        ))}
+
+        {!loading && filters.read !== 'unread' && readItems.length > 0 && groupMode === 'day' && (
+          <Box sx={{ mb: 1, opacity: 0.85 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
+              Earlier
+            </Typography>
+            <List dense disablePadding>
+              {readItems.slice(0, 10).map((n) => (
+                <NotificationRow
+                  key={n.id}
+                  n={n}
+                  onOpenNotification={onOpenNotification}
+                  onMarkRead={onMarkRead}
+                  onAcknowledge={onAcknowledge}
+                  onArchive={onArchive}
+                />
+              ))}
+            </List>
+          </Box>
+        )}
+
+        {persistence && nextBefore && (
+          <Button fullWidth size="small" onClick={() => loadServerPage(nextBefore)} sx={{ mt: 1, textTransform: 'none' }}>
+            Load more
+          </Button>
+        )}
+      </Box>
     </Box>
   );
 
@@ -422,7 +511,12 @@ const NotificationCenter = () => {
       </IconButton>
 
       {isMobile ? (
-        <Drawer anchor="right" open={open} onClose={handleClose} PaperProps={{ sx: { width: '100%', maxWidth: 420 } }}>
+        <Drawer
+          anchor="right"
+          open={open}
+          onClose={handleClose}
+          PaperProps={{ sx: { width: '100%', maxWidth: 420, bgcolor: (t) => alpha(t.palette.background.paper, 1) } }}
+        >
           {panelContent}
         </Drawer>
       ) : (
@@ -432,7 +526,7 @@ const NotificationCenter = () => {
           onClose={handleClose}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          PaperProps={{ sx: { p: 0 } }}
+          PaperProps={{ sx: { p: 0, borderRadius: 2, bgcolor: (t) => alpha(t.palette.background.paper, 1) } }}
         >
           {panelContent}
         </Popover>
