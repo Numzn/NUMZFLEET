@@ -28,7 +28,7 @@ import {
   summarizeRefuelBuckets,
   sumActualFuelAndCost,
 } from './utils/operationDayUtils.js';
-import { OPERATION_SESSION_SOCKET_EVENT } from './utils/operationSessionSocketBridge.js';
+import useNotificationBridge from '../notifications/useNotificationBridge.js';
 import PendingRefuelCard from './components/PendingRefuelCard.jsx';
 import CompletedRefuelCard from './components/CompletedRefuelCard.jsx';
 import OperationVehicleRow from './components/OperationVehicleRow.jsx';
@@ -78,17 +78,11 @@ const OperationRunPage = () => {
   // This page fetches independently of useTodayOperation, so it needs its own
   // live-update listener: an invoice created from another tab/page should drop
   // the newly-invoiced vehicle out of the Completed list here too.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !sessionId) return undefined;
-    const onSocketUpdate = (event) => {
-      const { sessionId: eventSessionId, type } = event.detail || {};
-      if (type !== 'invoice.reconciled') return;
-      if (Number(eventSessionId) !== Number(sessionId)) return;
-      loadSession();
-    };
-    window.addEventListener(OPERATION_SESSION_SOCKET_EVENT, onSocketUpdate);
-    return () => window.removeEventListener(OPERATION_SESSION_SOCKET_EVENT, onSocketUpdate);
-  }, [sessionId, loadSession]);
+  const isThisSessionInvoiceReconciled = useCallback(
+    (n) => n.type === 'operation.invoice.reconciled' && Number(n.metadata?.sessionId) === Number(sessionId),
+    [sessionId],
+  );
+  useNotificationBridge(isThisSessionInvoiceReconciled, loadSession);
 
   const capacityByDeviceId = useMemo(() => {
     const map = {};

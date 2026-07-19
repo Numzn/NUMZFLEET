@@ -7,6 +7,7 @@ import {
   createImmobilizationIntent,
   cancelImmobilizationIntent,
 } from '../immobilizationIntentsApi.js';
+import useNotificationBridge from '../../../notifications/useNotificationBridge.js';
 
 const POLL_MS = 2500;
 
@@ -69,6 +70,12 @@ export default function useImmobilizationIntent(vehicleId) {
       window.removeEventListener('immobilization.updated', onImmobilizationUpdated);
     };
   }, [vehicleId, refresh]);
+
+  const isThisVehicleSecurityNotification = useCallback(
+    (n) => n.entityType === 'security' && String(n.metadata?.vehicleId) === String(vehicleId),
+    [vehicleId],
+  );
+  useNotificationBridge(isThisVehicleSecurityNotification, refresh);
 
   const requestIntent = useCallback(
     async (action) => {

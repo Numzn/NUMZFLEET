@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useManager } from '../../common/util/permissions';
 import { fetchVehicles } from '../vehiclesApi';
+import useNotificationBridge from '../../notifications/useNotificationBridge';
 import {
   buildVehicleDisplayRegistry,
   lookupVehicleDisplay,
 } from './resolveVehicleDisplay';
+
+const isAssignmentNotification = (n) => n.entityType === 'assignment';
 
 /**
  * Loads fleet vehicles and exposes display registry keyed by Traccar deviceId.
@@ -46,6 +49,8 @@ export default function useVehicleDisplayRegistry() {
     window.addEventListener('numz:fleet-vehicles-changed', onFleetVehiclesChanged);
     return () => window.removeEventListener('numz:fleet-vehicles-changed', onFleetVehiclesChanged);
   }, [reload]);
+
+  useNotificationBridge(isAssignmentNotification, reload);
 
   const { byDeviceId, byFleetVehicleId } = useMemo(
     () => buildVehicleDisplayRegistry(rows),
