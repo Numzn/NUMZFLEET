@@ -32,18 +32,6 @@ export const registerErbPriceListeners = (io) => {
     }),
   );
 
-  // ─── socket broadcast to managers ────────────────────────────────────────
-  eventBus.on(
-    EVENT_NAMES.ERB_PRICES_UPDATED,
-    withSafeListener(EVENT_NAMES.ERB_PRICES_UPDATED, 'socket-push-managers', (payload) => {
-      io.emit('erbPricesUpdated', {
-        source:    payload.source,
-        timestamp: payload.timestamp,
-        prices:    payload.prices,
-      });
-    }),
-  );
-
   eventBus.on(
     EVENT_NAMES.ERB_PRICES_UPDATED,
     withSafeListener(EVENT_NAMES.ERB_PRICES_UPDATED, 'persist-notification', async (payload) => {

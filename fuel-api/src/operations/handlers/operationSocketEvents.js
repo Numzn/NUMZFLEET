@@ -17,7 +17,6 @@ export function emitOperationRefuelEvent(io, eventName, payload) {
     changedAt: new Date().toISOString(),
     ...rest,
   };
-  io.to(`operation-session:${sessionId}`).emit(eventName, data);
   io.to('managers').emit(eventName, data);
 }
 
@@ -27,9 +26,6 @@ export function emitOperationInvoiceReconciled(io, payload) {
     ...payload,
     changedAt: new Date().toISOString(),
   };
-  if (payload.sessionId) {
-    io.to(`operation-session:${payload.sessionId}`).emit('operation-invoice-reconciled', data);
-  }
   io.to('managers').emit('operation-invoice-reconciled', data);
 }
 
