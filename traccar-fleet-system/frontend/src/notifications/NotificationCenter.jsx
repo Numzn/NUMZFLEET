@@ -13,13 +13,13 @@ import {
   Menu,
   MenuItem,
   ListSubheader,
-  ToggleButtonGroup,
-  ToggleButton,
+  Tabs,
+  Tab,
   Tooltip,
   CircularProgress,
   useMediaQuery,
 } from '@mui/material';
-import { useTheme, alpha } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import TuneIcon from '@mui/icons-material/Tune';
@@ -28,6 +28,7 @@ import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { severityBorder } from '../common/theme/designTokens.js';
 import {
   selectUnreadCount,
   makeSelectNotificationsWithFilters,
@@ -53,13 +54,6 @@ const defaultFilters = () => ({
   archived: false,
 });
 
-const SEVERITY_COLORS = {
-  critical: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-  info: '#3b82f6',
-};
-
 const CATEGORY_OPTIONS = ['', 'fuel', 'tracking', 'maintenance', 'compliance', 'system', 'assignment'];
 const SEVERITY_OPTIONS = ['', 'info', 'success', 'warning', 'critical'];
 const GROUP_OPTIONS = [
@@ -67,22 +61,6 @@ const GROUP_OPTIONS = [
   { key: 'category', label: 'Category' },
   { key: 'vehicle', label: 'Vehicle' },
 ];
-
-function SeverityDot({ severity }) {
-  const color = SEVERITY_COLORS[severity] || SEVERITY_COLORS.info;
-  return (
-    <Box
-      sx={{
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        bgcolor: color,
-        flexShrink: 0,
-        mt: '6px',
-      }}
-    />
-  );
-}
 
 function NotificationRow({
   n,
@@ -97,37 +75,29 @@ function NotificationRow({
       disableRipple={!n.metadata?.deepLink}
       onClick={n.metadata?.deepLink ? () => onOpenNotification(n) : undefined}
       sx={{
-        borderRadius: 1.5,
-        mb: 0.25,
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--surface-border)',
+        borderLeftWidth: 3,
+        borderLeftColor: severityBorder[n.severity] || severityBorder.info,
+        mb: 0.75,
         py: 1,
-        gap: 1,
-        bgcolor: n.read ? 'transparent' : (theme) => alpha(theme.palette.primary.main, 0.06),
+        bgcolor: n.read ? 'var(--surface-card)' : 'var(--surface-workspace)',
         cursor: n.metadata?.deepLink ? 'pointer' : 'default',
         '&:hover .notif-actions': { opacity: 1 },
+        '&:hover': { bgcolor: 'var(--surface-card-hover)' },
       }}
     >
-      <SeverityDot severity={n.severity} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-          <Typography
-            variant="body2"
-            fontWeight={n.read ? 500 : 700}
-            sx={{ flex: 1, lineHeight: 1.35 }}
-          >
-            {n.title}
-          </Typography>
-          {n.category && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontSize: '0.65rem', flexShrink: 0 }}
-            >
-              {n.category}
-            </Typography>
-          )}
-        </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, lineHeight: 1.4 }}>
+        <Typography
+          variant="body2"
+          fontWeight={n.read ? 500 : 600}
+          sx={{ lineHeight: 1.35 }}
+        >
+          {n.title}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
           {n.message}
+          {n.category ? ` · ${n.category}` : ''}
         </Typography>
 
         <Box
@@ -321,48 +291,28 @@ const NotificationCenter = () => {
         )}
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, pb: 1.5 }}>
-        <ToggleButtonGroup
-          size="small"
-          exclusive
+      <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs
           value={filters.archived ? 'archived' : filters.read}
           onChange={(_e, value) => {
-            if (value == null) return;
             if (value === 'archived') {
               setFilters((f) => ({ ...f, archived: true, read: 'all' }));
             } else {
               setFilters((f) => ({ ...f, archived: false, read: value }));
             }
           }}
-          sx={{
-            '& .MuiToggleButton-root': {
-              textTransform: 'none',
-              px: 1.25,
-              py: 0.25,
-              fontSize: '0.8rem',
-              border: 'none',
-              borderRadius: 999,
-              color: 'text.secondary',
-              '&.Mui-selected': {
-                bgcolor: 'action.selected',
-                color: 'text.primary',
-                fontWeight: 600,
-              },
-            },
-          }}
+          sx={{ minHeight: 40, flex: 1, px: 2 }}
         >
-          <ToggleButton value="all">All</ToggleButton>
-          <ToggleButton value="unread">Unread</ToggleButton>
-          <ToggleButton value="archived">Archived</ToggleButton>
-        </ToggleButtonGroup>
-
-        <Box sx={{ flex: 1 }} />
+          <Tab value="all" label="All" sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40, minWidth: 0, mr: 2, px: 0 }} />
+          <Tab value="unread" label="Unread" sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40, minWidth: 0, mr: 2, px: 0 }} />
+          <Tab value="archived" label="Archived" sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40, minWidth: 0, px: 0 }} />
+        </Tabs>
 
         <Tooltip title="Filters">
           <IconButton
             size="small"
             onClick={(e) => setFilterMenuAnchor(e.currentTarget)}
-            sx={{ color: activeFilterCount ? 'primary.main' : 'text.secondary' }}
+            sx={{ color: activeFilterCount ? 'primary.main' : 'text.secondary', mr: 2 }}
           >
             <Badge variant="dot" color="primary" invisible={!activeFilterCount}>
               <TuneIcon fontSize="small" />
@@ -377,7 +327,7 @@ const NotificationCenter = () => {
         onClose={() => setFilterMenuAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        PaperProps={{ sx: { bgcolor: (t) => alpha(t.palette.background.paper, 1) } }}
+        PaperProps={{ sx: { bgcolor: 'var(--surface-elevated)' } }}
       >
         <ListSubheader disableSticky sx={{ lineHeight: 2.5 }}>Group by</ListSubheader>
         {GROUP_OPTIONS.map(({ key, label }) => (
@@ -414,8 +364,6 @@ const NotificationCenter = () => {
           </MenuItem>
         ))}
       </Menu>
-
-      <Divider />
 
       <Box sx={{ overflow: 'auto', px: 1, py: 1, flex: 1 }}>
         {loading && (
@@ -515,7 +463,7 @@ const NotificationCenter = () => {
           anchor="right"
           open={open}
           onClose={handleClose}
-          PaperProps={{ sx: { width: '100%', maxWidth: 420, bgcolor: (t) => alpha(t.palette.background.paper, 1) } }}
+          PaperProps={{ sx: { width: '100%', maxWidth: 420, bgcolor: 'var(--surface-elevated)' } }}
         >
           {panelContent}
         </Drawer>
@@ -526,7 +474,7 @@ const NotificationCenter = () => {
           onClose={handleClose}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          PaperProps={{ sx: { p: 0, borderRadius: 2, bgcolor: (t) => alpha(t.palette.background.paper, 1) } }}
+          PaperProps={{ sx: { p: 0, bgcolor: 'var(--surface-elevated)' } }}
         >
           {panelContent}
         </Popover>
