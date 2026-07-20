@@ -68,9 +68,12 @@ export async function pollAndPersistTrackingNotifications(io) {
           dedupKey: `traccar:${ev.id}`,
         },
         clientDedupKey: `traccar:${ev.id}`,
-        channels: policy.channels.includes('push')
-          ? [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.PUSH]
-          : [CHANNELS.INBOX, CHANNELS.WEBSOCKET],
+        channels: [
+          CHANNELS.INBOX,
+          CHANNELS.WEBSOCKET,
+          ...(policy.channels.includes('push') ? [CHANNELS.PUSH] : []),
+          ...(policy.channels.includes('sms') ? [CHANNELS.SMS] : []),
+        ],
       }, { io });
 
       persisted += result.persisted || 0;

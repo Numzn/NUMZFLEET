@@ -78,7 +78,7 @@ export function escalationPolicy({ deviceId, alertId }) {
     entityType: 'tracking',
     severity: 'critical',
     audience: { managers: true },
-    channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.PUSH],
+    channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.PUSH, CHANNELS.SMS],
     // Manual escalations (no alertId) are intentionally NEVER deduped —
     // every click creates a fresh notification. Do not "fix" this.
     clientDedupKey: buildEscalationDedupKey(deviceId, alertId),
@@ -276,13 +276,28 @@ export function complianceFindingPolicy({ fleetVehicleId, type, status }) {
 // imports them directly, so they stay defined there, not duplicated here.
 // ---------------------------------------------------------------------------
 
+// SMS only for statuses that reflect an outcome of a command that actually
+// reached the vehicle: 'completed' (Traccar HTTP accepted it) and 'failed'
+// (a genuine delivery failure, e.g. traccar_http_rejected/device_reassigned).
+// 'cancelled'/'expired' happen BEFORE any command is sent (only reachable
+// from 'pending'/'monitoring' per ALLOWED_TRANSITIONS) — not failures, just
+// never-executed. 'blocked' is never actually passed as a status by any
+// current call site (dead defensively-handled value) — excluded too.
+const IMMOBILIZATION_SMS_STATUSES = new Set(['completed', 'failed']);
+
+function immobilizationChannels(status) {
+  return IMMOBILIZATION_SMS_STATUSES.has(status)
+    ? [...STANDARD_CHANNELS, CHANNELS.SMS]
+    : STANDARD_CHANNELS;
+}
+
 export function immobilizationTransitionPolicy({ intentId, status }) {
   return {
     type: `immobilization.${status}`,
     entityType: 'security',
     severity: severityForStatus(status),
     audience: { managers: true },
-    channels: STANDARD_CHANNELS,
+    channels: immobilizationChannels(status),
     clientDedupKey: `immobilization:${intentId}:${status}`,
   };
 }

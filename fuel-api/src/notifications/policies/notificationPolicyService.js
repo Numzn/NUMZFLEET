@@ -115,7 +115,7 @@ export function resolveTraccarTrackingPolicy(traccarEvent) {
       category: 'security',
       notificationType: 'tracking.alarm',
       resolvedType,
-      channels: ['bell', 'push'],
+      channels: ['bell', 'push', 'sms'],
     };
   }
 
@@ -127,7 +127,7 @@ export function resolveTraccarTrackingPolicy(traccarEvent) {
       category: 'security',
       notificationType: `tracking.${resolvedLower}`,
       resolvedType,
-      channels: ['bell', 'push'],
+      channels: ['bell', 'push', 'sms'],
     };
   }
 

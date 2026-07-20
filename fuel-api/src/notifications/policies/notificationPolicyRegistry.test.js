@@ -71,12 +71,12 @@ describe('fuelRequestPolicy', () => {
 });
 
 describe('escalationPolicy', () => {
-  it('is fixed critical/managers/INBOX+WS+PUSH regardless of alertId', () => {
+  it('is fixed critical/managers/INBOX+WS+PUSH+SMS regardless of alertId', () => {
     const p = escalationPolicy({ deviceId: 7, alertId: 'alarm-1' });
     assert.equal(p.type, 'tracking.alert.escalated');
     assert.equal(p.severity, 'critical');
     assert.deepEqual(p.audience, { managers: true });
-    assert.deepEqual(p.channels, [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.PUSH]);
+    assert.deepEqual(p.channels, [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.PUSH, CHANNELS.SMS]);
   });
 
   it('dedup key is stable when alertId is present', () => {
@@ -221,6 +221,27 @@ describe('immobilizationTransitionPolicy', () => {
 
   it('dedup key is stable per (intentId, status)', () => {
     assert.equal(immobilizationTransitionPolicy({ intentId: 'x', status: 'failed' }).clientDedupKey, 'immobilization:x:failed');
+  });
+
+  it('completed and failed include SMS — these are the only statuses where a command actually reached the vehicle', () => {
+    assert.deepEqual(
+      immobilizationTransitionPolicy({ intentId: 'x', status: 'completed' }).channels,
+      [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.SMS],
+    );
+    assert.deepEqual(
+      immobilizationTransitionPolicy({ intentId: 'x', status: 'failed' }).channels,
+      [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.SMS],
+    );
+  });
+
+  it('cancelled, expired, and blocked do NOT include SMS — never-executed states, not failures', () => {
+    for (const status of ['cancelled', 'expired', 'blocked']) {
+      assert.deepEqual(
+        immobilizationTransitionPolicy({ intentId: 'x', status }).channels,
+        STANDARD_CHANNELS,
+        `expected ${status} to stay on STANDARD_CHANNELS`,
+      );
+    }
   });
 });
 
