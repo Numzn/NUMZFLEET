@@ -13,9 +13,12 @@ backend/.env
 .env
 .env.local
 .env.*.local
+.env.*
 *.env
 !*.env.template
 !*.env.example
+!.env.*.template
+!.env.*.example
 
 # SSL Certificates & Keys (should not be in repo)
 backend/cert.pem
@@ -88,3 +91,16 @@ docker-compose.override.yml
 # Git
 *.orig
 *.rej
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Backups / generated report output (not source)
+backups/
+fuel-api/backtest-output/
+fuel-api/shadow-output/
+
+# Local deploy-state bookkeeping (regenerated per-machine, not versioned)
+deployment/deploy/.last_staging_deploy
+deployment/deploy/.staging_deploy_history
