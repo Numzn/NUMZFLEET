@@ -21,7 +21,7 @@ export async function fetchTraccarEventsAfterCursor(opts) {
 
   const pool = getTraccarPool();
   const [rows] = await pool.execute(
-    `SELECT id, deviceid, type, eventtime, attributes
+    `SELECT id, deviceid, type, eventtime, geofenceid, attributes
      FROM tc_events
      WHERE id > ? AND eventtime >= ?
      ORDER BY id ASC

@@ -53,7 +53,7 @@ export function parseTraccarAttributesRaw(raw) {
 }
 
 /** @param {Record<string, unknown>} deviceAttributes */
-function normalizeBool(value, defaultValue) {
+export function normalizeBool(value, defaultValue) {
   if (value === true || value === false) return value;
   if (value === 'true') return true;
   if (value === 'false') return false;

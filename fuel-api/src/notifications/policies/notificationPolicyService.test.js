@@ -63,4 +63,52 @@ describe('resolveTraccarTrackingPolicy', () => {
       assert.deepEqual(p.channels, ['bell', 'push', 'sms']);
     }
   });
+
+  describe('restricted-geofence severity tiering (Phase 2)', () => {
+    it('a restricted geofence enter escalates to critical/security with sms', () => {
+      const p = resolveTraccarTrackingPolicy(
+        { type: 'geofenceEnter', attributes: {} },
+        { isRestrictedGeofence: true },
+      );
+      assert.equal(p.severity, 'critical');
+      assert.equal(p.category, 'security');
+      assert.deepEqual(p.channels, ['bell', 'push', 'sms']);
+      assert.equal(p.notificationType, 'tracking.geofence.entered');
+    });
+
+    it('a restricted geofence exit also escalates', () => {
+      const p = resolveTraccarTrackingPolicy(
+        { type: 'geofenceExit', attributes: {} },
+        { isRestrictedGeofence: true },
+      );
+      assert.equal(p.severity, 'critical');
+      assert.deepEqual(p.channels, ['bell', 'push', 'sms']);
+      assert.equal(p.notificationType, 'tracking.geofence.exited');
+    });
+
+    it('isRestrictedGeofence: false is identical to today\'s existing behavior', () => {
+      const p = resolveTraccarTrackingPolicy(
+        { type: 'geofenceEnter', attributes: {} },
+        { isRestrictedGeofence: false },
+      );
+      assert.equal(p.severity, 'warning');
+      assert.equal(p.category, 'tracking');
+      assert.deepEqual(p.channels, ['bell']);
+    });
+
+    it('omitting the context argument entirely is identical to today\'s existing behavior (regression guard)', () => {
+      const p = resolveTraccarTrackingPolicy({ type: 'geofenceEnter', attributes: {} });
+      assert.equal(p.severity, 'warning');
+      assert.deepEqual(p.channels, ['bell']);
+    });
+
+    it('isRestrictedGeofence is ignored for non-geofence event types', () => {
+      const withFlag = resolveTraccarTrackingPolicy(
+        { type: 'overspeed', attributes: {} },
+        { isRestrictedGeofence: true },
+      );
+      const withoutFlag = resolveTraccarTrackingPolicy({ type: 'overspeed', attributes: {} });
+      assert.deepEqual(withFlag, withoutFlag);
+    });
+  });
 });

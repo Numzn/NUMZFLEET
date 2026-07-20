@@ -418,6 +418,28 @@ export const closeTraccarConnection = async () => {
   }
 };
 
+/**
+ * Get geofence by ID from Traccar
+ */
+export const getTraccarGeofence = async (geofenceId) => {
+  try {
+    const pool = getTraccarPool();
+    const [rows] = await pool.execute(
+      'SELECT id, name, attributes FROM tc_geofences WHERE id = ?',
+      [geofenceId]
+    );
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return rows[0];
+  } catch (error) {
+    console.error('Error getting Traccar geofence:', error);
+    throw error;
+  }
+};
+
 export { getTraccarPool };
 
 export default {
@@ -428,6 +450,7 @@ export default {
   getTraccarUserBySessionToken,
   getTraccarUserBySessionViaAPI,
   getTraccarDevice,
+  getTraccarGeofence,
   upsertTraccarDeviceAttribute,
   getTraccarPosition,
   getTraccarDevicesByIds,

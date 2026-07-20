@@ -7,7 +7,8 @@ import {
 } from '../../notifications/policies/notificationPolicyService.js';
 import { fetchTraccarEventsAfterCursor } from './traccarEventQuery.js';
 import { getBridgeCursor, setBridgeCursor } from './bridgeStateRepository.js';
-import { resolveTrackingEventAudience } from './deviceAudienceResolver.js';
+import { resolveTrackingEventAudience, isGeofenceTrackingEvent } from './deviceAudienceResolver.js';
+import { isRestrictedGeofence } from './geofenceConfigLookup.js';
 
 function envEnabled() {
   const raw = process.env.TRACKING_NOTIFICATION_BRIDGE;
@@ -37,7 +38,12 @@ export async function pollAndPersistTrackingNotifications(io) {
 
   for (const ev of events) {
     try {
-      const policy = resolveTraccarTrackingPolicy({ type: ev.type, attributes: ev.attributes });
+      const isGeofence = isGeofenceTrackingEvent(ev.type, ev.attributes);
+      const restricted = isGeofence ? await isRestrictedGeofence(ev.geofenceid) : false;
+      const policy = resolveTraccarTrackingPolicy(
+        { type: ev.type, attributes: ev.attributes },
+        { isRestrictedGeofence: restricted },
+      );
       if (!policy.persist) continue;
 
       const audienceIds = await resolveTrackingEventAudience(ev.deviceid, {

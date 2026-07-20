@@ -63,7 +63,14 @@ function isGeofenceEvent(resolvedType, attributes) {
  *   channels: string[],
  * }}
  */
-export function resolveTraccarTrackingPolicy(traccarEvent) {
+/**
+ * @param {{ type?: string, attributes?: object }} traccarEvent
+ * @param {{ isRestrictedGeofence?: boolean }} [context] `isRestrictedGeofence`
+ *   is resolved by the caller (an async DB lookup — see geofenceConfigLookup.js)
+ *   and passed in already-resolved, keeping this function pure/sync. Only
+ *   affects geofence enter/exit; ignored for every other event type.
+ */
+export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
   const attrs = parseAttributes(traccarEvent?.attributes);
   const resolvedType = resolveEventType(traccarEvent?.type, attrs);
   const rawLower = String(traccarEvent?.type || '').toLowerCase();
@@ -83,14 +90,15 @@ export function resolveTraccarTrackingPolicy(traccarEvent) {
 
   if (isGeofenceEvent(resolvedType, attrs)) {
     const isExit = resolvedLower.includes('exit');
+    const restricted = Boolean(context?.isRestrictedGeofence);
     return {
       persist: true,
       ingestClient: true,
-      severity: 'warning',
-      category: 'tracking',
+      severity: restricted ? 'critical' : 'warning',
+      category: restricted ? 'security' : 'tracking',
       notificationType: isExit ? 'tracking.geofence.exited' : 'tracking.geofence.entered',
       resolvedType,
-      channels: ['bell'],
+      channels: restricted ? ['bell', 'push', 'sms'] : ['bell'],
     };
   }
 
