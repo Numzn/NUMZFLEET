@@ -19,7 +19,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_HOST_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U numztrak -d numztrak_fuel"]
       interval: 5s
@@ -183,7 +183,8 @@ services:
       DOCUMENT_OCR_BASE_URL: http://document-ocr:8010
       DOCUMENT_OCR_ON_UPLOAD: ${DOCUMENT_OCR_ON_UPLOAD:-1}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
+      - "172.17.0.1:3000:3000"
     volumes:
       - ../../fuel-api:/app
       - backend_node_modules:/app/node_modules
@@ -233,7 +234,8 @@ services:
       VITE_HMR_PROTOCOL: ${VITE_HMR_PROTOCOL:-}
     ports:
       # Map host :3003 (gateway target) to Vite :5174 inside container
-      - "3003:5174"
+      - "127.0.0.1:3003:5174"
+      - "172.17.0.1:3003:5174"
     volumes:
       - ../../traccar-fleet-system/frontend:/app
       - frontend_node_modules:/app/node_modules
