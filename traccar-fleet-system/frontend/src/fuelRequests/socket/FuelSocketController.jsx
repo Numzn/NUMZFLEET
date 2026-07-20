@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { io } from 'socket.io-client';
-import { fuelRequestsActions } from '../store/fuelRequests';
 import { useToastNotifications } from '../../hooks/useToastNotifications';
 import ConnectivityService from '../../connectivity/ConnectivityService';
 import diag from '../../common/util/diagLogger';
@@ -9,7 +8,6 @@ import { notificationsActions } from '../../store/notifications/notificationsSli
 import { normalizeNotificationCreated } from '../../notifications/adapters/normalizeNotificationCreated.js';
 import { isUnifiedNotificationsEnabled } from '../../notifications/notificationFeatureFlags.js';
 import { requestNotificationSync } from '../../notifications/NotificationSyncController.jsx';
-import useFeatures from '../../common/util/useFeatures';
 
 const SOCKET_STATE = Object.freeze({
   CONNECTED: 'CONNECTED',
@@ -52,25 +50,19 @@ const FuelSocketController = () => {
   const authenticated = useSelector((state) => !!state.session.user);
   const user = useSelector((state) => state.session.user);
   const unified = useSelector(isUnifiedNotificationsEnabled);
-  const { enableFuelRequests } = useFeatures();
 
   const browserNotificationsEnabled = user?.attributes?.browserNotificationsEnabled !== false;
 
-  const { showToast, ToastNotification, showFuelRequestNotification } = useToastNotifications({
+  const { ToastNotification } = useToastNotifications({
     enableBrowserNotifications: browserNotificationsEnabled,
     autoRequestPermission: false,
   });
 
   const socketRef = useRef(null);
   const stateRef = useRef(SOCKET_STATE.PAUSED);
-  const showToastRef = useRef(showToast);
-  const showFuelRequestNotificationRef = useRef(showFuelRequestNotification);
   const userRef = useRef(user);
   const dispatchRef = useRef(dispatch);
 
-  const shownNotificationsRef = useRef(new Set());
-  const notificationTimeoutRef = useRef({});
-  const tabFocusStateRef = useRef(true);
   const failureStreakRef = useRef(0);
 
   const setState = (next, reason) => {
@@ -81,30 +73,9 @@ const FuelSocketController = () => {
   };
 
   useEffect(() => {
-    showToastRef.current = showToast;
-    showFuelRequestNotificationRef.current = showFuelRequestNotification;
     userRef.current = user;
     dispatchRef.current = dispatch;
-  }, [showToast, showFuelRequestNotification, user, dispatch]);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return undefined;
-
-    const updateFocusState = () => {
-      tabFocusStateRef.current = !document.hidden && document.hasFocus();
-    };
-
-    updateFocusState();
-    document.addEventListener('visibilitychange', updateFocusState);
-    window.addEventListener('focus', updateFocusState);
-    window.addEventListener('blur', updateFocusState);
-
-    return () => {
-      document.removeEventListener('visibilitychange', updateFocusState);
-      window.removeEventListener('focus', updateFocusState);
-      window.removeEventListener('blur', updateFocusState);
-    };
-  }, []);
+  }, [user, dispatch]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -168,140 +139,6 @@ const FuelSocketController = () => {
         socket,
         !initialSnap.isBrowserOnline ? 'browser_offline' : 'backend_unreachable',
       );
-    }
-
-    const showSmartNotification = (request, change, eventType) => {
-      if (!request || !request.id) return;
-
-      const notificationId = `${eventType}-${request.id}-${change?.type || 'created'}`;
-
-      if (shownNotificationsRef.current.has(notificationId)) {
-        diag.log('fuel_notification_dedup', { id: notificationId });
-        return;
-      }
-
-      shownNotificationsRef.current.add(notificationId);
-
-      if (notificationTimeoutRef.current[notificationId]) {
-        clearTimeout(notificationTimeoutRef.current[notificationId]);
-      }
-      notificationTimeoutRef.current[notificationId] = setTimeout(() => {
-        shownNotificationsRef.current.delete(notificationId);
-        delete notificationTimeoutRef.current[notificationId];
-      }, 5000);
-
-      const isManager = userRef.current?.administrator;
-      const isMyRequest = request.userId === userRef.current?.id;
-
-      if (eventType === 'fuel-request-created' && isManager) {
-        setTimeout(() => {
-          if (showFuelRequestNotificationRef.current) {
-            try {
-              showFuelRequestNotificationRef.current('request-created', {
-                id: request.id,
-                driverName: request.driverName || 'Driver',
-                fuelAmount: request.requestedAmount,
-                vehicleName: request.vehicleName,
-                ...request,
-              });
-              diag.log('fuel_notification_push', { kind: 'request-created', id: notificationId });
-            } catch (error) {
-              diag.error('fuel_notification_push_error', { error: String(error && error.message) });
-            }
-          }
-        }, 50);
-      }
-
-      if (eventType === 'fuel-request-updated' && change && (isMyRequest || isManager)) {
-        const message = change.message || `Fuel request ${change.type}`;
-
-        let notificationType = 'info';
-        if (change.type === 'approved') notificationType = 'success';
-        else if (change.type === 'rejected') notificationType = 'error';
-        else if (change.type === 'cancelled') notificationType = 'warning';
-        else if (change.type === 'fulfilled') notificationType = 'success';
-
-        setTimeout(() => {
-          const currentFocusState = tabFocusStateRef.current;
-
-          if (currentFocusState) {
-            if (showToastRef.current) {
-              try {
-                showToastRef.current(message, notificationType, undefined, { skipPush: true });
-                diag.log('fuel_notification_toast', { id: notificationId, type: notificationType });
-              } catch (error) {
-                diag.error('fuel_notification_toast_error', { error: String(error && error.message) });
-              }
-            }
-          } else if (showFuelRequestNotificationRef.current) {
-            const pushNotificationType = change.type === 'approved' ? 'request-approved'
-              : change.type === 'rejected' ? 'request-rejected'
-                : change.type === 'fulfilled' ? 'request-fulfilled'
-                  : change.type === 'cancelled' ? 'request-cancelled' : null;
-
-            if (pushNotificationType) {
-              try {
-                showFuelRequestNotificationRef.current(pushNotificationType, {
-                  id: request.id,
-                  fuelAmount: request.approvedAmount || request.requestedAmount,
-                  reason: request.notes || request.rejectionReason,
-                  vehicleName: request.vehicleName,
-                  ...request,
-                });
-                diag.log('fuel_notification_push', { kind: pushNotificationType, id: notificationId });
-              } catch (error) {
-                diag.error('fuel_notification_push_error', { error: String(error && error.message) });
-              }
-            }
-          }
-        }, 50);
-      }
-    };
-
-    socket.off('fuel-request-created');
-    socket.off('fuel-request-updated');
-
-    // Legacy driver fuel requests can be disabled by an admin; when off, skip
-    // these listeners to avoid noise. Other channels (notifications,
-    // immobilization, ERB prices) stay active.
-    if (enableFuelRequests) {
-      socket.on('fuel-request-created', (data) => {
-        const request = data.request || data;
-        const change = data.change;
-
-        dispatchRef.current(fuelRequestsActions.update([request]));
-
-        if (unified) {
-          return;
-        }
-
-        if (userRef.current?.administrator) {
-          showSmartNotification(request, change, 'fuel-request-created');
-        }
-      });
-
-      socket.on('fuel-request-updated', (data) => {
-        const request = data.request || data;
-        const change = data.change;
-
-        if (!change) {
-          diag.log('fuel_event_no_change', { id: request?.id });
-        }
-
-        dispatchRef.current(fuelRequestsActions.update([request]));
-
-        if (unified) {
-          return;
-        }
-
-        if (change) {
-          showSmartNotification(request, change, 'fuel-request-updated');
-        } else if (!userRef.current?.administrator && request.userId === userRef.current?.id) {
-          if (showToastRef.current) {
-            showToastRef.current('Your fuel request was updated', 'info', undefined, { skipPush: true });
-          }
-        }
-      });
     }
 
     socket.off('notification.created');
@@ -393,15 +230,9 @@ const FuelSocketController = () => {
         socketRef.current = null;
       }
       setState(SOCKET_STATE.PAUSED, 'cleanup');
-
-      Object.values(notificationTimeoutRef.current).forEach((timeout) => {
-        if (timeout) clearTimeout(timeout);
-      });
-      notificationTimeoutRef.current = {};
-      shownNotificationsRef.current.clear();
       failureStreakRef.current = 0;
     };
-  }, [authenticated, user?.id, unified, enableFuelRequests]);
+  }, [authenticated, user?.id, unified]);
 
   if (unified) {
     return null;
