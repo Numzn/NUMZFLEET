@@ -6,33 +6,33 @@ Future platform migrations (companies lifecycle, `platform_audit_events`, etc.) 
 
 Sequelize `sync` on startup does **not** replace these SQL files for production schema changes.
 
-## Apply all migrations (local Docker — recommended)
+## Apply all migrations (recommended)
 
-With the stack up (`docker compose up -d db` or full `.\rebuild-stack.ps1`):
+With the dev stack up (`./scripts/dev`), from the repo root:
 
-```powershell
-.\fuel-api\scripts\apply-fuel-migrations.ps1
+```bash
+POSTGRES_CONTAINER=numzfleet-dev-db bash deployment/utils/run-fuel-migrations.sh
 ```
 
-This runs every migration in `MIGRATION_ORDER` (idempotent). Production uses the same list via `deployment/utils/fuel-migrations-lib.sh`.
+This runs every migration in `MIGRATION_ORDER` (idempotent). Production uses the same list via `deployment/utils/fuel-migrations-lib.sh` (`POSTGRES_CONTAINER=numzfleet-prod-db`).
 
 ## If you see `column "company_id" does not exist`
 
 Fleet vehicles and other fuel-api routes scope data by `company_id`. That column comes from **`20260616_multi_tenant_foundation.sql`**.
 
-**Fix:** run the full migration script above, or only:
+**Fix:** run the full migration script above, or only that file:
 
-```powershell
-docker cp fuel-api/migrations/20260616_multi_tenant_foundation.sql numzfleet-db-1:/tmp/m.sql
-docker exec numzfleet-db-1 psql -U numztrak -d numztrak_fuel -v ON_ERROR_STOP=1 -f /tmp/m.sql
+```bash
+docker exec -i numzfleet-dev-db psql -U numztrak -d numztrak_fuel -v ON_ERROR_STOP=1 \
+  < fuel-api/migrations/20260616_multi_tenant_foundation.sql
 ```
 
-(Adjust container name if yours differs — `docker ps` and set `$env:POSTGRES_CONTAINER`.)
+(Adjust the container name if yours differs — `docker ps`, or set `POSTGRES_CONTAINER`.)
 
 Verify:
 
-```powershell
-docker exec numzfleet-db-1 psql -U numztrak -d numztrak_fuel -c "\d vehicles"
+```bash
+docker exec numzfleet-dev-db psql -U numztrak -d numztrak_fuel -c "\d vehicles"
 ```
 
 Expect a `company_id` UUID column. Existing rows are backfilled to the default company `00000000-0000-0000-0000-000000000001`.
@@ -41,44 +41,30 @@ See also: [ACCOUNTS_AND_TENANCY.md](./ACCOUNTS_AND_TENANCY.md).
 
 ## If you see `relation "operation_sessions" does not exist`
 
-The production database never had these tables (common if the API once started **degraded** while Traccar MySQL was down: older code skipped Postgres `sync` entirely). **Fix:** create tables, then restart the backend.
+The database never had these tables (common if the API once started **degraded** while Traccar MySQL was down: older code skipped Postgres `sync` entirely). **Fix:** create tables, then restart the backend.
 
 ### 1) Baseline (creates `operation_sessions` + `operation_session_refuels` if missing)
 
-From the repository root (or copy the file onto the server):
+From the repo root:
 
-```powershell
-psql "$env:DATABASE_URL" -f "C:\Users\NUMERI\NUMZFLEET\fuel-api\migrations\20260503_create_operation_sessions_tables.sql"
-```
-
-If `DATABASE_URL` is not set:
-
-```powershell
-psql "postgresql://numztrak:<password>@<host>:5432/numztrak_fuel" -f "C:\Users\NUMERI\NUMZFLEET\fuel-api\migrations\20260503_create_operation_sessions_tables.sql"
+```bash
+docker exec -i numzfleet-dev-db psql -U numztrak -d numztrak_fuel -v ON_ERROR_STOP=1 \
+  < fuel-api/migrations/20260503_create_operation_sessions_tables.sql
 ```
 
 ### 2) Then apply incremental migrations (safe to re-run)
 
 If the tables **already existed** from an older install and only need new columns / enum values:
 
-```powershell
-psql "$env:DATABASE_URL" -f "C:\Users\NUMERI\NUMZFLEET\fuel-api\migrations\20260427_daily_intelligent_refueling.sql"
-psql "$env:DATABASE_URL" -f "C:\Users\NUMERI\NUMZFLEET\fuel-api\migrations\20260429_refuel_status_incomplete.sql"
+```bash
+docker exec -i numzfleet-dev-db psql -U numztrak -d numztrak_fuel -v ON_ERROR_STOP=1 \
+  < fuel-api/migrations/20260427_daily_intelligent_refueling.sql
+docker exec -i numzfleet-dev-db psql -U numztrak -d numztrak_fuel -v ON_ERROR_STOP=1 \
+  < fuel-api/migrations/20260429_refuel_status_incomplete.sql
 ```
 
-## Apply the operation session column migration (existing installs)
-
-Run this from the repository root:
-
-```powershell
-psql "$env:DATABASE_URL" -f "C:\Users\NUMERI\NUMZFLEET\fuel-api\migrations\20260427_daily_intelligent_refueling.sql"
-```
-
-If `DATABASE_URL` is not set, pass it directly:
-
-```powershell
-psql "postgresql://numztrak:<password>@<host>:5432/numztrak_fuel" -f "C:\Users\NUMERI\NUMZFLEET\fuel-api\migrations\20260427_daily_intelligent_refueling.sql"
-```
+(For a remote/production database, use `psql "$DATABASE_URL" -f <file>` instead, or the full
+runner with `POSTGRES_CONTAINER=numzfleet-prod-db`.)
 
 ## Why these migrations are safe to re-run
 
@@ -96,33 +82,33 @@ Note: the deploy safety guard (`forbidden_sql_check` in `deployment/run-migrate-
 
 ## Notification inbox (PR1)
 
-Idempotent; safe after `20260512_notifications.sql` baseline:
+Idempotent; safe after `20260512_notifications.sql` baseline — both files are in `MIGRATION_ORDER`,
+so the full runner above applies them. Manually:
 
-```powershell
-.\fuel-api\scripts\apply-notification-migrations.ps1
-```
-
-Or manually:
-
-```powershell
-psql "$env:DATABASE_URL" -f "fuel-api/migrations/20260512_notifications.sql"
-psql "$env:DATABASE_URL" -f "fuel-api/migrations/20260522_notifications_dedup_and_bridge.sql"
+```bash
+docker exec -i numzfleet-dev-db psql -U numztrak -d numztrak_fuel -v ON_ERROR_STOP=1 \
+  < fuel-api/migrations/20260512_notifications.sql
+docker exec -i numzfleet-dev-db psql -U numztrak -d numztrak_fuel -v ON_ERROR_STOP=1 \
+  < fuel-api/migrations/20260522_notifications_dedup_and_bridge.sql
 ```
 
 Enable bridge in `backend/.env`: `TRACKING_NOTIFICATION_BRIDGE=1` (see `backend/.env.example`).
 
 Verify:
 
-```powershell
-docker exec numzfleet-backend-1 node scripts/verify-tracking-bridge.mjs
+```bash
+docker exec numzfleet-dev-fuel-api node scripts/verify-tracking-bridge.mjs
 ```
 
 ## Verify migration state
 
-```powershell
-psql "$env:DATABASE_URL" -c "SELECT column_name FROM information_schema.columns WHERE table_name='operation_sessions' ORDER BY ordinal_position;"
-psql "$env:DATABASE_URL" -c "SELECT column_name FROM information_schema.columns WHERE table_name='operation_session_refuels' ORDER BY ordinal_position;"
-psql "$env:DATABASE_URL" -c "SELECT indexname FROM pg_indexes WHERE tablename='operation_sessions' ORDER BY indexname;"
+```bash
+docker exec numzfleet-dev-db psql -U numztrak -d numztrak_fuel \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name='operation_sessions' ORDER BY ordinal_position;"
+docker exec numzfleet-dev-db psql -U numztrak -d numztrak_fuel \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name='operation_session_refuels' ORDER BY ordinal_position;"
+docker exec numzfleet-dev-db psql -U numztrak -d numztrak_fuel \
+  -c "SELECT indexname FROM pg_indexes WHERE tablename='operation_sessions' ORDER BY indexname;"
 ```
 
 After migration, expect operation-session totals columns, intelligent refuel columns, and the `idx_operation_sessions_one_active_per_user` index.

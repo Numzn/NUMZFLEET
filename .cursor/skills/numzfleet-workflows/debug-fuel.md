@@ -54,7 +54,7 @@ docker exec numzfleet-dev-db psql -U numztrak -d numztrak_fuel \
 ### 3. ERB prices
 
 - Env: `backend/.env` — `ERB_API_TOKEN`, relay settings.
-- Token sync: `ensure-erb-token.ps1` (runs during rebuild).
+- Token sync: `ERB_API_TOKEN` in `backend/.env` maps to erb-api `API_TOKEN` via compose; compose fails fast if unset.
 - Docs: [fuel-api/docs/ERB_INTEGRATION.md](../../../fuel-api/docs/ERB_INTEGRATION.md)
 - UI: `ErbInsightCard.jsx` — check `erbState.error` path in `useVehicleData`.
 

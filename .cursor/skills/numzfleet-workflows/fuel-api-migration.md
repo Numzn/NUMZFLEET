@@ -31,15 +31,8 @@
 POSTGRES_CONTAINER=numzfleet-dev-db bash deployment/utils/run-fuel-migrations.sh
 ```
 
-**Windows (stack up):**
-
-```powershell
-.\fuel-api\scripts\apply-fuel-migrations.ps1
-```
-
 **Does NOT auto-apply on:**
 
-- `rebuild-stack.ps1` / `docker compose build`
 - `./scripts/dev` (hot reload)
 - `deploy-from-registry.sh`
 

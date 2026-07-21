@@ -272,8 +272,8 @@ def assert_github_token_valid(token: str) -> None:
     except urllib.error.HTTPError as e:
         if e.code == 401:
             print(
-                "[auto_deploy] GITHUB_TOKEN rejected (401). Update release-control-center/config/rcc.env "
-                "with a valid classic PAT (repo scope) or fine-grained token with Contents: Read and write.\n",
+                "[auto_deploy] GITHUB_TOKEN rejected (401). Set GITHUB_TOKEN (env or deployment/scripts/auto_deploy.env) "
+                "to a valid classic PAT (repo scope) or fine-grained token with Contents: Read and write.\n",
                 file=sys.stderr,
             )
             raise SystemExit(2) from e
@@ -683,19 +683,6 @@ def adjust_deploy_sha_for_registry_images(
     return deploy_sha
 
 
-def maybe_load_tokens_from_rcc(repo: Path) -> None:
-    """Use release-control-center/config/rcc.env for tokens not already in the environment."""
-    rcc = repo / "release-control-center" / "config" / "rcc.env"
-    if not rcc.is_file():
-        return
-    for key in ("GITHUB_TOKEN", "GITHUB_REPOSITORY", "DOCKERHUB_USERNAME", "DOCKERHUB_TOKEN"):
-        if os.environ.get(key, "").strip():
-            continue
-        val = read_env_file_key(rcc, key)
-        if val:
-            os.environ[key] = val
-
-
 def read_env_file_key(path: Path, key: str) -> str | None:
     if not path.is_file():
         return None
@@ -967,8 +954,6 @@ def main() -> int:
         return 2
 
     _, user_env_path = load_auto_deploy_env_file(repo)
-
-    maybe_load_tokens_from_rcc(repo)
 
     if args.ssh_identity_file:
         os.environ["NUMZFLEET_SSH_IDENTITY_FILE"] = str(Path(args.ssh_identity_file).expanduser())

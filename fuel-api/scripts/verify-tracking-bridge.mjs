@@ -23,7 +23,7 @@ try {
   const [indexes] = await sequelize.query(
     "SELECT indexname FROM pg_indexes WHERE tablename = 'notifications' AND indexname = 'idx_notifications_user_dedup'",
   );
-  assert(indexes?.length >= 1, 'idx_notifications_user_dedup missing — run apply-notification-migrations.ps1');
+  assert(indexes?.length >= 1, 'idx_notifications_user_dedup missing — run deployment/utils/run-fuel-migrations.sh');
 
   const [state] = await sequelize.query(
     "SELECT key, cursor_value FROM notification_bridge_state WHERE key = 'traccar_events'",

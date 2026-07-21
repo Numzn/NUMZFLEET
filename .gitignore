@@ -104,3 +104,4 @@ fuel-api/shadow-output/
 # Local deploy-state bookkeeping (regenerated per-machine, not versioned)
 deployment/deploy/.last_staging_deploy
 deployment/deploy/.staging_deploy_history
+.last_local_oci_restore

@@ -387,4 +387,4 @@ AUTH_STRATEGY=hybrid HYBRID_FALLBACK=true npm run dev
 - Session validation: `fuel-api/src/services/sessionService.js`
 - User lookup: `fuel-api/src/services/userService.js`
 - Authorization gates: `fuel-api/src/middleware/authGates.js`
-- Full documentation: `fuel-api/AUTHENTICATION_STRATEGY.md`
+- Full documentation: `fuel-api/docs/AUTHENTICATION_STRATEGY.md`

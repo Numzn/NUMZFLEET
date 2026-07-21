@@ -244,7 +244,7 @@ Use the GitHub issue template and include:
 
 - Open a discussion on GitHub
 - Check existing issues and PRs
-- Review documentation in `fuel-api/docs/` and repo markdown guides (`README.md`, `LOCAL_DEVELOPMENT_GUIDE.md`)
+- Review documentation in `fuel-api/docs/` and repo markdown guides (`README.md`, `docs/DEVELOPMENT.md`)
 
 Thank you for contributing! 🎉
 

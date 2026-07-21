@@ -7,23 +7,23 @@ set -euo pipefail
 umask 077
 
 # --- defaults (override via environment or backup.env wrapper) ---
-COMPOSE_DIR="${COMPOSE_DIR:-/home/ubuntu/numzfleet}"
+COMPOSE_DIR="${COMPOSE_DIR:-/home/ubuntu/NUMZFLEET}"
 # Set to the same value as production if you use: docker compose -p <name> up
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 BACKUP_ROOT="${BACKUP_ROOT:-/home/ubuntu/backups}"
 SECRETS_FILE="${SECRETS_FILE:-${COMPOSE_DIR}/backup-secrets.env}"
 
-# Space-separated flags, e.g. -f docker-compose.yml -f docker-compose.erb.yml (must match production; no spaces in paths)
+# Space-separated flags (must match how production was started; no spaces in paths)
 if [[ -n "${COMPOSE_ARGS_OVERRIDE:-}" ]]; then
   read -r -a COMPOSE_ARGS <<< "${COMPOSE_ARGS_OVERRIDE}"
 else
-  COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.erb.yml)
+  COMPOSE_ARGS=(-f deployment/compose/docker-compose.prod.yml)
 fi
 
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 MIN_DUMP_BYTES="${MIN_DUMP_BYTES:-4096}"
-# Named volume from docker-compose.erb.yml (override if compose volume name changes)
-ERB_VOLUME_NAME="${ERB_VOLUME_NAME:-numzfleet_erb_data}"
+# Named volume from docker-compose.prod.yml (override if compose volume name changes)
+ERB_VOLUME_NAME="${ERB_VOLUME_NAME:-numzfleet_prod_erb_data}"
 
 DISABLE_S3_UPLOAD="${DISABLE_S3_UPLOAD:-0}"
 S3_BUCKET="${S3_BUCKET:-}"

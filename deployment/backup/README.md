@@ -1,11 +1,11 @@
 # NUMZFLEET — production backup and recovery
 
-Logical backups for the Docker Compose stack: **Postgres** (`db`), **MySQL** (`traccar-mysql`), and optional **ERB** volume `numzfleet_erb_data`.
+Logical backups for the Docker Compose stack: **Postgres** (`db`), **MySQL** (`traccar-mysql`), and optional **ERB** volume `numzfleet_prod_erb_data`.
 
 ## Requirements
 
 - Ubuntu host with **Docker Compose v2**
-- Stack run directory (`COMPOSE_DIR`) containing [docker-compose.yml](../../docker-compose.yml) and [docker-compose.erb.yml](../../docker-compose.erb.yml)
+- Stack run directory (`COMPOSE_DIR`) — the repo checkout (default `/home/ubuntu/NUMZFLEET`) containing [deployment/compose/docker-compose.prod.yml](../compose/docker-compose.prod.yml)
 - **backup-secrets.env** at `COMPOSE_DIR` (minimal: `POSTGRES_PASSWORD`, `MYSQL_ROOT_PASSWORD`) — same values as in `backend/.env` for those keys
 - **aws** CLI on PATH if uploading to S3
 
@@ -69,7 +69,7 @@ Ensure `/home/ubuntu/backups/logs` exists (created by `run-backup.sh`).
 |----------|---------|-------------|
 | `COMPOSE_DIR` | `/home/ubuntu/numzfleet` | Directory containing compose files |
 | `COMPOSE_PROJECT_NAME` | (empty) | If production uses `docker compose -p <name>`, set this to match |
-| `COMPOSE_ARGS_OVERRIDE` | (empty) | Space-separated compose file flags; default is `-f docker-compose.yml -f docker-compose.erb.yml` |
+| `COMPOSE_ARGS_OVERRIDE` | (empty) | Space-separated compose file flags; default is `-f deployment/compose/docker-compose.prod.yml` |
 | `ERB_VOLUME_NAME` | `numzfleet_erb_data` | Docker volume name for ERB data (if renamed in compose) |
 | `SECRETS_FILE` | `${COMPOSE_DIR}/backup-secrets.env` | Minimal DB secrets |
 | `BACKUP_ROOT` | `/home/ubuntu/backups` | Root for `run/` subdirs |

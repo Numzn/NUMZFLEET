@@ -155,7 +155,7 @@ Vehicle **display names** on the map merge fuel-api registry + Traccar device na
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `column "company_id" does not exist` | Migration `20260616` not applied | `.\fuel-api\scripts\apply-fuel-migrations.ps1` |
+| `column "company_id" does not exist` | Migration `20260616` not applied | `POSTGRES_CONTAINER=numzfleet-dev-db bash deployment/utils/run-fuel-migrations.sh` |
 | `Authentication required` | No Traccar session | Log in again |
 | `Access denied` (manager) | User is not manager/admin | Traccar user permissions |
 | `Vehicle not found` | Wrong company or no row | Check `vehicles.company_id` vs `req.auth.companyId` |
@@ -165,10 +165,10 @@ Vehicle **display names** on the map merge fuel-api registry + Traccar device na
 
 **Local dev after pulling tenant code:**
 
-```powershell
-docker compose up -d db
-.\fuel-api\scripts\apply-fuel-migrations.ps1
-# restart backend if already running
+```bash
+./scripts/dev   # ensure the dev stack (including db) is up
+POSTGRES_CONTAINER=numzfleet-dev-db bash deployment/utils/run-fuel-migrations.sh
+# restart backend if already running: docker restart numzfleet-dev-fuel-api
 ```
 
 **Production deploy:**

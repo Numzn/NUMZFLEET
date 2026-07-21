@@ -128,9 +128,9 @@ def main() -> int:
     print("  Fuel API: http://localhost:3000")
     print()
     print("Tip: from repo root, start backends:")
-    print("  .\\rebuild-stack.ps1 -SkipVerify")
-    print("  # or: docker compose -f docker-compose.yml up -d")
-    print("  # stop static UI on :3002 if needed: docker compose stop frontend")
+    print("  ./scripts/dev   # NumzLab dev stack (Docker)")
+    print("  ./scripts/logs  # follow logs, ./scripts/stop to stop")
+    print("  # dev UI runs on :3003 (numzfleet-dev-frontend container)")
     print()
     print("Press Ctrl+C to stop.\n")
 

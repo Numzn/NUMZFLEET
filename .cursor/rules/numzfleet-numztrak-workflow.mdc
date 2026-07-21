@@ -6,21 +6,18 @@ alwaysApply: true
 # NUMZFLEET (NumzTrak) — repo workflow
 
 **Repo root:** monorepo with `backend/` (Traccar runtime assets), `fuel-api/`, `traccar-fleet-system/frontend/`.
+**Environment:** development runs on **NumzLab** (Linux, bash) at `/srv/projects/numzfleet`.
 
 ## Runtime contract (authoritative)
 
-### Rebuild (do not drift)
+### Dev stack / rebuild (do not drift)
 
-When the user says **rebuild**, when either of you suggests **“try rebuilding”** / **“have you tried rebuilding?”**, or when you need a **full stack rebuild** to validate runtime wiring, **always** use the repo script from the repo root — **do not** invent alternate `docker compose` command sequences; that is how behavior drifts from what is known to work.
+When the user says **rebuild**, when either of you suggests **“try rebuilding”** / **“have you tried rebuilding?”**, or when you need a **full stack rebuild** to validate runtime wiring, **always** use the repo scripts from the repo root — **do not** invent alternate `docker compose` command sequences; that is how behavior drifts from what is known to work.
 
-- **Canonical rebuild:** `.\rebuild-stack.ps1` (same directory as `docker-compose.yml`)
-- Default: core + ERB overlay, `ensure-erb-token.ps1`, `compose build` then `up -d --build`, then HTTP smoke checks.
+- **Dev stack (canonical):** `./scripts/dev` (compose file: `deployment/compose/docker-compose.dev.yml`, runs `up -d --build`)
+- **Full rebuild:** `./scripts/stop && ./scripts/dev`
+- **Health checks:** `./scripts/verify` — **Logs:** `./scripts/logs`
 - **Only** use raw compose for a **targeted** follow-up after the script failed (e.g. `docker compose … logs` on one service), or if the user explicitly asks for a one-off compose line.
-
-### First run / docs-style “bring stack up”
-
-- **Core:** `docker compose -f docker-compose.yml up -d --build`
-- **Core + ERB:** `docker compose -f docker-compose.yml -f docker-compose.erb.yml up -d --build`
 
 ### Production server deploy (single path)
 
@@ -33,17 +30,13 @@ When the user says **deploy to the server / production**, the canonical path is 
 
 ## CI (GitHub)
 
-- CI should validate the standardized stack inputs (frontend lint/build, basic file sanity).
-
-## Legacy scripts
-
-- Legacy deployment scripts and runbooks have been retired in favor of the standardized root compose.
+- CI validates the standardized stack inputs (fuel-api tests, migration manifest, frontend build).
 
 ## Coding assistant habits (this project + user prefs)
 
-- **Windows-first** when suggesting shell steps (PowerShell idioms).
+- **Bash on Linux (NumzLab)** when suggesting shell steps — not PowerShell.
 - **Ask before editing files** unless the user already asked for implementation or a concrete change.
 - **Do not run** `npm run build` / full production builds unless the user asked for a build, deploy, or CI-related verification.
-- When asked **how to rebuild**, answer with **`.\rebuild-stack.ps1`** and its switches (`-CoreOnly`, `-SkipVerify`, `-NoCache`, `-ForceRecreate`, etc.).
-- For **integration / Docker / “something is off in the running stack”** issues, treat **rebuild** as the first concrete step unless logs clearly show a non-runtime cause; use **`.\rebuild-stack.ps1`**, not ad-hoc compose.
-- When asked **how to run** (first-time / docs tone), answer: root compose as above, optionally the ERB overlay file list.
+- When asked **how to rebuild**, answer with **`./scripts/stop && ./scripts/dev`**.
+- For **integration / Docker / “something is off in the running stack”** issues, treat **rebuild** as the first concrete step unless logs clearly show a non-runtime cause; use the repo scripts, not ad-hoc compose.
+- When asked **how to run** (first-time / docs tone), answer: `./scripts/dev` from `/srv/projects/numzfleet` (see `docs/DEVELOPMENT.md`).

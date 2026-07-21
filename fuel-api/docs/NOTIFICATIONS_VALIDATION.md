@@ -13,7 +13,7 @@ Use after applying migrations and enabling the tracking bridge in staging.
 3. On Traccar server attributes (manager UI or DB):
    - `trackingNotificationPersist: true` (recommended when bridge is on)
    - `trackingBellIngest: false` (default client behavior when persist is true)
-4. Rebuild stack: `.\rebuild-stack.ps1` from repo root.
+4. Rebuild stack: `./scripts/stop && ./scripts/dev` from repo root.
 
 ## Automated checks
 

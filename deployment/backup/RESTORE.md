@@ -1,11 +1,11 @@
 # NUMZFLEET — restore procedures
 
-Use the **same** Compose file pair as production:
+Use the **same** Compose file as production:
 
 ```bash
-cd /home/ubuntu/numzfleet   # or your COMPOSE_DIR
+cd /home/ubuntu/NUMZFLEET   # or your COMPOSE_DIR (the repo checkout)
 export COMPOSE_PROJECT_NAME=   # optional: same as production -p if used
-export COMPOSE_ARGS="-f docker-compose.yml -f docker-compose.erb.yml"
+export COMPOSE_ARGS="-f deployment/compose/docker-compose.prod.yml"
 compose() {
   local -a p=()
   [[ -n "${COMPOSE_PROJECT_NAME:-}" ]] && p=(-p "${COMPOSE_PROJECT_NAME}")
@@ -130,4 +130,4 @@ Smoke checks: fuel-api `/health`, frontend `/health`, Traccar `/`, ERB `/v1/heal
 
 - Postgres and MySQL restores are **not** a single point in time; data can differ slightly between the two dumps taken during backup.
 - Full MySQL restore can fail mid-stream; keep a previous backup and a VM snapshot if possible.
-- Service names `db` and `traccar-mysql` must match [docker-compose.yml](../../docker-compose.yml).
+- Service names `db` and `traccar-mysql` must match [deployment/compose/docker-compose.prod.yml](../compose/docker-compose.prod.yml).

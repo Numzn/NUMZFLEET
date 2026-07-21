@@ -13,7 +13,7 @@ Monorepo: `backend/` (Traccar), `fuel-api/`, `traccar-fleet-system/frontend/`.
 
 | User intent | Read |
 |-------------|------|
-| Rebuild / stack broken / integration issue | [rebuild-stack.md](rebuild-stack.md) |
+| Rebuild / stack broken / integration issue | `./scripts/stop && ./scripts/dev`, then `./scripts/verify` — no separate doc |
 | Deploy production / release / OCI | [deploy-production.md](deploy-production.md) |
 | New SQL migration / schema change | [fuel-api-migration.md](fuel-api-migration.md) |
 | Vehicle engine, odometer, capabilities, hub | [vehicle-feature.md](vehicle-feature.md) |
@@ -26,10 +26,10 @@ Monorepo: `backend/` (Traccar), `fuel-api/`, `traccar-fleet-system/frontend/`.
 
 ## Global habits
 
-- **NumzLab dev** (hot reload): `./scripts/dev` — not `rebuild-stack.ps1`.
-- **Full local rebuild** (images + smoke tests): `.\rebuild-stack.ps1` from repo root.
+- **NumzLab dev** (hot reload): `./scripts/dev` from `/srv/projects/numzfleet`.
+- **Full local rebuild** (images + smoke tests): `./scripts/stop && ./scripts/dev`, then `./scripts/verify`.
 - **Production deploy**: registry pull only — never `docker compose build` on OCI.
-- **Windows-first** shell suggestions unless the user is clearly on Linux (NumzLab).
+- **Bash on Linux (NumzLab)** for shell suggestions — not PowerShell.
 - **Ask before editing files** unless the user requested implementation.
 - **Do not run** `npm run build` unless asked for build/deploy/CI verification.
 

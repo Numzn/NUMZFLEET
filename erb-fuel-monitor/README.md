@@ -6,7 +6,7 @@
 
 An automated fuel price monitoring system for the Energy Regulation Board (ERB) of Zambia. It uses a **lean monitor** (Lusaka window, soft day-of-month guard) to detect price changes, notify promptly, and **publish** to the API file at midnight.
 
-**NUMZFLEET clone:** you are already in `erb-fuel-monitor/` at the repo root. Use root **`docker-compose.erb.yml`** with **`rebuild-stack.ps1`** for the full stack that includes this worker.
+**NUMZFLEET clone:** you are already in `erb-fuel-monitor/` at the repo root. The NumzLab dev stack (`./scripts/dev`, compose file `deployment/compose/docker-compose.dev.yml`) includes the erb-api and erb-worker services.
 
 **Production source of truth (OCI and GitHub):** deploy servers often pull the same tree from the **NUMZFLEET** monorepo at [`erb-fuel-monitor`](https://github.com/Numzn/NUMZFLEET/tree/main/erb-fuel-monitor) on `main`; ship updates by committing under `erb-fuel-monitor/` in **Numzn/NUMZFLEET** when that remote is canonical for production.
 

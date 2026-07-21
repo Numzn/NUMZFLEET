@@ -286,7 +286,7 @@ bash deployment/push/push-images.sh deployment/.env <full-git-sha>
 
 ## Local development (not production)
 
-Use root `docker-compose.yml` (+ optional `docker-compose.erb.yml`) and `rebuild-stack.ps1` — **build-on-machine** for dev only. Do not use that flow for production servers.
+Use `./scripts/dev` on NumzLab (compose file `deployment/compose/docker-compose.dev.yml`) — **build-on-machine** for dev only. Do not use that flow for production servers.
 
 ## Legacy
 

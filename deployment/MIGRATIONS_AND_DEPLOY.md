@@ -23,7 +23,6 @@ Migrations are **idempotent** — safe to re-run on every production deploy.
 |------|-------------|
 | `deployment/deploy/deploy-from-registry.sh` | **No** — pull images + `compose up` only |
 | `./scripts/dev` (NumzLab hot reload) | **No** — bind mounts; DB unchanged |
-| `rebuild-stack.ps1` / root `docker compose build` | **No** — local image build only |
 | Sequelize `sync` on fuel-api startup | **Partial** — does not replace SQL migrations |
 
 ## What *does* run migrations (before image pull)
@@ -39,7 +38,6 @@ reverted — same policy as `deployment/deploy/rollback.sh`).
 | `deployment/utils/run-fuel-migrations.sh` | `POSTGRES_CONTAINER` (e.g. `numzfleet-dev-db`, `numzfleet-prod-db`) — manual, ad hoc |
 | `deployment/run-migrate-and-deploy.sh` | `numzfleet-prod-db` (OCI) — break-glass, no backup/rollback wrapper |
 | `deployment/deploy/full-production-deploy.sh` | `numzfleet-prod-db` — the path CI and `promote-to-production.sh` actually use |
-| `fuel-api/scripts/apply-fuel-migrations.ps1` | Local Docker (Windows) |
 
 ### `auto_deploy.py` (workstation → SSH OCI, break-glass/manual path)
 
