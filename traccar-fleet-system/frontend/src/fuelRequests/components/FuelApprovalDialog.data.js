@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { lookupVehicleDisplay } from '../../fleet/display/resolveVehicleDisplay.js';
+import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 
 /**
  * Fetch live validation data from the fuel-api when the dialog opens.

@@ -20,6 +20,7 @@ import TableShimmer from '../common/components/TableShimmer';
 import scheduleReport from './common/scheduleReport';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import useReportDeviceLabel from './common/useReportDeviceLabel';
+import exportExcel from '../common/util/exportExcel';
 
 const columnsArray = [
   ['startTime', 'reportStartDate'],
