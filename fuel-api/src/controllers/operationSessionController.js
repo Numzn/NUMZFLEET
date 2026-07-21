@@ -28,7 +28,7 @@ import {
   getVehicleOperationKpis,
   getManagementOperationKpis,
 } from '../services/operationReportingService.js';
-import { dbErrorMessage } from '../utils/dbErrorMessage.js';
+import { handleError } from '../utils/handleError.js';
 
 function parseRefuelIds(value) {
   if (value === undefined) return undefined;
@@ -44,14 +44,6 @@ function parseRefuelIds(value) {
     }
   }
   return [value];
-}
-
-function handleError(res, error, logLabel, fallback) {
-  const status = error.statusCode || 500;
-  if (status >= 500) {
-    console.error(`${logLabel}:`, error);
-  }
-  return res.status(status).json({ error: dbErrorMessage(error, fallback) });
 }
 
 export const listSessions = async (req, res) => {

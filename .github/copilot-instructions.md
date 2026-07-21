@@ -26,7 +26,7 @@ This file contains focused, actionable guidance to help an AI agent be productiv
 
 - Project-specific conventions and notes
   - Local compose uses named volumes (`docker-compose.yml` volume names) for Postgres and Traccar MySQL; do not delete volumes unless intentionally resetting state.
-  - Secrets & env: `backend/env.template` is the canonical template. Real secrets must not be committed; `.env` files are expected to be local only.
+  - Secrets & env: `backend/.env.example` is the canonical template. Real secrets must not be committed; `.env` files are expected to be local only.
   - Healthchecks and `depends_on` use `condition: service_healthy` in compose files — agents must respect that ordering when simulating starts.
   - `backend/start-numztrak.ps1` only forwards to repo root `rebuild-stack.ps1` (legacy path for bookmarks).
 
@@ -42,7 +42,7 @@ This file contains focused, actionable guidance to help an AI agent be productiv
   - Frontend dev and build: `traccar-fleet-system/frontend/package.json` and `traccar-fleet-system/frontend/src/`.
 
 - Quick safety rules for edits
-  - Never commit real secrets or `.env` contents; follow `backend/env.template` as the canonical shape.
+  - Never commit real secrets or `.env` contents; follow `backend/.env.example` as the canonical shape.
   - When changing Docker ports or protocol bindings, update `backend/conf/traccar.xml` and the root `docker-compose.yml` to keep behaviour consistent.
   - Database schema changes: document them and update `backend/scripts/init-database.sql` or provide a new migration — other services assume certain tables exist.
 

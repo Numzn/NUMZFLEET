@@ -1,9 +1,7 @@
 import { Op } from 'sequelize';
 import { OperationSession } from '../models/index.js';
 import { maybePersistLock } from '../services/operationLockHelper.js';
-
-let tickInFlight = false;
-let intervalRef = null;
+import { runIntervalJob } from './schedulerRuntime.js';
 
 function isEnabled() {
   return String(process.env.OPERATION_AUTO_CLOSE ?? '1') !== '0';
@@ -36,27 +34,11 @@ export function startOperationAutoCloseScheduler() {
     return () => {};
   }
 
-  const pollMs = Math.max(60000, Number(process.env.OPERATION_AUTO_CLOSE_POLL_MS) || 300000);
+  const intervalMs = Math.max(60000, Number(process.env.OPERATION_AUTO_CLOSE_POLL_MS) || 300000);
 
-  const tick = async () => {
-    if (tickInFlight) return;
-    tickInFlight = true;
-    try {
-      await runOnce();
-    } catch (e) {
-      console.error('[operation-auto-close] poll failed', e?.message || e);
-    } finally {
-      tickInFlight = false;
-    }
-  };
-
-  void tick();
-  intervalRef = setInterval(tick, pollMs);
-
-  return () => {
-    if (intervalRef) {
-      clearInterval(intervalRef);
-      intervalRef = null;
-    }
-  };
+  return runIntervalJob({
+    name: 'operation-auto-close',
+    intervalMs,
+    task: () => runOnce(),
+  });
 }

@@ -214,6 +214,23 @@ export async function assertVehicleInTenant(vehicleId, companyId = DEFAULT_COMPA
   return vehicle;
 }
 
+/**
+ * Throws 404 unless deviceId has an active assignment to a vehicle owned by companyId.
+ * Used to scope device-keyed resources (e.g. VehicleSpec) to the caller's tenant.
+ */
+export async function assertDeviceInTenant(deviceId, companyId = DEFAULT_COMPANY_ID) {
+  const scopedCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const assignment = await DeviceAssignment.findOne({
+    where: { deviceId, isActive: true },
+  });
+  if (!assignment) {
+    const err = new Error('Vehicle specification not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await assertVehicleInTenant(assignment.vehicleId, scopedCompanyId);
+}
+
 export async function createVehicle({ name, plateNumber, companyId }) {
   const trimmed = (name || '').trim();
   if (!trimmed) {

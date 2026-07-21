@@ -5,7 +5,7 @@
 - **fuel-api** calls **erb-api** with `Authorization: Bearer <token>`.
 - Env on fuel-api: `ERB_API_TOKEN`, `ERB_API_BASE_URL` (default `http://erb-api:8000` in Docker).
 - Env on erb-api: `API_TOKEN` — **must be the same value** as `ERB_API_TOKEN`.
-- Docker Compose maps both from one host value: `ERB_API_TOKEN` in `backend/.env` (see `backend/env.template`).
+- Docker Compose maps both from one host value: `ERB_API_TOKEN` in `backend/.env` (see `backend/.env.example`).
 - If `ERB_API_TOKEN` is unset when parsing compose, `docker compose` fails fast (`:?` substitution) so `erb-api` never starts with an empty `API_TOKEN`.
 
 ## How fuel-api consumes erb-api

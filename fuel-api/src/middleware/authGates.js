@@ -41,28 +41,6 @@ export const requireRealAuth = (req, res, next) => {
 };
 
 /**
- * Require administrator
- * Use on admin routes
- */
-export const requireAdmin = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      error: 'Authentication required',
-      message: 'Please log in to Traccar first',
-    });
-  }
-  
-  if (!req.user.administrator && !req.user.isManager) {
-    return res.status(403).json({
-      error: 'Access denied',
-      message: 'Administrator access required',
-    });
-  }
-  
-  next();
-};
-
-/**
  * Require user owns resource
  * Use on routes where user accesses their own data
  * 
@@ -119,20 +97,19 @@ export const checkAuth = (req, res, next) => {
   next();
 };
 
-  export const requireManager = (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    if (!req.user.isManager && !req.user.administrator) {
-      return res.status(403).json({ error: 'Forbidden - Manager access required' });
-    }
-    next();
-  };
+export const requireManager = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (!req.user.isManager && !req.user.administrator) {
+    return res.status(403).json({ error: 'Forbidden - Manager access required' });
+  }
+  next();
+};
 
-  export default {
+export default {
   requireAuth,
   requireRealAuth,
-  requireAdmin,
   requireManager,
   requireOwner,
   requireAuthDev,

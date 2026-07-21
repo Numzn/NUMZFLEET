@@ -71,9 +71,9 @@ If neither has a good answer, don't add it.
 
 ---
 
-## Six responsibilities
+## Seven responsibilities
 
-Nothing more. The response has exactly these top-level layers:
+Nothing more. The response has exactly these top-level layers (plus an `updatedAt` timestamp):
 
 | # | Layer | Question |
 |---|-------|----------|
@@ -81,8 +81,9 @@ Nothing more. The response has exactly these top-level layers:
 | 2 | `capabilities` | What can this vehicle support? (UI feature flags) |
 | 3 | `hub` | What do we know right now? (facts, not opinions) |
 | 4 | `engine` | What do those facts mean? (scores, KPIs, urgency) |
-| 5 | `intelligence` | What should we do? (findings + recommendations) |
-| 6 | `timeline` | What has happened? (recent history) |
+| 5 | `compliance` | Which obligations are due? (evaluated findings from hub compliance facts) |
+| 6 | `intelligence` | What should we do? (findings + recommendations) |
+| 7 | `timeline` | What has happened? (recent history) |
 
 ```text
 Vehicle Engine
@@ -90,6 +91,7 @@ Vehicle Engine
 ├── Capabilities
 ├── Hub
 ├── Engine
+├── Compliance
 ├── Intelligence
 └── Timeline
 ```
@@ -142,13 +144,15 @@ Booleans derived from registry + hub — no capability framework.
 
 ### Hub
 
-Normalized facts: `telemetry`, `fuel`, `maintenance`, `repairs`, `compliance`. No scores.
+Normalized facts: `telemetry`, `fuel`, `maintenance`, `repairs`, `activity`. No scores.
+
+Raw compliance records are loaded via `hub/complianceHub.js` but are not exposed on `hub` — they feed the top-level `compliance` evaluation directly.
 
 Maintenance schedules are loaded via `providers/traccarMaintenanceProvider.js` today. Swap the provider file to change GPS backend; hub shape stays the same.
 
 ### Engine
 
-Derived intelligence: `status`, `health`, `maintenance`, `fuel`, `costs`.
+Derived intelligence: `status`, `health`, `maintenance`, `activity`, `fuel`, `costs`.
 
 New calculators belong in `fuel-api/src/vehicleEngine/engine/` and `fuel-api/src/vehicleEngine/fuel/`.
 

@@ -1,18 +1,22 @@
 import { VehicleSpec } from '../models/index.js';
 import { syncFromTraccar, updateVehicleSpec } from '../services/vehicleSpecService.js';
+import { assertDeviceInTenant, listAssignedDeviceIdsForCompany } from '../services/vehicleFleetService.js';
+import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
 /**
- * List all vehicle specifications
+ * List all vehicle specifications for the caller's company
  */
 export const listVehicleSpecs = async (req, res) => {
   try {
+    const deviceIds = await listAssignedDeviceIdsForCompany(req.auth?.companyId);
     const specs = await VehicleSpec.findAll({
+      where: { deviceId: deviceIds },
       order: [['deviceId', 'ASC']]
     });
     res.json(specs);
   } catch (error) {
     console.error('List vehicle specs error:', error);
-    res.status(500).json({ error: 'Failed to fetch vehicle specifications' });
+    res.status(500).json({ error: dbErrorMessage(error, 'Failed to fetch vehicle specifications') });
   }
 };
 
@@ -22,6 +26,7 @@ export const listVehicleSpecs = async (req, res) => {
 export const getVehicleSpec = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    await assertDeviceInTenant(deviceId, req.auth?.companyId);
 
     const spec = await VehicleSpec.findOne({
       where: { deviceId: parseInt(deviceId) }
@@ -33,8 +38,9 @@ export const getVehicleSpec = async (req, res) => {
 
     res.json(spec);
   } catch (error) {
-    console.error('Get vehicle spec error:', error);
-    res.status(500).json({ error: 'Failed to fetch vehicle specification' });
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Get vehicle spec error:', error);
+    res.status(status).json({ error: dbErrorMessage(error, 'Failed to fetch vehicle specification') });
   }
 };
 
@@ -44,6 +50,7 @@ export const getVehicleSpec = async (req, res) => {
 export const updateVehicleSpecification = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    await assertDeviceInTenant(deviceId, req.auth?.companyId);
     const { tankCapacity, fuelEfficiency, fuelType } = req.body;
 
     if (req.body.verifiedOdometerKm != null && req.body.verifiedOdometerKm !== '') {
@@ -67,8 +74,9 @@ export const updateVehicleSpecification = async (req, res) => {
 
     res.json(spec);
   } catch (error) {
-    console.error('Update vehicle spec error:', error);
-    res.status(error.statusCode || 500).json({ error: 'Failed to update vehicle specification' });
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Update vehicle spec error:', error);
+    res.status(status).json({ error: dbErrorMessage(error, 'Failed to update vehicle specification') });
   }
 };
 
@@ -78,13 +86,15 @@ export const updateVehicleSpecification = async (req, res) => {
 export const syncFromTraccarAttributes = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    await assertDeviceInTenant(deviceId, req.auth?.companyId);
 
     const spec = await syncFromTraccar(deviceId);
 
     res.json(spec);
   } catch (error) {
-    console.error('Sync vehicle spec error:', error);
-    res.status(500).json({ error: 'Failed to sync vehicle specification' });
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Sync vehicle spec error:', error);
+    res.status(status).json({ error: dbErrorMessage(error, 'Failed to sync vehicle specification') });
   }
 };
 
@@ -107,6 +117,7 @@ export const bulkUpdateSpecs = async (req, res) => {
       if (entry.tankCapacity == null || entry.fuelEfficiency == null) {
         return res.status(400).json({ error: 'Each spec entry requires tankCapacity and fuelEfficiency' });
       }
+      await assertDeviceInTenant(deviceId, req.auth?.companyId);
       const updated = await updateVehicleSpec(deviceId, {
         tankCapacity: parseFloat(entry.tankCapacity),
         fuelEfficiency: parseFloat(entry.fuelEfficiency),
@@ -117,7 +128,8 @@ export const bulkUpdateSpecs = async (req, res) => {
 
     res.json({ updated: results.length, specs: results });
   } catch (error) {
-    console.error('Bulk update vehicle specs error:', error);
-    res.status(error.statusCode || 500).json({ error: 'Failed to bulk update vehicle specifications' });
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Bulk update vehicle specs error:', error);
+    res.status(status).json({ error: dbErrorMessage(error, 'Failed to bulk update vehicle specifications') });
   }
 };

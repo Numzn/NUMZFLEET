@@ -572,7 +572,7 @@ HYBRID_FALLBACK_TTL=600
 - [ ] Create `src/services/userService.js` with user lookups + synthesis
 - [ ] Refactor `src/middleware/auth.js` to use services
 - [ ] Create authorization gate middleware
-- [ ] Add environment variable defaults to `.env.template`
+- [ ] Add environment variable defaults to `backend/.env.example`
 - [ ] Update all routes to use `authenticate + requireAuth`
 - [ ] Add `req.authenticated` flag for templates/logging
 - [ ] Update route handlers to check `req.user.synthetic` if needed

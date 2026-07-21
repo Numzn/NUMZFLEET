@@ -1,7 +1,5 @@
 import { pollAndPersistTrackingNotifications, isTrackingBridgeEnabled } from '../integrations/traccarBridge/trackingNotificationService.js';
-
-let tickInFlight = false;
-let intervalRef = null;
+import { runIntervalJob } from './schedulerRuntime.js';
 
 /**
  * Poll Traccar tc_events for persist-worthy tracking notifications.
@@ -16,37 +14,21 @@ export function startTrackingNotificationBridgeScheduler(io) {
     return () => {};
   }
 
-  const pollMs = Math.max(5000, Number(process.env.TRACKING_BRIDGE_POLL_MS) || 15000);
+  const intervalMs = Math.max(5000, Number(process.env.TRACKING_BRIDGE_POLL_MS) || 15000);
 
-  const tick = async () => {
-    if (tickInFlight) return;
-    tickInFlight = true;
-    try {
-      const started = Date.now();
-      const result = await pollAndPersistTrackingNotifications(io);
-      const ms = Date.now() - started;
-      if (result.processed > 0 || result.persisted > 0) {
-        console.log('[tracking-bridge] poll', {
-          processed: result.processed,
-          persisted: result.persisted,
-          cursor: result.cursor,
-          ms,
-        });
-      }
-    } catch (e) {
-      console.error('[tracking-bridge] poll failed', e?.message || e);
-    } finally {
-      tickInFlight = false;
+  const task = async () => {
+    const started = Date.now();
+    const result = await pollAndPersistTrackingNotifications(io);
+    const ms = Date.now() - started;
+    if (result.processed > 0 || result.persisted > 0) {
+      console.log('[tracking-bridge] poll', {
+        processed: result.processed,
+        persisted: result.persisted,
+        cursor: result.cursor,
+        ms,
+      });
     }
   };
 
-  void tick();
-  intervalRef = setInterval(tick, pollMs);
-
-  return () => {
-    if (intervalRef) {
-      clearInterval(intervalRef);
-      intervalRef = null;
-    }
-  };
+  return runIntervalJob({ name: 'tracking-bridge', intervalMs, task });
 }

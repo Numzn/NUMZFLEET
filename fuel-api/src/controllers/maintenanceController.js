@@ -3,19 +3,11 @@ import {
   getMaintenanceBudget,
   upsertMaintenanceBudget,
 } from '../maintenance/maintenanceCostService.js';
-import { dbErrorMessage } from '../utils/dbErrorMessage.js';
+import { handleError } from '../utils/handleError.js';
 import {
   listTraccarMaintenances,
   resetTraccarMaintenanceSchedule,
 } from '../services/traccarMaintenanceProxyService.js';
-
-function handleError(res, error, logLabel, fallback) {
-  const status = error.statusCode || 500;
-  if (status >= 500) {
-    console.error(`${logLabel}:`, error);
-  }
-  return res.status(status).json({ error: dbErrorMessage(error, fallback) });
-}
 
 export async function getDashboard(req, res) {
   try {

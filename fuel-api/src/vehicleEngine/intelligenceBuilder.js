@@ -183,7 +183,7 @@ export function buildIntelligence(engine, options = {}) {
         : `${Math.abs(item.daysRemaining)} day(s) overdue`);
     findings.push({
       domain: 'compliance',
-      severity: item.status === 'overdue' || item.status === 'expired' ? 'warning' : 'info',
+      severity: item.status === 'overdue' ? 'warning' : 'info',
       code: `COMPLIANCE_${String(item.type).toUpperCase()}_${String(item.status).toUpperCase()}`,
       text: dueText
         ? `${titleLabel} ${item.status} (${dueText})`
@@ -192,7 +192,7 @@ export function buildIntelligence(engine, options = {}) {
     recommendations.push({
       domain: 'compliance',
       action: 'resolve_compliance_item',
-      severity: item.status === 'overdue' || item.status === 'expired' ? 'warning' : 'info',
+      severity: item.status === 'overdue' ? 'warning' : 'info',
       text: dueText
         ? `Review ${titleLabel} compliance — due ${dueText}`
         : `Review ${titleLabel} compliance`,

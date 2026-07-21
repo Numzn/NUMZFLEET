@@ -107,7 +107,7 @@ Copy the environment template and configure:
 
 ```bash
 # Backend environment
-cp backend/env.template backend/.env
+cp backend/.env.example backend/.env
 # Edit backend/.env with your configuration
 ```
 
@@ -130,7 +130,7 @@ npm install
 
 ### Environment Variables
 
-Create `backend/.env` from `backend/env.template`:
+Create `backend/.env` from `backend/.env.example`:
 
 ```env
 # Database Passwords
@@ -220,7 +220,7 @@ NUMZFLEET/  (canonical monorepo: [Numzn/NUMZFLEET](https://github.com/Numzn/NUMZ
 ├── backend/
 │   ├── conf/               # Traccar XML and runtime config
 │   ├── scripts/            # Database and utility scripts
-│   └── env.template        # Environment template (copy to backend/.env)
+│   └── .env.example        # Environment template (copy to backend/.env)
 │
 ├── fuel-api/               # Fuel Management API (Node.js)
 │   ├── src/
@@ -373,7 +373,7 @@ For issues and questions:
 - Never commit `.env` files
 - Use strong passwords in production
 - Keep dependencies updated
-- Review `backend/env.template` for required secrets
+- Review `backend/.env.example` for required secrets
 - SSL certificates should be generated separately
 
 ---

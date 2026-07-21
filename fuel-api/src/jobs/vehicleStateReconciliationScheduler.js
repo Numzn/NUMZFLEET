@@ -1,4 +1,3 @@
-import { QueryTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 import {
   Vehicle, DeviceAssignment, VehicleActivityState,
@@ -7,11 +6,10 @@ import { getTraccarDevicesByIds, getTraccarLatestPositionsByDeviceIds } from '..
 import { evaluateAndHeal } from '../vehicleEngine/activity/evaluateAndHeal.js';
 import { persistActivityState } from '../vehicleEngine/activity/activityStateService.js';
 import { recordVehicleStateCorrection } from '../vehicleEngine/activity/vehicleStateAuditService.js';
+import { runIntervalJob } from './schedulerRuntime.js';
+import { LOCK_KEYS } from './lockKeys.js';
 
 const isDev = process.env.NODE_ENV === 'development';
-const RECONCILE_LOCK_KEY = 84729105; // distinct from telemetryReconciliationScheduler's 84729104
-
-let tickInFlight = false;
 
 function isEnabled() {
   return String(process.env.VEHICLE_STATE_RECONCILE ?? '1') !== '0';
@@ -19,21 +17,6 @@ function isEnabled() {
 
 function logTick(fields) {
   console.log(JSON.stringify({ event: 'vehicle-state.reconciliation.tick', ...fields, ts: new Date().toISOString() }));
-}
-
-async function tryAcquireAdvisoryLock() {
-  const rows = await sequelize.query('SELECT pg_try_advisory_lock(:key) AS locked', {
-    replacements: { key: RECONCILE_LOCK_KEY },
-    type: QueryTypes.SELECT,
-  });
-  return rows[0]?.locked === true;
-}
-
-async function releaseAdvisoryLock() {
-  await sequelize.query('SELECT pg_advisory_unlock(:key)', {
-    replacements: { key: RECONCILE_LOCK_KEY },
-    type: QueryTypes.SELECT,
-  });
 }
 
 async function withVehicleLock(vehicleId, fn) {
@@ -161,37 +144,13 @@ export function startVehicleStateReconciliationScheduler() {
   }
 
   const intervalMs = Math.max(60000, Number(process.env.VEHICLE_STATE_RECONCILE_INTERVAL_MS) || 900000);
-  const startupDelay = Math.max(0, Number(process.env.VEHICLE_STATE_RECONCILE_STARTUP_DELAY_MS) || 60000);
+  const startupDelayMs = Math.max(0, Number(process.env.VEHICLE_STATE_RECONCILE_STARTUP_DELAY_MS) || 60000);
 
-  const tick = async () => {
-    if (tickInFlight) return;
-    tickInFlight = true;
-    let lockAcquired = false;
-    try {
-      lockAcquired = await tryAcquireAdvisoryLock();
-      if (!lockAcquired) return;
-      await runOnce({ source: 'reconciliation' });
-    } catch (err) {
-      console.error('[vehicle-state-reconciliation] poll failed', err?.message || err);
-    } finally {
-      if (lockAcquired) {
-        try {
-          await releaseAdvisoryLock();
-        } catch (unlockErr) {
-          console.error('[vehicle-state-reconciliation] advisory unlock failed:', unlockErr?.message || unlockErr);
-        }
-      }
-      tickInFlight = false;
-    }
-  };
-
-  const startupTimer = setTimeout(() => { void tick(); }, startupDelay);
-  const intervalId = setInterval(() => { void tick(); }, intervalMs);
-
-  if (isDev) console.log(`[vehicle-state-reconciliation] interval ${intervalMs}ms, first interval tick in ${startupDelay}ms`);
-
-  return () => {
-    clearTimeout(startupTimer);
-    clearInterval(intervalId);
-  };
+  return runIntervalJob({
+    name: 'vehicle-state-reconciliation',
+    intervalMs,
+    startupDelayMs,
+    lockKey: LOCK_KEYS.VEHICLE_STATE_RECONCILIATION,
+    task: () => runOnce({ source: 'reconciliation' }),
+  });
 }

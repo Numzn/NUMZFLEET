@@ -4,9 +4,7 @@ import { buildRoutineServiceSummaryByVehicle } from '../maintenance/routineServi
 import { listComplianceForCompany } from '../services/vehicleComplianceService.js';
 import { evaluateCompliance } from '../compliance/complianceEvaluator.js';
 import { notifyComplianceFinding } from '../notifications/complianceNotificationService.js';
-
-let tickInFlight = false;
-let intervalRef = null;
+import { runIntervalJob } from './schedulerRuntime.js';
 
 function isEnabled() {
   const raw = String(process.env.COMPLIANCE_NOTIFICATION_SCHEDULER || '0').toLowerCase();
@@ -61,25 +59,11 @@ export function startComplianceNotificationScheduler() {
     return () => {};
   }
 
-  const pollMs = Math.max(60_000, Number(process.env.COMPLIANCE_NOTIFICATION_POLL_MS) || 10 * 60_000);
-  const tick = async () => {
-    if (tickInFlight) return;
-    tickInFlight = true;
-    try {
-      await runOnce();
-    } catch (error) {
-      console.error('[compliance-notify] poll failed', error?.message || error);
-    } finally {
-      tickInFlight = false;
-    }
-  };
+  const intervalMs = Math.max(60_000, Number(process.env.COMPLIANCE_NOTIFICATION_POLL_MS) || 10 * 60_000);
 
-  void tick();
-  intervalRef = setInterval(tick, pollMs);
-  return () => {
-    if (intervalRef) {
-      clearInterval(intervalRef);
-      intervalRef = null;
-    }
-  };
+  return runIntervalJob({
+    name: 'compliance-notify',
+    intervalMs,
+    task: () => runOnce(),
+  });
 }

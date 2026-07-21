@@ -2,6 +2,7 @@ import { getLatestErbPrices } from '../reports/adapters/erbAdapter.js';
 import { syncLoginInsightFromErbPrices } from '../services/traccarLoginInsightSync.js';
 import { emitDomainEvent } from '../events/eventBus.js';
 import { EVENT_NAMES } from '../events/eventNames.js';
+import { runIntervalJob } from './schedulerRuntime.js';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -33,44 +34,32 @@ export function startErbLoginInsightScheduler() {
     return () => {};
   }
 
-  const startupDelay = Math.max(
+  const startupDelayMs = Math.max(
     0,
     parseInt(process.env.ERB_LOGIN_INSIGHT_SYNC_STARTUP_DELAY_MS ?? '8000', 10) || 0,
   );
 
-  const run = () => {
-    void tickErbLoginInsightSync()
-      .then((out) => {
-        if (isDev && out && !out.ok && out.reason !== 'traccar_api_not_configured' && out.reason !== 'unchanged') {
-          console.warn('[erbLoginInsightScheduler]', out.reason);
-        }
-        // Fire domain event if prices changed so downstream listeners react immediately
-        if (out?.ok && out.reason === 'updated') {
-          // tickErbLoginInsightSync already called getLatestErbPrices; re-fetch for the payload
-          getLatestErbPrices().then((result) => {
-            emitDomainEvent(EVENT_NAMES.ERB_PRICES_UPDATED, {
-              ...result,
-              trigger: 'scheduler',
-            });
-          }).catch(() => {/* non-critical */});
-        }
-      })
-      .catch((err) => {
-        console.error('[erbLoginInsightScheduler]', err?.message || err);
-      });
+  const task = async () => {
+    const out = await tickErbLoginInsightSync();
+    if (isDev && out && !out.ok && out.reason !== 'traccar_api_not_configured' && out.reason !== 'unchanged') {
+      console.warn('[erbLoginInsightScheduler]', out.reason);
+    }
+    // Fire domain event if prices changed so downstream listeners react immediately
+    if (out?.ok && out.reason === 'updated') {
+      // tickErbLoginInsightSync already called getLatestErbPrices; re-fetch for the payload
+      getLatestErbPrices().then((result) => {
+        emitDomainEvent(EVENT_NAMES.ERB_PRICES_UPDATED, {
+          ...result,
+          trigger: 'scheduler',
+        });
+      }).catch(() => {/* non-critical */});
+    }
   };
 
-  const startupTimer = setTimeout(run, startupDelay);
-  const intervalId = setInterval(run, intervalMs);
-
-  if (isDev) {
-    console.log(
-      `[erbLoginInsightScheduler] interval ${intervalMs}ms, first run in ${startupDelay}ms`,
-    );
-  }
-
-  return () => {
-    clearTimeout(startupTimer);
-    clearInterval(intervalId);
-  };
+  return runIntervalJob({
+    name: 'erbLoginInsightScheduler',
+    intervalMs,
+    startupDelayMs,
+    task,
+  });
 }

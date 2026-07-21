@@ -23,4 +23,4 @@ Full rebuild (Windows): `.\rebuild-stack.ps1`
 
 ## Secrets
 
-Use **`backend/.env`** (from **`backend/env.template`**). Do not rely on any sample passwords in old docs; they may not match your machine.
+Use **`backend/.env`** (from **`backend/.env.example`**). Do not rely on any sample passwords in old docs; they may not match your machine.
