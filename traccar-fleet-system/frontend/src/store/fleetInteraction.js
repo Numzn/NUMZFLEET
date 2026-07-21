@@ -1,7 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import {
   SHEET_LEVEL,
-  SHEET_MAX_LEVEL_SPRINT1,
   clampSheetLevel,
 } from '../main/fleet/fleetSheetConstants.js';
 
@@ -25,7 +24,7 @@ const { reducer, actions } = createSlice({
     fleetWorkspaceMode: 'live',
     /**
      * Mobile Fleet Command bottom sheet depth (snap derived from level).
-     * 0 = closed, 1 = overview, 2 = list, 3 = command (2–3 reserved after Sprint 1).
+     * 0 = closed, 1 = overview (compact list), 2 = list (search + virtualized list).
      */
     sheetLevel: SHEET_LEVEL.CLOSED,
   },
@@ -63,16 +62,10 @@ const { reducer, actions } = createSlice({
     setSheetLevel(state, action) {
       state.sheetLevel = clampSheetLevel(action.payload);
     },
-    expandSheet(state) {
-      state.sheetLevel = clampSheetLevel(state.sheetLevel + 1);
-    },
-    collapseSheet(state) {
-      state.sheetLevel = clampSheetLevel(state.sheetLevel - 1);
-    },
   },
 });
 
-export { SHEET_MAX_LEVEL_SPRINT1, SHEET_LEVEL };
+export { SHEET_LEVEL };
 
 export { actions as fleetInteractionActions };
 export { reducer as fleetInteractionReducer };

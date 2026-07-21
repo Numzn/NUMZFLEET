@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Snackbar, Box, Typography } from '@mui/material';
 import useConnectivity from './useConnectivity.js';
+import { readFleetSheetHeightCssVarPx } from '../main/fleet/fleetSheetConstants.js';
 
 const RESTORED_TOAST_MS = 2800;
 
@@ -45,14 +46,10 @@ function ConnectivityStrip({ kind, label }) {
 function readBottomChromeInsetPx() {
   if (typeof document === 'undefined') return 0;
   try {
-    const styles = getComputedStyle(document.documentElement);
-    const navRaw = styles.getPropertyValue('--app-bottomnav-height');
-    const sheetRaw = styles.getPropertyValue('--fleet-sheet-height');
+    const navRaw = getComputedStyle(document.documentElement).getPropertyValue('--app-bottomnav-height');
     const nav = parseFloat(String(navRaw).trim());
-    const sheet = parseFloat(String(sheetRaw).trim());
     const navPx = Number.isFinite(nav) ? nav : 0;
-    const sheetPx = Number.isFinite(sheet) ? sheet : 0;
-    return Math.max(navPx, sheetPx);
+    return Math.max(navPx, readFleetSheetHeightCssVarPx());
   } catch {
     return 0;
   }
