@@ -39,11 +39,14 @@ import { vehicleWorkspacePath } from '../fleet/vehicleRegistry/vehicleRegistryUt
 import { fetchDailyOperationReports, fetchOperationSessionDetails } from './api/operationSessionsApi.js';
 import { formatK, formatLitres } from './utils/formatters.js';
 import {
+  deriveVehicleWorkflowState,
   getTodayKeyInTimeZone,
   isRefuelComplete,
   relativeDayLabel,
   resolveFleetTimezone,
   varianceTone,
+  VEHICLE_STATE_LABEL,
+  vehicleStateChipColor,
 } from './utils/operationDayUtils.js';
 import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
 import OperationVehicleLabel from './components/OperationVehicleLabel.jsx';
@@ -258,7 +261,6 @@ function SessionRecordDetail({
 
 function SessionRecordVehiclesAndAttachments({ detail, vehicleName, onVehicleClick }) {
   const refuels = detail.refuels || [];
-  const fueledRefuels = refuels.filter(isRefuelComplete);
   const invoices = detail.invoices || [];
   const refuelsById = new Map(refuels.map((r) => [Number(r.id), r]));
 
@@ -267,17 +269,19 @@ function SessionRecordVehiclesAndAttachments({ detail, vehicleName, onVehicleCli
       <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ letterSpacing: 0.4 }}>
         VEHICLES
       </Typography>
-      {fueledRefuels.length === 0 ? (
+      {refuels.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
           No vehicles recorded
         </Typography>
       ) : (
         <Stack sx={{ mt: 0.5, mb: 1.5 }}>
-          {fueledRefuels.map((refuel) => {
+          {refuels.map((refuel) => {
+            const state = deriveVehicleWorkflowState(refuel);
+            const fueled = isRefuelComplete(refuel);
             const predicted = predictedLitres(refuel);
             const actual = refuel.actualFuelLitres != null ? Number(refuel.actualFuelLitres) : null;
             const tone = varianceTone(predicted, actual);
-            const showVariance = (tone === 'warning' || tone === 'error') && predicted != null && actual != null;
+            const showVariance = fueled && (tone === 'warning' || tone === 'error') && predicted != null && actual != null;
             const variance = showVariance ? actual - predicted : null;
             const fuelType = FUEL_TYPE_LABEL[String(refuel.fuelTypeSnapshot || '').toLowerCase()];
             return (
@@ -301,19 +305,28 @@ function SessionRecordVehiclesAndAttachments({ detail, vehicleName, onVehicleCli
                     titleWeight={700}
                     secondarySx={{ fontSize: '12px' }}
                   />
-                  {fuelType && (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px' }}>
-                      {fuelType}
-                    </Typography>
-                  )}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.25 }}>
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={VEHICLE_STATE_LABEL[state] || state}
+                      color={vehicleStateChipColor(state)}
+                      sx={{ height: 18, '& .MuiChip-label': { px: 0.75, fontSize: '10px' } }}
+                    />
+                    {fuelType && (
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px' }}>
+                        {fuelType}
+                      </Typography>
+                    )}
+                  </Box>
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
                   <Typography variant="body2" fontWeight={700}>
-                    {refuel.actualCost != null ? formatK(refuel.actualCost) : '—'}
+                    {fueled && refuel.actualCost != null ? formatK(refuel.actualCost) : '—'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    {formatLitres(actual)}
-                    {predicted != null && ` / ${formatLitres(predicted)} predicted`}
+                    {fueled ? formatLitres(actual) : (predicted != null ? formatLitres(predicted) : '—')}
+                    {fueled && predicted != null && ` / ${formatLitres(predicted)} predicted`}
                   </Typography>
                   {showVariance && (
                     <Typography variant="caption" fontWeight={700} sx={{ color: VARIANCE_COLOR[tone] }}>
@@ -405,6 +418,8 @@ const OperationHistoryPage = () => {
       if (toDate) query.to = toDate;
       const data = await fetchDailyOperationReports(user, query);
       setRows(Array.isArray(data) ? data : []);
+      setExpandedId(null);
+      setDetailsById({});
     } catch (err) {
       setError(fuelApiErrorMessage(err, 'Failed to load operation history'));
     } finally {
@@ -561,7 +576,8 @@ const OperationHistoryPage = () => {
             <MenuItem key={station} value={station}>{station}</MenuItem>
           ))}
         </TextField>
-        <Box sx={{ gridColumn: { xs: '1 / -1', sm: 'auto' }, display: 'flex', justifyContent: 'flex-end' }}>
+        <Box sx={{ gridColumn: { xs: '1 / -1', sm: 'auto' }, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+          {loading && rows.length > 0 && <CircularProgress size={16} />}
           <Button size="small" variant="outlined" onClick={load} disabled={loading}>
             Refresh
           </Button>
@@ -570,7 +586,7 @@ const OperationHistoryPage = () => {
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      {loading && (
+      {loading && rows.length === 0 && (
         <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
           <CircularProgress />
         </Box>
@@ -582,7 +598,7 @@ const OperationHistoryPage = () => {
         </Alert>
       )}
 
-      {!loading && sortedRows.length > 0 && isMobile && (
+      {sortedRows.length > 0 && isMobile && (
         <Stack spacing={1.25}>
           {sortedRows.map((row) => {
             const variance = row.varianceLitres != null ? Number(row.varianceLitres) : null;
@@ -644,7 +660,7 @@ const OperationHistoryPage = () => {
         </Stack>
       )}
 
-      {!loading && sortedRows.length > 0 && !isMobile && (
+      {sortedRows.length > 0 && !isMobile && (
         <Paper variant="outlined" sx={{ overflow: 'auto' }}>
           <Table size="small">
             <TableHead>
