@@ -118,7 +118,7 @@ ssh -L 3000:127.0.0.1:3000 -L 3002:127.0.0.1:3002 -L 8082:127.0.0.1:8082 <user>@
 
 SSH from Windows (key ACLs, interactive vs one-liner checks): [OCI_SSH.md](OCI_SSH.md).
 
-1. Clone repo (for `deployment/compose`, `deployment/deploy`, `backend/.env`, `backend/conf/traccar.xml`). OCI default: **`~/NUMZFLEET`** — [oci-server-setup.sh](oci-server-setup.sh) (same path in `deployment/scripts/auto_deploy.defaults.env`).
+1. Clone repo (for `deployment/compose`, `deployment/deploy`, `backend/.env`, `backend/conf/traccar.xml`). OCI default: **`~/NUMZFLEET`** — [oci-server-setup.sh](oci-server-setup.sh) (same path in `deployment/scripts/auto_deploy.env.example`).
 2. Copy [deployment/.env.example](.env.example) → `deployment/.env` and set `IMAGE_TAG` to the **full git SHA** you are deploying.
 3. Configure [../backend/.env](../backend/.env) (secrets, `POSTGRES_PASSWORD` or `DATABASE_URL` with host `db`, `TRACCAR_MYSQL_PASSWORD`, `ERB_API_TOKEN`, production `CORS_ORIGIN` / auth, etc.).
 
@@ -173,7 +173,7 @@ Single entrypoint from your laptop: **optional commit**, **`git push origin HEAD
 
 | Step | What runs |
 |------|-----------|
-| Config | [scripts/auto_deploy.defaults.env](scripts/auto_deploy.defaults.env) then optional [scripts/auto_deploy.env](scripts/auto_deploy.env) (gitignored; copy [auto_deploy.env.example](scripts/auto_deploy.env.example)) |
+| Config | optional `scripts/auto_deploy.env` (gitignored; copy [auto_deploy.env.example](scripts/auto_deploy.env.example)) |
 | Git | `git add .` → commit (message from `-m`, or auto from staged paths, or prompt) → `git push origin HEAD:<branch>` → `git fetch` + optional upstream tweak (VS Code sync) |
 | Registry tag | Uses **full `HEAD` SHA** for `IMAGE_TAG` by default. If this push **did not** match CI image `paths:` (deployment-only), **defaults to the latest ancestor commit** that touched `frontend/`, `fuel-api/`, `erb-fuel-monitor/`, or the image workflow — so `docker pull` does not hit **manifest unknown**. Override with **`NUMZFLEET_DEPLOY_IMAGE_TAG`** or **`--deploy-image-tag`**, or disable auto pick with **`--no-auto-image-sha`** / **`NUMZFLEET_AUTO_DEPLOY_IMAGE_FROM_LAST_CI_COMMIT=0`**. After **workflow_dispatch** for the same SHA, use **`--no-auto-image-sha`** or explicit **`--deploy-image-tag HEAD`** so images match `HEAD`. |
 | SSH / keys | Same expectations as [ssh-prod.sh](../ssh-prod.sh); details [OCI_SSH.md](OCI_SSH.md). Windows: **`deployment/scripts/...`** with forward slashes, or **`deployment\\scripts\\auto_deploy.cmd`**. **One SSH session** runs server git sync then migrate/deploy (and optional Traccar restart). During the CI wait, **OpenSSH ControlMaster** can keep a background SSH session open (default on when waiting for images) — see **`NUMZFLEET_SSH_MULTIPLEX_DURING_CI_WAIT`**. Long remote steps use **`NUMZFLEET_SSH_SERVER_ALIVE_INTERVAL`** (default 30s) to reduce idle drops. |
@@ -193,7 +193,7 @@ python deployment/scripts/auto_deploy.py --dry-run --skip-git
 
 **Post-deploy verification (workstation):** After a successful SSH deploy, `auto_deploy` waits **`NUMZFLEET_POST_VERIFY_WAIT_SECONDS`** (default **60**), then **GET**s **`{origin}/health`** and **`{origin}/api/health`** from your machine with **no-cache** headers and a **cache-busting query** (force refresh through browsers/CDNs). Origin: **`NUMZFLEET_POST_VERIFY_ORIGIN`** if set; otherwise the **first non-loopback** entry in **`CORS_ORIGIN`** (comma-separated lists often put `https://numz.site` before `http://localhost:3002` — localhost alone would be skipped; set **`NUMZFLEET_POST_VERIFY_ORIGIN`** explicitly if needed). Override URLs with **`NUMZFLEET_POST_VERIFY_HEALTH_URL`** / **`NUMZFLEET_POST_VERIFY_API_HEALTH_URL`**. Disable with **`NUMZFLEET_POST_VERIFY=0`** or **`--skip-post-verify`**. Set **`NUMZFLEET_POST_VERIFY_STRICT=1`** to exit non-zero if probes fail after retries.
 
-Full env list: comments in `auto_deploy.defaults.env` and **`python deployment/scripts/auto_deploy.py --help`** epilog (points here).
+Full env list: comments in `auto_deploy.env.example` and **`python deployment/scripts/auto_deploy.py --help`** epilog (points here).
 
 ## Baseline backup (pre-migration snapshot, automatic)
 

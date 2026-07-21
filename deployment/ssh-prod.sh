@@ -1,6 +1,6 @@
-          #!/usr/bin/env bash
+#!/usr/bin/env bash
 # Persistent shortcut for production SSH login.
-# Default IP is also in deployment/scripts/auto_deploy.defaults.env — update both if the instance changes.
+# Default IP is also documented in deployment/OCI_SSH.md — update both if the instance changes.
 set -euo pipefail
 
 HOST="${OCI_PROD_HOST:-129.151.163.95}"

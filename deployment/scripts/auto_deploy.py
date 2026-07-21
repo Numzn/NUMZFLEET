@@ -8,7 +8,7 @@ Flow (see deployment/REGISTRY_DEPLOY.md, section **auto_deploy.py (workstation �
   3. SSH: one session runs server git sync then migrate+deploy or registry deploy (optional SSH master during CI wait)
   4. Optional: wait then HTTP GET /health and /api/health from this machine (cache-bypass) — post-deploy verification
 
-Config: deployment/scripts/auto_deploy.defaults.env, optional auto_deploy.env (gitignored).
+Config: optional deployment/scripts/auto_deploy.env (gitignored; copy auto_deploy.env.example).
 Windows: use deployment/scripts/... paths; see deployment/OCI_SSH.md for keys.
 """
 
@@ -87,28 +87,15 @@ def _apply_env_text(text: str, *, only_if_empty: bool) -> None:
             os.environ[key] = val
 
 
-def load_auto_deploy_env_file(repo: Path) -> tuple[Path | None, Path | None]:
+def load_auto_deploy_env_file(repo: Path) -> Path | None:
     """
-    Load tracked defaults, then optional local overrides.
+    Load optional local config: deployment/scripts/auto_deploy.env if present
+    (copy auto_deploy.env.example), or the file named by
+    NUMZFLEET_AUTO_DEPLOY_ENV_FILE. Non-empty values override the environment.
 
-    1. deployment/scripts/auto_deploy.defaults.env — only fills empty env keys (won't override exports).
-    2. deployment/scripts/auto_deploy.env if present, or NUMZFLEET_AUTO_DEPLOY_ENV_FILE — overrides.
-
-    Returns (defaults_path_loaded_or_none, user_path_loaded_or_none).
+    Returns the path loaded, or None.
     """
-    scripts = repo / "deployment" / "scripts"
-    defaults_path = (scripts / "auto_deploy.defaults.env").resolve()
-    user_primary = (scripts / "auto_deploy.env").resolve()
-
-    loaded_defaults: Path | None = None
-    loaded_user: Path | None = None
-
-    if defaults_path.is_file():
-        try:
-            _apply_env_text(defaults_path.read_text(encoding="utf-8-sig"), only_if_empty=True)
-            loaded_defaults = defaults_path
-        except OSError:
-            pass
+    user_primary = (repo / "deployment" / "scripts" / "auto_deploy.env").resolve()
 
     path_str = os.environ.get("NUMZFLEET_AUTO_DEPLOY_ENV_FILE", "").strip()
     if path_str:
@@ -121,11 +108,11 @@ def load_auto_deploy_env_file(repo: Path) -> tuple[Path | None, Path | None]:
     if user_path.is_file():
         try:
             _apply_env_text(user_path.read_text(encoding="utf-8-sig"), only_if_empty=False)
-            loaded_user = user_path
+            return user_path
         except OSError:
             pass
 
-    return loaded_defaults, loaded_user
+    return None
 
 
 def _argv_for_log(argv: list[str]) -> str:
@@ -842,7 +829,7 @@ def countdown(seconds: int, label: str) -> None:
 
 
 _HELP_EPILOG = """
-Env: deployment/scripts/auto_deploy.defaults.env then auto_deploy.env (optional).
+Env: optional deployment/scripts/auto_deploy.env (copy auto_deploy.env.example).
 Override file: NUMZFLEET_AUTO_DEPLOY_ENV_FILE.
 
 All NUMZFLEET_* variables, flags, and operator flow: deployment/REGISTRY_DEPLOY.md (section auto_deploy).
@@ -953,7 +940,7 @@ def main() -> int:
         print(f"Not a git repository (or invalid --repo): {repo}", file=sys.stderr)
         return 2
 
-    _, user_env_path = load_auto_deploy_env_file(repo)
+    user_env_path = load_auto_deploy_env_file(repo)
 
     if args.ssh_identity_file:
         os.environ["NUMZFLEET_SSH_IDENTITY_FILE"] = str(Path(args.ssh_identity_file).expanduser())
@@ -983,7 +970,7 @@ def main() -> int:
         if user_env_path and not os.environ.get("NUMZFLEET_SSH_HOST", "").strip():
             hint = f"(Loaded {user_env_path}: NUMZFLEET_SSH_HOST empty; remove line or set host.)\n"
         print(
-            "NUMZFLEET_SSH_HOST not set. Use --ssh-host, or auto_deploy.defaults.env / auto_deploy.env, "
+            "NUMZFLEET_SSH_HOST not set. Use --ssh-host, or deployment/scripts/auto_deploy.env, "
             "or --skip-deploy.\n" + hint + "See deployment/REGISTRY_DEPLOY.md.",
             file=sys.stderr,
         )
