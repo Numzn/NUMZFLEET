@@ -21,7 +21,8 @@ function trimOrNull(value) {
  * @param {number|null} [input.odometerKm] - canonical resolved odometer (fuel-api resolveOdometerKm), NOT daily mileage
  * @param {string} [input.odometerConfidence]
  * @param {object|null} [input.activityState] - canonical resolveActivityState() result, persisted server-side
- * @returns {{ primary: string, secondary: string|null, deviceId: number|null, fleetVehicleId: string|null, odometerKm: number|null, odometerConfidence: string, activityState: object|null }}
+ * @param {object|null} [input.dailyMileage] - fuel-api dailyMileage DTO ({ km, source, date, ... }) — distance travelled today
+ * @returns {{ primary: string, secondary: string|null, deviceId: number|null, fleetVehicleId: string|null, odometerKm: number|null, odometerConfidence: string, activityState: object|null, dailyMileage: object|null }}
  */
 export function resolveVehicleDisplay(input = {}) {
   const nickname = trimOrNull(input.name);
@@ -51,6 +52,7 @@ export function resolveVehicleDisplay(input = {}) {
     odometerKm: Number.isFinite(Number(input.odometerKm)) ? Number(input.odometerKm) : null,
     odometerConfidence: input.odometerConfidence ?? 'unavailable',
     activityState: input.activityState ?? null,
+    dailyMileage: input.dailyMileage ?? null,
   };
 }
 
@@ -71,6 +73,7 @@ export function resolveVehicleDisplayFromFleetRow(vehicleRow) {
     odometerKm: vehicleRow.odometerKm,
     odometerConfidence: vehicleRow.odometerConfidence,
     activityState: vehicleRow.activityState ?? null,
+    dailyMileage: vehicleRow.dailyMileage ?? null,
   });
 }
 

@@ -68,6 +68,11 @@ export function resolveOdometerFromEvidence(evidence) {
     odometerDriftClass: driftClass,
     resolutionMode,
     diagnostics,
+    // Unit-corrected raw telemetry (km). Distance-over-a-window consumers
+    // (daily mileage) must diff THIS, not odometerKm: the anchored mode
+    // clamps readings below the anchor point (M2 §7), which flattens any
+    // window that spans or precedes an anchor capture to zero distance.
+    telemetryKm: unit.correctedKm ?? null,
   };
 }
 

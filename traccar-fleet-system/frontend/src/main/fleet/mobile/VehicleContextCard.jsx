@@ -16,7 +16,7 @@ import useMotionDurationTick from '../../../fleet/vehicleDetail/useMotionDuratio
 import VehicleLocationLine from '../../../common/components/VehicleLocationLine';
 import DeviceQuickActions from '../DeviceQuickActions';
 import { getGpsStaleWarning } from './gpsStaleWarning';
-import { formatOdometerLabel } from './vehicleTodayDistance';
+import { formatDistanceInsight } from './vehicleTodayDistance';
 import { STATUS_TINT } from './fleetMobileCardSx';
 
 const VehicleContextCard = ({
@@ -50,9 +50,9 @@ const VehicleContextCard = ({
   const motionDuration = getMotionDurationLabel(durationState, motionNow);
   const statusText = motionDuration ? `${motionLabel} • ${motionDuration}` : motionLabel;
   const gpsStale = position ? getGpsStaleWarning(position?.fixTime) : null;
-  // Canonical odometer (fuel-api resolveOdometerKm), not raw Traccar distance —
-  // labeled "Odometer", not "Today", since no day-start baseline exists yet.
-  const odometerLabel = formatOdometerLabel(display.odometerKm);
+  // Daily Mileage (distance travelled today, fuel-api daily-mileage ledger)
+  // when known; canonical odometer as the labeled fallback otherwise.
+  const odometerLabel = formatDistanceInsight(display);
   const hasFix = position?.latitude != null && position?.longitude != null;
 
   return (

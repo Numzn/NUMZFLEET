@@ -75,12 +75,19 @@ export async function computeDailyMileage({
       boundary: new Date(boundary.getTime() + 24 * 60 * 60 * 1000),
       anchorKm,
       anchorTelemetryKm,
-    }).then((r) => ({ odometerKm: r.odometerKm, odometerConfidence: r.confidence }));
+    }).then((r) => ({ odometerKm: r.odometerKm, odometerConfidence: r.confidence, telemetryKm: r.telemetryKm }));
 
-  const distanceKm = (dayStart.odometerKm != null && latest.odometerKm != null)
-    ? Number((latest.odometerKm - dayStart.odometerKm).toFixed(1))
-    // Not fabricated as 0 — either side missing means "don't know", not "no distance".
-    : null;
+  // Distance diffs RAW telemetry, not anchored odometerKm: the anchored mode
+  // clamps readings below the anchor point (M2 §7), so a day at/before an
+  // anchor capture would flatten to zero. Telemetry diffs are anchor-invariant.
+  // Anchored diff remains the fallback when telemetry is missing on a side.
+  let distanceKm = null;
+  if (dayStart.telemetryKm != null && latest.telemetryKm != null) {
+    distanceKm = Number((latest.telemetryKm - dayStart.telemetryKm).toFixed(1));
+  } else if (dayStart.odometerKm != null && latest.odometerKm != null) {
+    distanceKm = Number((latest.odometerKm - dayStart.odometerKm).toFixed(1));
+  }
+  // else stays null — not fabricated as 0; either side missing means "don't know".
 
   return upsertRow({
     vehicleId, localDate, timeZone,

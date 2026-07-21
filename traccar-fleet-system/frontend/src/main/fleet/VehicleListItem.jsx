@@ -21,11 +21,17 @@ import { STALE_FIX_MS } from './vehicleOperationalIndicators.js';
 dayjs.extend(relativeTime);
 
 /**
- * Single right-column insight: canonical odometer (fuel-api resolveOdometerKm),
- * NOT daily mileage — no day-start baseline exists yet (separate checkpoint),
- * so this must not be labeled "today".
+ * Single right-column insight: Daily Mileage (distance travelled today, from
+ * the fuel-api daily-mileage ledger) when known; canonical odometer
+ * (fuel-api resolveOdometerKm) as the labeled fallback — a lifetime reading
+ * is never presented as a daily distance.
  */
-function formatOdometerInsight(odometerKm) {
+function formatOdometerInsight(display) {
+  const dailyKm = display?.dailyMileage?.km;
+  if (dailyKm != null && Number.isFinite(Number(dailyKm))) {
+    return `Today ${Number(dailyKm).toFixed(1)} km`;
+  }
+  const odometerKm = display?.odometerKm;
   if (odometerKm == null || !Number.isFinite(Number(odometerKm))) return null;
   const n = Number(odometerKm);
   if (n >= 100) return `Odometer ${Math.round(n).toLocaleString()} km`;
@@ -85,7 +91,7 @@ const VehicleListItem = ({
 
   const fixRel = position?.fixTime ? dayjs(position.fixTime).fromNow() : null;
 
-  const odometerInsight = formatOdometerInsight(display.odometerKm);
+  const odometerInsight = formatOdometerInsight(display);
 
   const hasFix = position?.latitude != null && position?.longitude != null;
   const ign = !isOffline && isFixFresh ? getIgnitionPhrase(position?.attributes) : null;

@@ -1,6 +1,6 @@
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
-import { Vehicle, DeviceAssignment, VehicleSpec, DEFAULT_COMPANY_ID } from '../models/index.js';
+import { Vehicle, DeviceAssignment, VehicleSpec, VehicleDailyMileage, DEFAULT_COMPANY_ID } from '../models/index.js';
 import {
   getTraccarDevice,
   getTraccarDevicesByIds,
@@ -27,6 +27,8 @@ import { buildRoutineServiceSummaryByVehicle } from '../maintenance/routineServi
 import { buildEvidenceFromBatch } from '../vehicleEngine/odometer/collectEvidence.js';
 import { resolveOdometerFromEvidence } from '../vehicleEngine/odometer/resolveVehicleOdometer.js';
 import { evaluateAndPersistActivityStates } from '../vehicleEngine/activity/activityStateService.js';
+import { buildDailyMileageDto } from '../vehicleEngine/mileage/dailyMileageReadModel.js';
+import { localDateString, DEFAULT_BUSINESS_TIMEZONE } from '../utils/businessDay.js';
 
 /**
  * Canonical odometer fields for an unassigned/evidence-less vehicle — mirrors
@@ -432,10 +434,25 @@ export async function listVehiclesMerged(companyId = DEFAULT_COMPANY_ID) {
     activityByVehicle = new Map();
   }
 
+  // Today's daily-mileage ledger rows (maintained by jobs/dailyMileageScheduler)
+  // in one batched query. The DTO prefers a live diff against the odometer
+  // resolved above, so "distance today" is as fresh as this request.
+  let dailyMileageByVehicle = new Map();
+  try {
+    const today = localDateString(new Date(), DEFAULT_BUSINESS_TIMEZONE);
+    const dmRows = vehicleIds.length
+      ? await VehicleDailyMileage.findAll({ where: { localDate: today, vehicleId: { [Op.in]: vehicleIds } } })
+      : [];
+    dailyMileageByVehicle = new Map(dmRows.map((r) => [String(r.vehicleId), r]));
+  } catch {
+    dailyMileageByVehicle = new Map();
+  }
+
   return vehicles.map((v) => {
     const dto = toMergedDto(v, assignmentByVehicleId.get(v.id), deviceMap, positionMap, specMap);
     dto.routineService = routineByVehicle.get(String(v.id)) ?? null;
     dto.activityState = activityByVehicle.get(String(v.id)) ?? null;
+    dto.dailyMileage = buildDailyMileageDto(dailyMileageByVehicle.get(String(v.id)) ?? null, dto.odometerKm);
     return dto;
   });
 }
@@ -486,6 +503,15 @@ export async function getVehicleMerged(id, companyId = null) {
     }
   } else {
     merged.activityState = null;
+  }
+
+  // Same daily-mileage read model as listVehiclesMerged, single-row lookup.
+  try {
+    const today = localDateString(new Date(), DEFAULT_BUSINESS_TIMEZONE);
+    const dmRow = await VehicleDailyMileage.findOne({ where: { vehicleId: id, localDate: today } });
+    merged.dailyMileage = buildDailyMileageDto(dmRow, merged.odometerKm);
+  } catch {
+    merged.dailyMileage = null;
   }
 
   return merged;

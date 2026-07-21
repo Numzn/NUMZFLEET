@@ -55,7 +55,7 @@ async function fetchFirstPositionAfter(deviceId, boundary) {
  */
 export async function resolveDayStartOdometer({ deviceId, boundary, anchorKm, anchorTelemetryKm }) {
   if (deviceId == null) {
-    return { odometerKm: null, source: 'unavailable', evidenceFixtime: null, confidence: 'unavailable' };
+    return { odometerKm: null, source: 'unavailable', evidenceFixtime: null, confidence: 'unavailable', telemetryKm: null };
   }
 
   let row = await fetchLastPositionBefore(deviceId, boundary);
@@ -67,7 +67,7 @@ export async function resolveDayStartOdometer({ deviceId, boundary, anchorKm, an
   }
 
   if (!row) {
-    return { odometerKm: null, source: 'unavailable', evidenceFixtime: null, confidence: 'unavailable' };
+    return { odometerKm: null, source: 'unavailable', evidenceFixtime: null, confidence: 'unavailable', telemetryKm: null };
   }
 
   if (source === 'nearest_before') {
@@ -94,5 +94,6 @@ export async function resolveDayStartOdometer({ deviceId, boundary, anchorKm, an
     source,
     evidenceFixtime: new Date(row.fixtime),
     confidence: state.odometerConfidence,
+    telemetryKm: state.telemetryKm ?? null,
   };
 }

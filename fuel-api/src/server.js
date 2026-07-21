@@ -37,6 +37,7 @@ import {
 } from './jobs/vehicleStateReconciliationScheduler.js';
 import { startComplianceNotificationScheduler } from './jobs/complianceNotificationScheduler.js';
 import { startTelemetryReconciliationScheduler } from './jobs/telemetryReconciliationScheduler.js';
+import { startDailyMileageScheduler } from './jobs/dailyMileageScheduler.js';
 import {
   reconcileStuckExecuting,
   shouldReconcileOnStartup,
@@ -459,6 +460,7 @@ let stopOperationAutoCloseScheduler = () => {};
 let stopVehicleStateReconciliationScheduler = () => {};
 let stopComplianceNotificationScheduler = () => {};
 let stopTelemetryReconciliationScheduler = () => {};
+let stopDailyMileageScheduler = () => {};
 
 async function runImmobilizationStartupReconcile() {
   if (!shouldReconcileOnStartup()) return;
@@ -579,6 +581,7 @@ const startServer = async () => {
       stopOperationAutoCloseScheduler = startOperationAutoCloseScheduler();
       stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
       stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
+      stopDailyMileageScheduler = startDailyMileageScheduler();
       void runVehicleStateStartupReconcile().finally(() => {
         stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
       });
@@ -617,6 +620,7 @@ const startServer = async () => {
     stopOperationAutoCloseScheduler = startOperationAutoCloseScheduler();
     stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
     stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
+    stopDailyMileageScheduler = startDailyMileageScheduler();
     void runVehicleStateStartupReconcile().finally(() => {
       stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
     });
@@ -653,6 +657,7 @@ process.on('SIGTERM', () => {
   stopOperationAutoCloseScheduler();
   stopComplianceNotificationScheduler();
   stopTelemetryReconciliationScheduler();
+  stopDailyMileageScheduler();
   stopVehicleStateReconciliationScheduler();
   httpServer.close(() => {
     if (isDev) {

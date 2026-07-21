@@ -232,3 +232,25 @@ Immutable `odometer_observations` append-only table for audit trail. v1 uses anc
 
 - [x] `node --test` on `odometer.test.js` and `odometer.integration.test.js` (23/23 pass in backend container)
 
+
+## Daily Mileage (activated 2026-07-21)
+
+Distance travelled per vehicle per Africa/Lusaka business day, shown on MapView vehicle cards
+(`Daily Mileage • xx.x km`; sidebar rows show `Today xx.x km`; falls back to the labeled
+odometer when the day has no data — never a fabricated 0).
+
+| Piece | Location |
+|-------|----------|
+| Ledger table | `vehicle_daily_mileage` (`20260704_vehicle_daily_mileage.sql`), unique on (vehicleId, localDate) |
+| Writer | `fuel-api/src/vehicleEngine/mileage/dailyMileageService.js` — idempotent upsert; day-start baseline reconstructed from Traccar position history (`dayStartEvidence.js`); rows past a 48 h grace window freeze |
+| Scheduler | `fuel-api/src/jobs/dailyMileageScheduler.js` — sweeps actively assigned vehicles; env `DAILY_MILEAGE_INTERVAL_MS` (default 300000, 0 disables), `DAILY_MILEAGE_STARTUP_DELAY_MS` (default 20000) |
+| Read model | `dailyMileageReadModel.js` — attached as `dailyMileage` on merged vehicle rows (`GET /api/vehicles`, one batched query; no N+1) |
+| Frontend | display registry → `vehicleTodayDistance.js` → `VehicleContextCard` / `VehicleListItem` |
+
+**Distance semantics:** the ledger diffs **unit-corrected raw telemetry** (`telemetryKm` exposed by
+`resolveOdometerFromEvidence`), not the anchored `odometerKm` — the M2 §7 anchored mode clamps
+readings below the anchor point, which would flatten any day at/before an anchor capture to zero.
+Anchored values remain the display truth for absolute odometer readings. The API DTO serves
+`max(live anchored diff, ledger telemetry diff)`: the live diff can only undercount (clamp), and the
+ledger is at most one sweep stale, so the larger value is always closest to truth. `km: null` means
+"unknown" (e.g. tracker offline all day), never zero.
