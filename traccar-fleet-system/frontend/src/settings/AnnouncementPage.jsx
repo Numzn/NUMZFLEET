@@ -18,6 +18,7 @@ import useSettingsStyles from './common/useSettingsStyles';
 import SelectField from '../common/components/SelectField';
 import { prefixString } from '../common/util/stringUtils';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { SETTINGS_HOME } from '../common/util/navigationParents';
 
 const AnnouncementPage = () => {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ const AnnouncementPage = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message),
     });
-    navigate(-1);
+    navigate(SETTINGS_HOME);
   }, [users, notificator, message, navigate]);
 
   return (
@@ -80,7 +81,7 @@ const AnnouncementPage = () => {
             type="button"
             color="primary"
             variant="outlined"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(SETTINGS_HOME)}
           >
             {t('sharedCancel')}
           </Button>

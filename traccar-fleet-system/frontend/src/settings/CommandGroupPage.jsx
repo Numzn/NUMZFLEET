@@ -22,6 +22,7 @@ import { useCatch } from '../reactHelper';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import { traccarPath } from '../config/traccarApi.js';
+import { settingsGroupParent } from '../common/util/navigationParents';
 
 const CommandGroupPage = () => {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ const CommandGroupPage = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
-    navigate(-1);
+    navigate(settingsGroupParent(id));
   });
 
   return (
@@ -77,7 +78,7 @@ const CommandGroupPage = () => {
             type="button"
             color="primary"
             variant="outlined"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(settingsGroupParent(id))}
           >
             {t('sharedCancel')}
           </Button>

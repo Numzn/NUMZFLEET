@@ -19,6 +19,7 @@ import { useCatch } from '../reactHelper';
 import MapScale from '../map/MapScale';
 import BackIcon from '../common/components/BackIcon';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { SETTINGS_HOME } from '../common/util/navigationParents';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -105,7 +106,7 @@ const EmulatorPage = () => {
           classes={{ paper: classes.drawerPaper }}
         >
           <Toolbar>
-            <IconButton edge="start" sx={{ mr: 2 }} onClick={() => navigate(-1)}>
+            <IconButton edge="start" sx={{ mr: 2 }} onClick={() => navigate(SETTINGS_HOME)}>
               <BackIcon />
             </IconButton>
             <Typography variant="h6" className={classes.title}>{t('sharedEmulator')}</Typography>

@@ -21,6 +21,7 @@ import { sessionActions } from '../store';
 import { useAdministrator, useRestriction } from '../common/util/permissions';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { DASHBOARD } from '../common/util/navigationParents';
 
 const deviceFields = [
   { id: 'name', name: 'sharedName' },
@@ -77,7 +78,7 @@ const PreferencesPage = () => {
       body: JSON.stringify({ ...user, attributes }),
     });
     dispatch(sessionActions.updateUser(await response.json()));
-    navigate(-1);
+    navigate(DASHBOARD);
   });
 
   const handleReboot = useCatch(async () => {
@@ -396,7 +397,7 @@ const PreferencesPage = () => {
                 type="button"
                 color="primary"
                 variant="outlined"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(DASHBOARD)}
               >
                 {t('sharedCancel')}
               </Button>

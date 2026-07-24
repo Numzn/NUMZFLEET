@@ -33,6 +33,7 @@ import useMapStyles from '../map/core/useMapStyles';
 import { map } from '../map/core/MapView';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { SETTINGS_HOME } from '../common/util/navigationParents';
 
 const ServerPage = () => {
   const { classes } = useSettingsStyles();
@@ -64,7 +65,7 @@ const ServerPage = () => {
       body: JSON.stringify(item),
     });
     dispatch(sessionActions.updateServer(await response.json()));
-    navigate(-1);
+    navigate(SETTINGS_HOME);
   });
 
   return (
@@ -313,7 +314,7 @@ const ServerPage = () => {
           </>
         )}
         <div className={classes.buttons}>
-          <Button type="button" color="primary" variant="outlined" onClick={() => navigate(-1)}>
+          <Button type="button" color="primary" variant="outlined" onClick={() => navigate(SETTINGS_HOME)}>
             {t('sharedCancel')}
           </Button>
           <Button type="button" color="primary" variant="contained" onClick={handleSave}>

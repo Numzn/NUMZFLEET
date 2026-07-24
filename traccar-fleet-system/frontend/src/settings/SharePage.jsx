@@ -18,6 +18,7 @@ import { useTranslation } from '../common/components/LocalizationProvider';
 import { useCatchCallback } from '../reactHelper';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { settingsDeviceParent } from '../common/util/navigationParents';
 
 const SharePage = () => {
   const navigate = useNavigate();
@@ -83,7 +84,7 @@ const SharePage = () => {
             type="button"
             color="primary"
             variant="outlined"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(settingsDeviceParent(id))}
           >
             {t('sharedCancel')}
           </Button>

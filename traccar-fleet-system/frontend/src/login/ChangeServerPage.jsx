@@ -17,6 +17,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import Loader from '../common/components/Loader';
 import { errorsActions } from '../store';
+import { LOGIN } from '../common/util/navigationParents';
 
 const currentServer = `${window.location.protocol}//${window.location.host}`;
 
@@ -126,7 +127,7 @@ const ChangeServerPage = () => {
           filterOptions={filter}
         />
         <div className={classes.buttons}>
-          <Button color="primary" variant="outlined" onClick={() => navigate(-1)}>
+          <Button color="primary" variant="outlined" onClick={() => navigate(LOGIN)}>
             {t('sharedCancel')}
           </Button>
           {Boolean(navigator?.mediaDevices?.getUserMedia) && (

@@ -7,6 +7,7 @@ import { useTranslation } from '../../common/components/LocalizationProvider';
 import useSettingsStyles from '../common/useSettingsStyles';
 import fetchOrThrow from '../../common/util/fetchOrThrow';
 import { traccarPath } from '../../config/traccarApi.js';
+import { settingsListParent } from '../../common/util/navigationParents';
 
 const EditItemView = ({
   children, endpoint, item, setItem, defaultItem, validate, onItemSaved,
@@ -43,7 +44,7 @@ const EditItemView = ({
     if (onItemSaved) {
       onItemSaved(await response.json());
     }
-    navigate(-1);
+    navigate(settingsListParent(endpoint));
   });
 
   return (
@@ -68,7 +69,7 @@ const EditItemView = ({
           <Button
             color="primary"
             variant="outlined"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(settingsListParent(endpoint))}
             disabled={!item}
           >
             {t('sharedCancel')}

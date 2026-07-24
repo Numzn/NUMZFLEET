@@ -18,6 +18,7 @@ import { distanceFromMeters, distanceToMeters, distanceUnitString } from '../com
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import { traccarPath } from '../config/traccarApi.js';
+import { settingsDeviceParent } from '../common/util/navigationParents';
 
 const AccumulatorsPage = () => {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ const AccumulatorsPage = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
-    navigate(-1);
+    navigate(settingsDeviceParent(deviceId));
   });
 
   return (
@@ -80,7 +81,7 @@ const AccumulatorsPage = () => {
               type="button"
               color="primary"
               variant="outlined"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(settingsDeviceParent(deviceId))}
             >
               {t('sharedCancel')}
             </Button>

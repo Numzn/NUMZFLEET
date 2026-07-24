@@ -13,6 +13,7 @@ import usePositionAttributes from '../common/attributes/usePositionAttributes';
 import BackIcon from '../common/components/BackIcon';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import { traccarPath } from '../config/traccarApi.js';
+import { LIVE_MAP } from '../common/util/navigationParents';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -62,7 +63,7 @@ const PositionPage = () => {
     <div className={classes.root}>
       <AppBar position="sticky" color="inherit">
         <Toolbar>
-          <IconButton color="inherit" edge="start" sx={{ mr: 2 }} onClick={() => navigate(-1)}>
+          <IconButton color="inherit" edge="start" sx={{ mr: 2 }} onClick={() => navigate(LIVE_MAP)}>
             <BackIcon />
           </IconButton>
           <Typography variant="h6">

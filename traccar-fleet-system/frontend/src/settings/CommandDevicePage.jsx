@@ -16,6 +16,7 @@ import BaseCommandView from './components/BaseCommandView';
 import { useCatch } from '../reactHelper';
 import useSettingsStyles from './common/useSettingsStyles';
 import fetchOrThrow from '../common/util/fetchOrThrow';
+import { settingsDeviceParent } from '../common/util/navigationParents';
 
 const CommandDevicePage = () => {
   const navigate = useNavigate();
@@ -43,7 +44,7 @@ const CommandDevicePage = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(command),
     });
-    navigate(-1);
+    navigate(settingsDeviceParent(id));
   });
 
   const validate = () => savedId || (item && item.type);
@@ -72,7 +73,7 @@ const CommandDevicePage = () => {
             type="button"
             color="primary"
             variant="outlined"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(settingsDeviceParent(id))}
           >
             {t('sharedCancel')}
           </Button>
