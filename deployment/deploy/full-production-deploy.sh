@@ -37,6 +37,15 @@ LOG_CHECK_CONTAINERS=(
   numzfleet-prod-erb-worker
 )
 
+# Fixed-string log lines that match the error pattern in check_recent_logs
+# below but are routine, not deploy-blocking (e.g. a probe hitting an
+# expired/invalid Traccar session — happens dozens of times per hour in
+# normal operation). Add new lines here rather than loosening the pattern
+# itself, which would blind the check to real errors.
+LOG_IGNORE_LINES=(
+  'Error getting Traccar user by session token: Error: Session token not found or invalid'
+)
+
 log() { printf '[full-deploy] %s\n' "$*"; }
 fail() {
   printf '[full-deploy] ERROR: %s\n' "$*" >&2
@@ -129,12 +138,16 @@ verify_containers() {
 }
 
 check_recent_logs() {
-  local container
-  local pattern='(fatal|panic|traceback|unhandled|uncaught|exception|crash|(^|[[:space:]])error([[:space:]]|:|$))'
+  local container pattern raw ignore
+  pattern='(fatal|panic|traceback|unhandled|uncaught|exception|crash|(^|[[:space:]])error([[:space:]]|:|$))'
 
   for container in "${LOG_CHECK_CONTAINERS[@]}"; do
     log "Checking recent logs for $container"
-    if docker logs --since 10m "$container" 2>&1 | grep -Eiq "$pattern"; then
+    raw="$(docker logs --since 10m "$container" 2>&1 || true)"
+    for ignore in "${LOG_IGNORE_LINES[@]}"; do
+      raw="$(grep -Fv -- "$ignore" <<<"$raw" || true)"
+    done
+    if grep -Eiq "$pattern" <<<"$raw"; then
       fail "Recent logs contain error patterns for $container"
     fi
   done
