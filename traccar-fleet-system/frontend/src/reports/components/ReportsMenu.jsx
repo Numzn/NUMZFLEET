@@ -32,7 +32,7 @@ const ReportsMenu = () => {
       return path;
     }
     const params = new URLSearchParams();
-    if (path === '/reports/chart' || path === '/reports/route') {
+    if (path === '/reports/chart' || path === '/reports/route' || path === '/replay') {
       const [firstDeviceId] = deviceIds;
       if (firstDeviceId != null) {
         params.append('deviceId', firstDeviceId);
@@ -92,8 +92,9 @@ const ReportsMenu = () => {
         />
         <MenuItem
           title={t('reportReplay')}
-          link="/replay"
+          link={buildLink('/replay')}
           icon={<RouteIcon />}
+          selected={location.pathname === '/replay'}
         />
         <MenuItem
           title={t('reportPositions')}

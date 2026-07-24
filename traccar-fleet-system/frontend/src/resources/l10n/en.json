@@ -552,6 +552,8 @@
     "notificatorTelegram": "Telegram",
     "notificatorPushover": "Pushover",
     "reportReplay": "Replay",
+    "replayPlaybackSpeed": "Playback speed",
+    "replayChangeRoute": "Change vehicle / date range",
     "reportCombined": "Combined",
     "reportPositions": "Positions",
     "reportEvents": "Events",
