@@ -69,32 +69,40 @@ export const authConfig = getConfig();
  * Strategy definitions
  * Each strategy defines how authentication and fallback work
  */
+// trustHeaderAsRealUser: whether an unsigned x-user-id header may be resolved to a REAL,
+// fully-privileged Traccar identity with no password/token/signature check at all.
+// allowSyntheticUser: whether an unsigned x-user-id header may instead produce a
+// least-privilege placeholder user (never administrator/manager) for brief-outage tolerance.
+// These must stay independent: hybrid previously conflated them via a single
+// validateHeaderFallback flag, which let anyone impersonate any real user (including
+// admins) by sending x-user-id with no session cookie at all. See sessionService.js
+// validateAndLoadUser for how these two flags are now consumed separately.
 export const STRATEGIES = {
   strict: {
     name: 'strict',
     description: 'Production: Requires valid JSESSIONID from Traccar. No fallbacks.',
     validateSessionToken: true,
-    validateHeaderFallback: false,
+    trustHeaderAsRealUser: false,
     allowSyntheticUser: false,
     requireTraccar: true,
     logLevel: 'error',
   },
-  
+
   permissive: {
     name: 'permissive',
-    description: 'Development: Tries session, then header, then synthetic user.',
+    description: 'Development only: Tries session, then trusts x-user-id as a real user, then synthetic. Never valid in production (see validateAuthConfig).',
     validateSessionToken: true,
-    validateHeaderFallback: true,
+    trustHeaderAsRealUser: true,
     allowSyntheticUser: true,
     requireTraccar: false,
     logLevel: 'debug',
   },
-  
+
   hybrid: {
     name: 'hybrid',
-    description: 'Production-safe: Strict primary, synthetic fallback for brief outages.',
+    description: 'Production-safe: Strict primary; on missing/invalid session, x-user-id may only ever produce a least-privilege synthetic user (opt-in via HYBRID_FALLBACK=true) for brief outages — never a real identity.',
     validateSessionToken: true,
-    validateHeaderFallback: true,
+    trustHeaderAsRealUser: false,
     allowSyntheticUser: false, // Synthetic only if HYBRID_FALLBACK=true
     requireTraccar: true,
     logLevel: 'warn',
@@ -136,6 +144,10 @@ export const validateAuthConfig = () => {
     }
     if (!authConfig.TRACCAR_ENABLED) {
       errors.push('⚠️ WARNING: Traccar disabled in production! Set TRACCAR_ENABLED=true');
+    }
+    const corsOrigins = (process.env.CORS_ORIGIN || '').split(',').map((o) => o.trim());
+    if (corsOrigins.includes('*')) {
+      errors.push('⚠️ WARNING: CORS_ORIGIN=* in production! Set explicit allowed origins.');
     }
   }
   

@@ -167,29 +167,36 @@ export const validateAndLoadUser = async (credentials, options = {}) => {
     }
   }
   
-  // Step 2: Try header fallback (if strategy allows)
-  if (credentials.userIdHeader && strategyDef.validateHeaderFallback) {
-    const user = await validateHeaderUserId(credentials.userIdHeader);
-    if (user) {
-      return user;
+  if (credentials.userIdHeader) {
+    // Step 2: Trust the header as a REAL, fully-privileged identity — dev-only
+    // (permissive). Never for strict/hybrid: the header is unsigned, so trusting
+    // it here would let anyone impersonate any real user, including admins, with
+    // no password/token/signature check at all.
+    if (strategyDef.trustHeaderAsRealUser) {
+      const user = await validateHeaderUserId(credentials.userIdHeader);
+      if (user) {
+        return user;
+      }
     }
-    
-    // Step 3: Try synthetic user (if strategy allows and in dev/bypass mode)
+
+    // Step 3: Fall back to a least-privilege synthetic user (never administrator/
+    // manager) — independent of Step 2, so hybrid's brief-outage tolerance still
+    // works even though it never trusts the header as a real identity.
     if (strategyDef.allowSyntheticUser || (devAuthBypass && !traccarEnabled)) {
       const syntheticUser = createSyntheticUser(credentials.userIdHeader);
-      
+
       // Store for TTL tracking if hybrid mode
       if (strategy === 'hybrid') {
         storeSyntheticSession(credentials.userIdHeader, syntheticUser);
       }
-      
+
       if (authConfig.LOG_AUTH) {
         console.log('⚠️ Created synthetic user (Traccar unavailable)', {
           userId: credentials.userIdHeader,
           strategy,
         });
       }
-      
+
       return syntheticUser;
     }
   }

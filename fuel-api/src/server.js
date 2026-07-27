@@ -216,6 +216,7 @@ const strictLimiter = rateLimit({
 });
 
 const STRICT_PATH_PREFIXES = [
+  '/auth',
   '/fuel-requests',
   '/operation-sessions',
   '/vehicles',
