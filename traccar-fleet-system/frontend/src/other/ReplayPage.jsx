@@ -79,9 +79,12 @@ const useStyles = makeStyles()((theme) => ({
     flex: 1,
   },
   stateCard: {
-    position: 'fixed',
+    // `top` is set inline via sx, from the header's real measured height (headerHeight state
+    // below) — not a hardcoded guess. This used to be `position: fixed` with a viewport-relative
+    // offset while `header` (above) is `position: absolute` relative to `root`; two different
+    // coordinate systems for two cards meant to stack, which is exactly why they overlapped.
+    position: 'absolute',
     zIndex: 3,
-    top: `calc(var(--app-topbar-height, 40px) + ${theme.spacing(1.5)} + 56px)`,
     left: theme.spacing(1.5),
     padding: theme.spacing(1, 1.5),
     maxWidth: theme.dimensions.popupMaxWidth,
@@ -183,6 +186,7 @@ const ReplayPage = () => {
   const navigate = useNavigate();
   const timerRef = useRef();
   const consoleRef = useRef(null);
+  const headerRef = useRef(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -200,6 +204,7 @@ const ReplayPage = () => {
   const [stops, setStops] = useState([]);
   const [events, setEvents] = useState([]);
   const [consoleHeight, setConsoleHeight] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   const loaded = Boolean(from && to && !loading && positions.length);
   const currentPosition = loaded ? positions[index] : null;
@@ -227,6 +232,20 @@ const ReplayPage = () => {
     observer.observe(el);
     return () => observer.disconnect();
   }, [loaded]);
+
+  // Lets the vehicle-state card sit right below the header's real height, not a guessed offset —
+  // the header's content height varies (device name line only shows once a device is selected).
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) {
+      return undefined;
+    }
+    const observer = new ResizeObserver((entries) => {
+      setHeaderHeight(entries[0]?.contentRect?.height ?? 0);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Maps each Traccar position id to its index in `positions`, so stops/events (which only carry
   // a positionId) can be located on the same timeline the playback controls scrub through.
@@ -386,7 +405,7 @@ const ReplayPage = () => {
       <MapCamera positions={positions} />
 
       {/* Compact top-left header — back / title / vehicle / export / change-route */}
-      <Paper elevation={0} className={classes.header} sx={floatingSurfaceSx}>
+      <Paper elevation={0} className={classes.header} sx={floatingSurfaceSx} ref={headerRef}>
         <IconButton size="small" onClick={() => navigate(REPORTS_HOME)}>
           <BackIcon />
         </IconButton>
@@ -418,7 +437,11 @@ const ReplayPage = () => {
 
       {/* Compact floating vehicle-state card — speed-forward, driven by positions[index] */}
       {loaded && currentPosition && (
-        <Paper elevation={0} className={classes.stateCard} sx={floatingSurfaceSx}>
+        <Paper
+          elevation={0}
+          className={classes.stateCard}
+          sx={{ ...floatingSurfaceSx, top: `calc(${theme.spacing(1.5)} + ${headerHeight || 40}px + ${theme.spacing(1)})` }}
+        >
           <div className={classes.speedRow}>
             <Typography className={classes.speedValue}>
               <PositionValue position={currentPosition} property="speed" />
