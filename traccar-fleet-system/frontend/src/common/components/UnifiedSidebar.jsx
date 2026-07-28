@@ -25,7 +25,6 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ChevronLeftOutlinedIcon from '@mui/icons-material/ChevronLeftOutlined';
 import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
-import TuneIcon from '@mui/icons-material/Tune';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import PersonIcon from '@mui/icons-material/Person';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -256,18 +255,17 @@ const UnifiedSidebar = ({
   const systemChildren = useMemo(() => {
     const out = [];
     if (!readonly) {
-      out.push({ title: t('sharedPreferences'), path: '/settings/preferences', icon: TuneIcon });
+      out.push({
+        title: t('settingsTitle'),
+        path: '/settings/profile',
+        icon: PersonIcon,
+        activeMatch: (path) => path.startsWith('/settings/profile') || path === `/settings/user/${userId}` || path === '/settings/preferences',
+      });
       out.push({
         title: 'Alert rules',
         path: '/settings/notifications',
         icon: NotificationsIcon,
         activeMatch: (path) => path.startsWith('/settings/notification'),
-      });
-      out.push({
-        title: t('settingsUser'),
-        path: `/settings/user/${userId}`,
-        icon: PersonIcon,
-        activeMatch: (path) => path === `/settings/user/${userId}`,
       });
       if (!features.disableGroups) {
         out.push({

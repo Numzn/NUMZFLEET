@@ -98,7 +98,7 @@ const LoginPage = () => {
         const user = payload.user || payload;
         generateLoginToken();
         dispatch(sessionActions.updateUser(user));
-        const target = window.sessionStorage.getItem('postLogin') || '/';
+        const target = window.sessionStorage.getItem('postLogin') || payload.tenant?.defaultDashboard || '/';
         window.sessionStorage.removeItem('postLogin');
         navigate(target, { replace: true });
       } else if (response.status === 401 && response.headers.get('WWW-Authenticate') === 'TOTP') {

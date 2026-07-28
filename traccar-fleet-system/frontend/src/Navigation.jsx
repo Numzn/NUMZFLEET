@@ -9,9 +9,14 @@ import DashboardPage from './dashboard/DashboardPage';
 import CombinedReportPage from './reports/CombinedReportPage';
 import PositionsReportPage from './reports/PositionsReportPage';
 import ServerPage from './settings/ServerPage';
-import UsersPage from './settings/UsersPage';
 import DevicePage from './settings/DevicePage';
 import UserPage from './settings/UserPage';
+import ProfileSection from './settings/center/sections/ProfileSection';
+import SecuritySection from './settings/center/sections/SecuritySection';
+import OrganizationSection from './settings/center/sections/OrganizationSection';
+import TeamSection from './settings/center/sections/TeamSection';
+import DevicesSection from './settings/center/sections/DevicesSection';
+import NotificationsSection from './settings/center/sections/NotificationsSection';
 import NotificationsPage from './settings/NotificationsPage';
 import NotificationPage from './settings/NotificationPage';
 import GroupsPage from './settings/GroupsPage';
@@ -43,13 +48,12 @@ import GeofencePage from './settings/GeofencePage';
 import { useEffectAsync } from './reactHelper';
 import { devicesActions } from './store';
 import EventPage from './other/EventPage';
-import PreferencesPage from './settings/PreferencesPage';
+import PreferencesSection from './settings/center/sections/PreferencesSection';
 import AccumulatorsPage from './settings/AccumulatorsPage';
 import CommandDevicePage from './settings/CommandDevicePage';
 import CommandGroupPage from './settings/CommandGroupPage';
 import App from './App';
 import ChangeServerPage from './login/ChangeServerPage';
-import DevicesPage from './settings/DevicesPage';
 import TechnicianRoute from './common/components/TechnicianRoute';
 import ScheduledPage from './reports/ScheduledPage';
 import DeviceConnectionsPage from './settings/DeviceConnectionsPage';
@@ -176,6 +180,10 @@ const Navigation = () => {
           <Route path="test/toast-notifications" element={<ToastNotificationTest />} />
 
           <Route path="settings">
+          <Route path="profile" element={<ProfileSection />} />
+          <Route path="security" element={<SecuritySection />} />
+          <Route path="organization" element={<OrganizationSection />} />
+          <Route path="notification-preferences" element={<NotificationsSection />} />
           <Route path="accumulators/:deviceId" element={<AccumulatorsPage />} />
           <Route path="announcement" element={<AnnouncementPage />} />
           <Route path="calendars" element={<CalendarsPage />} />
@@ -187,7 +195,7 @@ const Navigation = () => {
           <Route path="attributes" element={<ComputedAttributesPage />} />
           <Route path="attribute/:id" element={<ComputedAttributePage />} />
           <Route path="attribute" element={<ComputedAttributePage />} />
-          <Route path="devices" element={<TechnicianRoute><DevicesPage /></TechnicianRoute>} />
+          <Route path="devices" element={<TechnicianRoute><DevicesSection /></TechnicianRoute>} />
           <Route path="device/:id/connections" element={<TechnicianRoute><DeviceConnectionsPage /></TechnicianRoute>} />
           <Route path="device/:id/command" element={<TechnicianRoute><CommandDevicePage /></TechnicianRoute>} />
           <Route path="device/:id/share" element={<TechnicianRoute><SharePage /></TechnicianRoute>} />
@@ -209,9 +217,9 @@ const Navigation = () => {
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="notification/:id" element={<NotificationPage />} />
           <Route path="notification" element={<NotificationPage />} />
-          <Route path="preferences" element={<PreferencesPage />} />
+          <Route path="preferences" element={<PreferencesSection />} />
           <Route path="server" element={<ServerPage />} />
-          <Route path="users" element={<UsersPage />} />
+          <Route path="users" element={<TeamSection />} />
           <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
           <Route path="user" element={<UserPage />} />

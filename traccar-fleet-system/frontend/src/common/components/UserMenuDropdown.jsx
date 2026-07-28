@@ -14,7 +14,6 @@ import {
   Divider,
   Chip,
 } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
 import SettingsIcon from '@mui/icons-material/Settings';
 import HelpIcon from '@mui/icons-material/Help';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -49,13 +48,8 @@ const UserMenuDropdown = () => {
     handleClose();
   };
 
-  const handleProfile = () => {
-    navigate('/settings/user/' + user.id);
-    handleClose();
-  };
-
   const handleSettings = () => {
-    navigate('/settings/preferences');
+    navigate('/settings/profile');
     handleClose();
   };
 
@@ -193,21 +187,6 @@ const UserMenuDropdown = () => {
           <Divider sx={{ my: 1 }} />
 
           <List dense>
-            <ListItemButton
-              onClick={handleProfile}
-              sx={{
-                borderRadius: 1,
-                '&:hover': {
-                  backgroundColor: 'action.hover',
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 36 }}>
-                <PersonIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary="My Profile" />
-            </ListItemButton>
-
             <ListItemButton
               onClick={handleSettings}
               sx={{
