@@ -29,7 +29,6 @@ import TripReportPage from './reports/TripReportPage';
 import StopReportPage from './reports/StopReportPage';
 import SummaryReportPage from './reports/SummaryReportPage';
 import ChartReportPage from './reports/ChartReportPage';
-import DriversPage from './settings/DriversPage';
 import DriverPage from './settings/DriverPage';
 import CalendarsPage from './settings/CalendarsPage';
 import CalendarPage from './settings/CalendarPage';
@@ -201,7 +200,10 @@ const Navigation = () => {
           <Route path="device/:id/share" element={<TechnicianRoute><SharePage /></TechnicianRoute>} />
           <Route path="device/:id" element={<TechnicianRoute><DevicePage /></TechnicianRoute>} />
           <Route path="device" element={<TechnicianRoute><DevicePage /></TechnicianRoute>} />
-          <Route path="drivers" element={<DriversPage />} />
+          {/* Legacy duplicate of /fleet/drivers over the same Traccar /api/drivers
+              data (confirmed in the Settings discovery audit) — redirect rather
+              than delete so any existing deep link still lands somewhere real. */}
+          <Route path="drivers" element={<Navigate to="/fleet/drivers" replace />} />
           <Route path="driver/:id" element={<DriverPage />} />
           <Route path="driver" element={<DriverPage />} />
           <Route path="geofence/:id" element={<GeofencePage />} />

@@ -37,11 +37,10 @@ import CalculateIcon from '@mui/icons-material/Calculate';
 import BuildIcon from '@mui/icons-material/Build';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
 import SettingsIcon from '@mui/icons-material/Settings';
-import PeopleIcon from '@mui/icons-material/People';
 import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from './UserMenuDropdown';
 import usePersistedState from '../util/usePersistedState';
-import { useAdministrator, useManager, useRestriction, useTechnician } from '../util/permissions';
+import { useAdministrator, useManager, useRestriction } from '../util/permissions';
 import useFeatures from '../util/useFeatures';
 import LogoImage from '../../login/LogoImage';
 import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
@@ -206,7 +205,6 @@ const UnifiedSidebar = ({
 
   const readonly = useRestriction('readonly');
   const admin = useAdministrator();
-  const technician = useTechnician();
   const manager = useManager();
   const features = useFeatures();
   const user = useSelector((state) => state.session.user);
@@ -307,14 +305,6 @@ const UnifiedSidebar = ({
           activeMatch: (path) => path.startsWith('/settings/command'),
         });
       }
-      if (technician) {
-        out.push({
-          title: t('deviceTitle'),
-          path: '/settings/devices',
-          icon: BuildIcon,
-          activeMatch: (path) => path.startsWith('/settings/device'),
-        });
-      }
     }
     if (billingLink) {
       out.push({
@@ -345,12 +335,6 @@ const UnifiedSidebar = ({
           icon: SettingsIcon,
         });
       }
-      out.push({
-        title: t('settingsUsers'),
-        path: '/settings/users',
-        icon: PeopleIcon,
-        activeMatch: (path) => path.startsWith('/settings/user') && path !== `/settings/user/${userId}`,
-      });
     }
     return out;
   }, [
