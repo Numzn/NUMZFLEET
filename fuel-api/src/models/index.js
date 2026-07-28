@@ -24,6 +24,8 @@ import VehicleFuelIntervalModel from './VehicleFuelInterval.js';
 import VehicleDailyMileageModel from './VehicleDailyMileage.js';
 import VehicleActivityStateModel from './VehicleActivityState.js';
 import VehicleStateAuditEventModel from './VehicleStateAuditEvent.js';
+import LoginAuditEventModel from './LoginAuditEvent.js';
+import NotificationPreferenceModel from './NotificationPreference.js';
 
 const FuelRequest = FuelRequestModel(sequelize);
 const VehicleSpec = VehicleSpecModel(sequelize);
@@ -50,11 +52,15 @@ const VehicleFuelInterval = VehicleFuelIntervalModel(sequelize);
 const VehicleDailyMileage = VehicleDailyMileageModel(sequelize);
 const VehicleActivityState = VehicleActivityStateModel(sequelize);
 const VehicleStateAuditEvent = VehicleStateAuditEventModel(sequelize);
+const LoginAuditEvent = LoginAuditEventModel(sequelize);
+const NotificationPreference = NotificationPreferenceModel(sequelize);
 
 Company.hasMany(Vehicle, { foreignKey: 'companyId' });
 Vehicle.belongsTo(Company, { foreignKey: 'companyId' });
 Company.hasMany(NumzUser, { foreignKey: 'companyId' });
 NumzUser.belongsTo(Company, { foreignKey: 'companyId' });
+NumzUser.hasMany(NotificationPreference, { foreignKey: 'numzUserId', onDelete: 'CASCADE' });
+NotificationPreference.belongsTo(NumzUser, { foreignKey: 'numzUserId' });
 Company.hasMany(CompanyDevice, { foreignKey: 'companyId' });
 CompanyDevice.belongsTo(Company, { foreignKey: 'companyId' });
 Company.hasMany(ServiceRecord, { foreignKey: 'companyId', as: 'serviceRecords' });
@@ -249,6 +255,8 @@ export {
   VehicleDailyMileage,
   VehicleActivityState,
   VehicleStateAuditEvent,
+  LoginAuditEvent,
+  NotificationPreference,
   DEFAULT_COMPANY_ID,
 };
 export default sequelize;

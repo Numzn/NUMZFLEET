@@ -34,3 +34,8 @@
 20260707_invoice_refuel_coverage.sql
 20260712_telemetry_processed_events.sql
 20260716_vehicle_state_audit_events.sql
+20260727_numz_users_profile_fields.sql
+20260727_login_audit_events.sql
+20260727_numz_users_default_dashboard.sql
+20260727_notification_preferences.sql
+20260727_fix_notification_login_audit_fk.sql

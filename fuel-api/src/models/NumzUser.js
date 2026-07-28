@@ -41,6 +41,26 @@ export default (sequelize) => {
         allowNull: false,
         defaultValue: 'active',
       },
+      avatarUrl: {
+        type: DataTypes.STRING(512),
+        allowNull: true,
+        field: 'avatar_url',
+      },
+      jobTitle: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        field: 'job_title',
+      },
+      department: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        field: 'department',
+      },
+      defaultDashboard: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        field: 'default_dashboard',
+      },
     },
     {
       tableName: 'numz_users',

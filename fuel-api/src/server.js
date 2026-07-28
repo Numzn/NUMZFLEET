@@ -22,6 +22,9 @@ import serviceRecordsRouter from './routes/serviceRecords.js';
 import fuelRequestsRouter from './fuelRequests/routes/fuelRequests.js';
 import reportsRouter from './reports/routes/reports.js';
 import notificationsRouter from './modules/notifications/routes.js';
+import meRouter from './modules/profile/routes.js';
+import organizationRouter from './modules/organization/routes.js';
+import notificationPreferencesRouter from './modules/notificationPreferences/routes.js';
 import telemetryIngestionRouter from './routes/telemetryIngestion.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
@@ -217,6 +220,9 @@ const strictLimiter = rateLimit({
 
 const STRICT_PATH_PREFIXES = [
   '/auth',
+  '/me',
+  '/organization',
+  '/notification-preferences',
   '/fuel-requests',
   '/operation-sessions',
   '/vehicles',
@@ -399,6 +405,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/fleet', fleetRouter);
 app.use('/api/fuel-requests', fuelRequestsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/me', meRouter);
+app.use('/api/organization', organizationRouter);
+app.use('/api/notification-preferences', notificationPreferencesRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
 app.use('/api/vehicles', vehiclesRouter);
 // Nested path registered on app first so it is never missed if an older router snapshot omits it.
