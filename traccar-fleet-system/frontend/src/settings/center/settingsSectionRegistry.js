@@ -16,7 +16,25 @@ import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
  * `live: false` sections have no destination yet — they render disabled with a
  * "Soon" chip until their phase in .claude/plans/this-is-a-very-deep-stallman.md
  * ships, rather than 404ing or being silently invented ahead of schedule.
+ *
+ * `category` is the frozen Configuration Hub information architecture
+ * (Overview/Personal/Organization/Fleet/Automation/Integrations/System) —
+ * see the Settings discovery-audit artifact for the evidence behind it.
+ * `description`/`keywords` exist so settings content can be searched (e.g.
+ * from CommandPalette) without a separate, hand-maintained search index.
+ * The 9 legacy Administration pages (Alert Rules, Groups, Calendars, etc.)
+ * are NOT in this registry yet — that migration is a later, larger change,
+ * not bundled into this metadata-only extension.
  */
+export const SETTINGS_CATEGORIES = {
+  personal: 'Personal',
+  organization: 'Organization',
+  fleet: 'Fleet',
+  automation: 'Automation',
+  integrations: 'Integrations',
+  system: 'System',
+};
+
 export const SETTINGS_SECTION_IDS = {
   profile: 'profile',
   security: 'security',
@@ -35,6 +53,9 @@ export const SETTINGS_SECTIONS = [
     path: '/settings/profile',
     match: (pathname) => pathname.startsWith('/settings/profile'),
     live: true,
+    category: 'personal',
+    description: 'Your name, email, phone, and avatar.',
+    keywords: ['name', 'email', 'phone', 'avatar', 'photo', 'account'],
   },
   {
     id: SETTINGS_SECTION_IDS.security,
@@ -43,6 +64,9 @@ export const SETTINGS_SECTIONS = [
     path: '/settings/security',
     match: (pathname) => pathname.startsWith('/settings/security'),
     live: true,
+    category: 'personal',
+    description: 'Password, two-factor authentication, and login history.',
+    keywords: ['password', 'totp', '2fa', 'two-factor', 'login history', 'security'],
   },
   {
     id: SETTINGS_SECTION_IDS.organization,
@@ -51,6 +75,9 @@ export const SETTINGS_SECTIONS = [
     path: '/settings/organization',
     match: (pathname) => pathname.startsWith('/settings/organization'),
     live: true,
+    category: 'organization',
+    description: 'Company name, member counts, and your role.',
+    keywords: ['company', 'organization', 'org', 'name', 'branding'],
   },
   {
     id: SETTINGS_SECTION_IDS.team,
@@ -60,6 +87,9 @@ export const SETTINGS_SECTIONS = [
     match: (pathname) => pathname.startsWith('/settings/users'),
     live: true,
     requiresRole: 'manager',
+    category: 'organization',
+    description: 'Manage who has access to your fleet.',
+    keywords: ['users', 'team', 'members', 'access', 'invite'],
   },
   {
     id: SETTINGS_SECTION_IDS.devices,
@@ -69,6 +99,9 @@ export const SETTINGS_SECTIONS = [
     match: (pathname) => pathname.startsWith('/settings/device'),
     live: true,
     requiresRole: 'technician',
+    category: 'integrations',
+    description: 'GPS trackers linked to your fleet.',
+    keywords: ['gps', 'devices', 'trackers', 'hardware', 'connectivity'],
   },
   {
     id: SETTINGS_SECTION_IDS.preferences,
@@ -77,6 +110,9 @@ export const SETTINGS_SECTIONS = [
     path: '/settings/preferences',
     match: (pathname) => pathname.startsWith('/settings/preferences'),
     live: true,
+    category: 'personal',
+    description: 'Units, theme, language, and default map.',
+    keywords: ['theme', 'dark mode', 'light mode', 'language', 'units', 'map', 'preferences'],
   },
   {
     id: SETTINGS_SECTION_IDS.notifications,
@@ -90,6 +126,9 @@ export const SETTINGS_SECTIONS = [
     path: '/settings/notification-preferences',
     match: (pathname) => pathname.startsWith('/settings/notification-preferences'),
     live: true,
+    category: 'personal',
+    description: 'Choose which events notify you, and how.',
+    keywords: ['notifications', 'alerts', 'sms', 'email', 'push', 'channels'],
   },
 ];
 

@@ -24,10 +24,13 @@ import SearchIcon from '@mui/icons-material/Search';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import PersonIcon from '@mui/icons-material/Person';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
+import { useManager, useTechnician } from '../util/permissions';
+import { SETTINGS_SECTIONS } from '../../settings/center/settingsSectionRegistry.js';
 
 const MAX_RESULTS = 12;
 
@@ -44,6 +47,8 @@ const CommandPalette = () => {
   const devices = useSelector((state) => state.devices.items);
   const drivers = useSelector((state) => state.drivers.items);
   const groups = useSelector((state) => state.groups.items);
+  const manager = useManager();
+  const technician = useTechnician();
 
   useEffect(() => {
     const onKey = (e) => {
@@ -93,7 +98,10 @@ const CommandPalette = () => {
           icon: <PersonIcon />,
           title: driver.name,
           subtitle: driver.uniqueId || 'Driver',
-          action: () => navigate('/settings/drivers'),
+          // The fleet-scoped drivers screen — not /settings/drivers, a legacy
+          // duplicate over the same Traccar /api/drivers data (see the
+          // Settings discovery audit; sidebar and search must agree here).
+          action: () => navigate('/fleet/drivers'),
         });
       }
     });
@@ -110,8 +118,26 @@ const CommandPalette = () => {
       }
     });
 
+    SETTINGS_SECTIONS.forEach((section) => {
+      if (!section.live) return;
+      if (section.requiresRole === 'manager' && !manager) return;
+      if (section.requiresRole === 'technician' && !technician) return;
+      const haystack = [section.label, section.description, ...(section.keywords || [])]
+        .join(' ')
+        .toLowerCase();
+      if (haystack.includes(q)) {
+        out.push({
+          key: `settings-${section.id}`,
+          icon: <SettingsOutlinedIcon />,
+          title: section.label,
+          subtitle: section.description || 'Settings',
+          action: () => navigate(section.path),
+        });
+      }
+    });
+
     return out.slice(0, MAX_RESULTS);
-  }, [devices, drivers, getDisplayForDevice, groups, navigate, query]);
+  }, [devices, drivers, getDisplayForDevice, groups, manager, navigate, query, technician]);
 
   const handlePick = useCallback((item) => {
     item.action();
