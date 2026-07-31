@@ -29,8 +29,9 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
-import { useManager, useTechnician } from '../util/permissions';
-import { SETTINGS_SECTIONS } from '../../settings/center/settingsSectionRegistry.js';
+import { useAdministrator, useManager, useTechnician } from '../util/permissions';
+import useFeatures from '../util/useFeatures';
+import { SETTINGS_SECTIONS, isSettingsSectionVisible } from '../../settings/center/settingsSectionRegistry.js';
 
 const MAX_RESULTS = 12;
 
@@ -48,7 +49,9 @@ const CommandPalette = () => {
   const drivers = useSelector((state) => state.drivers.items);
   const groups = useSelector((state) => state.groups.items);
   const manager = useManager();
+  const admin = useAdministrator();
   const technician = useTechnician();
+  const features = useFeatures();
 
   useEffect(() => {
     const onKey = (e) => {
@@ -120,8 +123,7 @@ const CommandPalette = () => {
 
     SETTINGS_SECTIONS.forEach((section) => {
       if (!section.live) return;
-      if (section.requiresRole === 'manager' && !manager) return;
-      if (section.requiresRole === 'technician' && !technician) return;
+      if (!isSettingsSectionVisible(section, { manager, admin, technician, features })) return;
       const haystack = [section.label, section.description, ...(section.keywords || [])]
         .join(' ')
         .toLowerCase();
@@ -137,7 +139,7 @@ const CommandPalette = () => {
     });
 
     return out.slice(0, MAX_RESULTS);
-  }, [devices, drivers, getDisplayForDevice, groups, manager, navigate, query, technician]);
+  }, [admin, devices, drivers, features, getDisplayForDevice, groups, manager, navigate, query, technician]);
 
   const handlePick = useCallback((item) => {
     item.action();

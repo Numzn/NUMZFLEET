@@ -5,6 +5,15 @@ import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
+import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
+import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined';
+import CalculateOutlinedIcon from '@mui/icons-material/CalculateOutlined';
+import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
+import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
+import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 
 /**
  * Single source of truth for the Settings Center's section nav — mirrors the
@@ -22,9 +31,14 @@ import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
  * see the Settings discovery-audit artifact for the evidence behind it.
  * `description`/`keywords` exist so settings content can be searched (e.g.
  * from CommandPalette) without a separate, hand-maintained search index.
- * The 9 legacy Administration pages (Alert Rules, Groups, Calendars, etc.)
- * are NOT in this registry yet — that migration is a later, larger change,
- * not bundled into this metadata-only extension.
+ *
+ * `requiresRole` filters coarsely ('manager' | 'admin' | 'technician'); note
+ * useManager() already returns true for admins (admin implies manager in
+ * this app's permission model — see permissions.js), so 'admin' only needs
+ * to be used where a check is genuinely stricter than 'manager'.
+ * `requiresFeature` names a key from useFeatures() — when present, the
+ * section only shows if that flag is falsy (mirrors the `!features.disableX`
+ * guards this migrated from in UnifiedSidebar.jsx).
  */
 export const SETTINGS_CATEGORIES = {
   personal: 'Personal',
@@ -36,6 +50,7 @@ export const SETTINGS_CATEGORIES = {
 };
 
 export const SETTINGS_SECTION_IDS = {
+  overview: 'overview',
   profile: 'profile',
   security: 'security',
   organization: 'organization',
@@ -43,9 +58,30 @@ export const SETTINGS_SECTION_IDS = {
   devices: 'devices',
   preferences: 'preferences',
   notifications: 'notifications',
+  alertRules: 'alertRules',
+  groups: 'groups',
+  calendars: 'calendars',
+  computedAttributes: 'computedAttributes',
+  maintenanceSchedules: 'maintenanceSchedules',
+  savedCommands: 'savedCommands',
+  announcement: 'announcement',
+  server: 'server',
 };
 
 export const SETTINGS_SECTIONS = [
+  {
+    id: SETTINGS_SECTION_IDS.overview,
+    label: 'Overview',
+    icon: DashboardOutlinedIcon,
+    path: '/settings',
+    // Exact match only — every other section's own match() would otherwise
+    // never fire if this one used startsWith('/settings').
+    match: (pathname) => pathname === '/settings',
+    live: true,
+    category: null,
+    description: 'Configuration health, recent changes, and quick access.',
+    keywords: ['overview', 'home', 'dashboard'],
+  },
   {
     id: SETTINGS_SECTION_IDS.profile,
     label: 'Profile',
@@ -130,8 +166,127 @@ export const SETTINGS_SECTIONS = [
     description: 'Choose which events notify you, and how.',
     keywords: ['notifications', 'alerts', 'sms', 'email', 'push', 'channels'],
   },
+  {
+    id: SETTINGS_SECTION_IDS.alertRules,
+    label: 'Alert Rules',
+    icon: NotificationsActiveOutlinedIcon,
+    path: '/settings/notifications',
+    // Exact/subsegment match only — must NOT swallow /settings/notification-preferences
+    // (see the Notifications section above and the discovery audit's note on
+    // this exact class of naming collision).
+    match: (pathname) => pathname === '/settings/notifications'
+      || pathname === '/settings/notification'
+      || pathname.startsWith('/settings/notification/'),
+    live: true,
+    category: 'automation',
+    description: 'Which Traccar events trigger which notificators.',
+    keywords: ['alert rules', 'notificators', 'events', 'automation'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.groups,
+    label: 'Groups',
+    icon: FolderOutlinedIcon,
+    path: '/settings/groups',
+    match: (pathname) => pathname.startsWith('/settings/group'),
+    live: true,
+    requiresFeature: 'disableGroups',
+    category: 'integrations',
+    description: 'Device grouping for permission inheritance.',
+    keywords: ['groups', 'device groups', 'connectivity'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.calendars,
+    label: 'Calendars',
+    icon: TodayOutlinedIcon,
+    path: '/settings/calendars',
+    match: (pathname) => pathname.startsWith('/settings/calendar'),
+    live: true,
+    requiresFeature: 'disableCalendars',
+    category: 'automation',
+    description: 'Time windows feeding rules and reports.',
+    keywords: ['calendars', 'schedule', 'time window'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.computedAttributes,
+    label: 'Computed Attributes',
+    icon: CalculateOutlinedIcon,
+    path: '/settings/attributes',
+    match: (pathname) => pathname.startsWith('/settings/attribute'),
+    live: true,
+    // Note: UnifiedSidebar's legacy guard checked `features.disableComputedAttributes`,
+    // a key useFeatures() never actually returns (it exposes `disableAttributes`) —
+    // that guard was already inert before this migration. Preserving the real
+    // current behavior (always visible to managers) rather than silently
+    // starting to enforce a gate nobody has been able to trip until now.
+    category: 'automation',
+    description: 'Derived values feeding automation rules.',
+    keywords: ['computed attributes', 'derived values', 'automation'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.maintenanceSchedules,
+    label: 'Maintenance Schedules',
+    icon: ScheduleOutlinedIcon,
+    path: '/settings/maintenances',
+    match: (pathname) => pathname.startsWith('/settings/maintenance'),
+    live: true,
+    requiresRole: 'admin',
+    requiresFeature: 'disableMaintenance',
+    category: 'fleet',
+    description: 'Traccar-native maintenance rule templates (advanced).',
+    keywords: ['maintenance schedules', 'traccar schedules', 'service intervals'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.savedCommands,
+    label: 'Saved Commands',
+    icon: SendOutlinedIcon,
+    path: '/settings/commands',
+    match: (pathname) => pathname.startsWith('/settings/command'),
+    live: true,
+    requiresFeature: 'disableSavedCommands',
+    category: 'automation',
+    description: 'Reusable device command presets.',
+    keywords: ['saved commands', 'device commands'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.announcement,
+    label: 'Announcement',
+    icon: CampaignOutlinedIcon,
+    path: '/settings/announcement',
+    match: (pathname) => pathname.startsWith('/settings/announcement'),
+    live: true,
+    requiresRole: 'manager',
+    category: 'system',
+    description: 'Broadcast a banner to every user.',
+    keywords: ['announcement', 'broadcast', 'banner'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.server,
+    label: 'Server',
+    icon: DnsOutlinedIcon,
+    path: '/settings/server',
+    match: (pathname) => pathname.startsWith('/settings/server'),
+    live: true,
+    requiresRole: 'admin',
+    category: 'system',
+    description: 'Raw Traccar server configuration.',
+    keywords: ['server', 'traccar server', 'defaults'],
+  },
 ];
 
 export function resolveActiveSettingsSection(pathname) {
   return SETTINGS_SECTIONS.find((section) => section.live && section.match(pathname)) || null;
+}
+
+/**
+ * Single gating rule for a section's requiresRole/requiresFeature, shared by
+ * every consumer (SettingsSubNav, CommandPalette, ...) so a new section only
+ * has to declare its gate once instead of every place that lists sections
+ * re-implementing the same three-role/one-feature check.
+ */
+export function isSettingsSectionVisible(section, { manager, admin, technician, features } = {}) {
+  if (section.requiresRole === 'manager' && !manager) return false;
+  if (section.requiresRole === 'admin' && !admin) return false;
+  if (section.requiresRole === 'technician' && !technician) return false;
+  if (section.requiresFeature && features?.[section.requiresFeature]) return false;
+  return true;
 }

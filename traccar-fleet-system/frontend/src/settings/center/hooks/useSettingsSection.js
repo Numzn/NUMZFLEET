@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { resolveActiveSettingsSection } from '../settingsSectionRegistry.js';
+import { recordSettingsVisit } from '../recentSettingsVisits.js';
 
 /**
  * URL-derived active section + navigation, mirroring the spirit of
@@ -15,6 +16,10 @@ export default function useSettingsSection() {
     () => resolveActiveSettingsSection(location.pathname)?.id || null,
     [location.pathname],
   );
+
+  useEffect(() => {
+    if (activeId && activeId !== 'overview') recordSettingsVisit(activeId);
+  }, [activeId]);
 
   const goToSection = (section) => {
     if (!section?.live || !section.path) return;

@@ -25,18 +25,9 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ChevronLeftOutlinedIcon from '@mui/icons-material/ChevronLeftOutlined';
 import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import PersonIcon from '@mui/icons-material/Person';
-import FolderIcon from '@mui/icons-material/Folder';
-import TodayIcon from '@mui/icons-material/Today';
-import SendIcon from '@mui/icons-material/Send';
 import HelpIcon from '@mui/icons-material/Help';
 import PaymentIcon from '@mui/icons-material/Payment';
-import CampaignIcon from '@mui/icons-material/Campaign';
-import CalculateIcon from '@mui/icons-material/Calculate';
-import BuildIcon from '@mui/icons-material/Build';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
-import SettingsIcon from '@mui/icons-material/Settings';
 import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from './UserMenuDropdown';
 import usePersistedState from '../util/usePersistedState';
@@ -208,7 +199,6 @@ const UnifiedSidebar = ({
   const manager = useManager();
   const features = useFeatures();
   const user = useSelector((state) => state.session.user);
-  const userId = user?.id;
   const [maintenanceBadge, setMaintenanceBadge] = useState(undefined);
 
   useEffect(() => {
@@ -247,64 +237,25 @@ const UnifiedSidebar = ({
   const [openState, setOpenState] = usePersistedState('unifiedSidebarNavOpen', {
     fleet: true,
     fuel: true,
-    system: false,
   });
 
-  const systemChildren = useMemo(() => {
+  // Alert Rules, Groups, Calendars, Computed Attributes, Maintenance Schedules,
+  // Saved Commands, Announcement, and Server used to live here as flat
+  // siblings of "Settings" — an expandable "Administration" parent whose
+  // dropdown mixed personal settings, Traccar config, and server admin with
+  // no grouping. They're now sections inside the Settings Center's own
+  // category rail (settingsSectionRegistry.js), reached the same way Profile
+  // and Security always were. This group is just the entry points left over:
+  // Settings itself, plus optional external Billing/Support links.
+  const systemItems = useMemo(() => {
     const out = [];
     if (!readonly) {
       out.push({
         title: t('settingsTitle'),
-        path: '/settings/profile',
-        icon: PersonIcon,
-        activeMatch: (path) => path.startsWith('/settings/profile') || path === `/settings/user/${userId}` || path === '/settings/preferences',
+        path: '/settings',
+        icon: SettingsOutlinedIcon,
+        activeMatch: (path) => path.startsWith('/settings'),
       });
-      out.push({
-        title: 'Alert rules',
-        path: '/settings/notifications',
-        icon: NotificationsIcon,
-        activeMatch: (path) => path.startsWith('/settings/notification'),
-      });
-      if (!features.disableGroups) {
-        out.push({
-          title: t('settingsGroups'),
-          path: '/settings/groups',
-          icon: FolderIcon,
-          activeMatch: (path) => path.startsWith('/settings/group'),
-        });
-      }
-      if (!features.disableCalendars) {
-        out.push({
-          title: t('sharedCalendars'),
-          path: '/settings/calendars',
-          icon: TodayIcon,
-          activeMatch: (path) => path.startsWith('/settings/calendar'),
-        });
-      }
-      if (!features.disableComputedAttributes) {
-        out.push({
-          title: t('sharedComputedAttributes'),
-          path: '/settings/attributes',
-          icon: CalculateIcon,
-          activeMatch: (path) => path.startsWith('/settings/attribute'),
-        });
-      }
-      if (!features.disableMaintenance && admin) {
-        out.push({
-          title: 'Traccar schedules (advanced)',
-          path: '/settings/maintenances',
-          icon: BuildIcon,
-          activeMatch: (path) => path.startsWith('/settings/maintenance'),
-        });
-      }
-      if (!features.disableSavedCommands) {
-        out.push({
-          title: t('sharedSavedCommands'),
-          path: '/settings/commands',
-          icon: SendIcon,
-          activeMatch: (path) => path.startsWith('/settings/command'),
-        });
-      }
     }
     if (billingLink) {
       out.push({
@@ -322,35 +273,8 @@ const UnifiedSidebar = ({
         external: true,
       });
     }
-    if (manager && !readonly) {
-      out.push({
-        title: t('serverAnnouncement'),
-        path: '/settings/announcement',
-        icon: CampaignIcon,
-      });
-      if (admin) {
-        out.push({
-          title: t('settingsServer'),
-          path: '/settings/server',
-          icon: SettingsIcon,
-        });
-      }
-    }
     return out;
-  }, [
-    admin,
-    billingLink,
-    features.disableCalendars,
-    features.disableComputedAttributes,
-    features.disableGroups,
-    features.disableMaintenance,
-    features.disableSavedCommands,
-    manager,
-    readonly,
-    supportLink,
-    t,
-    userId,
-  ]);
+  }, [billingLink, readonly, supportLink, t]);
 
   const navGroups = useMemo(() => ([
     {
@@ -415,15 +339,7 @@ const UnifiedSidebar = ({
     {
       key: 'system',
       label: 'SYSTEM',
-      items: [
-        {
-          key: 'system',
-          title: 'Administration',
-          icon: SettingsOutlinedIcon,
-          show: manager || admin,
-          children: systemChildren,
-        },
-      ].filter((i) => i.show !== false),
+      items: systemItems,
     },
   ]), [
     alertsBadgeCount,
@@ -433,7 +349,7 @@ const UnifiedSidebar = ({
     pendingFuelCount,
     maintenanceBadge,
     readonly,
-    systemChildren,
+    systemItems,
   ]);
 
   const pathActive = useCallback((path, exact = false) => {

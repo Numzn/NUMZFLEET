@@ -11,6 +11,8 @@ import PositionsReportPage from './reports/PositionsReportPage';
 import ServerPage from './settings/ServerPage';
 import DevicePage from './settings/DevicePage';
 import UserPage from './settings/UserPage';
+import SettingsCenterShell from './settings/center/SettingsCenterShell.jsx';
+import OverviewSection from './settings/center/sections/OverviewSection.jsx';
 import ProfileSection from './settings/center/sections/ProfileSection';
 import SecuritySection from './settings/center/sections/SecuritySection';
 import OrganizationSection from './settings/center/sections/OrganizationSection';
@@ -179,21 +181,22 @@ const Navigation = () => {
           <Route path="test/toast-notifications" element={<ToastNotificationTest />} />
 
           <Route path="settings">
+          <Route index element={<OverviewSection />} />
           <Route path="profile" element={<ProfileSection />} />
           <Route path="security" element={<SecuritySection />} />
           <Route path="organization" element={<OrganizationSection />} />
           <Route path="notification-preferences" element={<NotificationsSection />} />
           <Route path="accumulators/:deviceId" element={<AccumulatorsPage />} />
-          <Route path="announcement" element={<AnnouncementPage />} />
-          <Route path="calendars" element={<CalendarsPage />} />
-          <Route path="calendar/:id" element={<CalendarPage />} />
-          <Route path="calendar" element={<CalendarPage />} />
-          <Route path="commands" element={<CommandsPage />} />
-          <Route path="command/:id" element={<CommandPage />} />
-          <Route path="command" element={<CommandPage />} />
-          <Route path="attributes" element={<ComputedAttributesPage />} />
-          <Route path="attribute/:id" element={<ComputedAttributePage />} />
-          <Route path="attribute" element={<ComputedAttributePage />} />
+          <Route path="announcement" element={<SettingsCenterShell><AnnouncementPage /></SettingsCenterShell>} />
+          <Route path="calendars" element={<SettingsCenterShell><CalendarsPage /></SettingsCenterShell>} />
+          <Route path="calendar/:id" element={<SettingsCenterShell><CalendarPage /></SettingsCenterShell>} />
+          <Route path="calendar" element={<SettingsCenterShell><CalendarPage /></SettingsCenterShell>} />
+          <Route path="commands" element={<SettingsCenterShell><CommandsPage /></SettingsCenterShell>} />
+          <Route path="command/:id" element={<SettingsCenterShell><CommandPage /></SettingsCenterShell>} />
+          <Route path="command" element={<SettingsCenterShell><CommandPage /></SettingsCenterShell>} />
+          <Route path="attributes" element={<SettingsCenterShell><ComputedAttributesPage /></SettingsCenterShell>} />
+          <Route path="attribute/:id" element={<SettingsCenterShell><ComputedAttributePage /></SettingsCenterShell>} />
+          <Route path="attribute" element={<SettingsCenterShell><ComputedAttributePage /></SettingsCenterShell>} />
           <Route path="devices" element={<TechnicianRoute><DevicesSection /></TechnicianRoute>} />
           <Route path="device/:id/connections" element={<TechnicianRoute><DeviceConnectionsPage /></TechnicianRoute>} />
           <Route path="device/:id/command" element={<TechnicianRoute><CommandDevicePage /></TechnicianRoute>} />
@@ -208,19 +211,19 @@ const Navigation = () => {
           <Route path="driver" element={<DriverPage />} />
           <Route path="geofence/:id" element={<GeofencePage />} />
           <Route path="geofence" element={<GeofencePage />} />
-          <Route path="groups" element={<GroupsPage />} />
-          <Route path="group/:id/connections" element={<GroupConnectionsPage />} />
-          <Route path="group/:id/command" element={<CommandGroupPage />} />
-          <Route path="group/:id" element={<GroupPage />} />
-          <Route path="group" element={<GroupPage />} />
-          <Route path="maintenances" element={<MaintenancesPage />} />
-          <Route path="maintenance/:id" element={<MaintenancePage />} />
-          <Route path="maintenance" element={<MaintenancePage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="notification/:id" element={<NotificationPage />} />
-          <Route path="notification" element={<NotificationPage />} />
+          <Route path="groups" element={<SettingsCenterShell><GroupsPage /></SettingsCenterShell>} />
+          <Route path="group/:id/connections" element={<SettingsCenterShell><GroupConnectionsPage /></SettingsCenterShell>} />
+          <Route path="group/:id/command" element={<SettingsCenterShell><CommandGroupPage /></SettingsCenterShell>} />
+          <Route path="group/:id" element={<SettingsCenterShell><GroupPage /></SettingsCenterShell>} />
+          <Route path="group" element={<SettingsCenterShell><GroupPage /></SettingsCenterShell>} />
+          <Route path="maintenances" element={<SettingsCenterShell><MaintenancesPage /></SettingsCenterShell>} />
+          <Route path="maintenance/:id" element={<SettingsCenterShell><MaintenancePage /></SettingsCenterShell>} />
+          <Route path="maintenance" element={<SettingsCenterShell><MaintenancePage /></SettingsCenterShell>} />
+          <Route path="notifications" element={<SettingsCenterShell><NotificationsPage /></SettingsCenterShell>} />
+          <Route path="notification/:id" element={<SettingsCenterShell><NotificationPage /></SettingsCenterShell>} />
+          <Route path="notification" element={<SettingsCenterShell><NotificationPage /></SettingsCenterShell>} />
           <Route path="preferences" element={<PreferencesSection />} />
-          <Route path="server" element={<ServerPage />} />
+          <Route path="server" element={<SettingsCenterShell><ServerPage /></SettingsCenterShell>} />
           <Route path="users" element={<TeamSection />} />
           <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
