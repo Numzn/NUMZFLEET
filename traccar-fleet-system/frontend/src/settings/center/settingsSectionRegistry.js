@@ -4,6 +4,7 @@ import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
+import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
 import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
@@ -55,6 +56,7 @@ export const SETTINGS_SECTION_IDS = {
   security: 'security',
   organization: 'organization',
   team: 'team',
+  roles: 'roles',
   devices: 'devices',
   preferences: 'preferences',
   notifications: 'notifications',
@@ -126,6 +128,18 @@ export const SETTINGS_SECTIONS = [
     category: 'organization',
     description: 'Manage who has access to your fleet.',
     keywords: ['users', 'team', 'members', 'access', 'invite'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.roles,
+    label: 'Roles',
+    icon: AssignmentIndOutlinedIcon,
+    path: '/settings/roles',
+    match: (pathname) => pathname.startsWith('/settings/roles'),
+    live: true,
+    requiresRole: 'manager',
+    category: 'organization',
+    description: 'What each role can and cannot do.',
+    keywords: ['roles', 'permissions', 'access', 'rbac'],
   },
   {
     id: SETTINGS_SECTION_IDS.devices,

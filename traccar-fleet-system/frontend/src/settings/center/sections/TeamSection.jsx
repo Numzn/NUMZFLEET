@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   Box, Typography, Chip, Switch, FormControlLabel, TextField, CircularProgress, Stack,
 } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
 import LinkIcon from '@mui/icons-material/Link';
+import BadgeIcon from '@mui/icons-material/Badge';
 import { traccarPath } from '../../../config/traccarApi.js';
 import { useCatch, useEffectAsync } from '../../../reactHelper';
 import { useTranslation } from '../../../common/components/LocalizationProvider';
@@ -15,9 +17,11 @@ import { useSetTopBarTitle } from '../../../common/components/TopBarTitleContext
 import SettingsCenterShell from '../SettingsCenterShell.jsx';
 import SettingsSectionPanel from '../components/SettingsSectionPanel.jsx';
 import SettingsCard from '../components/SettingsCard.jsx';
+import EditRolesDialog from '../components/EditRolesDialog.jsx';
 import CollectionActions from '../../components/CollectionActions';
 import CollectionFab from '../../components/CollectionFab';
 import { filterByKeyword } from '../../components/SearchHeader';
+import { fetchSystemRoles, fetchRoleAssignments } from '../rolesApi.js';
 
 /**
  * Restyled UsersPage.jsx — same data source, same CollectionActions/CollectionFab
@@ -30,12 +34,21 @@ export default function TeamSection() {
   const navigate = useNavigate();
   const t = useTranslation();
   const manager = useManager();
+  const currentUser = useSelector((state) => state.session.user);
 
   const [timestamp, setTimestamp] = useState(Date.now());
   const [items, setItems] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [temporary, setTemporary] = useState(false);
+
+  const [roles, setRoles] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [editingMember, setEditingMember] = useState(null);
+
+  const refreshAssignments = useCatch(async () => {
+    setAssignments(await fetchRoleAssignments(currentUser));
+  });
 
   const handleLogin = useCatch(async (userId) => {
     await fetchOrThrow(traccarPath(`/api/session/${userId}`));
@@ -56,6 +69,13 @@ export default function TeamSection() {
     handler: (userId) => navigate(`/settings/user/${userId}/connections`),
   };
 
+  const actionEditRoles = {
+    key: 'editRoles',
+    title: 'Edit roles',
+    icon: <BadgeIcon fontSize="small" />,
+    handler: (userId) => setEditingMember(items.find((item) => item.id === userId) || null),
+  };
+
   useEffectAsync(async () => {
     setLoading(true);
     try {
@@ -65,6 +85,12 @@ export default function TeamSection() {
       setLoading(false);
     }
   }, [timestamp]);
+
+  useEffectAsync(async () => {
+    setRoles(await fetchSystemRoles(currentUser));
+    setAssignments(await fetchRoleAssignments(currentUser));
+    return null;
+  }, []);
 
   const visible = items.filter((u) => temporary || !u.temporary).filter(filterByKeyword(searchKeyword));
 
@@ -102,6 +128,11 @@ export default function TeamSection() {
                     display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0,
                   }}
                   >
+                    {assignments
+                      .filter((a) => a.traccarUserId === item.id)
+                      .map((a) => (
+                        <Chip key={a.userRoleId} size="small" label={a.roleLabel} variant="outlined" />
+                      ))}
                     {item.administrator && (
                       <Chip size="small" label={t('userAdmin')} color="primary" variant="outlined" />
                     )}
@@ -118,7 +149,7 @@ export default function TeamSection() {
                       editPath="/settings/user"
                       endpoint="users"
                       setTimestamp={setTimestamp}
-                      customActions={manager ? [actionLogin, actionConnections] : [actionConnections]}
+                      customActions={manager ? [actionEditRoles, actionLogin, actionConnections] : [actionConnections]}
                     />
                   </Box>
                 </Box>
@@ -142,6 +173,14 @@ export default function TeamSection() {
         />
       </SettingsSectionPanel>
       <CollectionFab editPath="/settings/user" />
+      <EditRolesDialog
+        open={!!editingMember}
+        member={editingMember}
+        roles={roles}
+        assignments={assignments}
+        onClose={() => setEditingMember(null)}
+        onChanged={refreshAssignments}
+      />
     </SettingsCenterShell>
   );
 }

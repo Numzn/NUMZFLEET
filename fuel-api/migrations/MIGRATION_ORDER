@@ -39,3 +39,4 @@
 20260727_numz_users_default_dashboard.sql
 20260727_notification_preferences.sql
 20260727_fix_notification_login_audit_fk.sql
+20260731_roles_permissions_foundation.sql

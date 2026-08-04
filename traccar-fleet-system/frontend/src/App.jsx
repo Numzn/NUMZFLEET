@@ -10,6 +10,7 @@ import NotificationSyncController from './notifications/NotificationSyncControll
 import CachingController from './CachingController';
 import { useCatch, useEffectAsync } from './reactHelper';
 import { sessionActions } from './store';
+import { fetchMyProfile } from './settings/center/profileApi.js';
 import UpdateController from './UpdateController';
 import TermsDialog from './common/components/TermsDialog';
 import Loader from './common/components/Loader';
@@ -48,7 +49,15 @@ const App = () => {
     if (!user) {
       const response = await traccarFetch('/api/session');
       if (response.ok) {
-        dispatch(sessionActions.updateUser(await response.json()));
+        const sessionUser = await response.json();
+        dispatch(sessionActions.updateUser(sessionUser));
+
+        // Fire-and-forget: populates the new roles/permissions system's
+        // permissions[] for observation. Never blocks render/login on this —
+        // this phase must not change existing authorization behavior.
+        fetchMyProfile(sessionUser)
+          .then((profile) => dispatch(sessionActions.updatePermissions(profile.permissions || [])))
+          .catch(() => {});
 
         try {
           const fuelProbe = await fetch('/api/fuel-requests', { credentials: 'include' });

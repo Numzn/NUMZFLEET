@@ -18,6 +18,11 @@ const { reducer, actions } = createSlice({
     updateUser(state, action) {
       state.user = action.payload;
     },
+    updatePermissions(state, action) {
+      if (state.user) {
+        state.user.permissions = action.payload;
+      }
+    },
     updateSocket(state, action) {
       state.socket = action.payload;
     },

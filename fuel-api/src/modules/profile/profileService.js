@@ -3,6 +3,7 @@ import { clearCompanyContextCache } from '../../services/tenantResolverService.j
 import { buildProfileAvatarPath } from '../../middleware/profileUpload.js';
 import { listLoginHistoryForUser } from '../../services/loginAuditService.js';
 import { ensureNumzUserRow } from '../../services/numzUserProvisioning.js';
+import { resolvePermissionsForNumzUser } from '../../services/rolesService.js';
 import * as repo from './profileRepository.js';
 
 // req.user (from the auth middleware) never carries `phone`/`attributes`/`map`/
@@ -14,7 +15,7 @@ async function fetchTraccarUser(req) {
   return traccarServiceFetch(`/api/users/${req.user.id}`);
 }
 
-function toProfileDto(traccarUser, numzUser) {
+function toProfileDto(traccarUser, numzUser, permissions) {
   return {
     id: traccarUser.id,
     name: traccarUser.name || null,
@@ -27,6 +28,11 @@ function toProfileDto(traccarUser, numzUser) {
     jobTitle: numzUser?.jobTitle || null,
     department: numzUser?.department || null,
     defaultDashboard: numzUser?.defaultDashboard || null,
+    // Observation-only for now — nothing gates on this yet (see the
+    // roles/permissions foundation work). Exposed here so the new
+    // user_roles-driven system is checkable against real requests before
+    // any authGates.js check is cut over to trust it.
+    permissions,
   };
 }
 
@@ -35,7 +41,10 @@ export async function getMe(req) {
     fetchTraccarUser(req),
     ensureNumzUserRow(req),
   ]);
-  return toProfileDto(traccarUser, numzUser);
+  const permissions = await resolvePermissionsForNumzUser(numzUser?.id, req.auth?.companyId, {
+    isTraccarAdmin: !!req.user?.administrator,
+  });
+  return toProfileDto(traccarUser, numzUser, permissions);
 }
 
 export async function patchMe(req) {
@@ -110,7 +119,10 @@ export async function patchMe(req) {
     clearCompanyContextCache();
   }
 
-  return toProfileDto(traccarUser, finalNumzUser);
+  const permissions = await resolvePermissionsForNumzUser(finalNumzUser?.id, req.auth?.companyId, {
+    isTraccarAdmin: !!req.user?.administrator,
+  });
+  return toProfileDto(traccarUser, finalNumzUser, permissions);
 }
 
 export async function changePassword(req) {
@@ -160,5 +172,8 @@ export async function patchAvatar(req) {
   const updated = await repo.updateNumzUserFields(numzUser.id, { avatarUrl });
   clearCompanyContextCache();
   const traccarUser = await fetchTraccarUser(req);
-  return toProfileDto(traccarUser, updated);
+  const permissions = await resolvePermissionsForNumzUser(updated?.id, req.auth?.companyId, {
+    isTraccarAdmin: !!req.user?.administrator,
+  });
+  return toProfileDto(traccarUser, updated, permissions);
 }

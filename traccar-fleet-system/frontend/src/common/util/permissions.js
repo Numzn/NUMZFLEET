@@ -49,3 +49,11 @@ export const useDispatcher = () => useSelector((state) => {
   const user = state.session.user;
   return numzRole(user) === 'dispatcher';
 });
+
+// Reads the permissions[] the new roles/permissions system resolved for this
+// user (see fuel-api/src/permissions/permissionCatalog.js). Additive and
+// observational only right now — nothing gates on this yet, existing
+// Traccar-flag hooks above remain the enforced checks.
+export const usePermission = (key) => useSelector((state) => (
+  state.session.user?.permissions?.includes(key) ?? false
+));

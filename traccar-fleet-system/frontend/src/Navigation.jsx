@@ -17,6 +17,7 @@ import ProfileSection from './settings/center/sections/ProfileSection';
 import SecuritySection from './settings/center/sections/SecuritySection';
 import OrganizationSection from './settings/center/sections/OrganizationSection';
 import TeamSection from './settings/center/sections/TeamSection';
+import RolesSection from './settings/center/sections/RolesSection';
 import DevicesSection from './settings/center/sections/DevicesSection';
 import NotificationsSection from './settings/center/sections/NotificationsSection';
 import NotificationsPage from './settings/NotificationsPage';
@@ -225,6 +226,7 @@ const Navigation = () => {
           <Route path="preferences" element={<PreferencesSection />} />
           <Route path="server" element={<SettingsCenterShell><ServerPage /></SettingsCenterShell>} />
           <Route path="users" element={<TeamSection />} />
+          <Route path="roles" element={<RolesSection />} />
           <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
           <Route path="user" element={<UserPage />} />

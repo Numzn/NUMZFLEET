@@ -1,7 +1,19 @@
 import { clearCompanyContextCache } from './tenantResolverService.js';
 import {
-  findByNumzUserId, findByTraccarUserId, createForTraccarUser,
+  findByNumzUserId, findByTraccarUserId, createForTraccarUser, updateNumzUserFields,
 } from '../modules/profile/profileRepository.js';
+
+// A row created by someone else's role assignment (see
+// modules/roles/rolesRepository.js) carries a placeholder email — nothing
+// else ever touches it before this user actually logs in themselves. Once
+// they do, Traccar's email is the real one; reconcile it here rather than
+// leaving the placeholder stuck in numz_users indefinitely.
+async function reconcileEmail(numzUser, traccarEmail) {
+  if (traccarEmail && numzUser.email !== traccarEmail) {
+    return updateNumzUserFields(numzUser.id, { email: traccarEmail });
+  }
+  return numzUser;
+}
 
 /**
  * numz_users rows are not provisioned anywhere else in the app today (see
@@ -15,13 +27,13 @@ import {
 export async function ensureNumzUserRow(req) {
   if (req.auth?.numzUserId) {
     const existing = await findByNumzUserId(req.auth.numzUserId);
-    if (existing) return existing;
+    if (existing) return reconcileEmail(existing, req.user.email);
   }
 
   const byTraccarId = await findByTraccarUserId(req.user.id);
   if (byTraccarId) {
     req.auth.numzUserId = byTraccarId.id;
-    return byTraccarId;
+    return reconcileEmail(byTraccarId, req.user.email);
   }
 
   const created = await createForTraccarUser({

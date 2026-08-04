@@ -22,6 +22,7 @@ import { useCatch } from '../reactHelper';
 import QrCodeDialog from '../common/components/QrCodeDialog';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import { traccarPath, traccarFetch } from '../config/traccarApi.js';
+import { fetchMyProfile } from '../settings/center/profileApi.js';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -98,6 +99,9 @@ const LoginPage = () => {
         const user = payload.user || payload;
         generateLoginToken();
         dispatch(sessionActions.updateUser(user));
+        fetchMyProfile(user)
+          .then((profile) => dispatch(sessionActions.updatePermissions(profile.permissions || [])))
+          .catch(() => {});
         const target = window.sessionStorage.getItem('postLogin') || payload.tenant?.defaultDashboard || '/';
         window.sessionStorage.removeItem('postLogin');
         navigate(target, { replace: true });
@@ -116,6 +120,9 @@ const LoginPage = () => {
     const response = await fetchOrThrow(`${traccarPath('/api/session')}?token=${encodeURIComponent(token)}`);
     const user = await response.json();
     dispatch(sessionActions.updateUser(user));
+    fetchMyProfile(user)
+      .then((profile) => dispatch(sessionActions.updatePermissions(profile.permissions || [])))
+      .catch(() => {});
     navigate('/');
   });
 

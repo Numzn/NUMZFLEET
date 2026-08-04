@@ -26,6 +26,10 @@ import VehicleActivityStateModel from './VehicleActivityState.js';
 import VehicleStateAuditEventModel from './VehicleStateAuditEvent.js';
 import LoginAuditEventModel from './LoginAuditEvent.js';
 import NotificationPreferenceModel from './NotificationPreference.js';
+import RoleModel from './Role.js';
+import PermissionModel from './Permission.js';
+import RolePermissionModel from './RolePermission.js';
+import UserRoleModel from './UserRole.js';
 
 const FuelRequest = FuelRequestModel(sequelize);
 const VehicleSpec = VehicleSpecModel(sequelize);
@@ -54,6 +58,10 @@ const VehicleActivityState = VehicleActivityStateModel(sequelize);
 const VehicleStateAuditEvent = VehicleStateAuditEventModel(sequelize);
 const LoginAuditEvent = LoginAuditEventModel(sequelize);
 const NotificationPreference = NotificationPreferenceModel(sequelize);
+const Role = RoleModel(sequelize);
+const Permission = PermissionModel(sequelize);
+const RolePermission = RolePermissionModel(sequelize);
+const UserRole = UserRoleModel(sequelize);
 
 Company.hasMany(Vehicle, { foreignKey: 'companyId' });
 Vehicle.belongsTo(Company, { foreignKey: 'companyId' });
@@ -67,6 +75,22 @@ Company.hasMany(ServiceRecord, { foreignKey: 'companyId', as: 'serviceRecords' }
 ServiceRecord.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Company.hasOne(MaintenanceBudget, { foreignKey: 'companyId', as: 'maintenanceBudget' });
 MaintenanceBudget.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+
+// RBAC foundation (additive — see the roles/permissions foundation migration).
+// company_id is nullable on both Role and UserRole (NULL = system-wide /
+// platform-level, e.g. a Platform Super Admin's role has no company).
+Company.hasMany(Role, { foreignKey: 'companyId' });
+Role.belongsTo(Company, { foreignKey: 'companyId' });
+Role.hasMany(RolePermission, { foreignKey: 'roleId' });
+RolePermission.belongsTo(Role, { foreignKey: 'roleId' });
+Permission.hasMany(RolePermission, { foreignKey: 'permissionId' });
+RolePermission.belongsTo(Permission, { foreignKey: 'permissionId' });
+NumzUser.hasMany(UserRole, { foreignKey: 'numzUserId' });
+UserRole.belongsTo(NumzUser, { foreignKey: 'numzUserId' });
+Role.hasMany(UserRole, { foreignKey: 'roleId' });
+UserRole.belongsTo(Role, { foreignKey: 'roleId' });
+Company.hasMany(UserRole, { foreignKey: 'companyId' });
+UserRole.belongsTo(Company, { foreignKey: 'companyId' });
 
 Vehicle.hasMany(DeviceAssignment, { foreignKey: 'vehicleId' });
 DeviceAssignment.belongsTo(Vehicle, { foreignKey: 'vehicleId' });
@@ -257,6 +281,10 @@ export {
   VehicleStateAuditEvent,
   LoginAuditEvent,
   NotificationPreference,
+  Role,
+  Permission,
+  RolePermission,
+  UserRole,
   DEFAULT_COMPANY_ID,
 };
 export default sequelize;
