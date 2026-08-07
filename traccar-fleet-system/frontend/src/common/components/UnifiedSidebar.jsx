@@ -3,7 +3,6 @@ import {
   ListItemIcon,
   ListItemText,
   ListItemButton,
-  Collapse,
   Box,
   Divider,
   Typography,
@@ -21,13 +20,16 @@ import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutl
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
-import ExpandLessOutlinedIcon from '@mui/icons-material/ExpandLessOutlined';
 import ChevronLeftOutlinedIcon from '@mui/icons-material/ChevronLeftOutlined';
 import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
-import HelpIcon from '@mui/icons-material/Help';
-import PaymentIcon from '@mui/icons-material/Payment';
+// Outlined throughout — Help and Payment were the only filled icons in the
+// sidebar, which read as heavier than everything beside them.
+import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
+import PaymentOutlinedIcon from '@mui/icons-material/PaymentOutlined';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
+import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from './UserMenuDropdown';
 import usePersistedState from '../util/usePersistedState';
@@ -134,27 +136,6 @@ const useStyles = makeStyles()((theme) => ({
       letterSpacing: '0.01em',
     },
   },
-  subMenuItem: {
-    paddingLeft: theme.spacing(5.5),
-    padding: theme.spacing(0.875, 1.5, 0.875, 5.5),
-    marginBottom: theme.spacing(0.25),
-    '&:hover': {
-      paddingLeft: theme.spacing(5.75),
-      backgroundColor: theme.palette.action.hover,
-    },
-    '&::before': {
-      content: '""',
-      position: 'absolute',
-      left: theme.spacing(2.5),
-      top: '50%',
-      width: '4px',
-      height: '4px',
-      borderRadius: '50%',
-      backgroundColor: theme.palette.text.secondary,
-      opacity: 0.4,
-      transform: 'translateY(-50%)',
-    },
-  },
   badge: {
     '& .MuiBadge-badge': {
       backgroundColor: theme.palette.error.main,
@@ -179,8 +160,11 @@ const useStyles = makeStyles()((theme) => ({
   },
 }));
 
-const SIDEBAR_WIDTH_EXPANDED = 168;
-const SIDEBAR_WIDTH_COLLAPSED = 68;
+// 168 was too narrow to fit "Driver requests" or a label plus its badge without
+// truncating, and 68 was wider than an icon rail needs (40px target + gutters).
+// Reference points: Linear 240/54, GitHub 296, Stripe 240.
+const SIDEBAR_WIDTH_EXPANDED = 240;
+const SIDEBAR_WIDTH_COLLAPSED = 56;
 
 const UnifiedSidebar = ({
   collapsed: collapsedProp,
@@ -234,11 +218,6 @@ const UnifiedSidebar = ({
   const collapsed = forceExpanded ? false : (collapsedProp ?? collapsedState);
   const setCollapsed = setCollapsedProp ?? setCollapsedState;
 
-  const [openState, setOpenState] = usePersistedState('unifiedSidebarNavOpen', {
-    fleet: true,
-    fuel: true,
-  });
-
   // Alert Rules, Groups, Calendars, Computed Attributes, Maintenance Schedules,
   // Saved Commands, Announcement, and Server used to live here as flat
   // siblings of "Settings" — an expandable "Administration" parent whose
@@ -261,7 +240,7 @@ const UnifiedSidebar = ({
       out.push({
         title: t('userBilling'),
         href: billingLink,
-        icon: PaymentIcon,
+        icon: PaymentOutlinedIcon,
         external: true,
       });
     }
@@ -269,19 +248,34 @@ const UnifiedSidebar = ({
       out.push({
         title: t('settingsSupport'),
         href: supportLink,
-        icon: HelpIcon,
+        icon: HelpOutlineOutlinedIcon,
         external: true,
       });
     }
     return out;
   }, [billingLink, readonly, supportLink, t]);
 
+  // Flat — no expandable parents. "Fleet" and "Fuel" used to be accordions, but
+  // neither was a destination: they existed only to hold children, so reaching
+  // Vehicles or Fueling Day cost an expand click on every visit. A fuel officer
+  // opens this app to do one thing, and paid that click every session.
+  //
+  // Group labels are the domain; the items under them are the real destinations.
   const navGroups = useMemo(() => ([
     {
       key: 'primary',
       items: [
-        { title: 'Live Map', path: '/map', icon: MapOutlinedIcon },
         { title: 'Dashboard', path: '/', icon: DashboardOutlinedIcon },
+        {
+          title: 'Live Map',
+          path: '/map',
+          icon: MapOutlinedIcon,
+          // Recent Traccar events this session. It used to sit on the "Fleet"
+          // accordion, where its own tooltip had to explain it was not unread
+          // notifications; live events are what the map is for.
+          badge: alertsBadgeCount,
+          badgeHint: 'Live activity — recent Traccar events in this session (not notification unread)',
+        },
       ],
     },
     {
@@ -289,35 +283,40 @@ const UnifiedSidebar = ({
       label: 'OPERATIONS',
       items: [
         {
-          key: 'fleet',
-          title: 'Fleet',
+          title: 'Vehicles',
+          path: '/fleet/vehicles',
           icon: DirectionsCarOutlinedIcon,
-          show: !readonly,
-          badge: alertsBadgeCount,
-          badgeHint: 'Live activity — recent Traccar events in this session (not notification unread)',
-          children: [
-            { title: 'Vehicles', path: '/fleet/vehicles', show: manager },
-            { title: 'Drivers', path: '/fleet/drivers', show: !features.disableDrivers && manager },
-            { title: 'Geofences', path: '/geofences', show: admin },
-          ].filter((c) => c.show !== false),
+          show: manager && !readonly,
         },
         {
-          key: 'fuel',
-          title: 'Fuel',
+          title: 'Drivers',
+          path: '/fleet/drivers',
+          icon: PersonOutlineOutlinedIcon,
+          show: !features.disableDrivers && manager && !readonly,
+        },
+        {
+          title: 'Geofences',
+          path: '/geofences',
+          icon: PlaceOutlinedIcon,
+          show: admin && !readonly,
+        },
+        {
+          title: 'Fueling Day',
+          path: '/fleet/operation-sessions/prepare',
           icon: LocalGasStationOutlinedIcon,
           show: !readonly,
-          badge: pendingFuelCount > 0 ? pendingFuelCount : undefined,
-          children: [
-            {
-              title: 'Fueling Day',
-              path: '/fleet/operation-sessions/prepare',
-              activeMatch: (path) => path.startsWith('/fleet/operation-sessions'),
-            },
-            { title: 'Driver requests', path: '/fuel-requests', show: features.enableFuelRequests },
-          ].filter((c) => c.show !== false),
+          activeMatch: (path) => path.startsWith('/fleet/operation-sessions'),
         },
         {
-          key: 'maintenance',
+          title: 'Driver requests',
+          path: '/fuel-requests',
+          icon: AssignmentOutlinedIcon,
+          show: features.enableFuelRequests && !readonly,
+          // Pending fuel requests — this is literally what the count is, so it
+          // belongs here rather than on the group that used to contain it.
+          badge: pendingFuelCount > 0 ? pendingFuelCount : undefined,
+        },
+        {
           title: 'Maintenance',
           path: '/maintenance',
           icon: BuildOutlinedIcon,
@@ -328,12 +327,16 @@ const UnifiedSidebar = ({
       ].filter((i) => i.show !== false),
     },
     {
-      key: 'intelligence',
-      label: 'INTELLIGENCE',
+      key: 'reports',
+      // "Intelligence" is a category name no one using this app says out loud.
+      label: 'REPORTS',
       items: [
-        { title: 'Fuel reports', path: '/reports/fuel-operations', icon: LocalGasStationOutlinedIcon, show: manager },
+        // Named for the question each answers, not the engine that answers it.
+        // "Traccar reports" put the GPS vendor's brand in front of a fleet
+        // manager who has no reason to know that name.
+        { title: 'Fuel', path: '/reports/fuel-operations', icon: LocalGasStationOutlinedIcon, show: manager },
         { title: 'Analytics', path: '/reports/statistics', icon: InsightsOutlinedIcon, show: admin },
-        { title: 'Traccar reports', path: '/reports/summary', icon: BarChartOutlinedIcon, show: admin },
+        { title: 'Activity', path: '/reports/summary', icon: BarChartOutlinedIcon, show: admin },
       ].filter((i) => i.show !== false),
     },
     {
@@ -344,6 +347,7 @@ const UnifiedSidebar = ({
   ]), [
     alertsBadgeCount,
     features.disableDrivers,
+    features.enableFuelRequests,
     manager,
     admin,
     pendingFuelCount,
@@ -358,31 +362,14 @@ const UnifiedSidebar = ({
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   }, [location.pathname]);
 
-  const isAnyChildActive = useCallback((children) => {
-    if (!Array.isArray(children) || !children.length) return false;
-    return children.some((c) => {
-      if (c.external) return false;
-      if (c.activeMatch) return c.activeMatch(location.pathname);
-      return pathActive(c.path);
-    });
-  }, [location.pathname, pathActive]);
-
   const handleGo = useCallback((path) => {
     if (!path) return;
     navigate(path);
     onNavigate?.();
   }, [navigate, onNavigate]);
 
-  const toggleOpen = useCallback((key) => {
-    setOpenState((prev) => ({ ...(prev || {}), [key]: !prev?.[key] }));
-  }, [setOpenState]);
-
   const buildTooltip = useCallback((item) => {
     if (!collapsed) return '';
-    if (Array.isArray(item.children) && item.children.length) {
-      const hint = item.children.slice(0, 3).map((c) => c.title).join(', ');
-      return hint ? `${item.title} — ${hint}` : item.title;
-    }
     return item.title;
   }, [collapsed]);
 
@@ -392,10 +379,10 @@ const UnifiedSidebar = ({
     return pathActive(item.path);
   }, [location.pathname, pathActive]);
 
-  const renderLeaf = useCallback((item, opts = {}) => {
-    const { dense = false, keyPrefix = '' } = opts;
+  const renderLeaf = useCallback((item) => {
     const active = leafActive(item);
     const tooltip = buildTooltip(item);
+    const { badge } = item;
 
     const go = () => {
       if (item.disabled) return;
@@ -413,14 +400,15 @@ const UnifiedSidebar = ({
 
     const button = (
       <ListItemButton
-        key={`${keyPrefix}${item.title}`}
-        className={`${classes.menuItem} ${dense ? classes.subMenuItem : ''} ${active ? classes.menuItemActive : ''}`}
+        key={item.title}
+        className={`${classes.menuItem} ${active ? classes.menuItemActive : ''}`}
         onClick={go}
         disabled={item.disabled}
+        aria-label={badge ? `${item.title}, ${item.badgeHint || `${badge} pending`}` : item.title}
         sx={{
           justifyContent: collapsed ? 'center' : 'flex-start',
           px: collapsed ? 1 : undefined,
-          minHeight: dense ? 40 : 44,
+          minHeight: 44,
         }}
       >
         {item.icon && (
@@ -428,7 +416,17 @@ const UnifiedSidebar = ({
             className={`${classes.menuItemIcon} ${active ? classes.menuItemIconActive : ''}`}
             sx={{ minWidth: collapsed ? 'auto' : 38 }}
           >
-            <item.icon />
+            {/* Badges only ever rendered on the accordion parents, so a badge on
+                a plain item — Maintenance already had one — silently never
+                showed. The sidebar was fetching the maintenance dashboard on
+                every mount to compute a number nothing displayed. */}
+            {badge ? (
+              <Badge badgeContent={badge} className={classes.badge}>
+                <item.icon />
+              </Badge>
+            ) : (
+              <item.icon />
+            )}
           </ListItemIcon>
         )}
         {!collapsed && (
@@ -439,7 +437,7 @@ const UnifiedSidebar = ({
 
     return (
       <Tooltip
-        key={`${keyPrefix}${item.title}-tt`}
+        key={`${item.title}-tt`}
         title={tooltipTitle}
         placement="right"
         disableHoverListener={!collapsed && !item.disabled}
@@ -449,73 +447,7 @@ const UnifiedSidebar = ({
         </Box>
       </Tooltip>
     );
-  }, [buildTooltip, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, classes.subMenuItem, collapsed, handleGo, leafActive, onNavigate]);
-
-  const renderParent = useCallback((item) => {
-    const open = Boolean(openState?.[item.key]);
-    const active = isAnyChildActive(item.children);
-    const badge = item.badge;
-    const tooltip = item.badgeHint && badge
-      ? `${item.title} — ${item.badgeHint}`
-      : buildTooltip(item);
-    const Icon = item.icon;
-
-    const onClick = () => {
-      if (collapsed) {
-        const first = item.children?.find((c) => c.path);
-        handleGo(first?.path);
-        return;
-      }
-      toggleOpen(item.key);
-    };
-
-    const parentButton = (
-      <ListItemButton
-        key={item.title}
-        className={`${classes.menuItem} ${active ? classes.menuItemActive : ''}`}
-        onClick={onClick}
-        aria-label={item.badgeHint && badge ? `${item.title}, live activity ${badge}` : item.title}
-        sx={{
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          px: collapsed ? 1 : undefined,
-          minHeight: 44,
-        }}
-      >
-        <ListItemIcon className={classes.menuItemIcon} sx={{ minWidth: collapsed ? 'auto' : 38 }}>
-          {badge ? (
-            <Badge badgeContent={badge} className={classes.badge} aria-label={item.badgeHint || 'badge'}>
-              <Icon />
-            </Badge>
-          ) : (
-            <Icon />
-          )}
-        </ListItemIcon>
-        {!collapsed && (
-          <>
-            <ListItemText primary={item.title} className={classes.menuItemText} />
-            {open ? <ExpandLessOutlinedIcon fontSize="small" /> : <ExpandMoreOutlinedIcon fontSize="small" />}
-          </>
-        )}
-      </ListItemButton>
-    );
-
-    return (
-      <Box key={item.key || item.title}>
-        <Tooltip title={tooltip} placement="right" disableHoverListener={!collapsed}>
-          <Box>{parentButton}</Box>
-        </Tooltip>
-        {!collapsed && (
-          <Collapse in={open} timeout={150} unmountOnExit>
-            <List component="div" disablePadding>
-              {item.children
-                .filter((c) => c.show !== false)
-                .map((c) => renderLeaf(c, { dense: true, keyPrefix: `${item.key}-` }))}
-            </List>
-          </Collapse>
-        )}
-      </Box>
-    );
-  }, [buildTooltip, classes.badge, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, collapsed, handleGo, isAnyChildActive, openState, renderLeaf, toggleOpen]);
+  }, [buildTooltip, classes.badge, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, collapsed, handleGo, leafActive, onNavigate]);
 
   return (
     <Box
@@ -570,7 +502,6 @@ const UnifiedSidebar = ({
             )}
             {group.items.map((item) => {
               if (item.show === false) return null;
-              if (item.children) return renderParent(item);
               return renderLeaf(item);
             })}
           </Box>
