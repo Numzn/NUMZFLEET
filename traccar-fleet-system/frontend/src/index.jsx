@@ -42,9 +42,17 @@ root.render(
   </ErrorBoundary>,
 );
 
-// index.html renders a static .loader spinner so there's something on
-// screen before this bundle even parses. Nothing ever removed it once React
-// took over — it sat on top of the fully-rendered app indefinitely on every
-// fresh page load (HMR-preserved sessions never hit this, which is why it
-// went unnoticed in normal day-to-day dev).
-document.querySelector('.loader')?.remove();
+// index.html paints a static .loader spinner so there is something on screen
+// before this bundle even parses. Nothing hid it once React took over — it sat
+// on top of the fully-rendered app on every fresh page load (HMR-preserved dev
+// sessions never hit that path, which is why it went unnoticed).
+//
+// Hidden, NOT removed: common/components/Loader.jsx does not render its own
+// spinner, it shows and hides this same element — and four components render
+// <Loader /> (App, Navigation, ServerProvider, ChangeServerPage). Removing the
+// node makes every one of them throw on mount, which takes down the whole app
+// behind the ErrorBoundary.
+const staticLoader = document.querySelector('.loader');
+if (staticLoader) {
+  staticLoader.style.display = 'none';
+}
