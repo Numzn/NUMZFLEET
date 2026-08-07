@@ -5,6 +5,7 @@ import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
 import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined';
+import DomainAddOutlinedIcon from '@mui/icons-material/DomainAddOutlined';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
 import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
@@ -48,6 +49,7 @@ export const SETTINGS_CATEGORIES = {
   automation: 'Automation',
   integrations: 'Integrations',
   system: 'System',
+  platform: 'Platform',
 };
 
 export const SETTINGS_SECTION_IDS = {
@@ -68,6 +70,7 @@ export const SETTINGS_SECTION_IDS = {
   savedCommands: 'savedCommands',
   announcement: 'announcement',
   server: 'server',
+  platformCompanies: 'platformCompanies',
 };
 
 export const SETTINGS_SECTIONS = [
@@ -285,6 +288,18 @@ export const SETTINGS_SECTIONS = [
     description: 'Raw Traccar server configuration.',
     keywords: ['server', 'traccar server', 'defaults'],
   },
+  {
+    id: SETTINGS_SECTION_IDS.platformCompanies,
+    label: 'Companies',
+    icon: DomainAddOutlinedIcon,
+    path: '/settings/platform/companies',
+    match: (pathname) => pathname.startsWith('/settings/platform/companies'),
+    live: true,
+    requiresRole: 'platformOwner',
+    category: 'platform',
+    description: 'Create and manage tenant companies.',
+    keywords: ['platform', 'companies', 'tenants', 'onboarding', 'provision'],
+  },
 ];
 
 export function resolveActiveSettingsSection(pathname) {
@@ -297,10 +312,19 @@ export function resolveActiveSettingsSection(pathname) {
  * has to declare its gate once instead of every place that lists sections
  * re-implementing the same three-role/one-feature check.
  */
-export function isSettingsSectionVisible(section, { manager, admin, technician, features } = {}) {
+export function isSettingsSectionVisible(section, {
+  manager, admin, technician, platformOwner, features,
+} = {}) {
   if (section.requiresRole === 'manager' && !manager) return false;
   if (section.requiresRole === 'admin' && !admin) return false;
   if (section.requiresRole === 'technician' && !technician) return false;
+  // Real enforcement is server-side (requirePlatformOwner in authGates.js,
+  // which checks req.auth.isSuperAdmin — company_id IS NULL). useSuperAdmin()
+  // is a looser frontend proxy for this (documented gap in
+  // docs/PLATFORM_ARCHITECTURE.md, not resolved until its Phase 5 frontend
+  // context store) — good enough to decide whether to show the nav entry,
+  // not what actually gates the API.
+  if (section.requiresRole === 'platformOwner' && !platformOwner) return false;
   if (section.requiresFeature && features?.[section.requiresFeature]) return false;
   return true;
 }

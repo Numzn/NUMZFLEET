@@ -107,10 +107,28 @@ export const requireManager = (req, res, next) => {
   next();
 };
 
+/**
+ * Platform-level routes only (company provisioning, cross-tenant directory).
+ * Requires attachTenantContext to have already run — reads req.auth.isSuperAdmin,
+ * which is only true for a Traccar administrator whose numz_users.company_id
+ * is NULL (see tenantResolverService.js). A company_admin, even with Traccar
+ * administrator: true, does not pass this.
+ */
+export const requirePlatformOwner = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (!req.auth?.isSuperAdmin) {
+    return res.status(403).json({ error: 'Forbidden - Platform owner access required' });
+  }
+  next();
+};
+
 export default {
   requireAuth,
   requireRealAuth,
   requireManager,
+  requirePlatformOwner,
   requireOwner,
   requireAuthDev,
   checkAuth,

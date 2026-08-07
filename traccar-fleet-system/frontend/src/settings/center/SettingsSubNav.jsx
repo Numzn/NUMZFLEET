@@ -2,7 +2,9 @@ import {
   Box, List, ListItemButton, ListItemIcon, ListItemText, Typography, Chip,
 } from '@mui/material';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, isSettingsSectionVisible } from './settingsSectionRegistry.js';
-import { useAdministrator, useManager, useTechnician } from '../../common/util/permissions.js';
+import {
+  useAdministrator, useManager, useTechnician, useSuperAdmin,
+} from '../../common/util/permissions.js';
 import useFeatures from '../../common/util/useFeatures.js';
 import useSettingsSection from './hooks/useSettingsSection.js';
 
@@ -10,11 +12,14 @@ export default function SettingsSubNav({ desktop }) {
   const manager = useManager();
   const admin = useAdministrator();
   const technician = useTechnician();
+  const platformOwner = useSuperAdmin();
   const features = useFeatures();
   const { activeId, goToSection } = useSettingsSection();
 
   const visible = SETTINGS_SECTIONS.filter((section) => (
-    isSettingsSectionVisible(section, { manager, admin, technician, features })
+    isSettingsSectionVisible(section, {
+      manager, admin, technician, platformOwner, features,
+    })
   ));
 
   // Overview has category: null — it's pinned above the categories, not one

@@ -11,7 +11,9 @@ import SettingsCard from '../components/SettingsCard.jsx';
 import ModernKPICard from '../../../dashboard/components/ModernKPICard';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, isSettingsSectionVisible } from '../settingsSectionRegistry.js';
 import { getRecentSettingsVisits } from '../recentSettingsVisits.js';
-import { useAdministrator, useManager, useTechnician } from '../../../common/util/permissions.js';
+import {
+  useAdministrator, useManager, useTechnician, useSuperAdmin,
+} from '../../../common/util/permissions.js';
 import useFeatures from '../../../common/util/useFeatures.js';
 import { useSetTopBarTitle } from '../../../common/components/TopBarTitleContext';
 
@@ -30,6 +32,7 @@ export default function OverviewSection() {
   const manager = useManager();
   const admin = useAdministrator();
   const technician = useTechnician();
+  const platformOwner = useSuperAdmin();
   const features = useFeatures();
 
   const devices = useSelector((state) => state.devices.items);
@@ -49,10 +52,10 @@ export default function OverviewSection() {
       section.category
       && section.live
       && isSettingsSectionVisible(section, {
-        manager, admin, technician, features,
+        manager, admin, technician, platformOwner, features,
       })
     )),
-    [admin, features, manager, technician],
+    [admin, features, manager, platformOwner, technician],
   );
 
   const quickAccess = useMemo(() => {
