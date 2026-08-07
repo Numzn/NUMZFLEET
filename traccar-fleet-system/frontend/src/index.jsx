@@ -41,3 +41,10 @@ root.render(
     </Provider>
   </ErrorBoundary>,
 );
+
+// index.html renders a static .loader spinner so there's something on
+// screen before this bundle even parses. Nothing ever removed it once React
+// took over — it sat on top of the fully-rendered app indefinitely on every
+// fresh page load (HMR-preserved sessions never hit this, which is why it
+// went unnoticed in normal day-to-day dev).
+document.querySelector('.loader')?.remove();
