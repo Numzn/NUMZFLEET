@@ -10,7 +10,7 @@ function toOrganizationDto(company, memberCount, vehicleCount, deviceCount) {
     memberCount,
     vehicleCount,
     deviceCount,
-    createdAt: company.createdAt,
+    createdAt: company.created_at,
   };
 }
 
