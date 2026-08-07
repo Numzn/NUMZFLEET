@@ -16,6 +16,7 @@ import LiveMapTopBar from '../../main/components/LiveMapTopBar';
 import FleetSidebar from '../../main/fleet/FleetSidebar';
 import usePersistedState, { savePersistedState } from '../util/usePersistedState';
 import { getWorkspaceType } from '../util/workspaceTypes';
+import { resolveShellChrome } from './shellChrome';
 import {
   FLEET_SIDEBAR_RAIL_WIDTH_PX,
   FLEET_SIDEBAR_WIDTH_PX,
@@ -27,6 +28,10 @@ import { RUNTIME_WORKSPACE_PT, RUNTIME_WORKSPACE_PX } from '../styles/runtimeDen
 const DRAWER_WIDTH_EXPANDED = 260;
 const DRAWER_WIDTH_COLLAPSED = 72;
 const CHROME_GAP = 8;
+
+/** Paper size for the temporary nav drawer, on every surface that opens one. */
+const TEMPORARY_NAV_WIDTH = { xs: '80vw', sm: 360 };
+const TEMPORARY_NAV_MAX_WIDTH = 420;
 
 const useStyles = makeStyles()(() => ({
   root: {
@@ -99,18 +104,17 @@ function UnifiedShellContent() {
   const { title: topBarTitle } = useTopBarTitle();
   const fleetSidebarCollapsed = useSelector((s) => s.fleetInteraction.sidebarCollapsed);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [appNavOpen, setAppNavOpen] = useState(false);
+  // One flag for the single temporary nav drawer. The default workspace, the
+  // live map and fullscreen pages never show it at the same time, so they do
+  // not need an open-state each.
+  const [navDrawerOpen, setNavDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = usePersistedState('sidebarCollapsed', false);
   const topbarRef = useRef(null);
   const [topbarHeight, setTopbarHeight] = useState(56);
 
   const handleSidebarNavigate = useCallback(() => {
-    if (!desktop) {
-      setSidebarOpen(false);
-      setAppNavOpen(false);
-    }
-  }, [desktop]);
+    setNavDrawerOpen(false);
+  }, []);
 
   const handleToggleFleetCollapse = useCallback(() => {
     const next = !fleetSidebarCollapsed;
@@ -118,9 +122,8 @@ function UnifiedShellContent() {
     savePersistedState('fleetSidebarCollapsed', next);
   }, [dispatch, fleetSidebarCollapsed]);
 
-  const appDrawerWidth = desktop
-    ? (collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED)
-    : { xs: '80vw', sm: 360 };
+  // Only read by the permanent desktop rail — the temporary drawer sizes itself.
+  const appDrawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
 
   const liveDrawerWidth = desktop
     ? (fleetSidebarCollapsed ? FLEET_SIDEBAR_RAIL_WIDTH_PX : FLEET_SIDEBAR_WIDTH_PX)
@@ -150,11 +153,11 @@ function UnifiedShellContent() {
     };
   }, [topbarHeight, isLive, desktop]);
 
-  const showDefaultNavDrawer = !isLive && !isFullscreen;
-  const showLiveFleetPermanentDrawer = isLive && desktop;
-
-  const showDefaultPermanentNav = showDefaultNavDrawer && desktop;
-  const showDefaultTemporaryNav = showDefaultNavDrawer && !desktop;
+  const {
+    showPermanentNav: showDefaultPermanentNav,
+    showTemporaryNav,
+    showLiveFleetRail: showLiveFleetPermanentDrawer,
+  } = resolveShellChrome({ workspaceType, desktop });
 
   const sidebarFleetProps = chrome?.sidebarFleetProps;
 
@@ -193,70 +196,28 @@ function UnifiedShellContent() {
         effectiveFleetTab={sidebarFleetProps.effectiveFleetTab}
         operationalPresence={sidebarFleetProps.operationalPresence}
         showAppNavMenuButton={!desktop}
-        onOpenAppNavMenu={() => setAppNavOpen(true)}
+        onOpenAppNavMenu={() => setNavDrawerOpen(true)}
       />
     );
   };
 
-  const renderDrawers = () => (
-    <>
-      {showDefaultTemporaryNav && (
-        <Drawer
-          variant="temporary"
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          className={classes.drawer}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            width: 0,
-            '& .MuiDrawer-paper': {
-              width: appDrawerWidth,
-              maxWidth: 420,
-            },
-          }}
-        >
-          {renderAppSidebar()}
-        </Drawer>
-      )}
-
-      {isLive && !desktop && (
-        <Drawer
-          variant="temporary"
-          anchor="left"
-          open={appNavOpen}
-          onClose={() => setAppNavOpen(false)}
-          className={classes.drawer}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            '& .MuiDrawer-paper': {
-              width: { xs: '80vw', sm: 360 },
-              maxWidth: 420,
-            },
-          }}
-        >
-          {renderAppSidebar()}
-        </Drawer>
-      )}
-
-      {isFullscreen && (
-        <Drawer
-          variant="temporary"
-          anchor="left"
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          className={classes.drawer}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            '& .MuiDrawer-paper': {
-              width: { xs: '80vw', sm: 360 },
-              maxWidth: 420,
-            },
-          }}
-        >
-          {renderAppSidebar()}
-        </Drawer>
-      )}
-    </>
+  const renderDrawers = () => showTemporaryNav && (
+    <Drawer
+      variant="temporary"
+      anchor="left"
+      open={navDrawerOpen}
+      onClose={() => setNavDrawerOpen(false)}
+      className={classes.drawer}
+      ModalProps={{ keepMounted: true }}
+      sx={{
+        '& .MuiDrawer-paper': {
+          width: TEMPORARY_NAV_WIDTH,
+          maxWidth: TEMPORARY_NAV_MAX_WIDTH,
+        },
+      }}
+    >
+      {renderAppSidebar()}
+    </Drawer>
   );
 
   const renderNavRails = () => (
@@ -282,7 +243,7 @@ function UnifiedShellContent() {
           {workspaceType === 'default' && (!desktop || topBarTitle) && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.5, borderBottom: 1, borderColor: 'divider' }}>
               {!desktop && (
-                <IconButton edge="start" size="small" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+                <IconButton edge="start" size="small" onClick={() => setNavDrawerOpen(true)} aria-label="Open menu">
                   <MenuIcon />
                 </IconButton>
               )}
@@ -296,7 +257,7 @@ function UnifiedShellContent() {
 
           {isFullscreen && (
             <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
-              <IconButton edge="start" size="small" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+              <IconButton edge="start" size="small" onClick={() => setNavDrawerOpen(true)} aria-label="Open menu">
                 <MenuIcon />
               </IconButton>
             </Box>
