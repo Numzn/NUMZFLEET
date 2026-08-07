@@ -51,6 +51,7 @@
     "start:local": "cross-env LOCAL_DEV=true vite --host",
     "build": "vite build",
     "generate-pwa-assets": "pwa-assets-generator --preset minimal public/logo.svg",
+    "test": "node --test src",
     "lint": "eslint src scripts eslint.config.js",
     "lint:fix": "eslint --fix src scripts eslint.config.js"
   },

@@ -78,10 +78,12 @@ jobs:
           cache: npm
           cache-dependency-path: traccar-fleet-system/frontend/package-lock.json
 
-      - name: Install and build frontend
+      - name: Install, lint, test and build frontend
         working-directory: traccar-fleet-system/frontend
         run: |
           npm ci
+          npm run lint
+          npm test
           npm run build
 
   build-and-push:
