@@ -1,35 +1,22 @@
-import { Box, useMediaQuery, useTheme } from '@mui/material';
-import SettingsSubNav from './SettingsSubNav.jsx';
-import { RUNTIME_STACK_GAP } from '../../common/styles/runtimeDensity.js';
+import { Box } from '@mui/material';
 
 /**
- * Shared Settings Center layout: persistent left rail on desktop, stacked
- * section list + content on mobile — the same `md` breakpoint convention used
- * throughout the app (see UnifiedShell.jsx, fleet/VehiclesPage.jsx).
+ * Content wrapper for every Settings Center route.
  *
- * Each Settings Center route renders its own section component wrapped in
- * this shell (rather than this being a react-router layout route with
- * <Outlet/>), so adding new sections in later phases never touches the
- * existing, unrelated /settings/* route block.
+ * This used to render a permanent SettingsSubNav rail beside the content, which
+ * meant a user in Settings saw two left sidebars — the app's and this one — and
+ * had to navigate twice to reach a page. Settings navigation now lives in the
+ * one app sidebar, whose contents swap when the workspace changes (see
+ * common/util/navWorkspace.js), so this is just the content column.
+ *
+ * Kept as a component rather than deleted because ~18 legacy /settings/* routes
+ * and every section wrap themselves in it; it stays the single place to change
+ * how Settings content is laid out.
  */
 export default function SettingsCenterShell({ children }) {
-  const theme = useTheme();
-  const desktop = useMediaQuery(theme.breakpoints.up('md'));
-
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: desktop ? 'row' : 'column',
-        gap: RUNTIME_STACK_GAP,
-        alignItems: 'flex-start',
-        width: '100%',
-      }}
-    >
-      <SettingsSubNav desktop={desktop} />
-      <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
-        {children}
-      </Box>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
+      {children}
     </Box>
   );
 }

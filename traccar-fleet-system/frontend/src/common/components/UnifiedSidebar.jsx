@@ -10,7 +10,9 @@ import {
   Tooltip,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
@@ -30,6 +32,7 @@ import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
+import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
 import NotificationCenter from '../../notifications/NotificationCenter';
 import UserMenuDropdown from './UserMenuDropdown';
 import usePersistedState from '../util/usePersistedState';
@@ -39,6 +42,9 @@ import LogoImage from '../../login/LogoImage';
 import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
 import { useTranslation } from './LocalizationProvider';
 import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
+import { isSettingsWorkspace, resolveExitTarget } from '../util/navWorkspace.js';
+import { buildSettingsNavGroups } from '../../settings/center/settingsSectionRegistry.js';
+import { useSuperAdmin, useTechnician } from '../util/permissions';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -217,6 +223,53 @@ const UnifiedSidebar = ({
   const [collapsedState, setCollapsedState] = usePersistedState('sidebarCollapsed', false);
   const collapsed = forceExpanded ? false : (collapsedProp ?? collapsedState);
   const setCollapsed = setCollapsedProp ?? setCollapsedState;
+
+  const technician = useTechnician();
+  const platformOwner = useSuperAdmin();
+  const inSettings = isSettingsWorkspace(location.pathname);
+
+  // Where "Exit Settings" returns to. Held in a ref rather than state because it
+  // must not re-render the sidebar as the user moves around the app — it is only
+  // ever read at the moment Exit is rendered.
+  const lastOperationalPath = useRef(null);
+  useEffect(() => {
+    if (!inSettings) {
+      lastOperationalPath.current = `${location.pathname}${location.search}`;
+    }
+  }, [inSettings, location.pathname, location.search]);
+
+  /**
+   * Settings replaces the sidebar's contents rather than adding a second rail
+   * beside it — entering Settings is a workspace switch, not a nested panel.
+   */
+  const settingsNavGroups = useMemo(() => {
+    if (!inSettings) return [];
+    const groups = buildSettingsNavGroups({
+      manager, admin, technician, platformOwner, features,
+    });
+    return [
+      {
+        key: 'exit',
+        items: [{
+          title: 'Exit Settings',
+          path: resolveExitTarget(lastOperationalPath.current),
+          icon: ArrowBackOutlinedIcon,
+        }],
+      },
+      ...groups.map((group) => ({
+        key: group.key,
+        label: group.label ? group.label.toUpperCase() : undefined,
+        items: group.sections.map((section) => ({
+          title: section.label,
+          path: section.path,
+          icon: section.icon,
+          activeMatch: section.match,
+          disabled: !section.live,
+          disabledTooltip: !section.live ? `${section.label} — coming soon` : undefined,
+        })),
+      })),
+    ];
+  }, [admin, features, inSettings, manager, platformOwner, technician]);
 
   // Alert Rules, Groups, Calendars, Computed Attributes, Maintenance Schedules,
   // Saved Commands, Announcement, and Server used to live here as flat
@@ -493,7 +546,7 @@ const UnifiedSidebar = ({
           </Box>
         )}
 
-        {navGroups.map((group) => (
+        {(inSettings ? settingsNavGroups : navGroups).map((group) => (
           <Box key={group.key}>
             {group.label && !collapsed && (
               <Box className={classes.sectionHeader}>
@@ -504,6 +557,9 @@ const UnifiedSidebar = ({
               if (item.show === false) return null;
               return renderLeaf(item);
             })}
+            {/* The Exit action is the workspace switch, not a destination —
+                separated so it does not read as the first Settings section. */}
+            {group.key === 'exit' && <Divider sx={{ my: 1, opacity: 0.5 }} />}
           </Box>
         ))}
       </List>

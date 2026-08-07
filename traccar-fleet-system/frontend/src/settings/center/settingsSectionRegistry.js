@@ -308,7 +308,7 @@ export function resolveActiveSettingsSection(pathname) {
 
 /**
  * Single gating rule for a section's requiresRole/requiresFeature, shared by
- * every consumer (SettingsSubNav, CommandPalette, ...) so a new section only
+ * every consumer (the app sidebar, CommandPalette, ...) so a new section only
  * has to declare its gate once instead of every place that lists sections
  * re-implementing the same three-role/one-feature check.
  */
@@ -327,4 +327,31 @@ export function isSettingsSectionVisible(section, {
   if (section.requiresRole === 'platformOwner' && !platformOwner) return false;
   if (section.requiresFeature && features?.[section.requiresFeature]) return false;
   return true;
+}
+
+/**
+ * The Settings workspace's navigation, grouped and gated — consumed by the one
+ * app sidebar when the user is in Settings, so that entering Settings swaps the
+ * sidebar's contents rather than opening a second rail beside it.
+ *
+ * Overview has `category: null`; it is pinned above the categories rather than
+ * being one of them, so it comes back as its own unlabelled group. Groups follow
+ * SETTINGS_CATEGORIES' declared order, not the registry array's insertion order,
+ * so a category keeps its place no matter which order sections were added.
+ */
+export function buildSettingsNavGroups(gates = {}) {
+  const visible = SETTINGS_SECTIONS.filter((section) => isSettingsSectionVisible(section, gates));
+  const pinned = visible.filter((section) => !section.category);
+
+  const groups = Object.keys(SETTINGS_CATEGORIES)
+    .map((key) => ({
+      key,
+      label: SETTINGS_CATEGORIES[key],
+      sections: visible.filter((section) => section.category === key),
+    }))
+    .filter((group) => group.sections.length > 0);
+
+  return pinned.length > 0
+    ? [{ key: 'pinned', label: null, sections: pinned }, ...groups]
+    : groups;
 }
