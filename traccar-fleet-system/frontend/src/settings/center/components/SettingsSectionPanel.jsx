@@ -1,35 +1,23 @@
-import { Box, Typography, Stack } from '@mui/material';
+import { Stack } from '@mui/material';
+import PageHeader from '../../../common/components/PageHeader.jsx';
 import SettingsCard from './SettingsCard.jsx';
 
 /**
- * Shared section wrapper (title + description + actions slot + card body) for
- * every Settings Center section. Built and reviewed before any individual
- * section was written, per the app-wide UI/UX audit's recommendation — the
- * vehicle workspace built an equivalent (OperationalItemPanel) explicitly for
- * cross-tab reuse and only one of four eligible tabs ever adopted it, because
- * it existed only after those tabs had already freelanced their own headings.
- * This also serves the "PageHeader" role from the plan — a separate generic
- * header component would have been near-identical for this module's needs.
+ * Shared section wrapper for every Settings Center section: the app's standard
+ * page header over a card body.
+ *
+ * The header used to be written inline here, and its docblock noted it doubled
+ * as the app's "PageHeader". It now composes common/components/PageHeader so
+ * the rest of the app can use the same header without importing something from
+ * settings/. This component's props and output are unchanged — all nine
+ * consumers keep working untouched.
  */
 export default function SettingsSectionPanel({
   title, description, actions, children,
 }) {
   return (
     <Stack spacing={2}>
-      <Box sx={{
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2,
-      }}
-      >
-        <Box>
-          <Typography variant="h6" fontWeight={700}>{title}</Typography>
-          {description && (
-            <Typography variant="body2" sx={{ color: 'var(--color-text-secondary)', mt: 0.5 }}>
-              {description}
-            </Typography>
-          )}
-        </Box>
-        {actions}
-      </Box>
+      <PageHeader title={title} subtitle={description} actions={actions} />
       <SettingsCard>{children}</SettingsCard>
     </Stack>
   );
