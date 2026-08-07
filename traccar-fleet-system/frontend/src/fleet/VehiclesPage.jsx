@@ -10,14 +10,18 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   LinearProgress,
   MenuItem,
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
@@ -42,7 +46,7 @@ import {
   fuelApiErrorMessage,
   vehiclesLoadErrorMessage,
 } from './vehiclesApi';
-import VehicleRegistryHeader from './vehicleRegistry/VehicleRegistryHeader';
+import PageHeader from '../common/components/PageHeader.jsx';
 import VehicleRegistryCard from './vehicleRegistry/VehicleRegistryCard';
 import VehicleRegistryTable from './vehicleRegistry/VehicleRegistryTable';
 import { vehicleWorkspacePath } from './vehicleRegistry/vehicleRegistryUtils';
@@ -296,10 +300,33 @@ const VehiclesPage = () => {
     >
       <FleetWorkspaceShell>
         <Stack spacing={RUNTIME_STACK_GAP} sx={{ minWidth: 0 }}>
-          <VehicleRegistryHeader
-            loading={loading}
-            onRefresh={load}
-            onAdd={() => setCreateOpen(true)}
+          <PageHeader
+            title="Fleet vehicles"
+            subtitle="Manage registered vehicles and open operational workspaces."
+            actions={(
+              <>
+                <Tooltip title="Refresh list">
+                  <span style={{ display: 'inline-flex' }}>
+                    <IconButton
+                      onClick={load}
+                      disabled={loading}
+                      aria-label="Refresh list"
+                      size="small"
+                      sx={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      <RefreshIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  Add vehicle
+                </Button>
+              </>
+            )}
           />
 
           {error && (

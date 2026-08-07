@@ -6,6 +6,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
+import PageHeader from '../common/components/PageHeader.jsx';
 import { RUNTIME_STACK_GAP } from '../common/styles/runtimeDensity';
 import { fetchVehicleEngine } from '../fleet/vehiclesApi.js';
 import MaintenanceKpiRow from './components/MaintenanceKpiRow';
@@ -173,30 +174,15 @@ export default function MaintenanceDashboardPage() {
   return (
     <FleetWorkspaceShell>
       <Stack spacing={RUNTIME_STACK_GAP} sx={{ width: '100%', minWidth: 0 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2,
-            flexWrap: 'wrap',
-            width: '100%',
-          }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h6" fontWeight={800} lineHeight={1.25}>
-              Maintenance
-              {fleetVehicleId && vehicleEngine?.registry?.plateNumber
-                ? ` · ${vehicleEngine.registry.plateNumber}`
-                : ''}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {fleetVehicleId
-                ? 'Vehicle-scoped view from Vehicle Engine'
-                : 'Fleet health, work orders, and service costs'}
-            </Typography>
-          </Box>
-          <Box sx={HEADER_ACTIONS_SX}>
+        <PageHeader
+          title={`Maintenance${fleetVehicleId && vehicleEngine?.registry?.plateNumber
+            ? ` · ${vehicleEngine.registry.plateNumber}`
+            : ''}`}
+          subtitle={fleetVehicleId
+            ? 'Vehicle-scoped view from Vehicle Engine'
+            : 'Fleet health, work orders, and service costs'}
+          actions={(
+            <Box sx={HEADER_ACTIONS_SX}>
             <TextField
               size="small"
               placeholder="Search work orders…"
@@ -215,8 +201,9 @@ export default function MaintenanceDashboardPage() {
             >
               New Work Order
             </Button>
-          </Box>
-        </Box>
+            </Box>
+          )}
+        />
 
         {actionError ? (
           <Alert severity="error" onClose={() => setActionError(null)}>
