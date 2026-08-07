@@ -48,7 +48,11 @@ const EditItemView = ({
   });
 
   return (
-      <Container maxWidth="xs" className={classes.container}>
+      // `xs` capped every settings form at 444px regardless of screen size, so
+      // on a desktop the form sat in a narrow ribbon with the rest of the page
+      // empty. `sm` (600px) still respects a sane line length for a single
+      // column of fields without wasting the whole viewport.
+      <Container maxWidth="sm" className={classes.container} sx={{ mx: 0 }}>
         {item ? children : (
           <Accordion defaultExpanded>
             <AccordionSummary>

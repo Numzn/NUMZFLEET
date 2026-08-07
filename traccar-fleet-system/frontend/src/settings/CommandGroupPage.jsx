@@ -46,7 +46,7 @@ const CommandGroupPage = () => {
   });
 
   return (
-      <Container maxWidth="xs" className={classes.container}>
+      <Container maxWidth="sm" className={classes.container} sx={{ mx: 0 }}>
         <Accordion defaultExpanded>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography variant="subtitle1">
