@@ -17,6 +17,7 @@ import FleetSidebar from '../../main/fleet/FleetSidebar';
 import usePersistedState, { savePersistedState } from '../util/usePersistedState';
 import { getWorkspaceType } from '../util/workspaceTypes';
 import { resolveShellChrome } from './shellChrome';
+import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
 import {
   FLEET_SIDEBAR_RAIL_WIDTH_PX,
   FLEET_SIDEBAR_WIDTH_PX,
@@ -110,7 +111,7 @@ function UnifiedShellContent() {
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = usePersistedState('sidebarCollapsed', false);
   const topbarRef = useRef(null);
-  const [topbarHeight, setTopbarHeight] = useState(56);
+  const [topbarHeight, setTopbarHeight] = useState(TOPBAR_HEIGHT);
 
   const handleSidebarNavigate = useCallback(() => {
     setNavDrawerOpen(false);
@@ -241,7 +242,23 @@ function UnifiedShellContent() {
       {!isLive && (
         <Box ref={topbarRef} sx={{ flexShrink: 0, pt: isFullscreen ? 'env(safe-area-inset-top, 0px)' : 0 }}>
           {workspaceType === 'default' && (!desktop || topBarTitle) && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.5, borderBottom: 1, borderColor: 'divider' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 1.5,
+                boxSizing: 'border-box',
+                // Same height, background and border as the sidebar's own logo
+                // strip (UnifiedSidebar.jsx) — the two used to be sized and
+                // colored independently, so on desktop they read as two
+                // unrelated bars stitched together instead of one shell.
+                minHeight: `calc(env(safe-area-inset-top, 0px) + ${TOPBAR_HEIGHT}px)`,
+                backgroundColor: 'var(--surface-card)',
+                borderBottom: 1,
+                borderColor: 'divider',
+              }}
+            >
               {!desktop && (
                 <IconButton edge="start" size="small" onClick={() => setNavDrawerOpen(true)} aria-label="Open menu">
                   <MenuIcon />
@@ -256,7 +273,17 @@ function UnifiedShellContent() {
           )}
 
           {isFullscreen && (
-            <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                px: 0.5,
+                py: 0.25,
+                backgroundColor: 'var(--surface-card)',
+                borderBottom: 1,
+                borderColor: 'divider',
+              }}
+            >
               <IconButton edge="start" size="small" onClick={() => setNavDrawerOpen(true)} aria-label="Open menu">
                 <MenuIcon />
               </IconButton>
