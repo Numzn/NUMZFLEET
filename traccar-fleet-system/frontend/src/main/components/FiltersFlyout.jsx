@@ -27,33 +27,38 @@ import TuneIcon from '@mui/icons-material/Tune';
 import CloseIcon from '@mui/icons-material/Close';
 import ClearIcon from '@mui/icons-material/Clear';
 import { useTranslation } from '../../common/components/LocalizationProvider';
+import { TOPBAR_HEIGHT } from '../../common/styles/topbarStyles';
 
+// Everything else in this file already reads from theme.palette.* — these four
+// rules were the exception, independently reaching for a hardcoded cyan/red
+// instead, with no dark-mode branch of their own (they just happened to look
+// plausible on both themes by coincidence).
 const useStyles = makeStyles()((theme) => ({
   filterButton: {
     padding: '8px',
-    backgroundColor: 'rgba(6, 182, 212, 0.08)',
+    backgroundColor: 'var(--color-primary-light)',
     borderRadius: '8px',
     transition: 'all 0.2s',
     '&:hover': {
-      backgroundColor: 'rgba(6, 182, 212, 0.15)',
+      backgroundColor: theme.palette.primary.light,
       transform: 'scale(1.05)',
     },
   },
   drawer: {
     '& .MuiDrawer-paper': {
       width: 360,
-      top: 56,
-      height: 'calc(100vh - 56px)',
+      top: TOPBAR_HEIGHT,
+      height: `calc(100vh - ${TOPBAR_HEIGHT}px)`,
       borderRadius: '0 16px 16px 0',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-      borderLeft: '1px solid rgba(6, 182, 212, 0.1)',
+      boxShadow: 'var(--shadow-elevation)',
+      borderLeft: '1px solid var(--surface-border)',
     },
   },
   mobileDrawer: {
     '& .MuiDrawer-paper': {
       width: '100%',
-      top: 56,
-      height: 'calc(100vh - 56px)',
+      top: TOPBAR_HEIGHT,
+      height: `calc(100vh - ${TOPBAR_HEIGHT}px)`,
       borderRadius: '16px 16px 0 0',
     },
   },
@@ -139,7 +144,7 @@ const useStyles = makeStyles()((theme) => ({
   footer: {
     marginTop: 'auto',
     paddingTop: theme.spacing(2),
-    borderTop: '1px solid rgba(6, 182, 212, 0.1)',
+    borderTop: '1px solid var(--surface-border)',
     display: 'flex',
     gap: theme.spacing(1),
     justifyContent: 'flex-end',
@@ -147,7 +152,7 @@ const useStyles = makeStyles()((theme) => ({
   clearButton: {
     color: theme.palette.text.secondary,
     '&:hover': {
-      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+      backgroundColor: 'var(--color-critical-light)',
       color: theme.palette.error.main,
     },
   },
