@@ -37,7 +37,10 @@ export default function FuelCard({ fuel }) {
               borderRadius: 1,
               mb: 2,
               '& .MuiLinearProgress-bar': {
-                background: 'linear-gradient(90deg, #38bdf8, #22d3ee)',
+                // designTokens.js has a --color-fuel token defined specifically
+                // for this gauge; this was the one place that needed it and
+                // instead invented its own unrelated blue-cyan gradient.
+                backgroundColor: 'var(--color-fuel)',
               },
             }}
           />
