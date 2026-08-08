@@ -6,7 +6,6 @@ import {
   Skeleton,
   Stack,
   Typography,
-  useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
@@ -60,8 +59,6 @@ const normalizePricesMap = (raw) => {
 };
 
 const ErbPricesCard = () => {
-  const theme = useTheme();
-  const dark = theme.palette.mode === 'dark';
   const user = useSelector((state) => state.session.user);
 
   const [prices, setPrices] = useState(null);
@@ -180,10 +177,6 @@ const ErbPricesCard = () => {
     return Number.isFinite(parsed) ? parsed.toFixed(2) : null;
   };
 
-  const cardBg = dark
-    ? 'linear-gradient(135deg, rgba(4,15,28,0.94) 0%, rgba(8,34,56,0.92) 55%, rgba(10,79,98,0.9) 100%)'
-    : 'linear-gradient(135deg, rgba(8,28,46,0.96) 0%, rgba(10,69,96,0.92) 58%, rgba(13,138,165,0.88) 100%)';
-
   const renderPrice = (key, label, color, compact = false) => (
     <Box
       key={key}
@@ -201,11 +194,11 @@ const ErbPricesCard = () => {
       {loading ? (
         <Skeleton variant="text" width="60%" sx={{ bgcolor: alpha(color, 0.12) }} />
       ) : error ? (
-        <Typography sx={{ color: alpha('#fda4af', 0.8), fontSize: '0.78rem', fontWeight: 700 }}>—</Typography>
+        <Typography sx={{ color: 'var(--color-critical)', fontSize: '0.78rem', fontWeight: 700 }}>—</Typography>
       ) : (
-        <Typography sx={{ color: '#f8fdff', fontSize: compact ? '0.95rem' : '1.05rem', fontWeight: 800, lineHeight: 1 }}>
+        <Typography sx={{ color: 'text.primary', fontSize: compact ? '0.95rem' : '1.05rem', fontWeight: 800, lineHeight: 1 }}>
           {formatPrice(prices?.[key]) ?? '—'}
-          <Typography component="span" sx={{ color: alpha('#f8fdff', 0.55), fontSize: '0.6rem', fontWeight: 600, ml: 0.35 }}>
+          <Typography component="span" sx={{ color: 'text.secondary', fontSize: '0.6rem', fontWeight: 600, ml: 0.35 }}>
             ZMW/L
           </Typography>
         </Typography>
@@ -214,24 +207,24 @@ const ErbPricesCard = () => {
   );
 
   return (
+    // Used to duplicate DashboardPage's hero gradient verbatim, hand-copied
+    // rather than shared. Now a plain card like every other surface in the
+    // app — see the same note on DashboardPage.jsx's hero block.
     <Box
       sx={{
         position: 'relative',
         overflow: 'hidden',
         p: 1.5,
-        borderRadius: '14px',
-        border: `1px solid ${alpha('#9be7f5', dark ? 0.18 : 0.28)}`,
-        background: cardBg,
-        boxShadow: dark
-          ? '0 12px 36px rgba(0,0,0,0.28)'
-          : '0 12px 38px rgba(6,37,64,0.14)',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--surface-border)',
+        backgroundColor: 'var(--surface-card)',
       }}
     >
       {/* Header row */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, position: 'relative', zIndex: 1 }}>
         <Stack direction="row" alignItems="center" spacing={0.75}>
-          <LocalGasStationIcon sx={{ fontSize: '1rem', color: '#67e8f9' }} />
-          <Typography sx={{ color: '#f8fdff', fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.15 }}>
+          <LocalGasStationIcon color="primary" sx={{ fontSize: '1rem' }} />
+          <Typography sx={{ color: 'text.primary', fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.15 }}>
             Fuel Prices
           </Typography>
         </Stack>
@@ -246,10 +239,10 @@ const ErbPricesCard = () => {
               fontSize: '0.65rem',
               fontWeight: 700,
               cursor: 'pointer',
-              backgroundColor: alpha('#67e8f9', 0.1),
-              border: `1px solid ${alpha('#67e8f9', 0.2)}`,
-              color: '#9be7f5',
-              '& .MuiChip-icon': { color: '#9be7f5' },
+              backgroundColor: 'var(--color-primary-light)',
+              border: '1px solid var(--color-primary)',
+              color: 'var(--color-primary)',
+              '& .MuiChip-icon': { color: 'var(--color-primary)' },
             }}
           />
         )}
@@ -271,15 +264,15 @@ const ErbPricesCard = () => {
       <Stack direction="row" alignItems="center" spacing={0.6} sx={{ mt: 1, position: 'relative', zIndex: 1 }}>
         {error ? (
           <>
-            <ErrorOutlineIcon sx={{ fontSize: '0.75rem', color: '#fda4af' }} />
-            <Typography noWrap sx={{ color: '#fda4af', fontSize: '0.65rem' }}>
+            <ErrorOutlineIcon sx={{ fontSize: '0.75rem', color: 'var(--color-critical)' }} />
+            <Typography noWrap sx={{ color: 'var(--color-critical)', fontSize: '0.65rem' }}>
               {error}
             </Typography>
           </>
         ) : (
           <>
-            <AccessTimeIcon sx={{ fontSize: '0.75rem', color: 'rgba(226,241,248,0.45)' }} />
-            <Typography noWrap sx={{ color: 'rgba(226,241,248,0.45)', fontSize: '0.65rem' }}>
+            <AccessTimeIcon sx={{ fontSize: '0.75rem', color: 'text.secondary' }} />
+            <Typography noWrap sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
               {loading ? 'Loading…' : (formatTimestamp(timestamp) || 'Unknown time')}
             </Typography>
           </>

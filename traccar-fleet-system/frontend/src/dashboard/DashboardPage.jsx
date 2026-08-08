@@ -7,7 +7,6 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 import { useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
@@ -239,26 +238,29 @@ const DashboardPage = () => {
         px: { xs: 1.5, sm: 2 },
         py: { xs: 1.25, sm: 1.5, md: 2 },
         pb: 'calc(var(--app-bottomnav-height, 0px) + env(safe-area-inset-bottom, 0px) + 28px)',
-        background: theme.palette.mode === 'dark'
-          ? 'radial-gradient(circle at top, rgba(8, 145, 178, 0.1), transparent 28%), linear-gradient(180deg, rgba(2, 6, 23, 0.96) 0%, rgba(6, 23, 42, 0.9) 100%)'
-          : 'radial-gradient(circle at top, rgba(6, 182, 212, 0.1), transparent 24%), linear-gradient(180deg, #f7fbff 0%, #eef5fb 100%)',
+        // Was a hand-tuned teal-tinted gradient, independently light/dark
+        // branched — the one page in the app that painted its own background
+        // instead of inheriting the shell's, which is why it read as a
+        // different theme from every other screen. var(--surface-app) is the
+        // exact color every other page already sits on.
+        backgroundColor: 'var(--surface-app)',
         minHeight: '100%',
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
       }}>
-        {/* Compact hero: title + primary actions only — status/alerts live in the sections below, not duplicated here. */}
+        {/* Compact hero: title + primary actions only — status/alerts live in the sections below, not duplicated here.
+            Used to be a hand-painted navy-to-teal gradient (duplicated verbatim in ErbPricesCard.jsx) with hardcoded
+            near-white text and one-off button gradients built to work against that dark background specifically.
+            Now a plain card like every other surface in the app, so the standard button styles from
+            common/theme/components.js apply instead of a bespoke pair invented for this one banner. */}
         <Box
           sx={{
-            position: 'relative',
-            overflow: 'hidden',
             mb: 2.5,
             p: { xs: 1.5, sm: 2 },
-            borderRadius: '16px',
-            border: `1px solid ${alpha('#9be7f5', theme.palette.mode === 'dark' ? 0.18 : 0.28)}`,
-            background: theme.palette.mode === 'dark'
-              ? 'linear-gradient(135deg, rgba(4, 15, 28, 0.94) 0%, rgba(8, 34, 56, 0.92) 55%, rgba(10, 79, 98, 0.9) 100%)'
-              : 'linear-gradient(135deg, rgba(8, 28, 46, 0.96) 0%, rgba(10, 69, 96, 0.92) 58%, rgba(13, 138, 165, 0.88) 100%)',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--surface-border)',
+            backgroundColor: 'var(--surface-card)',
           }}
         >
           <Stack
@@ -267,29 +269,23 @@ const DashboardPage = () => {
             justifyContent="space-between"
             alignItems={{ xs: 'stretch', sm: 'center' }}
           >
-            <Typography sx={{ fontSize: { xs: '1.05rem', sm: '1.15rem' }, fontWeight: 800, color: '#f8fdff' }}>
+            <Typography sx={{ fontSize: { xs: '1.05rem', sm: '1.15rem' }, fontWeight: 800, color: 'text.primary' }}>
               Fleet Dashboard
             </Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Button
+                variant="contained"
                 size="small"
                 onClick={() => navigate('/map')}
                 startIcon={<MapOutlinedIcon />}
-                sx={{
-                  fontWeight: 700,
-                  color: '#02131e',
-                  background: 'linear-gradient(135deg, #9be7f5 0%, #67e8f9 100%)',
-                  '&:hover': { background: 'linear-gradient(135deg, #b2eff8 0%, #7deaf9 100%)' },
-                }}
               >
                 Live map
               </Button>
               <Button
-                size="small"
                 variant="outlined"
+                size="small"
                 onClick={handleFuelQueueJump}
                 startIcon={<LocalGasStationOutlinedIcon />}
-                sx={{ color: '#f8fdff', borderColor: 'rgba(255,255,255,0.16)' }}
               >
                 Fuel queue
               </Button>
