@@ -315,20 +315,24 @@ const useStyles = makeStyles()((theme) => ({
     fontSize: '0.75rem',
     padding: theme.spacing(0.5, 1),
   },
+  // Was its own hex palette (#F59E0B/#10B981/#3B82F6/#EF4444) — a second,
+  // slightly-different definition of warning/success/info/critical from the
+  // one every other status chip in the app uses (globalCssVariables.css).
+  // A "pending" badge here did not match a "warning" badge anywhere else.
   statusPending: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: 'var(--color-warning)',
     color: 'white',
   },
   statusApproved: {
-    backgroundColor: '#10B981',
+    backgroundColor: 'var(--color-success)',
     color: 'white',
   },
   statusFulfilled: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: 'var(--color-info)',
     color: 'white',
   },
   statusRejected: {
-    backgroundColor: '#EF4444',
+    backgroundColor: 'var(--color-critical)',
     color: 'white',
   },
   emptyState: {
