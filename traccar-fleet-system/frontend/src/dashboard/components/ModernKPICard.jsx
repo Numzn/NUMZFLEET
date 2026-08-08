@@ -1,9 +1,6 @@
 import React from 'react';
 import { Card, CardContent, Box, Typography, LinearProgress } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { lightTokens } from '../../common/theme/designTokens';
-
-const { colors: c } = lightTokens;
 
 const StyledCard = styled(Card)(() => ({
   borderRadius: 'var(--radius-md)',
@@ -39,7 +36,7 @@ const TrendIndicator = styled(Box)(({ theme }) => ({
   gap: theme.spacing(0.5),
   fontSize: '0.75rem',
   fontWeight: 600,
-  color: c.success,
+  color: 'var(--color-success)',
 }));
 
 const ValueText = styled(Typography)(() => ({
@@ -66,40 +63,46 @@ const ProgressContainer = styled(Box)(() => ({
 const StyledProgress = styled(LinearProgress)(() => ({
   height: 6,
   borderRadius: 'var(--radius-sm)',
-  backgroundColor: c.fuelBarTrack,
+  // MuiLinearProgress's own theme default (components.js) already sets
+  // var(--surface-elevated) for the track — no override needed here, and the
+  // override that used to be here was a light-only hex that never adapted.
   '& .MuiLinearProgress-bar': {
     borderRadius: 'var(--radius-sm)',
-    backgroundColor: c.primary,
+    backgroundColor: 'var(--color-primary)',
   },
 }));
 
+// Was `lightTokens.colors.*` — a plain JS object frozen at light-theme values,
+// so every KPI card's icon chip and progress fill stayed light-mode-colored
+// even when the surrounding card correctly switched to dark. CSS vars pick up
+// the theme automatically, the same way the card shell already does.
 function getIconBackgroundColor(color) {
   switch (color) {
     case 'primary':
-      return c.primaryLight;
+      return 'var(--color-primary-light)';
     case 'success':
-      return c.successLight;
+      return 'var(--color-success-light)';
     case 'warning':
-      return c.warningLight;
+      return 'var(--color-warning-light)';
     case 'danger':
-      return c.criticalLight;
+      return 'var(--color-critical-light)';
     default:
-      return c.surfaceAlt;
+      return 'var(--color-surface-alt)';
   }
 }
 
 function getIconColor(color) {
   switch (color) {
     case 'primary':
-      return c.primary;
+      return 'var(--color-primary)';
     case 'success':
-      return c.success;
+      return 'var(--color-success)';
     case 'warning':
-      return c.warning;
+      return 'var(--color-warning)';
     case 'danger':
-      return c.critical;
+      return 'var(--color-critical)';
     default:
-      return c.textSecondary;
+      return 'var(--color-text-secondary)';
   }
 }
 
