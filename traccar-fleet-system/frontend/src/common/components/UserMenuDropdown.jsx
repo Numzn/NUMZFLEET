@@ -84,7 +84,10 @@ const UserMenuDropdown = () => {
           padding: '4px 8px',
           borderRadius: 1,
           '&:hover': {
-            backgroundColor: 'rgba(255,255,255,0.1)',
+            // Was rgba(255,255,255,0.1) — a 10%-white overlay on a white card
+            // in light mode is functionally invisible; it only ever looked
+            // right on the dark-mode navy card it was written against.
+            backgroundColor: 'var(--color-surface-alt)',
           },
         }}
       >
@@ -138,7 +141,7 @@ const UserMenuDropdown = () => {
               sx={{
                 width: 48,
                 height: 48,
-                backgroundColor: '#06b6d4',
+                backgroundColor: 'var(--color-brand-accent)',
                 fontSize: '1.25rem',
                 fontWeight: 700,
               }}
@@ -174,7 +177,7 @@ const UserMenuDropdown = () => {
               }}
             >
               <LogoImage
-                color="#06b6d4"
+                color="var(--color-brand-accent)"
                 style={{
                   width: '44px',
                   height: '44px',
@@ -226,7 +229,7 @@ const UserMenuDropdown = () => {
               borderRadius: 1,
               color: 'error.main',
               '&:hover': {
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                backgroundColor: 'var(--color-critical-light)',
               },
             }}
           >

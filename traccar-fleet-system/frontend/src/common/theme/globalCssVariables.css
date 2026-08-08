@@ -13,6 +13,11 @@
   --color-primary: #1A56DB;
   --color-primary-dark: #1E3A8A;
   --color-primary-light: #DBEAFE;
+  /* The logo mark's own color — distinct from --color-primary (the app's
+     interactive/action blue). Declared once, not redefined for dark mode:
+     the logo doesn't reskin, the same way the semantic colors below don't.
+     Was hardcoded as the literal hex in ~8 files before this token existed. */
+  --color-brand-accent: #06b6d4;
   --color-success: #059669;
   --color-success-light: #D1FAE5;
   --color-warning: #D97706;
@@ -21,6 +26,7 @@
   --color-critical-light: #FEE2E2;
   --color-info: #3B82F6;
   --color-info-light: #DBEAFE;
+  --color-fuel: #FFB800;
 
   /* Legacy aliases (mode-aware via surface tokens) */
   --color-surface: var(--surface-card);

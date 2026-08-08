@@ -525,7 +525,7 @@ const UnifiedSidebar = ({
           }}
         >
           <LogoImage
-            color="#06b6d4"
+            color="var(--color-brand-accent)"
             style={{
               width: collapsed ? 36 : 44,
               height: collapsed ? 36 : 44,
