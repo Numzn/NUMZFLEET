@@ -1,10 +1,15 @@
 :root,
 [data-theme="light"] {
-  /* Surface hierarchy */
-  --surface-app: #FFFFFF;
-  --surface-workspace: #F9FAFB;
+  /* Surface hierarchy. Dark mode below has four visibly distinct tones
+     (app < workspace < card < elevated) — this block used to collapse all
+     of them to #FFFFFF, so cards had zero background separation from the
+     page canvas and nothing but a 1px border to read as a surface at all.
+     That's the concrete mechanism behind "light mode looks flat/cheap":
+     no tonal depth cue existed, at all, anywhere in light mode. */
+  --surface-app: #F7F8FA;
+  --surface-workspace: #EEF1F4;
   --surface-card: #FFFFFF;
-  --surface-card-hover: #F9FAFB;
+  --surface-card-hover: #FAFBFC;
   --surface-elevated: #FFFFFF;
   --surface-border: #E5E7EB;
   --surface-border-subtle: #F3F4F6;

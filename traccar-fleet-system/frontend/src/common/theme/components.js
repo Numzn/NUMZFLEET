@@ -13,7 +13,14 @@ export default {
       root: {
         backgroundImage: 'none',
         borderRadius: `${radius.md}px`,
-        boxShadow: 'none',
+        // Was 'none' — with the surface-hierarchy fix in
+        // globalCssVariables.css, a card now has a real background of its
+        // own, so this shadow is a light lift on top of that, not the only
+        // depth cue doing the work alone. shadow-subtle (unused until now)
+        // is deliberately faint — --shadow-elevation stays reserved for
+        // things that actually float (drawers, dialogs, popovers), per
+        // docs/UX_ARCHITECTURE_REDESIGN.md §4.3.
+        boxShadow: 'var(--shadow-subtle)',
         border: '1px solid var(--surface-border)',
         backgroundColor: 'var(--surface-card)',
       },
@@ -80,7 +87,7 @@ export default {
     styleOverrides: {
       root: {
         borderRadius: `${radius.md}px`,
-        boxShadow: 'none',
+        boxShadow: 'var(--shadow-subtle)',
         border: '1px solid var(--surface-border)',
         backgroundColor: 'var(--surface-card)',
         backgroundImage: 'none',
