@@ -1,7 +1,14 @@
 import { resolveCompanyContextForTraccarUser } from '../services/tenantResolverService.js';
 
 /**
- * Attach req.auth with companyId and roles after authenticate.
+ * Attach req.auth with extended context after authenticate.
+ * 
+ * Populates:
+ * - companyId (backward compat)
+ * - activeContext: { type, companyId, parentCompanyId }
+ * - organizationType: 'customer' | 'partner' | null
+ * - accessibleCustomerIds: [] (if partner)
+ * - roles, isSuperAdmin, numzUserId
  */
 export async function attachTenantContext(req, res, next) {
   try {
@@ -13,21 +20,31 @@ export async function attachTenantContext(req, res, next) {
     const ctx = await resolveCompanyContextForTraccarUser(req.user);
     req.auth = {
       userId: req.user.id,
-      companyId: ctx.companyId,
+      companyId: ctx.companyId, // Backward compat
       numzUserId: ctx.numzUserId,
+      activeContext: ctx.activeContext,
+      organizationType: ctx.organizationType,
+      accessibleCustomerIds: ctx.accessibleCustomerIds || [],
       roles: ctx.roles,
       isSuperAdmin: ctx.isSuperAdmin,
       traccarUserId: req.user.id,
     };
     next();
   } catch (error) {
-    // Non-fatal: fall back to default company so individual routes are not blocked.
+    // Non-fatal: fall back to default context so individual routes are not blocked.
     // Common cause: numz_users table not yet created (migration pending).
     console.warn('[tenantContext] resolution failed, using default context:', error?.message || error);
     req.auth = {
       userId: req.user?.id ?? null,
       companyId: null,
       numzUserId: null,
+      activeContext: {
+        type: 'customer',
+        companyId: null,
+        parentCompanyId: null,
+      },
+      organizationType: null,
+      accessibleCustomerIds: [],
       roles: [],
       isSuperAdmin: req.user?.administrator === true,
       traccarUserId: req.user?.id ?? null,

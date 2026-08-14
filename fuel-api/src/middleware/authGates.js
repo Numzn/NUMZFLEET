@@ -124,11 +124,57 @@ export const requirePlatformOwner = (req, res, next) => {
   next();
 };
 
+/**
+ * Require partner context.
+ * Only allows users with activeContext.type = 'partner'.
+ */
+export const requirePartner = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (req.auth?.activeContext?.type !== 'partner') {
+    return res.status(403).json({ error: 'Forbidden - Partner access required' });
+  }
+  next();
+};
+
+/**
+ * Require customer context.
+ * Only allows users with activeContext.type = 'customer'.
+ */
+export const requireCustomer = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (req.auth?.activeContext?.type !== 'customer') {
+    return res.status(403).json({ error: 'Forbidden - Customer access required' });
+  }
+  next();
+};
+
+/**
+ * Require either partner or customer context (not platform).
+ * Blocks platform-level (NUMZ super admin) access to operational routes.
+ */
+export const requirePartnerOrCustomer = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const contextType = req.auth?.activeContext?.type;
+  if (contextType !== 'partner' && contextType !== 'customer') {
+    return res.status(403).json({ error: 'Forbidden - Partner or customer access required' });
+  }
+  next();
+};
+
 export default {
   requireAuth,
   requireRealAuth,
   requireManager,
   requirePlatformOwner,
+  requirePartner,
+  requireCustomer,
+  requirePartnerOrCustomer,
   requireOwner,
   requireAuthDev,
   checkAuth,

@@ -28,6 +28,7 @@ import rolesRouter from './modules/roles/routes.js';
 import platformRouter from './modules/platform/routes.js';
 import notificationPreferencesRouter from './modules/notificationPreferences/routes.js';
 import telemetryIngestionRouter from './routes/telemetryIngestion.js';
+import organizationsRouter from './routes/organizations.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
 import { setNotificationIo } from './notifications/notificationContext.js';
@@ -421,6 +422,8 @@ app.get('/api/operation-sessions/suggestions/vehicles', authenticate, requireAut
 app.use('/api/operation-sessions', operationSessionsRouter);
 app.use('/api/service-records', serviceRecordsRouter);
 app.use('/api/reports', reportsRouter);
+// Phase 2B: Partner & Customer Management
+app.use('/api', organizationsRouter);
 // Server-to-server only (Traccar event.forward.url) — deliberately outside /api
 // so it's never touched by the browser-oriented /api rate limiters or nginx's
 // public /api proxy; reachable only on the docker-internal network. Auth is

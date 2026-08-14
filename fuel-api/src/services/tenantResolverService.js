@@ -1,17 +1,47 @@
-import { NumzUser, DEFAULT_COMPANY_ID } from '../models/index.js';
+import { NumzUser, Company, ActiveContext, DEFAULT_COMPANY_ID } from '../models/index.js';
+
+/**
+ * Tenant Resolver Service — Identity vs. Active Context (Phase 2D)
+ *
+ * Two distinct concepts:
+ *
+ * 1. IDENTITY — "Who is this user?" Derived purely from the Traccar-authenticated
+ *    user and their numz_users row (home company, roles, isSuperAdmin). Cached
+ *    per traccarUserId (companyCache below) since it rarely changes; invalidated
+ *    via clearCompanyContextCache() whenever a user's role/company assignment
+ *    changes (see numzUserProvisioning.js, profileService.js).
+ *
+ * 2. ACTIVE CONTEXT — "Which organization is this user currently operating in?"
+ *    Defaults to the identity's home context (platform for a super admin, the
+ *    user's own company otherwise), but can be overridden per-request via the
+ *    active_contexts table (see switchActiveContext / resetActiveContext).
+ *    The override is re-validated on every read (NEVER cached) so a request
+ *    immediately after a switch — or after access is revoked — sees the correct,
+ *    authoritative result.
+ *
+ * resolveCompanyContextForTraccarUser() returns the merged result (home identity
+ * facts + active context), which is what the rest of the app (req.auth) reads.
+ */
 
 const companyCache = new Map();
 
 /**
- * Resolve tenant company for a Traccar-authenticated user.
- * Falls back to default company until numz_users are provisioned.
+ * Resolve the identity's HOME context: who they are and which company they
+ * belong to by default. This is the pre-Phase-2D behavior, unaffected by any
+ * active-context override. Cached per traccarUserId.
  */
-export async function resolveCompanyContextForTraccarUser(traccarUser) {
+async function getHomeContext(traccarUser) {
   if (!traccarUser?.id) {
     return {
       companyId: DEFAULT_COMPANY_ID,
+      numzUserId: null,
+      organizationType: 'customer',
+      parentCompanyId: null,
+      companyName: null,
+      accessibleCustomerIds: [],
       roles: [],
       isSuperAdmin: false,
+      numzRole: null,
     };
   }
 
@@ -34,30 +64,304 @@ export async function resolveCompanyContextForTraccarUser(traccarUser) {
   const numzRole = attrs.numzRole || attrs.numz_role;
 
   const roles = [];
+  let companyId = numzUser?.companyId || DEFAULT_COMPANY_ID;
+  let isSuperAdmin = false;
+  let organizationType = 'customer';
+  let parentCompanyId = null;
+  let companyName = null;
+  let accessibleCustomerIds = [];
+
+  // Platform Super Admin: Traccar admin with no company_id
   if (traccarUser.administrator && !numzUser?.companyId) {
     roles.push('super_admin');
-  }
-  if (traccarUser.administrator || traccarUser.isManager) {
-    roles.push('company_admin', 'fleet_manager');
-  }
-  if (numzRole === 'technician') roles.push('technician');
-  if (numzRole === 'dispatcher') roles.push('dispatcher');
-  if (!traccarUser.administrator && !traccarUser.isManager) {
-    roles.push('driver');
+    isSuperAdmin = true;
+    companyId = null;
+    organizationType = null;
+  } else {
+    // User has a company — determine if it's a partner or customer
+    if (numzUser?.companyId) {
+      const company = await Company.findByPk(numzUser.companyId, {
+        attributes: ['id', 'name', 'organizationType', 'parentCompanyId'],
+      });
+      organizationType = company?.organizationType || 'customer';
+      parentCompanyId = company?.parentCompanyId || null;
+      companyName = company?.name || null;
+
+      if (organizationType === 'partner') {
+        accessibleCustomerIds = await resolvePartnerAccessibleCustomers(numzUser.companyId);
+      }
+    }
+
+    // Add operational roles
+    if (traccarUser.administrator || traccarUser.isManager) {
+      roles.push('company_admin', 'fleet_manager');
+    }
+    if (numzRole === 'technician') roles.push('technician');
+    if (numzRole === 'dispatcher') roles.push('dispatcher');
+    if (!traccarUser.administrator && !traccarUser.isManager) {
+      roles.push('driver');
+    }
   }
 
-  const ctx = {
-    companyId: numzUser?.companyId || DEFAULT_COMPANY_ID,
+  const homeCtx = {
+    companyId,
     numzUserId: numzUser?.id || null,
+    organizationType,
+    parentCompanyId,
+    companyName,
+    accessibleCustomerIds,
     roles: [...new Set(roles)],
-    isSuperAdmin: roles.includes('super_admin'),
+    isSuperAdmin,
     numzRole: numzRole || null,
   };
 
-  companyCache.set(cacheKey, ctx);
-  return ctx;
+  companyCache.set(cacheKey, homeCtx);
+  return homeCtx;
+}
+
+/**
+ * Can this identity (their home context) enter the given target company as an
+ * active context? Authoritative, backend-only check — never trust the caller.
+ *
+ *  - Platform (isSuperAdmin): any company.
+ *  - Partner: their own partner company, or any customer under it.
+ *  - Customer: only their own company.
+ */
+export function canAccessCompany(homeCtx, targetCompany) {
+  if (!targetCompany) return false;
+  if (homeCtx.isSuperAdmin) return true;
+  if (!homeCtx.companyId) return false;
+  if (String(targetCompany.id) === String(homeCtx.companyId)) return true;
+  if (
+    homeCtx.organizationType === 'partner'
+    && targetCompany.organizationType === 'customer'
+    && targetCompany.parentCompanyId
+    && String(targetCompany.parentCompanyId) === String(homeCtx.companyId)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function buildPlatformContext() {
+  return {
+    type: 'platform',
+    companyId: null,
+    companyName: 'NUMZ Platform',
+    organizationType: null,
+    parentCompanyId: null,
+  };
+}
+
+function buildCompanyContext(company) {
+  return {
+    type: company.organizationType,
+    companyId: company.id,
+    companyName: company.name,
+    organizationType: company.organizationType,
+    parentCompanyId: company.parentCompanyId || null,
+  };
+}
+
+/**
+ * Read (never cache) any active-context override for this Traccar user and
+ * apply it on top of their home context, re-validating authorization on every
+ * call. Falls back to the home context (and self-heals by deleting the
+ * override row) if the override is missing, stale, or no longer authorized.
+ */
+async function applyActiveContextOverride(homeCtx, traccarUserId) {
+  const override = await ActiveContext.findByPk(traccarUserId);
+
+  if (!override) {
+    return homeCtx;
+  }
+
+  if (override.companyId == null) {
+    if (homeCtx.isSuperAdmin) {
+      return homeCtx; // already resolves to platform by default
+    }
+    // Invalid: only a super admin may hold an explicit platform override.
+    await override.destroy();
+    return homeCtx;
+  }
+
+  const target = await Company.findByPk(override.companyId, {
+    attributes: ['id', 'name', 'organizationType', 'parentCompanyId', 'status'],
+  });
+
+  if (!target || target.status !== 'active' || !canAccessCompany(homeCtx, target)) {
+    // Stale/invalid override (company deleted, deactivated, or access revoked).
+    await override.destroy();
+    return homeCtx;
+  }
+
+  const accessibleCustomerIds = target.organizationType === 'partner'
+    ? await resolvePartnerAccessibleCustomers(target.id)
+    : [];
+
+  return {
+    ...homeCtx,
+    companyId: target.id,
+    organizationType: target.organizationType,
+    parentCompanyId: target.parentCompanyId || null,
+    companyName: target.name,
+    accessibleCustomerIds,
+  };
+}
+
+/**
+ * Resolve the full context (identity + active context) for a Traccar-authenticated
+ * user. This is what req.auth is built from (see middleware/tenantContext.js).
+ */
+export async function resolveCompanyContextForTraccarUser(traccarUser) {
+  if (!traccarUser?.id) {
+    return {
+      companyId: DEFAULT_COMPANY_ID,
+      numzUserId: null,
+      activeContext: {
+        type: 'customer',
+        companyId: DEFAULT_COMPANY_ID,
+        companyName: null,
+        parentCompanyId: null,
+      },
+      organizationType: 'customer',
+      accessibleCustomerIds: [],
+      roles: [],
+      isSuperAdmin: false,
+    };
+  }
+
+  const homeCtx = await getHomeContext(traccarUser);
+  const traccarUserId = Number(traccarUser.id);
+  const resolved = await applyActiveContextOverride(homeCtx, traccarUserId);
+
+  const activeContext = resolved.isSuperAdmin && resolved.companyId == null
+    ? buildPlatformContext()
+    : {
+      type: resolved.organizationType || 'customer',
+      companyId: resolved.companyId,
+      companyName: resolved.companyName || null,
+      parentCompanyId: resolved.parentCompanyId,
+    };
+
+  return {
+    companyId: resolved.companyId, // Backward compat — the ACTIVE context's company
+    numzUserId: resolved.numzUserId,
+    activeContext,
+    organizationType: resolved.organizationType,
+    accessibleCustomerIds: resolved.accessibleCustomerIds,
+    roles: resolved.roles,
+    isSuperAdmin: resolved.isSuperAdmin, // Identity fact — never changed by active context
+    numzRole: resolved.numzRole,
+  };
+}
+
+/**
+ * Switch the active context for this Traccar user to another organization.
+ * Authoritative: independently determines whether the identity may enter the
+ * requested company. Never trusts anything from the caller except the target ID.
+ *
+ * Pass targetCompanyId = null/undefined to switch into the platform context
+ * (super admins only — see resetActiveContext for a generic "back to home").
+ */
+export async function switchActiveContext(traccarUser, targetCompanyId) {
+  const homeCtx = await getHomeContext(traccarUser);
+  const traccarUserId = Number(traccarUser.id);
+
+  if (!targetCompanyId) {
+    if (!homeCtx.isSuperAdmin) {
+      const error = new Error('Only the platform administrator can switch into the platform context');
+      error.statusCode = 403;
+      throw error;
+    }
+    await ActiveContext.upsert({ traccarUserId, companyId: null });
+    return buildPlatformContext();
+  }
+
+  const target = await Company.findByPk(targetCompanyId, {
+    attributes: ['id', 'name', 'organizationType', 'parentCompanyId', 'status'],
+  });
+
+  if (!target) {
+    const error = new Error('Company not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!canAccessCompany(homeCtx, target)) {
+    const error = new Error('You do not have access to this organization');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  await ActiveContext.upsert({ traccarUserId, companyId: target.id });
+
+  return buildCompanyContext(target);
+}
+
+/**
+ * Reset this Traccar user's active context back to their default (home)
+ * context — platform for a super admin, their own company otherwise. This is
+ * the "back to platform"/"back to home" path referenced in Phase 2D: it does
+ * not require the browser to reload the app.
+ */
+export async function resetActiveContext(traccarUser) {
+  const traccarUserId = Number(traccarUser.id);
+  await ActiveContext.destroy({ where: { traccarUserId } });
+
+  const homeCtx = await getHomeContext(traccarUser);
+  if (homeCtx.isSuperAdmin) {
+    return buildPlatformContext();
+  }
+  if (!homeCtx.companyId || homeCtx.companyId === DEFAULT_COMPANY_ID) {
+    return {
+      type: homeCtx.organizationType || 'customer',
+      companyId: homeCtx.companyId,
+      companyName: homeCtx.companyName,
+      organizationType: homeCtx.organizationType,
+      parentCompanyId: homeCtx.parentCompanyId,
+    };
+  }
+  const company = await Company.findByPk(homeCtx.companyId, {
+    attributes: ['id', 'name', 'organizationType', 'parentCompanyId'],
+  });
+  return company ? buildCompanyContext(company) : {
+    type: homeCtx.organizationType || 'customer',
+    companyId: homeCtx.companyId,
+    companyName: homeCtx.companyName,
+    organizationType: homeCtx.organizationType,
+    parentCompanyId: homeCtx.parentCompanyId,
+  };
+}
+
+/**
+ * Resolve all customer companies under a partner.
+ * Returns array of customer IDs.
+ */
+export async function resolvePartnerAccessibleCustomers(partnerCompanyId) {
+  if (!partnerCompanyId) {
+    return [];
+  }
+
+  try {
+    const customers = await Company.findAll({
+      where: {
+        parentCompanyId: partnerCompanyId,
+        organizationType: 'customer',
+        status: 'active',
+      },
+      attributes: ['id'],
+      raw: true,
+    });
+
+    return customers.map((c) => c.id);
+  } catch (error) {
+    console.warn(`[tenantResolver] Failed to resolve partner customers for ${partnerCompanyId}:`, error?.message);
+    return [];
+  }
 }
 
 export function clearCompanyContextCache() {
   companyCache.clear();
 }
+

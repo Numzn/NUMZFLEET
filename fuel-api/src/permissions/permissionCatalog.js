@@ -21,8 +21,14 @@
 export const PERMISSIONS = [
   // Platform — Platform Super Admin only, never bundled into a company role.
   { key: 'platform.companies.manage', category: 'platform', description: 'Register and manage companies (tenants).' },
+  { key: 'platform.partners.manage', category: 'platform', description: 'Register and manage partner resellers.' },
   { key: 'platform.audit.read', category: 'platform', description: 'View platform-wide audit logs.' },
   { key: 'platform.settings.manage', category: 'platform', description: 'Manage global platform settings.' },
+
+  // Partner — Partner reseller permissions
+  { key: 'partner.customers.read', category: 'partner', description: 'View partner\'s customer roster.' },
+  { key: 'partner.customers.manage', category: 'partner', description: 'Create and manage customer accounts under this partner.' },
+  { key: 'partner.analytics.read', category: 'partner', description: 'View aggregate analytics for partner\'s customers.' },
 
   // Fleet — Vehicles, Drivers, Geofences, Maintenance (OPERATIONS > Fleet)
   { key: 'fleet.vehicles.read', category: 'fleet', description: 'View the vehicle registry.' },
@@ -66,7 +72,7 @@ export const PERMISSIONS = [
 ];
 
 /**
- * Six system roles (company-scoped, except platform_super_admin) and the
+ * Eight system roles (company-scoped, except platform_super_admin) and the
  * permission keys each bundles. "Viewer" is deliberately not a role here —
  * see the domain-model discussion: read-only is a modifier on any role, not
  * a seventh bundle to keep in sync by hand. "driver" is kept because it
@@ -78,15 +84,25 @@ export const SYSTEM_ROLES = [
     label: 'Platform Super Admin',
     permissions: [
       'platform.companies.manage',
+      'platform.partners.manage',
       'platform.audit.read',
       'platform.settings.manage',
+    ],
+  },
+  {
+    key: 'partner_admin',
+    label: 'Partner Admin',
+    permissions: [
+      'partner.customers.read',
+      'partner.customers.manage',
+      'partner.analytics.read',
     ],
   },
   {
     key: 'company_admin',
     label: 'Company Admin',
     permissions: PERMISSIONS
-      .filter((p) => p.category !== 'platform')
+      .filter((p) => p.category !== 'platform' && p.category !== 'partner')
       .map((p) => p.key),
   },
   {

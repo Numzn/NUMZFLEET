@@ -35,6 +35,18 @@ export default (sequelize) => {
         allowNull: false,
         defaultValue: {},
       },
+      organizationType: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'customer',
+        field: 'organization_type',
+      },
+      parentCompanyId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        field: 'parent_company_id',
+        references: { model: 'companies', key: 'id' },
+      },
     },
     {
       tableName: 'companies',
