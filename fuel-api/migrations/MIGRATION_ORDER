@@ -40,3 +40,6 @@
 20260727_notification_preferences.sql
 20260727_fix_notification_login_audit_fk.sql
 20260731_roles_permissions_foundation.sql
+20260811_partner_reseller_model.sql
+20260811_remove_company_relationships.sql
+20260812_active_context_switching.sql
