@@ -210,4 +210,64 @@ export function assertCanAccessSession(session, user, companyId = null) {
   }
 }
 
+/**
+ * Validate access to a session using Partner-aware scope.
+ * 
+ * Replaces assertCanAccessSession for mutation operations.
+ * Enforces that user can only access sessions in their scope:
+ * - Platform: can access any session
+ * - Partner: can access sessions in own company + child customer companies
+ * - Customer: can access sessions in own company only
+ * 
+ * @param {Object} session - The operation session to validate
+ * @param {Object} user - The user attempting access (for isAdmin/isOwner checks)
+ * @param {Object} auth - The req.auth context (contains activeContext, accessibleCustomerIds)
+ * @throws {Error} with statusCode 403 if user cannot access
+ */
+export function assertCanAccessSessionWithScope(session, user, auth) {
+  if (!session) {
+    const error = new Error('Operation session not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const isAdmin = !!user?.administrator;
+  const isOwner = Number(session.userId) === Number(user?.id);
+
+  // Import canAccessCompany for scope validation
+  // Using dynamic import to avoid circular dependencies
+  if (!isAdmin && !isOwner) {
+    // Validate company scope
+    if (!auth?.activeContext) {
+      const error = new Error('Forbidden');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const { type, companyId } = auth.activeContext;
+    const sessionCompanyId = String(session.companyId);
+
+    // Platform can access any company
+    if (type === 'platform') {
+      return;
+    }
+
+    // Must be in own company or child customer list
+    if (String(companyId) === sessionCompanyId) {
+      return;
+    }
+
+    // Partner can access child customers
+    if (type === 'partner' && auth.accessibleCustomerIds) {
+      if (auth.accessibleCustomerIds.includes(sessionCompanyId)) {
+        return;
+      }
+    }
+
+    const error = new Error('Forbidden');
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
 export { OperationSessionRefuel };

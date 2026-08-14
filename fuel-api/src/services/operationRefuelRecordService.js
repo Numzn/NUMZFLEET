@@ -8,6 +8,7 @@ import { emitDomainEvent } from '../events/eventBus.js';
 import { EVENT_NAMES } from '../events/eventNames.js';
 import {
   assertCanAccessSession,
+  assertCanAccessSessionWithScope,
   toRefuelDtoEnriched,
   refreshSessionTotals,
 } from './operationSessionCore.js';
@@ -40,9 +41,9 @@ function parseOptionalMileage(value) {
   return number;
 }
 
-export async function recordOperationRefuel(user, sessionId, payload = {}, companyId = null) {
+export async function recordOperationRefuel(user, sessionId, payload = {}, auth = null) {
   const session = await findSessionById(sessionId);
-  assertCanAccessSession(session, user, companyId);
+  assertCanAccessSessionWithScope(session, user, auth);
   await maybePersistLock(session);
   await assertOperationWritable(session, 'Operation is locked');
 

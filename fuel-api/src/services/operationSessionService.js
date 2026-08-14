@@ -64,8 +64,10 @@ const parseOptionalNumber = (value, field) => {
   return number;
 };
 
-export async function listOperationSessions(user, companyId) {
-  const rows = await listByUser(user, companyId);
+export async function listOperationSessions(user, auth) {
+  const { getAccessibleCompanyIds } = await import('./scopeValidationService.js');
+  const accessibleIds = getAccessibleCompanyIds(auth);
+  const rows = await listByUser(user, accessibleIds);
   return Promise.all(rows.map((row) => toSessionDto(row)));
 }
 

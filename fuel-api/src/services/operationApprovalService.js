@@ -7,15 +7,16 @@ import { getErbPriceMap } from './fuelPriceService.js';
 import { recordAuditEvent, AUDIT_EVENT_TYPES } from './auditEventService.js';
 import {
   assertCanAccessSession,
+  assertCanAccessSessionWithScope,
   refreshSessionTotals,
   toSessionDto,
 } from './operationSessionCore.js';
 import { assertOperationWritable, maybePersistLock } from './operationLockHelper.js';
 import { notifyOperationApproved } from './operationNotificationService.js';
 
-export async function approveOperation(user, sessionId, companyId = null) {
+export async function approveOperation(user, sessionId, auth = null) {
   const session = await findSessionById(sessionId);
-  assertCanAccessSession(session, user, companyId);
+  assertCanAccessSessionWithScope(session, user, auth);
   await maybePersistLock(session);
   await assertOperationWritable(session, 'Cannot approve a locked operation');
 

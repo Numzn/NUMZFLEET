@@ -387,9 +387,28 @@ export async function listAssignedDeviceIdsForCompany(companyId = DEFAULT_COMPAN
   )].sort((a, b) => a - b);
 }
 
-export async function listVehiclesMerged(companyId = DEFAULT_COMPANY_ID) {
+export async function listVehiclesMerged(auth) {
+  const { getAccessibleCompanyIds } = await import('./scopeValidationService.js');
+  const accessibleIds = getAccessibleCompanyIds(auth);
+
+  // If auth is not provided or no access, use default company
+  let companyIds = accessibleIds;
+  if (!companyIds) {
+    companyIds = [DEFAULT_COMPANY_ID];
+  }
+
+  // Build WHERE clause for accessible companies
+  let where = {};
+  if (companyIds && Array.isArray(companyIds)) {
+    if (companyIds.length === 1) {
+      where.companyId = companyIds[0];
+    } else if (companyIds.length > 1) {
+      where.companyId = { [Op.in]: companyIds };
+    }
+  }
+
   const vehicles = await Vehicle.findAll({
-    where: { companyId },
+    where,
     order: [['name', 'ASC']],
   });
   const vehicleIds = vehicles.map((v) => v.id);
@@ -404,7 +423,10 @@ export async function listVehiclesMerged(companyId = DEFAULT_COMPANY_ID) {
 
   let routineByVehicle = new Map();
   try {
-    const dueState = await loadCompanyMaintenanceDueState(companyId);
+    // For Partners with multiple customer companies, load maintenance state for each accessible company
+    // For backward compatibility, handle both single company and multiple companies
+    const effectiveCompanyId = Array.isArray(companyIds) && companyIds.length > 0 ? companyIds[0] : DEFAULT_COMPANY_ID;
+    const dueState = await loadCompanyMaintenanceDueState(effectiveCompanyId);
     routineByVehicle = buildRoutineServiceSummaryByVehicle(dueState);
   } catch {
     routineByVehicle = new Map();
@@ -457,10 +479,17 @@ export async function listVehiclesMerged(companyId = DEFAULT_COMPANY_ID) {
   });
 }
 
-export async function getVehicleMerged(id, companyId = null) {
+export async function getVehicleMerged(id, auth = null) {
   const vehicle = await Vehicle.findByPk(id);
   if (!vehicle) return null;
-  if (companyId && vehicle.companyId && vehicle.companyId !== companyId) return null;
+
+  // Validate scope if auth is provided
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      return null; // Return null for 404 (don't leak that vehicle exists)
+    }
+  }
 
   const assignment = await DeviceAssignment.findOne({
     where: { vehicleId: id, isActive: true },
@@ -469,7 +498,7 @@ export async function getVehicleMerged(id, companyId = null) {
   const { deviceMap, positionMap, specMap } = await loadMergeMapsForDeviceIds(deviceIds);
 
   const merged = toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap);
-  const effectiveCompanyId = companyId || vehicle.companyId || DEFAULT_COMPANY_ID;
+  const effectiveCompanyId = vehicle.companyId || DEFAULT_COMPANY_ID;
   merged.serviceSummary = await summarizeForVehicle(id, effectiveCompanyId);
 
   // Authoritative routine-service signal (actual Traccar schedule, tagged
@@ -541,6 +570,8 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
   const vid = String(vehicleId);
   const did = Number(deviceId);
   const actorUserId = options.actorUserId != null ? Number(options.actorUserId) : null;
+  const auth = options.auth || null;
+
   if (!Number.isFinite(did) || did <= 0) {
     const err = new Error('deviceId must be a positive Traccar device id');
     err.statusCode = 400;
@@ -552,6 +583,16 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
+  }
+
+  // SECURITY FIX: Validate that user can access this vehicle's company
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      const err = new Error('Access denied - You do not have permission to access this vehicle');
+      err.statusCode = 403;
+      throw err;
+    }
   }
 
   const trDevice = await getTraccarDevice(did);

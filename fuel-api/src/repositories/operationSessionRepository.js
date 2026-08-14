@@ -1,8 +1,23 @@
 import { OperationSession } from '../models/index.js';
+import { Op } from 'sequelize';
 
 export async function listByUser(user, companyId) {
   const where = {};
-  if (companyId) where.companyId = companyId;
+  
+  // Handle both single companyId (backward compat) and array (Partner scope)
+  if (companyId) {
+    if (Array.isArray(companyId)) {
+      if (companyId.length > 0) {
+        where.companyId = { [Op.in]: companyId };
+      } else {
+        // Empty array = no accessible companies, return empty
+        return [];
+      }
+    } else if (companyId !== null) {
+      where.companyId = companyId;
+    }
+  }
+  
   if (!user?.administrator && !user?.isManager) {
     where.userId = user.id;
   }
