@@ -30,7 +30,7 @@ export const createVehicle = async (req, res) => {
       plateNumber,
       companyId: req.auth?.companyId,
     });
-    const merged = await getVehicleMerged(vehicle.id, req.auth?.companyId);
+    const merged = await getVehicleMerged(vehicle.id, req.auth);
     return res.status(201).json(merged);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -44,7 +44,7 @@ export const createVehicle = async (req, res) => {
  */
 export const listVehicles = async (req, res) => {
   try {
-    const rows = await listVehiclesMerged(req.auth?.companyId);
+    const rows = await listVehiclesMerged(req.auth);
     return res.json(rows);
   } catch (error) {
     console.error('List vehicles error:', error);
@@ -59,7 +59,7 @@ export const listVehicles = async (req, res) => {
  */
 export const getVehicle = async (req, res) => {
   try {
-    const merged = await getVehicleMerged(req.params.id, req.auth?.companyId);
+    const merged = await getVehicleMerged(req.params.id, req.auth);
     if (!merged) {
       return res.status(404).json({ error: 'Vehicle not found' });
     }
@@ -96,6 +96,7 @@ export const assignDevice = async (req, res) => {
     }
     const merged = await assignDeviceService(vehicleId, deviceId, {
       actorUserId: req.user?.id,
+      auth: req.auth,
     });
     return res.json(merged);
   } catch (error) {
@@ -168,7 +169,7 @@ export const deleteVehicle = async (req, res) => {
 
 export const getVehicleFuelStatistics = async (req, res) => {
   try {
-    const merged = await getVehicleMerged(req.params.id, req.auth?.companyId);
+    const merged = await getVehicleMerged(req.params.id, req.auth);
     if (!merged) {
       return res.status(404).json({ error: 'Vehicle not found' });
     }

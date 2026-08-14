@@ -9,7 +9,7 @@ import { dbErrorMessage } from '../utils/dbErrorMessage.js';
  */
 export async function postOdometerObservation(req, res) {
   try {
-    const merged = await getVehicleMerged(req.params.id, req.auth?.companyId);
+    const merged = await getVehicleMerged(req.params.id, req.auth);
     if (!merged) {
       return res.status(404).json({ error: 'Vehicle not found' });
     }
@@ -39,7 +39,7 @@ export async function postOdometerObservation(req, res) {
  */
 export async function getVehicleOdometer(req, res) {
   try {
-    const merged = await getVehicleMerged(req.params.id, req.auth?.companyId);
+    const merged = await getVehicleMerged(req.params.id, req.auth);
     if (!merged) {
       return res.status(404).json({ error: 'Vehicle not found' });
     }
