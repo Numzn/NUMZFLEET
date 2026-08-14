@@ -23,6 +23,11 @@ export const FUEL_API_PREFIXES = [
   '/api/reports/summary',
   '/api/reports/erb/',
   '/api/reports/fuel-summary',
+  '/api/partners',
+  '/api/direct-customers',
+  '/api/my-customers',
+  '/api/context',
+  '/api/platform',
 ];
 
 const raw = String(import.meta.env.VITE_TRACCAR_PREFIX ?? '').trim();

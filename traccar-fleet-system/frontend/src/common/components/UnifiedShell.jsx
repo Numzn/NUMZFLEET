@@ -11,6 +11,7 @@ import { useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import MenuIcon from '@mui/icons-material/Menu';
 import UnifiedSidebar from './UnifiedSidebar';
+import ContextSelector from '../../saas/components/ContextSelector';
 import { TopBarTitleProvider, useTopBarTitle } from './TopBarTitleContext';
 import LiveMapTopBar from '../../main/components/LiveMapTopBar';
 import FleetSidebar from '../../main/fleet/FleetSidebar';
@@ -246,7 +247,7 @@ function UnifiedShellContent() {
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1,
+                gap: 1.5,
                 px: 1.5,
                 boxSizing: 'border-box',
                 // Same height, background and border as the sidebar's own logo
@@ -264,6 +265,7 @@ function UnifiedShellContent() {
                   <MenuIcon />
                 </IconButton>
               )}
+              <ContextSelector />
               {topBarTitle && (
                 <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ flex: 1 }}>
                   {topBarTitle}

@@ -45,6 +45,7 @@ import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 import { isSettingsWorkspace, resolveExitTarget } from '../util/navWorkspace.js';
 import { buildSettingsNavGroups } from '../../settings/center/settingsSectionRegistry.js';
 import { useSuperAdmin, useTechnician } from '../util/permissions';
+import { resolveNavigation } from '../util/navigationResolver';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -189,6 +190,7 @@ const UnifiedSidebar = ({
   const manager = useManager();
   const features = useFeatures();
   const user = useSelector((state) => state.session.user);
+  const currentContext = useSelector((state) => state.organizations?.currentContext);
   const [maintenanceBadge, setMaintenanceBadge] = useState(undefined);
 
   useEffect(() => {
@@ -271,24 +273,9 @@ const UnifiedSidebar = ({
     ];
   }, [admin, features, inSettings, manager, platformOwner, technician]);
 
-  // Alert Rules, Groups, Calendars, Computed Attributes, Maintenance Schedules,
-  // Saved Commands, Announcement, and Server used to live here as flat
-  // siblings of "Settings" — an expandable "Administration" parent whose
-  // dropdown mixed personal settings, Traccar config, and server admin with
-  // no grouping. They're now sections inside the Settings Center's own
-  // category rail (settingsSectionRegistry.js), reached the same way Profile
-  // and Security always were. This group is just the entry points left over:
-  // Settings itself, plus optional external Billing/Support links.
-  const systemItems = useMemo(() => {
+  // External system items (billing/support links) are added to all contexts
+  const externalSystemItems = useMemo(() => {
     const out = [];
-    if (!readonly) {
-      out.push({
-        title: t('settingsTitle'),
-        path: '/settings',
-        icon: SettingsOutlinedIcon,
-        activeMatch: (path) => path.startsWith('/settings'),
-      });
-    }
     if (billingLink) {
       out.push({
         title: t('userBilling'),
@@ -306,107 +293,38 @@ const UnifiedSidebar = ({
       });
     }
     return out;
-  }, [billingLink, readonly, supportLink, t]);
+  }, [billingLink, supportLink, t]);
 
-  // Flat — no expandable parents. "Fleet" and "Fuel" used to be accordions, but
-  // neither was a destination: they existed only to hold children, so reaching
-  // Vehicles or Fueling Day cost an expand click on every visit. A fuel officer
-  // opens this app to do one thing, and paid that click every session.
-  //
-  // Group labels are the domain; the items under them are the real destinations.
-  const navGroups = useMemo(() => ([
-    {
-      key: 'primary',
-      items: [
-        { title: 'Dashboard', path: '/', icon: DashboardOutlinedIcon },
-        {
-          title: 'Live Map',
-          path: '/map',
-          icon: MapOutlinedIcon,
-          // Recent Traccar events this session. It used to sit on the "Fleet"
-          // accordion, where its own tooltip had to explain it was not unread
-          // notifications; live events are what the map is for.
-          badge: alertsBadgeCount,
-          badgeHint: 'Live activity — recent Traccar events in this session (not notification unread)',
-        },
-      ],
-    },
-    {
-      key: 'operations',
-      label: 'OPERATIONS',
-      items: [
-        {
-          title: 'Vehicles',
-          path: '/fleet/vehicles',
-          icon: DirectionsCarOutlinedIcon,
-          show: manager && !readonly,
-        },
-        {
-          title: 'Drivers',
-          path: '/fleet/drivers',
-          icon: PersonOutlineOutlinedIcon,
-          show: !features.disableDrivers && manager && !readonly,
-        },
-        {
-          title: 'Geofences',
-          path: '/geofences',
-          icon: PlaceOutlinedIcon,
-          show: admin && !readonly,
-        },
-        {
-          title: 'Fueling Day',
-          path: '/fleet/operation-sessions/prepare',
-          icon: LocalGasStationOutlinedIcon,
-          show: !readonly,
-          activeMatch: (path) => path.startsWith('/fleet/operation-sessions'),
-        },
-        {
-          title: 'Driver requests',
-          path: '/fuel-requests',
-          icon: AssignmentOutlinedIcon,
-          show: features.enableFuelRequests && !readonly,
-          // Pending fuel requests — this is literally what the count is, so it
-          // belongs here rather than on the group that used to contain it.
-          badge: pendingFuelCount > 0 ? pendingFuelCount : undefined,
-        },
-        {
-          title: 'Maintenance',
-          path: '/maintenance',
-          icon: BuildOutlinedIcon,
-          show: manager && !readonly,
-          badge: maintenanceBadge,
-          activeMatch: (path) => path.startsWith('/maintenance'),
-        },
-      ].filter((i) => i.show !== false),
-    },
-    {
-      key: 'reports',
-      // "Intelligence" is a category name no one using this app says out loud.
-      label: 'REPORTS',
-      items: [
-        // Named for the question each answers, not the engine that answers it.
-        // "Traccar reports" put the GPS vendor's brand in front of a fleet
-        // manager who has no reason to know that name.
-        { title: 'Fuel', path: '/reports/fuel-operations', icon: LocalGasStationOutlinedIcon, show: manager },
-        { title: 'Analytics', path: '/reports/statistics', icon: InsightsOutlinedIcon, show: admin },
-        { title: 'Activity', path: '/reports/summary', icon: BarChartOutlinedIcon, show: admin },
-      ].filter((i) => i.show !== false),
-    },
-    {
-      key: 'system',
-      label: 'SYSTEM',
-      items: systemItems,
-    },
-  ]), [
+  // Context-aware navigation resolver
+  // Returns the appropriate navigation structure based on current organization context
+  const navGroups = useMemo(() => {
+    // If in Settings workspace, use Settings navigation (unchanged)
+    if (inSettings) {
+      return []; // Handled separately by settingsNavGroups below
+    }
+
+    // Otherwise use context-aware navigation
+    return resolveNavigation(currentContext, {
+      alertsBadgeCount,
+      pendingFuelCount,
+      maintenanceBadge,
+      manager,
+      admin,
+      readonly,
+      features,
+      externalSystemItems,
+    });
+  }, [
+    inSettings,
+    currentContext,
     alertsBadgeCount,
-    features.disableDrivers,
-    features.enableFuelRequests,
-    manager,
-    admin,
     pendingFuelCount,
     maintenanceBadge,
+    manager,
+    admin,
     readonly,
-    systemItems,
+    features,
+    externalSystemItems,
   ]);
 
   const pathActive = useCallback((path, exact = false) => {

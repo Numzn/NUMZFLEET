@@ -92,6 +92,10 @@ import FuelVehiclesRoute, { RunRedirect } from './operationSessions/FuelVehicles
 import SmartInvoicesPage from './operationSessions/SmartInvoicesPage';
 import ReviewClosePage from './operationSessions/ReviewClosePage';
 import MaintenanceDashboardPage from './maintenance/MaintenanceDashboardPage';
+import PartnersPage from './saas/pages/PartnersPage';
+import DirectCustomersPage from './saas/pages/DirectCustomersPage';
+import PartnerCustomersPage from './saas/pages/PartnerCustomersPage';
+import PlatformOverviewPage from './saas/pages/PlatformOverviewPage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -173,6 +177,11 @@ const Navigation = () => {
           <Route path="fleet/operation-sessions/create" element={<CreateSessionPage />} />
           <Route path="fleet/operation-sessions/plan" element={<PlanningPage />} />
           <Route path="maintenance" element={<MaintenanceDashboardPage />} />
+
+          <Route path="saas/platform/overview" element={<PlatformOverviewPage />} />
+          <Route path="saas/platform/partners" element={<PartnersPage />} />
+          <Route path="saas/platform/direct-customers" element={<DirectCustomersPage />} />
+          <Route path="saas/partner/customers" element={<PartnerCustomersPage />} />
 
           <Route path="position/:id" element={<PositionPage />} />
           <Route path="network/:positionId" element={<NetworkPage />} />

@@ -11,6 +11,7 @@ import CachingController from './CachingController';
 import { useCatch, useEffectAsync } from './reactHelper';
 import { sessionActions } from './store';
 import { fetchMyProfile } from './settings/center/profileApi.js';
+import { useOrganizationContext } from './hooks/useOrganizationContext.js';
 import UpdateController from './UpdateController';
 import TermsDialog from './common/components/TermsDialog';
 import Loader from './common/components/Loader';
@@ -44,6 +45,9 @@ const App = () => {
     });
     dispatch(sessionActions.updateUser(await response.json()));
   });
+
+  // Initialize organization context (Platform/Partner/Customer)
+  useOrganizationContext(user);
 
   useEffectAsync(async () => {
     if (!user) {
