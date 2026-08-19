@@ -139,6 +139,7 @@ export const ROUTES = [
   '/reports/trips',
   '/reset-password',
   '/saas/partner/customers',
+  '/saas/partner/overview',
   '/saas/platform/direct-customers',
   '/saas/platform/overview',
   '/saas/platform/partners',

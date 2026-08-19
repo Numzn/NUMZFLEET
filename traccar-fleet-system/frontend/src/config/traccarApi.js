@@ -26,6 +26,7 @@ export const FUEL_API_PREFIXES = [
   '/api/partners',
   '/api/direct-customers',
   '/api/my-customers',
+  '/api/partner',
   '/api/context',
   '/api/platform',
 ];

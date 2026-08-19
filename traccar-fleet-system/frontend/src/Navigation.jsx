@@ -95,6 +95,7 @@ import MaintenanceDashboardPage from './maintenance/MaintenanceDashboardPage';
 import PartnersPage from './saas/pages/PartnersPage';
 import DirectCustomersPage from './saas/pages/DirectCustomersPage';
 import PartnerCustomersPage from './saas/pages/PartnerCustomersPage';
+import PartnerOverviewPage from './saas/pages/PartnerOverviewPage';
 import PlatformOverviewPage from './saas/pages/PlatformOverviewPage';
 
 const Navigation = () => {
@@ -182,6 +183,7 @@ const Navigation = () => {
           <Route path="saas/platform/partners" element={<PartnersPage />} />
           <Route path="saas/platform/direct-customers" element={<DirectCustomersPage />} />
           <Route path="saas/partner/customers" element={<PartnerCustomersPage />} />
+          <Route path="saas/partner/overview" element={<PartnerOverviewPage />} />
 
           <Route path="position/:id" element={<PositionPage />} />
           <Route path="network/:positionId" element={<NetworkPage />} />

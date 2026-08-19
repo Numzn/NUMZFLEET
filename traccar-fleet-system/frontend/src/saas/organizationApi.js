@@ -12,6 +12,11 @@ import { fuelApiAuthHeaders } from '../config/fuelApiAuth.js';
  * settings/center/platformCompaniesApi.js.
  */
 
+export const fetchContext = async (user) => {
+  const response = await fetchOrThrow('/api/context', { headers: fuelApiAuthHeaders(user) });
+  return response.json();
+};
+
 export const fetchPartners = async (user) => {
   const response = await fetchOrThrow('/api/partners', { headers: fuelApiAuthHeaders(user) });
   return response.json();
@@ -22,13 +27,13 @@ export const fetchDirectCustomers = async (user) => {
   return response.json();
 };
 
-export const fetchPartnerCustomers = async (user, partnerId) => {
-  const response = await fetchOrThrow(`/api/partners/${partnerId}/customers`, { headers: fuelApiAuthHeaders(user) });
+export const fetchPlatformOverview = async (user) => {
+  const response = await fetchOrThrow('/api/platform/overview', { headers: fuelApiAuthHeaders(user) });
   return response.json();
 };
 
-export const fetchPlatformOverview = async (user) => {
-  const response = await fetchOrThrow('/api/platform/overview', { headers: fuelApiAuthHeaders(user) });
+export const fetchPartnerOverview = async (user) => {
+  const response = await fetchOrThrow('/api/partner/overview', { headers: fuelApiAuthHeaders(user) });
   return response.json();
 };
 
@@ -43,15 +48,6 @@ export const createPartner = async (user, data) => {
 
 export const createDirectCustomer = async (user, data) => {
   const response = await fetchOrThrow('/api/direct-customers', {
-    method: 'POST',
-    headers: fuelApiAuthHeaders(user),
-    body: JSON.stringify(data),
-  });
-  return response.json();
-};
-
-export const createPartnerCustomer = async (user, partnerId, data) => {
-  const response = await fetchOrThrow(`/api/partners/${partnerId}/customers`, {
     method: 'POST',
     headers: fuelApiAuthHeaders(user),
     body: JSON.stringify(data),

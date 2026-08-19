@@ -29,6 +29,8 @@ import {
   createDirectCustomerOrg,
   createCustomerUnderPartnerOrg,
   createMyCustomer,
+  getMyOverview,
+  getContext,
 } from './organizationController.js';
 import { traccarServiceFetch } from '../services/traccarServiceClient.js';
 
@@ -174,5 +176,82 @@ describe('organizationController — admin passthrough', () => {
     // input before Company.create(), so a bad admin block must not create an
     // orphaned company row.
     assert.equal(res.statusCode, 400, JSON.stringify(res.body));
+  });
+});
+
+describe('organizationController — getMyOverview', () => {
+  it('returns the caller partner\'s own customer count, scoped to just that partner', async () => {
+    const partnerRes = mockRes();
+    await createPartnerOrg({ body: { name: 'Overview Test Partner', slug: slug() }, user: { id: 1 } }, partnerRes);
+    createdCompanyIds.push(partnerRes.body.id);
+
+    const customerA = mockRes();
+    await createCustomerUnderPartnerOrg({
+      params: { partnerId: partnerRes.body.id },
+      body: { name: 'Overview Test Customer A', slug: slug() },
+      user: { id: 1 },
+    }, customerA);
+    createdCompanyIds.push(customerA.body.id);
+
+    const customerB = mockRes();
+    await createCustomerUnderPartnerOrg({
+      params: { partnerId: partnerRes.body.id },
+      body: { name: 'Overview Test Customer B', slug: slug() },
+      user: { id: 1 },
+    }, customerB);
+    createdCompanyIds.push(customerB.body.id);
+
+    const req = { auth: { activeContext: { type: 'partner', companyId: partnerRes.body.id } } };
+    const res = mockRes();
+    await getMyOverview(req, res);
+
+    assert.equal(res.body.customerCount, 2, JSON.stringify(res.body));
+  });
+
+  it('rejects with 401 when there is no active-context companyId', async () => {
+    const req = { auth: { activeContext: { type: 'partner', companyId: null } } };
+    const res = mockRes();
+    await getMyOverview(req, res);
+
+    assert.equal(res.statusCode, 401, JSON.stringify(res.body));
+  });
+});
+
+describe('organizationController — getContext', () => {
+  it('returns a read-only projection of req.auth, not just the active context', async () => {
+    const req = {
+      auth: {
+        activeContext: { type: 'customer', companyId: 'some-company-uuid', companyName: 'Acme' },
+        accessibleContexts: [
+          { type: 'customer', companyId: 'some-company-uuid', label: 'My Fleet' },
+          { type: 'platform', companyId: null, label: 'Platform' },
+        ],
+        homeCompanyId: 'some-company-uuid',
+        isSuperAdmin: true,
+        roles: ['super_admin', 'company_admin'],
+      },
+    };
+    const res = mockRes();
+
+    await getContext(req, res);
+
+    assert.equal(res.body.activeContext.type, 'customer');
+    assert.equal(res.body.homeCompanyId, 'some-company-uuid');
+    assert.equal(res.body.isSuperAdmin, true);
+    assert.deepEqual(res.body.roles, ['super_admin', 'company_admin']);
+    assert.equal(res.body.accessibleContexts.length, 2);
+  });
+
+  it('degrades gracefully to empty/null defaults when req.auth is missing', async () => {
+    const req = {};
+    const res = mockRes();
+
+    await getContext(req, res);
+
+    assert.equal(res.body.activeContext, null);
+    assert.deepEqual(res.body.accessibleContexts, []);
+    assert.equal(res.body.homeCompanyId, null);
+    assert.equal(res.body.isSuperAdmin, false);
+    assert.deepEqual(res.body.roles, []);
   });
 });

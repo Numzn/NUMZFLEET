@@ -43,6 +43,7 @@ export async function getMe(req) {
   ]);
   const permissions = await resolvePermissionsForNumzUser(numzUser?.id, req.auth?.companyId, {
     isTraccarAdmin: !!req.user?.administrator,
+    homeCompanyId: req.auth?.homeCompanyId,
   });
   return toProfileDto(traccarUser, numzUser, permissions);
 }
@@ -121,6 +122,7 @@ export async function patchMe(req) {
 
   const permissions = await resolvePermissionsForNumzUser(finalNumzUser?.id, req.auth?.companyId, {
     isTraccarAdmin: !!req.user?.administrator,
+    homeCompanyId: req.auth?.homeCompanyId,
   });
   return toProfileDto(traccarUser, finalNumzUser, permissions);
 }
@@ -174,6 +176,7 @@ export async function patchAvatar(req) {
   const traccarUser = await fetchTraccarUser(req);
   const permissions = await resolvePermissionsForNumzUser(updated?.id, req.auth?.companyId, {
     isTraccarAdmin: !!req.user?.administrator,
+    homeCompanyId: req.auth?.homeCompanyId,
   });
   return toProfileDto(traccarUser, updated, permissions);
 }

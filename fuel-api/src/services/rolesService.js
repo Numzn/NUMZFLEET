@@ -20,6 +20,23 @@ async function ensureCompanyAdminRoleForTraccarAdmin(numzUserId, companyId) {
 }
 
 /**
+ * Does this numz user hold an explicit platform_super_admin role assignment
+ * (companyId IS NULL)? This is the additive signal tenantResolverService.js's
+ * getHomeContext() ORs into isSuperAdmin so a Traccar admin can hold platform
+ * capability even when they also have a home company (numz_users.companyId
+ * set) — previously the two were mutually exclusive by construction. Nothing
+ * in the application writes this assignment yet (Phase 5, deferred); this
+ * only reads it.
+ */
+export async function hasPlatformSuperAdminRole(numzUserId) {
+  if (!numzUserId) return false;
+  const role = await Role.findOne({ where: { key: 'platform_super_admin', companyId: null } });
+  if (!role) return false;
+  const assignment = await UserRole.findOne({ where: { numzUserId, roleId: role.id, companyId: null } });
+  return !!assignment;
+}
+
+/**
  * Resolves a numz user's permissions for a given company (or platform-wide,
  * when companyId is null) into a flat array of permission keys — the one
  * function everything downstream should call, rather than each caller
@@ -42,8 +59,12 @@ function cacheKey(numzUserId, companyId) {
 export async function resolvePermissionsForNumzUser(numzUserId, companyId, options = {}) {
   if (!numzUserId) return [];
 
+  // Grant against the identity's HOME company, not whichever company the
+  // caller's active context currently happens to be — otherwise switching
+  // context into a company (even briefly) silently mints a standing
+  // company_admin grant there. See tenantResolverService.js's homeCompanyId.
   if (options.isTraccarAdmin) {
-    await ensureCompanyAdminRoleForTraccarAdmin(numzUserId, companyId);
+    await ensureCompanyAdminRoleForTraccarAdmin(numzUserId, options.homeCompanyId);
   }
 
   const key = cacheKey(numzUserId, companyId);

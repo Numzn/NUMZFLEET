@@ -9,9 +9,9 @@ import {
 import { makeStyles } from 'tss-react/mui';
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { setCurrentContext } from '../../store/organizations';
-import { switchContext } from '../organizationApi';
+import { switchContextAndNavigate } from '../util/contextNavigation.js';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -59,10 +59,12 @@ const useStyles = makeStyles()((theme) => ({
 const ContextSelector = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const currentContext = useSelector((state) => state.organizations.currentContext);
+  const accessibleContexts = useSelector((state) => state.organizations.accessibleContexts);
   const partners = useSelector((state) => state.organizations.partners);
   const directCustomers = useSelector((state) => state.organizations.directCustomers);
   const partnerCustomers = useSelector(
@@ -81,16 +83,9 @@ const ContextSelector = () => {
   const handleContextSwitch = async (companyId) => {
     setLoading(true);
     try {
-      // Trust only the backend's response for the new context — it is the
-      // authoritative source (see fuel-api Phase 2D switchActiveContext).
-      // Never assume the switch succeeded as requested; use what the server
-      // actually activated.
-      const result = await switchContext(user, companyId);
-      dispatch(setCurrentContext({
-        id: result.companyId,
-        name: result.companyName,
-        type: result.type,
-      }));
+      await switchContextAndNavigate({
+        dispatch, navigate, user, companyId,
+      });
       handleMenuClose();
     } catch (error) {
       console.error('Failed to switch context:', error);
@@ -102,6 +97,23 @@ const ContextSelector = () => {
   if (!currentContext) {
     return null;
   }
+
+  // Every workspace this identity may enter (own fleet, platform, etc.) —
+  // always offered first, regardless of which context is currently active.
+  // Previously there was no way back to "My Fleet" from inside Platform (or
+  // any context) at all — only the org-specific lists below existed.
+  const currentCompanyId = currentContext.id ?? null;
+  const workspaceItems = (accessibleContexts || [])
+    .filter((c) => {
+      if (c.type === 'platform') return currentContext.type !== 'platform';
+      return c.companyId !== currentCompanyId;
+    })
+    .map((c) => ({
+      type: 'workspace',
+      id: c.type === 'platform' ? 'platform' : c.companyId,
+      name: c.label || c.companyName || (c.type === 'platform' ? 'Platform' : 'Workspace'),
+      contextType: c.type,
+    }));
 
   // Build menu items based on current context type
   const menuItems = [];
@@ -146,6 +158,10 @@ const ContextSelector = () => {
     }
   }
 
+  const allMenuItems = workspaceItems.length
+    ? [{ type: 'header', label: 'My Workspaces' }, ...workspaceItems, ...menuItems]
+    : menuItems;
+
   return (
     <Box className={classes.container}>
       <Button
@@ -173,11 +189,25 @@ const ContextSelector = () => {
           sx: { maxHeight: 300 },
         }}
       >
-        {menuItems.map((item, idx) => {
+        {allMenuItems.map((item, idx) => {
           if (item.type === 'header') {
             return (
               <MenuItem key={`header-${idx}`} disabled sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
                 {item.label}
+              </MenuItem>
+            );
+          }
+          if (item.type === 'workspace') {
+            return (
+              <MenuItem
+                key={`workspace-${item.id}`}
+                onClick={() => handleContextSwitch(item.id)}
+                className={classes.menuItem}
+              >
+                <Typography variant="body2">{item.name}</Typography>
+                <Typography variant="caption" sx={{ color: 'var(--text-secondary)' }}>
+                  {item.contextType === 'platform' ? 'Platform' : item.contextType === 'partner' ? 'Partner' : 'My Fleet'}
+                </Typography>
               </MenuItem>
             );
           }

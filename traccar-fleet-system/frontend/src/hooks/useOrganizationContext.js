@@ -2,20 +2,29 @@ import { useDispatch } from 'react-redux';
 import { useEffectAsync } from '../reactHelper';
 import {
   setCurrentContext,
+  setAccessibleContexts,
   setPartners,
   setDirectCustomers,
   setOverview,
   setError,
 } from '../store/organizations';
 import {
+  fetchContext,
   fetchPartners,
   fetchDirectCustomers,
   fetchPlatformOverview,
 } from '../saas/organizationApi';
 
 /**
- * Hook to initialize organization context on app load
- * Determines user type (Platform/Partner/Customer) and loads appropriate organization data
+ * Hook to initialize organization context on app load.
+ *
+ * Reads the server's real activeContext/accessibleContexts (GET /api/context)
+ * instead of guessing from user.administrator. The old guess
+ * (administrator ? 'platform' : 'customer') meant any server-side context
+ * switch (e.g. via ContextSelector) was silently reverted on the next full
+ * page reload, since this hook re-runs on every mount and never read the
+ * server back — see tenantResolverService.js's getHomeContext/resetActiveContext
+ * for what the server now considers a user's default context.
  */
 export const useOrganizationContext = (user) => {
   const dispatch = useDispatch();
@@ -26,25 +35,16 @@ export const useOrganizationContext = (user) => {
     }
 
     try {
-      // TODO: Fetch user context from backend (need context endpoint)
-      // For now, assume platform admin
-      // The backend tenantResolverService.js determines context based on:
-      // - req.user.administrator flag
-      // - req.auth.activeContext.type ('platform' | 'partner' | 'customer')
-      // - req.auth.companyId
+      const { activeContext, accessibleContexts } = await fetchContext(user);
 
-      // Placeholder: determine context (this should come from backend auth response)
-      const isSuperAdmin = user.administrator || false;
-      
-      if (isSuperAdmin) {
-        // Platform admin context
-        dispatch(setCurrentContext({
-          type: 'platform',
-          name: 'NUMZ Platform',
-          id: null,
-        }));
+      dispatch(setCurrentContext({
+        type: activeContext?.type || 'customer',
+        name: activeContext?.companyName || null,
+        id: activeContext?.companyId ?? null,
+      }));
+      dispatch(setAccessibleContexts(accessibleContexts || []));
 
-        // Load platform data
+      if (activeContext?.type === 'platform') {
         const [partners, directCustomers, overview] = await Promise.all([
           fetchPartners(user).catch(() => []),
           fetchDirectCustomers(user).catch(() => []),
@@ -54,14 +54,6 @@ export const useOrganizationContext = (user) => {
         dispatch(setPartners(partners));
         dispatch(setDirectCustomers(directCustomers));
         dispatch(setOverview(overview));
-      } else {
-        // Partner or customer context
-        // TODO: Load from user's companyId
-        dispatch(setCurrentContext({
-          type: 'customer',
-          name: user.attributes?.company || 'My Company',
-          id: user.id,
-        }));
       }
     } catch (err) {
       console.error('Failed to load organization context:', err);

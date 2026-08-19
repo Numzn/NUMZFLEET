@@ -21,7 +21,9 @@ import {
   createMyCustomer,
   switchContext,
   resetContext,
+  getContext,
   getPlatformOverview,
+  getMyOverview,
 } from '../controllers/organizationController.js';
 
 const router = express.Router();
@@ -85,6 +87,17 @@ router.get(
   getPlatformOverview
 );
 
+// GET /api/context — Read-only projection of the caller's current context.
+// No mutation; safe to call on every page load. Any authenticated user may
+// read their own context.
+router.get(
+  '/context',
+  authenticate,
+  attachTenantContext,
+  requireAuth,
+  getContext
+);
+
 // POST /api/context/switch/:companyId — Switch active context. Authorization is
 // enforced inside switchActiveContext (identity-aware: platform can switch
 // anywhere, a partner only into itself or its own customers, a customer
@@ -122,6 +135,16 @@ router.get(
   requireAuth,
   requirePartner,
   listMyCustomers
+);
+
+// GET /api/partner/overview — Partner's own aggregate statistics
+router.get(
+  '/partner/overview',
+  authenticate,
+  attachTenantContext,
+  requireAuth,
+  requirePartner,
+  getMyOverview
 );
 
 // POST /api/my-customers — Partner creates own customer

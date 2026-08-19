@@ -14,7 +14,7 @@ import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import DirectionsCarOutlinedIcon from '@mui/icons-material/DirectionsCarOutlined';
@@ -46,6 +46,7 @@ import { isSettingsWorkspace, resolveExitTarget } from '../util/navWorkspace.js'
 import { buildSettingsNavGroups } from '../../settings/center/settingsSectionRegistry.js';
 import { useSuperAdmin, useTechnician } from '../util/permissions';
 import { resolveNavigation } from '../util/navigationResolver';
+import { switchContextAndNavigate } from '../../saas/util/contextNavigation.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -183,6 +184,7 @@ const UnifiedSidebar = ({
   const { classes } = useStyles();
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const t = useTranslation();
 
   const readonly = useRestriction('readonly');
@@ -191,6 +193,7 @@ const UnifiedSidebar = ({
   const features = useFeatures();
   const user = useSelector((state) => state.session.user);
   const currentContext = useSelector((state) => state.organizations?.currentContext);
+  const accessibleContexts = useSelector((state) => state.organizations?.accessibleContexts);
   const [maintenanceBadge, setMaintenanceBadge] = useState(undefined);
 
   useEffect(() => {
@@ -313,10 +316,12 @@ const UnifiedSidebar = ({
       readonly,
       features,
       externalSystemItems,
+      accessibleContexts,
     });
   }, [
     inSettings,
     currentContext,
+    accessibleContexts,
     alertsBadgeCount,
     pendingFuelCount,
     maintenanceBadge,
@@ -359,6 +364,16 @@ const UnifiedSidebar = ({
       if (item.disabled) return;
       if (item.external && item.href) {
         window.open(item.href, '_blank', 'noopener,noreferrer');
+        onNavigate?.();
+        return;
+      }
+      if (item.contextSwitchTo !== undefined) {
+        // "Switch workspace" nav item (navigationResolver's accessibleContexts
+        // group) — must actually switch the active context, not just navigate:
+        // company-scoped reads are filtered by the ACTIVE context, not identity.
+        switchContextAndNavigate({
+          dispatch, navigate, user, companyId: item.contextSwitchTo,
+        }).catch((err) => console.error('Failed to switch workspace:', err));
         onNavigate?.();
         return;
       }
@@ -418,7 +433,7 @@ const UnifiedSidebar = ({
         </Box>
       </Tooltip>
     );
-  }, [buildTooltip, classes.badge, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, collapsed, handleGo, leafActive, onNavigate]);
+  }, [buildTooltip, classes.badge, classes.menuItem, classes.menuItemActive, classes.menuItemIcon, classes.menuItemText, collapsed, dispatch, handleGo, leafActive, navigate, onNavigate, user]);
 
   return (
     <Box

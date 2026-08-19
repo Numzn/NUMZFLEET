@@ -231,6 +231,17 @@ export async function getOrganizationOverview() {
 }
 
 /**
+ * Get a Partner's own aggregate statistics
+ */
+export async function getPartnerOverview(partnerCompanyId) {
+  const customerCount = await Company.count({
+    where: { organizationType: 'customer', parentCompanyId: partnerCompanyId },
+  });
+
+  return { customerCount };
+}
+
+/**
  * Convert Company model to DTO
  */
 function toOrgDto(company) {

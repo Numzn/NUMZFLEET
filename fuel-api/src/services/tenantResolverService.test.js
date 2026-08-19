@@ -40,10 +40,15 @@ const freshTraccarUserId = () => nextTraccarUserId++;
 
 const TEST_SLUG_PREFIX = 'phase2d-';
 
+const createdUserRoleIds = [];
+
 after(async () => {
   // Clean up everything this test file created, regardless of pass/fail, so
   // repeated runs never collide and the dev DB isn't left with test debris.
-  const { Company, NumzUser, ActiveContext } = await import('../models/index.js');
+  const { Company, NumzUser, ActiveContext, UserRole } = await import('../models/index.js');
+  if (createdUserRoleIds.length) {
+    await UserRole.destroy({ where: { id: { [Op.in]: createdUserRoleIds } } });
+  }
   await ActiveContext.destroy({ where: { traccarUserId: { [Op.gte]: 900_000_000 } } });
   await NumzUser.destroy({ where: { email: { [Op.like]: `${TEST_SLUG_PREFIX}%@test.local` } } });
   await Company.destroy({ where: { slug: { [Op.like]: `${TEST_SLUG_PREFIX}%` } } });
@@ -72,6 +77,23 @@ async function makeNumzUser(traccarUserId, companyId) {
     displayName: `Phase 2D User ${traccarUserId}`,
     status: 'active',
   });
+}
+
+/**
+ * Grants the already-seeded platform_super_admin role (companyId IS NULL) to
+ * a numz user — the additive signal getHomeContext() ORs into isSuperAdmin.
+ * Nothing in the application writes this today (Phase 5, deferred); tests
+ * grant it directly, the same way an admin-only endpoint would later.
+ */
+async function grantPlatformSuperAdminRole(numzUserId) {
+  const { Role, UserRole } = await import('../models/index.js');
+  const role = await Role.findOne({ where: { key: 'platform_super_admin', companyId: null } });
+  assert.ok(role, 'platform_super_admin role must already be seeded (seedRolesAndPermissions.js)');
+  const [userRole] = await UserRole.findOrCreate({
+    where: { numzUserId, roleId: role.id, companyId: null },
+  });
+  createdUserRoleIds.push(userRole.id);
+  return userRole;
 }
 
 function platformTraccarUser(id) {
@@ -430,6 +452,119 @@ describe('Phase 2D: Active-Context Switching', () => {
       );
 
       await Vehicle.destroy({ where: { id: vehicleB1.id } });
+    });
+  });
+
+  describe('Additive identity: platform capability + home company (Phase 1)', () => {
+    it('a company-scoped admin WITHOUT the platform_super_admin role stays company_admin only (unchanged today behavior)', async () => {
+      clearCompanyContextCache();
+      const traccarUserId = freshTraccarUserId();
+      const company = await makeCompany({ name: 'Additive Co No Role', organizationType: 'customer' });
+      await makeNumzUser(traccarUserId, company.id);
+      const adminUser = platformTraccarUser(traccarUserId); // administrator: true, has a company
+
+      const ctx = await resolveCompanyContextForTraccarUser(adminUser);
+
+      assert.equal(ctx.isSuperAdmin, false, 'administrator + companyId, no role grant, must not become platform-capable');
+      assert.equal(ctx.homeCompanyId, company.id);
+      assert.ok(ctx.roles.includes('company_admin'));
+      assert.equal(ctx.activeContext.type, 'customer');
+      assert.equal(ctx.activeContext.companyId, company.id);
+    });
+
+    it('a Traccar admin with BOTH a home company AND the platform_super_admin role becomes platform-capable while keeping their home company', async () => {
+      clearCompanyContextCache();
+      const traccarUserId = freshTraccarUserId();
+      const company = await makeCompany({ name: 'Additive Co With Role', organizationType: 'customer' });
+      const numzUser = await makeNumzUser(traccarUserId, company.id);
+      await grantPlatformSuperAdminRole(numzUser.id);
+      const dualUser = platformTraccarUser(traccarUserId);
+
+      const ctx = await resolveCompanyContextForTraccarUser(dualUser);
+
+      assert.equal(ctx.isSuperAdmin, true, 'the role grant must be sufficient even though numz_users.companyId is set');
+      assert.equal(ctx.homeCompanyId, company.id, 'home company must survive alongside platform capability');
+      assert.ok(ctx.roles.includes('super_admin'));
+      assert.ok(ctx.roles.includes('company_admin'), 'operational roles for the home company must still apply');
+
+      // Default (no override yet) must land on the HOME company, not platform —
+      // this is the "log in and see my own fleet" behavior change.
+      assert.equal(ctx.activeContext.type, 'customer');
+      assert.equal(ctx.activeContext.companyId, company.id);
+
+      assert.deepEqual(
+        ctx.accessibleContexts.map((c) => c.type).sort(),
+        ['customer', 'platform'],
+        'a dual-capability identity must see both workspaces as accessible',
+      );
+    });
+
+    it('the pure platform admin (no home company) is completely unaffected: isSuperAdmin true, homeCompanyId null, default is platform', async () => {
+      clearCompanyContextCache();
+      const traccarUserId = freshTraccarUserId();
+      const pureAdmin = platformTraccarUser(traccarUserId); // no numz_users row at all
+
+      const ctx = await resolveCompanyContextForTraccarUser(pureAdmin);
+
+      assert.equal(ctx.isSuperAdmin, true);
+      assert.equal(ctx.homeCompanyId, null);
+      assert.equal(ctx.activeContext.type, 'platform');
+      assert.equal(ctx.activeContext.companyId, null);
+      assert.deepEqual(ctx.accessibleContexts.map((c) => c.type), ['platform']);
+    });
+
+    it('resetActiveContext returns a dual-capability identity to their HOME COMPANY, not platform', async () => {
+      clearCompanyContextCache();
+      const traccarUserId = freshTraccarUserId();
+      const company = await makeCompany({ name: 'Additive Reset Co', organizationType: 'customer' });
+      const numzUser = await makeNumzUser(traccarUserId, company.id);
+      await grantPlatformSuperAdminRole(numzUser.id);
+      const dualUser = platformTraccarUser(traccarUserId);
+
+      // Explicitly switch into platform first, then reset — reset must land
+      // back on the home company, per the new default (Phase 1 §3.4).
+      await switchActiveContext(dualUser, null);
+      let ctx = await resolveCompanyContextForTraccarUser(dualUser);
+      assert.equal(ctx.activeContext.type, 'platform');
+
+      const resetResult = await resetActiveContext(dualUser);
+      assert.equal(resetResult.type, 'customer');
+      assert.equal(resetResult.companyId, company.id);
+
+      ctx = await resolveCompanyContextForTraccarUser(dualUser);
+      assert.equal(ctx.activeContext.type, 'customer');
+      assert.equal(ctx.activeContext.companyId, company.id);
+    });
+
+    it('resetActiveContext still returns a PURE platform admin to platform (no home company to fall back to)', async () => {
+      clearCompanyContextCache();
+      const traccarUserId = freshTraccarUserId();
+      const pureAdmin = platformTraccarUser(traccarUserId);
+
+      const resetResult = await resetActiveContext(pureAdmin);
+      assert.equal(resetResult.type, 'platform');
+      assert.equal(resetResult.companyId, null);
+    });
+
+    it('a dual-capability identity can still explicitly switch into platform, and it correctly overrides their home company (not silently staying on it)', async () => {
+      clearCompanyContextCache();
+      const traccarUserId = freshTraccarUserId();
+      const company = await makeCompany({ name: 'Additive Override Co', organizationType: 'customer' });
+      const numzUser = await makeNumzUser(traccarUserId, company.id);
+      await grantPlatformSuperAdminRole(numzUser.id);
+      const dualUser = platformTraccarUser(traccarUserId);
+
+      const switchResult = await switchActiveContext(dualUser, null);
+      assert.equal(switchResult.type, 'platform');
+      assert.equal(switchResult.companyId, null);
+
+      // A completely separate subsequent request must see platform too — not
+      // silently fall back to the home company just because homeCtx.companyId
+      // is non-null now (this is the applyActiveContextOverride fix).
+      const ctx = await resolveCompanyContextForTraccarUser(dualUser);
+      assert.equal(ctx.activeContext.type, 'platform');
+      assert.equal(ctx.activeContext.companyId, null);
+      assert.equal(ctx.isSuperAdmin, true, 'identity fact must still read true while viewing platform');
     });
   });
 });

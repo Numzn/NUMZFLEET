@@ -1,4 +1,5 @@
 import { NumzUser, Company, ActiveContext, DEFAULT_COMPANY_ID } from '../models/index.js';
+import { hasPlatformSuperAdminRole } from './rolesService.js';
 
 /**
  * Tenant Resolver Service — Identity vs. Active Context (Phase 2D)
@@ -34,11 +35,13 @@ async function getHomeContext(traccarUser) {
   if (!traccarUser?.id) {
     return {
       companyId: DEFAULT_COMPANY_ID,
+      homeCompanyId: null,
       numzUserId: null,
       organizationType: 'customer',
       parentCompanyId: null,
       companyName: null,
       accessibleCustomerIds: [],
+      accessibleContexts: [],
       roles: [],
       isSuperAdmin: false,
       numzRole: null,
@@ -65,34 +68,49 @@ async function getHomeContext(traccarUser) {
 
   const roles = [];
   let companyId = numzUser?.companyId || DEFAULT_COMPANY_ID;
-  let isSuperAdmin = false;
   let organizationType = 'customer';
   let parentCompanyId = null;
   let companyName = null;
   let accessibleCustomerIds = [];
 
-  // Platform Super Admin: Traccar admin with no company_id
-  if (traccarUser.administrator && !numzUser?.companyId) {
-    roles.push('super_admin');
-    isSuperAdmin = true;
-    companyId = null;
-    organizationType = null;
-  } else {
-    // User has a company — determine if it's a partner or customer
-    if (numzUser?.companyId) {
-      const company = await Company.findByPk(numzUser.companyId, {
-        attributes: ['id', 'name', 'organizationType', 'parentCompanyId'],
-      });
-      organizationType = company?.organizationType || 'customer';
-      parentCompanyId = company?.parentCompanyId || null;
-      companyName = company?.name || null;
+  // Home company facts — computed whenever the identity has an assigned
+  // company, unconditionally (previously this only ran in the "not a pure
+  // platform admin" branch below, which made a platform admin having a home
+  // company unrepresentable). See docs/PLATFORM_ARCHITECTURE.md — identity
+  // vs. active context.
+  if (numzUser?.companyId) {
+    const company = await Company.findByPk(numzUser.companyId, {
+      attributes: ['id', 'name', 'organizationType', 'parentCompanyId'],
+    });
+    organizationType = company?.organizationType || 'customer';
+    parentCompanyId = company?.parentCompanyId || null;
+    companyName = company?.name || null;
 
-      if (organizationType === 'partner') {
-        accessibleCustomerIds = await resolvePartnerAccessibleCustomers(numzUser.companyId);
-      }
+    if (organizationType === 'partner') {
+      accessibleCustomerIds = await resolvePartnerAccessibleCustomers(numzUser.companyId);
     }
+  }
 
-    // Add operational roles
+  // Platform capability — a Traccar admin with no home company (the
+  // original, sole case, unchanged) OR a Traccar admin who ALSO has a home
+  // company but holds an explicit platform_super_admin role assignment
+  // (additive; see rolesService.js's hasPlatformSuperAdminRole).
+  const hasPlatformRole = numzUser?.id
+    ? await hasPlatformSuperAdminRole(numzUser.id)
+    : false;
+  const isSuperAdmin = traccarUser.administrator === true
+    && (!numzUser?.companyId || hasPlatformRole);
+
+  if (isSuperAdmin) {
+    roles.push('super_admin');
+  }
+
+  // Operational roles for the home company. Unchanged from before for every
+  // case that existed previously: a pure platform admin (administrator with
+  // no home company) still gets none of these, exactly as today. What's new
+  // is that this block is now reachable for a platform admin who ALSO has a
+  // home company (previously that combination could not occur at all).
+  if (!(traccarUser.administrator && !numzUser?.companyId)) {
     if (traccarUser.administrator || traccarUser.isManager) {
       roles.push('company_admin', 'fleet_manager');
     }
@@ -103,13 +121,46 @@ async function getHomeContext(traccarUser) {
     }
   }
 
+  // homeCompanyId is the identity's own company independent of platform
+  // status — null only when there isn't one (pure platform admin, or an
+  // unprovisioned user). companyId below keeps its pre-existing meaning
+  // (the identity's default active-context company) for every other
+  // function in this file — null only for a pure platform admin, exactly
+  // as before.
+  const homeCompanyId = numzUser?.companyId || null;
+
+  if (traccarUser.administrator && !numzUser?.companyId) {
+    companyId = null;
+    organizationType = null;
+  }
+
+  const accessibleContexts = [];
+  if (homeCompanyId) {
+    accessibleContexts.push({
+      type: organizationType || 'customer',
+      companyId: homeCompanyId,
+      companyName,
+      label: 'My Fleet',
+    });
+  }
+  if (isSuperAdmin) {
+    accessibleContexts.push({
+      type: 'platform',
+      companyId: null,
+      companyName: 'NUMZ Platform',
+      label: 'Platform',
+    });
+  }
+
   const homeCtx = {
     companyId,
+    homeCompanyId,
     numzUserId: numzUser?.id || null,
     organizationType,
     parentCompanyId,
     companyName,
     accessibleCustomerIds,
+    accessibleContexts,
     roles: [...new Set(roles)],
     isSuperAdmin,
     numzRole: numzRole || null,
@@ -178,7 +229,17 @@ async function applyActiveContextOverride(homeCtx, traccarUserId) {
 
   if (override.companyId == null) {
     if (homeCtx.isSuperAdmin) {
-      return homeCtx; // already resolves to platform by default
+      // Explicit platform override — force platform regardless of whether
+      // this identity also has a home company (homeCtx.companyId may be
+      // non-null now that the two can coexist; the override must win).
+      return {
+        ...homeCtx,
+        companyId: null,
+        organizationType: null,
+        parentCompanyId: null,
+        companyName: null,
+        accessibleCustomerIds: [],
+      };
     }
     // Invalid: only a super admin may hold an explicit platform override.
     await override.destroy();
@@ -217,6 +278,7 @@ export async function resolveCompanyContextForTraccarUser(traccarUser) {
   if (!traccarUser?.id) {
     return {
       companyId: DEFAULT_COMPANY_ID,
+      homeCompanyId: null,
       numzUserId: null,
       activeContext: {
         type: 'customer',
@@ -226,6 +288,7 @@ export async function resolveCompanyContextForTraccarUser(traccarUser) {
       },
       organizationType: 'customer',
       accessibleCustomerIds: [],
+      accessibleContexts: [],
       roles: [],
       isSuperAdmin: false,
     };
@@ -246,10 +309,12 @@ export async function resolveCompanyContextForTraccarUser(traccarUser) {
 
   return {
     companyId: resolved.companyId, // Backward compat — the ACTIVE context's company
+    homeCompanyId: resolved.homeCompanyId, // Identity fact — never changed by active context
     numzUserId: resolved.numzUserId,
     activeContext,
     organizationType: resolved.organizationType,
     accessibleCustomerIds: resolved.accessibleCustomerIds,
+    accessibleContexts: resolved.accessibleContexts, // Identity fact — never changed by active context
     roles: resolved.roles,
     isSuperAdmin: resolved.isSuperAdmin, // Identity fact — never changed by active context
     numzRole: resolved.numzRole,
@@ -301,16 +366,18 @@ export async function switchActiveContext(traccarUser, targetCompanyId) {
 
 /**
  * Reset this Traccar user's active context back to their default (home)
- * context — platform for a super admin, their own company otherwise. This is
- * the "back to platform"/"back to home" path referenced in Phase 2D: it does
- * not require the browser to reload the app.
+ * context — their own company if they have one (including a platform-capable
+ * identity who also has a home company, per docs/PLATFORM_ARCHITECTURE.md's
+ * identity-vs-context split), platform only for an identity with no home
+ * company at all. This is the "back to platform"/"back to home" path
+ * referenced in Phase 2D: it does not require the browser to reload the app.
  */
 export async function resetActiveContext(traccarUser) {
   const traccarUserId = Number(traccarUser.id);
   await ActiveContext.destroy({ where: { traccarUserId } });
 
   const homeCtx = await getHomeContext(traccarUser);
-  if (homeCtx.isSuperAdmin) {
+  if (!homeCtx.homeCompanyId && homeCtx.isSuperAdmin) {
     return buildPlatformContext();
   }
   if (!homeCtx.companyId || homeCtx.companyId === DEFAULT_COMPANY_ID) {

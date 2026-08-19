@@ -4,6 +4,7 @@ const organizationsSlice = createSlice({
   name: 'organizations',
   initialState: {
     currentContext: null, // { id, name, type: 'platform' | 'partner' | 'customer' }
+    accessibleContexts: [], // every workspace this identity may enter (from GET /api/context)
     partners: [],
     directCustomers: [],
     myCustomers: [], // Partner's own customers (from /api/my-customers)
@@ -16,6 +17,9 @@ const organizationsSlice = createSlice({
   reducers: {
     setCurrentContext: (state, action) => {
       state.currentContext = action.payload;
+    },
+    setAccessibleContexts: (state, action) => {
+      state.accessibleContexts = action.payload;
     },
     setPartners: (state, action) => {
       state.partners = action.payload;
@@ -66,6 +70,7 @@ const organizationsSlice = createSlice({
 
 export const {
   setCurrentContext,
+  setAccessibleContexts,
   setPartners,
   setDirectCustomers,
   setMyCustomers,

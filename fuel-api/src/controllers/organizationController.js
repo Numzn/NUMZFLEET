@@ -9,8 +9,11 @@
  * - GET /api/direct-customers (NUMZ only)
  * - GET /api/my-customers (Partner only)
  * - POST /api/my-customers (Partner only)
- * - POST /api/context/switch/:companyId (NUMZ admin only)
+ * - GET /api/context (any authenticated user — read-only)
+ * - POST /api/context/switch/:companyId (identity-aware, see switchActiveContext)
+ * - POST /api/context/reset (any authenticated user)
  * - GET /api/platform/overview (NUMZ only)
+ * - GET /api/partner/overview (Partner only)
  *
  * Phase 2 consolidation (Stage 2, controller wiring): the four create
  * handlers pass an optional `req.body.admin` through to organizationService.js,
@@ -27,6 +30,7 @@ import {
   listDirectCustomers,
   listPartnerCustomers,
   getOrganizationOverview,
+  getPartnerOverview,
 } from '../services/organizationService.js';
 import { switchActiveContext, resetActiveContext } from '../services/tenantResolverService.js';
 import { handleError } from '../utils/handleError.js';
@@ -224,8 +228,13 @@ export const createMyCustomer = async (req, res) => {
 export const switchContext = async (req, res) => {
   try {
     const { companyId } = req.params;
+    // 'platform' is the frontend's sentinel for "switch to platform" — a real
+    // URL path segment can't be empty/null, and switchActiveContext treats
+    // any truthy string (including the literal "null") as a real company id
+    // to look up. Translate the sentinel to the falsy value it expects.
+    const targetCompanyId = companyId === 'platform' ? null : companyId;
 
-    const newContext = await switchActiveContext(req.user, companyId);
+    const newContext = await switchActiveContext(req.user, targetCompanyId);
 
     // Audit trail
     console.log(`[AUDIT] Traccar user ${req.user?.id} switched active context to ${newContext.type} (${newContext.companyId || 'platform'})`);
@@ -256,6 +265,29 @@ export const resetContext = async (req, res) => {
 };
 
 /**
+ * GET /api/context
+ * Read-only projection of req.auth — the current activeContext plus the
+ * identity facts (isSuperAdmin, roles, homeCompanyId, accessibleContexts)
+ * needed to render navigation. No mutation, no side effects; safe to call on
+ * every page load. This is the endpoint the frontend was missing entirely —
+ * previously only POST /context/switch and /context/reset returned context,
+ * and only as a side effect of changing it.
+ */
+export const getContext = async (req, res) => {
+  try {
+    return res.json({
+      activeContext: req.auth?.activeContext ?? null,
+      accessibleContexts: req.auth?.accessibleContexts ?? [],
+      homeCompanyId: req.auth?.homeCompanyId ?? null,
+      isSuperAdmin: req.auth?.isSuperAdmin === true,
+      roles: req.auth?.roles ?? [],
+    });
+  } catch (error) {
+    return handleError(res, error, 'Get context error', 'Failed to get context');
+  }
+};
+
+/**
  * GET /api/platform/overview
  * NUMZ only — Platform-level aggregate statistics
  */
@@ -265,5 +297,24 @@ export const getPlatformOverview = async (req, res) => {
     return res.json(overview);
   } catch (error) {
     return handleError(res, error, 'Get platform overview error', 'Failed to get overview');
+  }
+};
+
+/**
+ * GET /api/partner/overview
+ * Partner only — the caller's own aggregate statistics
+ */
+export const getMyOverview = async (req, res) => {
+  try {
+    const partnerCompanyId = req.auth?.activeContext?.companyId;
+
+    if (!partnerCompanyId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const overview = await getPartnerOverview(partnerCompanyId);
+    return res.json(overview);
+  } catch (error) {
+    return handleError(res, error, 'Get partner overview error', 'Failed to get overview');
   }
 };
