@@ -25,7 +25,6 @@ import notificationsRouter from './modules/notifications/routes.js';
 import meRouter from './modules/profile/routes.js';
 import organizationRouter from './modules/organization/routes.js';
 import rolesRouter from './modules/roles/routes.js';
-import platformRouter from './modules/platform/routes.js';
 import notificationPreferencesRouter from './modules/notificationPreferences/routes.js';
 import telemetryIngestionRouter from './routes/telemetryIngestion.js';
 import organizationsRouter from './routes/organizations.js';
@@ -226,7 +225,6 @@ const STRICT_PATH_PREFIXES = [
   '/me',
   '/organization',
   '/roles',
-  '/platform',
   '/notification-preferences',
   '/fuel-requests',
   '/operation-sessions',
@@ -413,7 +411,6 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/me', meRouter);
 app.use('/api/organization', organizationRouter);
 app.use('/api/roles', rolesRouter);
-app.use('/api/platform', platformRouter);
 app.use('/api/notification-preferences', notificationPreferencesRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
 app.use('/api/vehicles', vehiclesRouter);

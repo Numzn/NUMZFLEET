@@ -5,7 +5,6 @@ import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
 import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined';
-import DomainAddOutlinedIcon from '@mui/icons-material/DomainAddOutlined';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
 import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
@@ -49,7 +48,6 @@ export const SETTINGS_CATEGORIES = {
   automation: 'Automation',
   integrations: 'Integrations',
   system: 'System',
-  platform: 'Platform',
 };
 
 export const SETTINGS_SECTION_IDS = {
@@ -70,7 +68,6 @@ export const SETTINGS_SECTION_IDS = {
   savedCommands: 'savedCommands',
   announcement: 'announcement',
   server: 'server',
-  platformCompanies: 'platformCompanies',
 };
 
 export const SETTINGS_SECTIONS = [
@@ -287,18 +284,6 @@ export const SETTINGS_SECTIONS = [
     category: 'system',
     description: 'Raw Traccar server configuration.',
     keywords: ['server', 'traccar server', 'defaults'],
-  },
-  {
-    id: SETTINGS_SECTION_IDS.platformCompanies,
-    label: 'Companies',
-    icon: DomainAddOutlinedIcon,
-    path: '/settings/platform/companies',
-    match: (pathname) => pathname.startsWith('/settings/platform/companies'),
-    live: true,
-    requiresRole: 'platformOwner',
-    category: 'platform',
-    description: 'Create and manage tenant companies.',
-    keywords: ['platform', 'companies', 'tenants', 'onboarding', 'provision'],
   },
 ];
 

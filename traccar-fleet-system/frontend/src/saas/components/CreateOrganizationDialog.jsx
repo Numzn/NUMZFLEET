@@ -7,16 +7,12 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { provisionCompany } from '../platformCompaniesApi.js';
 
 const EMPTY_FORM = {
-  companyName: '',
-  companySlug: '',
-  contactEmail: '',
-  contactPhone: '',
+  name: '',
+  slug: '',
   adminName: '',
   adminEmail: '',
-  adminPhone: '',
   adminPassword: '',
 };
 
@@ -28,11 +24,22 @@ function parseApiError(e) {
   try {
     return JSON.parse(e.message)?.error || e.message;
   } catch {
-    return e.message || 'Failed to create company';
+    return e.message || 'Failed to create organization';
   }
 }
 
-export default function CreateCompanyDialog({ open, onClose, onCreated }) {
+/**
+ * Shared create dialog for Partners and Direct Customers — an optional
+ * "first administrator" section, provisioning a real login-capable account
+ * via createPartner/createDirectCustomer's `admin` field
+ * (organizationService.js). Previously these dialogs only ever sent
+ * { name, slug } — no admin, so a partner/customer created through the
+ * saas/platform UI had no way to log in until someone separately provisioned
+ * one through the older Settings -> Platform -> Companies flow (now removed).
+ */
+export default function CreateOrganizationDialog({
+  open, onClose, onCreated, createFn, title, namePlaceholder, slugPlaceholder,
+}) {
   const currentUser = useSelector((state) => state.session.user);
   const [form, setForm] = useState(EMPTY_FORM);
   const [slugTouched, setSlugTouched] = useState(false);
@@ -45,12 +52,12 @@ export default function CreateCompanyDialog({ open, onClose, onCreated }) {
     const { value } = e.target;
     setForm((prev) => {
       const next = { ...prev, [field]: value };
-      if (field === 'companyName' && !slugTouched) {
-        next.companySlug = slugify(value);
+      if (field === 'name' && !slugTouched) {
+        next.slug = slugify(value);
       }
       return next;
     });
-    if (field === 'companySlug') setSlugTouched(true);
+    if (field === 'slug') setSlugTouched(true);
   };
 
   const handleClose = () => {
@@ -61,26 +68,26 @@ export default function CreateCompanyDialog({ open, onClose, onCreated }) {
     onClose();
   };
 
+  const adminStarted = form.adminName || form.adminEmail || form.adminPassword;
+
   const handleCreate = async () => {
     setSaving(true);
     setError('');
     try {
-      const created = await provisionCompany(currentUser, {
-        company: {
-          name: form.companyName,
-          slug: form.companySlug,
-          contactEmail: form.contactEmail || undefined,
-          contactPhone: form.contactPhone || undefined,
-        },
-        admin: {
-          name: form.adminName,
-          email: form.adminEmail,
-          phone: form.adminPhone || undefined,
-          password: form.adminPassword,
-        },
+      const created = await createFn(currentUser, {
+        name: form.name,
+        slug: form.slug,
+        traccarGroupId: null,
+        ...(adminStarted ? {
+          admin: { name: form.adminName, email: form.adminEmail, password: form.adminPassword },
+        } : {}),
       });
-      setResult(created);
-      onCreated();
+      onCreated(created);
+      if (created.admin) {
+        setResult(created);
+      } else {
+        handleClose();
+      }
     } catch (e) {
       setError(parseApiError(e));
     } finally {
@@ -88,17 +95,16 @@ export default function CreateCompanyDialog({ open, onClose, onCreated }) {
     }
   };
 
-  const canSubmit = form.companyName && form.companySlug && form.adminName
-    && form.adminEmail && form.adminPassword.length >= 6;
+  const canSubmit = form.name && form.slug
+    && (!adminStarted || (form.adminName && form.adminEmail && form.adminPassword.length >= 6));
 
   if (result) {
     return (
       <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
-        <DialogTitle>Company created</DialogTitle>
+        <DialogTitle>{result.name} created</DialogTitle>
         <DialogContent>
           <Alert severity="success" sx={{ mb: 2 }}>
-            {result.company.name} is active. Hand these credentials to the new admin now —
-            the password will not be shown again.
+            Hand these credentials to the new admin now — the password will not be shown again.
           </Alert>
           <Stack spacing={1.5}>
             <TextField label="Admin email" value={result.admin.email} InputProps={{ readOnly: true }} size="small" />
@@ -131,35 +137,31 @@ export default function CreateCompanyDialog({ open, onClose, onCreated }) {
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
-      <DialogTitle>Create company</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Stack spacing={2}>
-          <Typography variant="overline" color="text.secondary">Company</Typography>
-          <TextField label="Company name" value={form.companyName} onChange={set('companyName')} required size="small" />
+          <TextField label="Name" value={form.name} onChange={set('name')} required size="small" placeholder={namePlaceholder} />
           <TextField
-            label="Slug"
-            value={form.companySlug}
-            onChange={set('companySlug')}
-            helperText="Lowercase letters, numbers, hyphens only"
+            label="Slug (URL-friendly)"
+            value={form.slug}
+            onChange={set('slug')}
+            helperText="Lowercase letters, numbers, and hyphens only"
             required
             size="small"
+            placeholder={slugPlaceholder}
           />
-          <TextField label="Contact email" value={form.contactEmail} onChange={set('contactEmail')} size="small" />
-          <TextField label="Contact phone" value={form.contactPhone} onChange={set('contactPhone')} size="small" />
 
           <Divider />
-          <Typography variant="overline" color="text.secondary">First administrator</Typography>
-          <TextField label="Full name" value={form.adminName} onChange={set('adminName')} required size="small" />
-          <TextField label="Email" value={form.adminEmail} onChange={set('adminEmail')} required size="small" />
-          <TextField label="Phone" value={form.adminPhone} onChange={set('adminPhone')} size="small" />
+          <Typography variant="overline" color="text.secondary">First administrator (optional)</Typography>
+          <TextField label="Full name" value={form.adminName} onChange={set('adminName')} size="small" />
+          <TextField label="Email" value={form.adminEmail} onChange={set('adminEmail')} size="small" />
           <TextField
             label="Temporary password"
             value={form.adminPassword}
             onChange={set('adminPassword')}
             type={showPassword ? 'text' : 'password'}
             helperText="At least 6 characters — hand this to the admin directly"
-            required
             size="small"
             InputProps={{
               endAdornment: (
@@ -176,7 +178,7 @@ export default function CreateCompanyDialog({ open, onClose, onCreated }) {
       <DialogActions>
         <Button onClick={handleClose} disabled={saving}>Cancel</Button>
         <Button onClick={handleCreate} variant="contained" disabled={!canSubmit || saving}>
-          {saving ? 'Creating…' : 'Create company'}
+          {saving ? 'Creating…' : 'Create'}
         </Button>
       </DialogActions>
     </Dialog>

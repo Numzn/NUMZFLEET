@@ -179,7 +179,6 @@ export const ROUTES = [
   '/settings/notification/:id',
   '/settings/notifications',
   '/settings/organization',
-  '/settings/platform/companies',
   '/settings/preferences',
   '/settings/profile',
   '/settings/roles',

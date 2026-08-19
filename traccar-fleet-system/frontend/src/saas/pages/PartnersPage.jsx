@@ -4,12 +4,6 @@ import {
   Card,
   CardContent,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  TextField,
   Typography,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
@@ -19,6 +13,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { setPartners, setError, clearError } from '../../store/organizations';
 import { fetchPartners, createPartner } from '../organizationApi';
 import PageHeader from '../../common/components/PageHeader';
+import CreateOrganizationDialog from '../components/CreateOrganizationDialog';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -70,9 +65,6 @@ const useStyles = makeStyles()((theme) => ({
     alignItems: 'center',
     minHeight: 200,
   },
-  formField: {
-    marginBottom: theme.spacing(2),
-  },
 }));
 
 /**
@@ -83,8 +75,6 @@ const PartnersPage = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
   const [openDialog, setOpenDialog] = useState(false);
-  const [formData, setFormData] = useState({ name: '', slug: '' });
-  const [submitting, setSubmitting] = useState(false);
 
   const user = useSelector((state) => state.session.user);
   const partners = useSelector((state) => state.organizations.partners);
@@ -102,29 +92,6 @@ const PartnersPage = () => {
       dispatch(setPartners(data));
     } catch (err) {
       dispatch(setError(err.message));
-    }
-  };
-
-  const handleCreatePartner = async () => {
-    if (!formData.name || !formData.slug) {
-      dispatch(setError('Name and slug are required'));
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const newPartner = await createPartner(user, {
-        name: formData.name,
-        slug: formData.slug,
-        traccarGroupId: null,
-      });
-      dispatch(setPartners([...partners, newPartner]));
-      setOpenDialog(false);
-      setFormData({ name: '', slug: '' });
-    } catch (err) {
-      dispatch(setError(err.message));
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -195,40 +162,15 @@ const PartnersPage = () => {
         </Box>
       )}
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Partner</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Partner Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className={classes.formField}
-            margin="normal"
-            placeholder="e.g., Posh Media"
-          />
-          <TextField
-            fullWidth
-            label="Slug (URL-friendly)"
-            value={formData.slug}
-            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-            className={classes.formField}
-            margin="normal"
-            placeholder="e.g., posh-media"
-            helperText="Lowercase letters, numbers, and hyphens only"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button
-            onClick={handleCreatePartner}
-            variant="contained"
-            disabled={submitting}
-          >
-            {submitting ? <CircularProgress size={20} /> : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CreateOrganizationDialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        onCreated={(newPartner) => dispatch(setPartners([...partners, newPartner]))}
+        createFn={createPartner}
+        title="Create New Partner"
+        namePlaceholder="e.g., Posh Media"
+        slugPlaceholder="e.g., posh-media"
+      />
     </Box>
   );
 };

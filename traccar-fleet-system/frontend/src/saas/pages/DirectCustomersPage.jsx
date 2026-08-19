@@ -4,12 +4,6 @@ import {
   Card,
   CardContent,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  TextField,
   Typography,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
@@ -19,6 +13,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { setDirectCustomers, setError, clearError } from '../../store/organizations';
 import { fetchDirectCustomers, createDirectCustomer } from '../organizationApi';
 import PageHeader from '../../common/components/PageHeader';
+import CreateOrganizationDialog from '../components/CreateOrganizationDialog';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -70,9 +65,6 @@ const useStyles = makeStyles()((theme) => ({
     alignItems: 'center',
     minHeight: 200,
   },
-  formField: {
-    marginBottom: theme.spacing(2),
-  },
 }));
 
 /**
@@ -83,8 +75,6 @@ const DirectCustomersPage = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
   const [openDialog, setOpenDialog] = useState(false);
-  const [formData, setFormData] = useState({ name: '', slug: '' });
-  const [submitting, setSubmitting] = useState(false);
 
   const user = useSelector((state) => state.session.user);
   const customers = useSelector((state) => state.organizations.directCustomers);
@@ -102,29 +92,6 @@ const DirectCustomersPage = () => {
       dispatch(setDirectCustomers(data));
     } catch (err) {
       dispatch(setError(err.message));
-    }
-  };
-
-  const handleCreateCustomer = async () => {
-    if (!formData.name || !formData.slug) {
-      dispatch(setError('Name and slug are required'));
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const newCustomer = await createDirectCustomer(user, {
-        name: formData.name,
-        slug: formData.slug,
-        traccarGroupId: null,
-      });
-      dispatch(setDirectCustomers([...customers, newCustomer]));
-      setOpenDialog(false);
-      setFormData({ name: '', slug: '' });
-    } catch (err) {
-      dispatch(setError(err.message));
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -195,40 +162,15 @@ const DirectCustomersPage = () => {
         </Box>
       )}
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Direct Customer</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Customer Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className={classes.formField}
-            margin="normal"
-            placeholder="e.g., ABC Logistics"
-          />
-          <TextField
-            fullWidth
-            label="Slug (URL-friendly)"
-            value={formData.slug}
-            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-            className={classes.formField}
-            margin="normal"
-            placeholder="e.g., abc-logistics"
-            helperText="Lowercase letters, numbers, and hyphens only"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button
-            onClick={handleCreateCustomer}
-            variant="contained"
-            disabled={submitting}
-          >
-            {submitting ? <CircularProgress size={20} /> : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CreateOrganizationDialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        onCreated={(newCustomer) => dispatch(setDirectCustomers([...customers, newCustomer]))}
+        createFn={createDirectCustomer}
+        title="Create New Direct Customer"
+        namePlaceholder="e.g., ABC Logistics"
+        slugPlaceholder="e.g., abc-logistics"
+      />
     </Box>
   );
 };

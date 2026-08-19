@@ -8,8 +8,7 @@ import { fuelApiAuthHeaders } from '../config/fuelApiAuth.js';
  * do NOT route them through traccarFetch/traccarPath, which is reserved for Traccar (Java) endpoints.
  *
  * Every function takes the Traccar `user` (from state.session.user) as its first argument
- * so fuelApiAuthHeaders can attach x-user-id, matching the pattern used by
- * settings/center/platformCompaniesApi.js.
+ * so fuelApiAuthHeaders can attach x-user-id.
  */
 
 export const fetchContext = async (user) => {
