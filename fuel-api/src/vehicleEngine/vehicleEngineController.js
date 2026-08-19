@@ -3,7 +3,7 @@ import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
 export async function getEngine(req, res) {
   try {
-    const data = await getVehicleEngine(req.params.id, req.auth?.companyId);
+    const data = await getVehicleEngine(req.params.id, req.auth);
     return res.json(data);
   } catch (error) {
     const status = error.statusCode || 500;

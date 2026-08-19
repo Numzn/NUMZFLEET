@@ -79,6 +79,7 @@ export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap
   const base = {
     id: vehicle.id,
     name: vehicle.name,
+    companyId: vehicle.companyId ?? null,
     plateNumber: vehicle.plateNumber ?? null,
     notes: vehicle.notes ?? null,
     make: vehicle.make ?? null,
@@ -299,17 +300,20 @@ export async function updateVehicle(id, { name, plateNumber }) {
   return getVehicleMerged(id);
 }
 
-export async function patchVehicleFields(id, fields = {}, companyId = null) {
+export async function patchVehicleFields(id, fields = {}, auth = null) {
   const vehicle = await Vehicle.findByPk(id);
   if (!vehicle) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
   }
-  if (companyId && vehicle.companyId && vehicle.companyId !== companyId) {
-    const err = new Error('Vehicle not found');
-    err.statusCode = 404;
-    throw err;
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      const err = new Error('Vehicle not found');
+      err.statusCode = 404;
+      throw err;
+    }
   }
 
   const patch = {};
@@ -330,7 +334,7 @@ export async function patchVehicleFields(id, fields = {}, companyId = null) {
   }
 
   await vehicle.update(patch);
-  return getVehicleMerged(id, companyId || vehicle.companyId);
+  return getVehicleMerged(id, auth);
 }
 
 export async function deleteVehicle(id) {

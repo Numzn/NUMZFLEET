@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { getVehicleEngine } from '../vehicleEngine/vehicleEngineService.js';
 import { findNextServiceDue } from '../services/vehicleOverviewMetricsService.js';
-import { patchVehicleFields } from '../services/vehicleFleetService.js';
+import { getVehicleMerged, patchVehicleFields } from '../services/vehicleFleetService.js';
 import {
   listDocumentsForVehicle,
   createDocument,
@@ -13,8 +13,16 @@ import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 import { computeFleetFuelEfficiencyAverage } from '../services/fleetFuelBenchmarkService.js';
 import { getFleetFuelIntelligenceSummary } from '../services/fleetFuelIntelligenceService.js';
 
-export async function buildOverviewMetrics(fleetVehicleId, companyId) {
-  const snapshot = await getVehicleEngine(fleetVehicleId, companyId);
+export async function buildOverviewMetrics(fleetVehicleId, auth) {
+  const merged = await getVehicleMerged(fleetVehicleId, auth);
+  if (!merged) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  const companyId = merged.companyId;
+
+  const snapshot = await getVehicleEngine(fleetVehicleId, auth);
   const { registry, engine, hub } = snapshot;
   const nextServiceWo = await findNextServiceDue(companyId, fleetVehicleId);
 
@@ -40,7 +48,7 @@ export async function buildOverviewMetrics(fleetVehicleId, companyId) {
 
 export const getOverviewMetrics = async (req, res) => {
   try {
-    const metrics = await buildOverviewMetrics(req.params.id, req.auth?.companyId);
+    const metrics = await buildOverviewMetrics(req.params.id, req.auth);
     return res.json(metrics);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -77,7 +85,7 @@ export const patchVehicleWorkspaceFields = async (req, res) => {
       make,
       model,
       homeBaseLabel,
-    }, req.auth?.companyId);
+    }, req.auth);
     return res.json(merged);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -93,7 +101,7 @@ export const postVehiclePhoto = async (req, res) => {
     }
     const merged = await patchVehicleFields(req.params.id, {
       photoFileId: req.file.filename,
-    }, req.auth?.companyId);
+    }, req.auth);
     return res.json(merged);
   } catch (error) {
     const status = error.statusCode || 500;

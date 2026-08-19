@@ -20,13 +20,14 @@ import { evaluateCompliance } from '../compliance/complianceEvaluator.js';
 import { buildActivityHub } from './activity/buildActivityHub.js';
 import { buildActivityEngine } from './activity/buildActivityEngine.js';
 
-export async function getVehicleEngine(fleetVehicleId, companyId) {
-  const merged = await getVehicleMerged(fleetVehicleId, companyId);
+export async function getVehicleEngine(fleetVehicleId, auth) {
+  const merged = await getVehicleMerged(fleetVehicleId, auth);
   if (!merged) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
   }
+  const companyId = merged.companyId;
 
   const deviceId = merged?.assignment?.deviceId ?? null;
   const odometerState = await resolveVehicleOdometer({ merged, deviceId });
