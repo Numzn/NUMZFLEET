@@ -3,17 +3,9 @@ import { useEffectAsync } from '../reactHelper';
 import {
   setCurrentContext,
   setAccessibleContexts,
-  setPartners,
-  setDirectCustomers,
-  setOverview,
   setError,
 } from '../store/organizations';
-import {
-  fetchContext,
-  fetchPartners,
-  fetchDirectCustomers,
-  fetchPlatformOverview,
-} from '../saas/organizationApi';
+import { fetchContext } from '../saas/organizationApi';
 
 /**
  * Hook to initialize organization context on app load.
@@ -25,6 +17,13 @@ import {
  * page reload, since this hook re-runs on every mount and never read the
  * server back — see tenantResolverService.js's getHomeContext/resetActiveContext
  * for what the server now considers a user's default context.
+ *
+ * Deliberately does NOT prefetch partners/directCustomers/platformOverview —
+ * that used to happen here unconditionally for every platform user on every
+ * app load, duplicating the fetch each of PlatformOverviewPage/PartnersPage/
+ * DirectCustomersPage already does on its own mount, with no cache or dedup
+ * between the two. Those pages own their own data now; this hook owns only
+ * the context itself.
  */
 export const useOrganizationContext = (user) => {
   const dispatch = useDispatch();
@@ -43,18 +42,6 @@ export const useOrganizationContext = (user) => {
         id: activeContext?.companyId ?? null,
       }));
       dispatch(setAccessibleContexts(accessibleContexts || []));
-
-      if (activeContext?.type === 'platform') {
-        const [partners, directCustomers, overview] = await Promise.all([
-          fetchPartners(user).catch(() => []),
-          fetchDirectCustomers(user).catch(() => []),
-          fetchPlatformOverview(user).catch(() => null),
-        ]);
-
-        dispatch(setPartners(partners));
-        dispatch(setDirectCustomers(directCustomers));
-        dispatch(setOverview(overview));
-      }
     } catch (err) {
       console.error('Failed to load organization context:', err);
       dispatch(setError(err.message));

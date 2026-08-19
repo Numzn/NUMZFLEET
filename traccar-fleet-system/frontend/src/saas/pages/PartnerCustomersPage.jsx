@@ -4,21 +4,18 @@ import {
   Card,
   CardContent,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  TextField,
   Typography,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import { setMyCustomers, setError, clearError } from '../../store/organizations';
 import { fetchMyCustomers, createMyCustomer } from '../organizationApi';
 import PageHeader from '../../common/components/PageHeader';
+import CreateOrganizationDialog from '../components/CreateOrganizationDialog';
+import { switchContextAndNavigate } from '../util/contextNavigation.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -70,9 +67,6 @@ const useStyles = makeStyles()((theme) => ({
     alignItems: 'center',
     minHeight: 200,
   },
-  formField: {
-    marginBottom: theme.spacing(2),
-  },
 }));
 
 /**
@@ -83,9 +77,9 @@ const useStyles = makeStyles()((theme) => ({
 const PartnerCustomersPage = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [openDialog, setOpenDialog] = useState(false);
-  const [formData, setFormData] = useState({ name: '', slug: '' });
-  const [submitting, setSubmitting] = useState(false);
+  const [switchingTo, setSwitchingTo] = useState(null);
 
   const user = useSelector((state) => state.session.user);
   const customers = useSelector((state) => state.organizations.myCustomers);
@@ -106,26 +100,17 @@ const PartnerCustomersPage = () => {
     }
   };
 
-  const handleCreateCustomer = async () => {
-    if (!formData.name || !formData.slug) {
-      dispatch(setError('Name and slug are required'));
-      return;
-    }
-
-    setSubmitting(true);
+  // Enter that customer's own fleet — same switch ContextSelector's dropdown
+  // already performs, reachable directly from the card.
+  const handleOpenCustomer = async (companyId) => {
+    setSwitchingTo(companyId);
     try {
-      const newCustomer = await createMyCustomer(user, {
-        name: formData.name,
-        slug: formData.slug,
-        traccarGroupId: null,
+      await switchContextAndNavigate({
+        dispatch, navigate, user, companyId,
       });
-      dispatch(setMyCustomers([...customers, newCustomer]));
-      setOpenDialog(false);
-      setFormData({ name: '', slug: '' });
     } catch (err) {
       dispatch(setError(err.message));
-    } finally {
-      setSubmitting(false);
+      setSwitchingTo(null);
     }
   };
 
@@ -170,9 +155,16 @@ const PartnerCustomersPage = () => {
       ) : (
         <Box className={classes.grid}>
           {customers.map((customer) => (
-            <Card key={customer.id} className={classes.customerCard}>
+            <Card
+              key={customer.id}
+              className={classes.customerCard}
+              onClick={() => (switchingTo ? null : handleOpenCustomer(customer.id))}
+            >
               <CardContent>
-                <Typography variant="h6">{customer.name}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="h6">{customer.name}</Typography>
+                  {switchingTo === customer.id && <CircularProgress size={18} />}
+                </Box>
                 <Typography variant="caption" color="textSecondary">
                   {customer.slug}
                 </Typography>
@@ -196,41 +188,15 @@ const PartnerCustomersPage = () => {
         </Box>
       )}
 
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Customer</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Customer Name"
-            fullWidth
-            variant="outlined"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className={classes.formField}
-          />
-          <TextField
-            margin="dense"
-            label="URL Slug"
-            fullWidth
-            variant="outlined"
-            value={formData.slug}
-            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-            className={classes.formField}
-            helperText="Used in URLs (lowercase, no spaces)"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button
-            onClick={handleCreateCustomer}
-            variant="contained"
-            disabled={submitting}
-          >
-            {submitting ? <CircularProgress size={20} /> : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CreateOrganizationDialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        onCreated={(newCustomer) => dispatch(setMyCustomers([...customers, newCustomer]))}
+        createFn={createMyCustomer}
+        title="Create New Customer"
+        namePlaceholder="e.g., ABC Logistics"
+        slugPlaceholder="e.g., abc-logistics"
+      />
     </Box>
   );
 };

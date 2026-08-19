@@ -28,7 +28,7 @@ import {
   resolveCompanyContextForTraccarUser,
   switchActiveContext,
   resetActiveContext,
-  canAccessCompany,
+  canEnterCompanyContext,
   clearCompanyContextCache,
 } from '../services/tenantResolverService.js';
 
@@ -304,10 +304,10 @@ describe('Phase 2D: Active-Context Switching', () => {
     });
   });
 
-  describe('canAccessCompany (pure authorization function)', () => {
+  describe('canEnterCompanyContext (pure authorization function)', () => {
     it('platform identity can access any company', async () => {
       const target = await makeCompany({ name: 'Any Co', organizationType: 'customer' });
-      assert.equal(canAccessCompany({ isSuperAdmin: true, companyId: null }, target), true);
+      assert.equal(canEnterCompanyContext({ isSuperAdmin: true, companyId: null }, target), true);
     });
 
     it('partner identity can access own company and its own customers only', async () => {
@@ -321,9 +321,9 @@ describe('Phase 2D: Active-Context Switching', () => {
         isSuperAdmin: false, companyId: partnerA.id, organizationType: 'partner',
       };
 
-      assert.equal(canAccessCompany(partnerIdentity, partnerA), true);
-      assert.equal(canAccessCompany(partnerIdentity, ownCustomer), true);
-      assert.equal(canAccessCompany(partnerIdentity, otherPartner), false);
+      assert.equal(canEnterCompanyContext(partnerIdentity, partnerA), true);
+      assert.equal(canEnterCompanyContext(partnerIdentity, ownCustomer), true);
+      assert.equal(canEnterCompanyContext(partnerIdentity, otherPartner), false);
     });
 
     it('customer identity can only access its own company', async () => {
@@ -334,8 +334,8 @@ describe('Phase 2D: Active-Context Switching', () => {
         isSuperAdmin: false, companyId: customerA.id, organizationType: 'customer',
       };
 
-      assert.equal(canAccessCompany(customerIdentity, customerA), true);
-      assert.equal(canAccessCompany(customerIdentity, customerB), false);
+      assert.equal(canEnterCompanyContext(customerIdentity, customerA), true);
+      assert.equal(canEnterCompanyContext(customerIdentity, customerB), false);
     });
   });
 

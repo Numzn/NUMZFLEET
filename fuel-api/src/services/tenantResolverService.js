@@ -177,8 +177,17 @@ async function getHomeContext(traccarUser) {
  *  - Platform (isSuperAdmin): any company.
  *  - Partner: their own partner company, or any customer under it.
  *  - Customer: only their own company.
+ *
+ * Named distinctly from scopeValidationService.js's canAccessCompany(auth,
+ * requestedCompanyId) — that one gates ongoing per-request DATA access using
+ * the already-active context; this one gates a CONTEXT SWITCH itself, using
+ * the identity's home context and a real Company model instance. Same
+ * underlying question ("can this identity touch this company") asked at two
+ * different moments with two different input shapes — not interchangeable,
+ * kept as two functions deliberately, disambiguated by name so they don't
+ * read as the same thing when grepped.
  */
-export function canAccessCompany(homeCtx, targetCompany) {
+export function canEnterCompanyContext(homeCtx, targetCompany) {
   if (!targetCompany) return false;
   if (homeCtx.isSuperAdmin) return true;
   if (!homeCtx.companyId) return false;
@@ -250,7 +259,7 @@ async function applyActiveContextOverride(homeCtx, traccarUserId) {
     attributes: ['id', 'name', 'organizationType', 'parentCompanyId', 'status'],
   });
 
-  if (!target || target.status !== 'active' || !canAccessCompany(homeCtx, target)) {
+  if (!target || target.status !== 'active' || !canEnterCompanyContext(homeCtx, target)) {
     // Stale/invalid override (company deleted, deactivated, or access revoked).
     await override.destroy();
     return homeCtx;
@@ -353,7 +362,7 @@ export async function switchActiveContext(traccarUser, targetCompanyId) {
     throw error;
   }
 
-  if (!canAccessCompany(homeCtx, target)) {
+  if (!canEnterCompanyContext(homeCtx, target)) {
     const error = new Error('You do not have access to this organization');
     error.statusCode = 403;
     throw error;

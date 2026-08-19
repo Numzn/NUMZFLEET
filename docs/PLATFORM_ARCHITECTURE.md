@@ -1,6 +1,6 @@
 # NUMZ Platform Architecture
 
-**Status:** Frozen v1.0  
+**Status:** Frozen v1.1  
 **Scope:** Platform identity, tenancy, context, permissions, service boundaries, provisioning, audit, UI modes, auth evolution  
 **Does not cover:** Implementation code, API endpoint specs, database migration SQL  
 **Applies to:** All work touching authentication, tenancy, company provisioning, platform navigation, or cross-tenant data access  
@@ -183,6 +183,7 @@ Platform users enter Company Mode only by **explicit context switch**, never by 
 3. **Platform APIs in platform context only:** `/api/platform/*` rejects requests where `activeContext.type !== platform` (except documented service-to-service paths).
 4. **Audit every switch:** `context.entered_company` and `context.exited_company` logged to platform audit.
 5. **One active context at a time (v1):** No nested context stack. Future `branch`/`depot` extends the same model.
+6. **Scope boundary, v1 (frozen, not a bug):** A context switch governs **fuel-api-owned, tenant-scoped tables only** (vehicles, fuel operations, service records, `numz_users`, etc. — everything filtered by `company_id`). It does **not** change what Traccar shows on the Live Map, device list, or Dashboard alerts — those are authorized purely by the operator's own real Traccar session and Traccar's own per-user device ACLs, which are managed separately (`company_devices` + Traccar groups, see [Data isolation rules](#data-isolation-rules)). Switching into Company X's workspace does **not** grant visibility into Company X's live devices unless the operator's Traccar account is separately permissioned for them. This is a deliberate v1 boundary — a future phase may unify the two (Traccar-side context-aware device ACL switching), but until then, UI that presents "switch workspace" as "enter their whole operation" must make this boundary visible, not silent.
 
 ---
 

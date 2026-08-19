@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  Typography, List, ListItemButton, ListItemIcon, ListItemText, CircularProgress,
+  Typography, List, ListItemButton, ListItemIcon, ListItemText, CircularProgress, Alert,
 } from '@mui/material';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -54,6 +54,11 @@ export default function PlatformAccessSection() {
         title="Platform"
         description="Switch between your accessible workspaces."
       >
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Switching workspace changes what you see in Vehicles, Fuel, and Customers for that
+          organization. It does not change the Live Map or device list — those follow your own
+          Traccar login and its device permissions, which are managed separately.
+        </Alert>
         {others.length ? (
           <List sx={{ py: 0 }}>
             {others.map((c) => {

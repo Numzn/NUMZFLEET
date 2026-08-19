@@ -114,7 +114,7 @@ function partnerAuth(partner, accessibleCustomerIds) {
   };
 }
 
-/** Matches organizationController.test.js / companyScopeMiddleware.test.js's mock res shape. */
+/** Matches organizationController.test.js's mock res shape. */
 function mockRes() {
   return {
     statusCode: null,

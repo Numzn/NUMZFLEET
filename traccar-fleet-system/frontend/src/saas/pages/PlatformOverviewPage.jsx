@@ -186,6 +186,36 @@ const PlatformOverviewPage = () => {
                 Direct + Partner customers combined
               </Typography>
             </Card>
+
+            <Card className={classes.statCard}>
+              <Typography className={classes.statValue}>
+                {overview.userCount || 0}
+              </Typography>
+              <Typography className={classes.statLabel}>Users</Typography>
+              <Typography className={classes.statDescription}>
+                Active accounts across every company
+              </Typography>
+            </Card>
+
+            <Card className={classes.statCard}>
+              <Typography className={classes.statValue}>
+                {overview.vehicleCount || 0}
+              </Typography>
+              <Typography className={classes.statLabel}>Vehicles</Typography>
+              <Typography className={classes.statDescription}>
+                Registered across the whole platform
+              </Typography>
+            </Card>
+
+            <Card className={classes.statCard}>
+              <Typography className={classes.statValue}>
+                {overview.deviceCount || 0}
+              </Typography>
+              <Typography className={classes.statLabel}>Devices</Typography>
+              <Typography className={classes.statDescription}>
+                Active trackers across every company
+              </Typography>
+            </Card>
           </Box>
 
           <Box className={classes.section}>

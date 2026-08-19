@@ -128,6 +128,8 @@ When you onboard **Company B**:
 
 Relevant: `companyProvisioningService.js`.
 
+**This is why switching workspace doesn't change the Live Map.** `switchActiveContext`/`active_contexts` only override `req.auth.activeContext` for **fuel-api** requests — Traccar's own API calls (`/api/devices`, `/api/positions`, live map, dashboard alerts) go straight to Traccar authenticated by the operator's real Traccar session, which Traccar authorizes against its own per-user device ACLs (independent of `active_contexts`). A platform admin who switches into Partner X's workspace sees Partner X's fuel-api-owned data (vehicles registry, fuel ops, customers) correctly re-scoped, but the Live Map continues to reflect whatever devices the admin's own Traccar account can already see — not Partner X's fleet. See [PLATFORM_ARCHITECTURE.md's Context switching invariant #6](../../docs/PLATFORM_ARCHITECTURE.md#context-switching-invariants-frozen) — this is a deliberate v1 boundary, not a bug.
+
 ## Login paths
 
 ### Production (today)

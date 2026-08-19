@@ -12,8 +12,7 @@
  * this because none of its tests go through the controller at all — they
  * call Company.create() directly.
  *
- * This file tests the controller functions directly (mocked req/res,
- * matching middleware/companyScopeMiddleware.test.js's convention — no
+ * This file tests the controller functions directly (mocked req/res — no
  * supertest or HTTP server in this codebase's test style), hitting the real
  * service/DB/Traccar exactly like organizationService.test.js, so it proves
  * the wiring end-to-end rather than re-testing provisioning logic already
@@ -72,7 +71,7 @@ function testAdmin() {
   };
 }
 
-/** Matches companyScopeMiddleware.test.js's mock res shape. */
+/** Minimal mock res — no supertest/HTTP server needed for a controller-level test. */
 function mockRes() {
   return {
     statusCode: null,

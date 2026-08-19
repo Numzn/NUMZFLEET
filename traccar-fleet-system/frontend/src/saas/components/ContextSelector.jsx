@@ -7,7 +7,7 @@ import {
   Typography,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -67,9 +67,7 @@ const ContextSelector = () => {
   const accessibleContexts = useSelector((state) => state.organizations.accessibleContexts);
   const partners = useSelector((state) => state.organizations.partners);
   const directCustomers = useSelector((state) => state.organizations.directCustomers);
-  const partnerCustomers = useSelector(
-    (state) => state.organizations.partnerCustomers[state.organizations.selectedPartnerId] || []
-  );
+  const myCustomers = useSelector((state) => state.organizations.myCustomers);
   const user = useSelector((state) => state.session.user);
 
   const handleMenuOpen = (event) => {
@@ -140,9 +138,9 @@ const ContextSelector = () => {
     }
   } else if (currentContext.type === 'partner') {
     // Partner can see their own customers
-    if (partnerCustomers.length > 0) {
+    if (myCustomers.length > 0) {
       menuItems.push({ type: 'header', label: 'My Customers' });
-      partnerCustomers.forEach((customer) => {
+      myCustomers.forEach((customer) => {
         menuItems.push({
           type: 'customer',
           id: customer.id,

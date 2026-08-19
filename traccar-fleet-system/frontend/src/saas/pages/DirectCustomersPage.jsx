@@ -9,11 +9,13 @@ import {
 import { makeStyles } from 'tss-react/mui';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import { setDirectCustomers, setError, clearError } from '../../store/organizations';
 import { fetchDirectCustomers, createDirectCustomer } from '../organizationApi';
 import PageHeader from '../../common/components/PageHeader';
 import CreateOrganizationDialog from '../components/CreateOrganizationDialog';
+import { switchContextAndNavigate } from '../util/contextNavigation.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -74,7 +76,9 @@ const useStyles = makeStyles()((theme) => ({
 const DirectCustomersPage = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [openDialog, setOpenDialog] = useState(false);
+  const [switchingTo, setSwitchingTo] = useState(null);
 
   const user = useSelector((state) => state.session.user);
   const customers = useSelector((state) => state.organizations.directCustomers);
@@ -92,6 +96,20 @@ const DirectCustomersPage = () => {
       dispatch(setDirectCustomers(data));
     } catch (err) {
       dispatch(setError(err.message));
+    }
+  };
+
+  // Enter that customer's own fleet — same switch ContextSelector's dropdown
+  // already performs, reachable directly from the card.
+  const handleOpenCustomer = async (companyId) => {
+    setSwitchingTo(companyId);
+    try {
+      await switchContextAndNavigate({
+        dispatch, navigate, user, companyId,
+      });
+    } catch (err) {
+      dispatch(setError(err.message));
+      setSwitchingTo(null);
     }
   };
 
@@ -136,9 +154,16 @@ const DirectCustomersPage = () => {
       ) : (
         <Box className={classes.grid}>
           {customers.map((customer) => (
-            <Card key={customer.id} className={classes.customerCard}>
+            <Card
+              key={customer.id}
+              className={classes.customerCard}
+              onClick={() => (switchingTo ? null : handleOpenCustomer(customer.id))}
+            >
               <CardContent>
-                <Typography variant="h6">{customer.name}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="h6">{customer.name}</Typography>
+                  {switchingTo === customer.id && <CircularProgress size={18} />}
+                </Box>
                 <Typography variant="caption" color="textSecondary">
                   {customer.slug}
                 </Typography>

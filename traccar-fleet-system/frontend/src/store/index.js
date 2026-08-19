@@ -49,20 +49,6 @@ export { fuelRequestsActions } from '../fuelRequests/store/fuelRequests';
 export { operationSessionsActions } from '../operationSessions/store/operationSessions';
 export { fleetInteractionActions } from './fleetInteraction.js';
 export { notificationsActions } from './notifications/notificationsSlice.js';
-export {
-  setCurrentContext,
-  setPartners,
-  setDirectCustomers,
-  setPartnerCustomers,
-  setOverview,
-  setSelectedPartnerId,
-  setLoading,
-  setError,
-  clearError,
-  addPartner,
-  addDirectCustomer,
-  addPartnerCustomer,
-} from './organizations.js';
 
 export default configureStore({
   reducer,
