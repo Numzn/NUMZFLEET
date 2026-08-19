@@ -11,7 +11,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { switchContextAndNavigate } from '../util/contextNavigation.js';
+import { otherAccessibleContexts, switchContextAndNavigate } from '../util/contextNavigation.js';
 
 const useStyles = makeStyles()((theme) => ({
   container: {
@@ -102,12 +102,7 @@ const ContextSelector = () => {
   // always offered first, regardless of which context is currently active.
   // Previously there was no way back to "My Fleet" from inside Platform (or
   // any context) at all — only the org-specific lists below existed.
-  const currentCompanyId = currentContext.id ?? null;
-  const workspaceItems = (accessibleContexts || [])
-    .filter((c) => {
-      if (c.type === 'platform') return currentContext.type !== 'platform';
-      return c.companyId !== currentCompanyId;
-    })
+  const workspaceItems = otherAccessibleContexts(currentContext, accessibleContexts)
     .map((c) => ({
       type: 'workspace',
       id: c.type === 'platform' ? 'platform' : c.companyId,

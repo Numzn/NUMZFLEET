@@ -2,8 +2,23 @@ import { switchContext } from '../organizationApi';
 import { setCurrentContext } from '../../store/organizations';
 
 /**
+ * Every accessible workspace EXCEPT the one currently active — the shared
+ * filter behind every "switch workspace" UI (Settings -> Platform,
+ * ContextSelector's dropdown). Previously reimplemented independently in
+ * both places.
+ */
+export function otherAccessibleContexts(currentContext, accessibleContexts) {
+  if (!Array.isArray(accessibleContexts)) return [];
+  const currentCompanyId = currentContext?.id ?? currentContext?.companyId ?? null;
+  return accessibleContexts.filter((c) => {
+    if (c.type === 'platform') return currentContext?.type !== 'platform';
+    return c.companyId !== currentCompanyId;
+  });
+}
+
+/**
  * Where a workspace lands once you're in it. Shared by ContextSelector and
- * UnifiedSidebar's "switch workspace" nav group so both entry points agree.
+ * Settings -> Platform's workspace switcher so both entry points agree.
  */
 export function landingRouteForContextType(type) {
   if (type === 'platform') return '/saas/platform/overview';

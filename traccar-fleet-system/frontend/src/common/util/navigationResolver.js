@@ -204,57 +204,18 @@ export function getCustomerNavigation({
   ];
 }
 
-const CONTEXT_ICONS = {
-  platform: AnalyticsIcon,
-  partner: BusinessIcon,
-  customer: DashboardOutlinedIcon,
-};
-
-/**
- * Build the "switch workspace" group linking to every OTHER context this
- * identity may enter (from GET /api/context's accessibleContexts) — the
- * union this whole resolver was missing: a platform admin who also has a
- * home company previously had no way to see "My Fleet" from inside Platform,
- * or "Platform" from inside their own fleet, without going through the
- * ContextSelector dropdown. Items carry `contextSwitchTo` instead of a plain
- * `path` — UnifiedSidebar's click handler performs a real context switch
- * before navigating, because company-scoped data is filtered by the ACTIVE
- * context, not identity, so a bare link would show the wrong data.
- */
-function buildSwitchWorkspaceGroup(currentContext, accessibleContexts) {
-  if (!Array.isArray(accessibleContexts) || accessibleContexts.length < 2) {
-    return null;
-  }
-
-  const currentCompanyId = currentContext?.id ?? currentContext?.companyId ?? null;
-  const others = accessibleContexts.filter((c) => {
-    if (c.type === 'platform') return currentContext?.type !== 'platform';
-    return c.companyId !== currentCompanyId;
-  });
-
-  if (!others.length) {
-    return null;
-  }
-
-  return {
-    key: 'switch-workspace',
-    label: 'SWITCH WORKSPACE',
-    items: others.map((c) => ({
-      title: c.label || c.companyName || (c.type === 'platform' ? 'Platform' : 'Workspace'),
-      icon: CONTEXT_ICONS[c.type] || DashboardOutlinedIcon,
-      contextSwitchTo: c.type === 'platform' ? 'platform' : c.companyId,
-    })),
-  };
-}
-
 /**
  * Main navigation resolver
  * Returns the appropriate navigation structure based on context type
  *
+ * Workspace switching (My Fleet <-> Platform <-> Partner) lives in
+ * Settings -> Platform (settings/center/sections/PlatformAccessSection.jsx)
+ * and ContextSelector's dropdown, not here — this resolver only ever
+ * returns ONE context's nav tree.
+ *
  * @param {Object} currentContext - Redux organizations.currentContext
  * @param {Object} options - Configuration options
  * @param {Array} options.externalSystemItems - External items to add to system section (billing, support)
- * @param {Array} options.accessibleContexts - Redux organizations.accessibleContexts
  * @returns {Array} Navigation group structure
  */
 export function resolveNavigation(currentContext, options = {}) {
@@ -288,13 +249,6 @@ export function resolveNavigation(currentContext, options = {}) {
         ...options.externalSystemItems,
       ];
     }
-  }
-
-  const switchWorkspaceGroup = buildSwitchWorkspaceGroup(currentContext, options.accessibleContexts);
-  if (switchWorkspaceGroup) {
-    // Right after the first (primary) group — visible without scrolling,
-    // ahead of management/operations/reports/system.
-    navGroups.splice(1, 0, switchWorkspaceGroup);
   }
 
   return navGroups;
