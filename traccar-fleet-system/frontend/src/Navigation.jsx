@@ -15,7 +15,7 @@ import SettingsCenterShell from './settings/center/SettingsCenterShell.jsx';
 import OverviewSection from './settings/center/sections/OverviewSection.jsx';
 import ProfileSection from './settings/center/sections/ProfileSection';
 import SecuritySection from './settings/center/sections/SecuritySection';
-import OrganizationSection from './settings/center/sections/OrganizationSection';
+import PlatformAccessSection from './settings/center/sections/PlatformAccessSection.jsx';
 import TeamSection from './settings/center/sections/TeamSection';
 import RolesSection from './settings/center/sections/RolesSection';
 import DevicesSection from './settings/center/sections/DevicesSection';
@@ -196,7 +196,7 @@ const Navigation = () => {
           <Route index element={<OverviewSection />} />
           <Route path="profile" element={<ProfileSection />} />
           <Route path="security" element={<SecuritySection />} />
-          <Route path="organization" element={<OrganizationSection />} />
+          <Route path="platform" element={<PlatformAccessSection />} />
           <Route path="notification-preferences" element={<NotificationsSection />} />
           <Route path="accumulators/:deviceId" element={<AccumulatorsPage />} />
           <Route path="announcement" element={<SettingsCenterShell><AnnouncementPage /></SettingsCenterShell>} />
