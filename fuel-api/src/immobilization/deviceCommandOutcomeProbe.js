@@ -16,6 +16,38 @@ export function getAckProbeWindowSec() {
 }
 
 /**
+ * How long the sweep keeps *retrying* a completed intent (getAckProbeWindowSec,
+ * above) is a different question from how close a given commandResult event
+ * has to land to plausibly BE this command's result. Traccar's tc_events has
+ * no command identifier — attributes is just protocol-specific raw text
+ * (verified: a real row is `{"result":"S20,OK,190531"}`) — so a device ACK
+ * genuinely arriving minutes after delivery is indistinguishable from an
+ * unrelated later event without *some* bound. This is that bound.
+ */
+export function getAckMatchWindowSec() {
+  const raw = process.env.IMMOBILIZATION_ACK_MATCH_WINDOW_SEC;
+  const n = raw === undefined || raw === '' ? 120 : parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 120;
+}
+
+/**
+ * Events plausibly attributable to a command delivered at `sinceMs`: not
+ * before delivery, and within `matchWindowMs` after it. Sorted earliest
+ * first — the event closest to delivery is the most plausible candidate,
+ * not just whichever is most recent overall.
+ *
+ * @param {Array<{ eventtime: Date|string }>} events
+ * @param {{ sinceMs: number, matchWindowMs: number }} bounds
+ */
+export function selectPlausibleAckEvents(events, { sinceMs, matchWindowMs }) {
+  return (events || [])
+    .map((ev) => ({ ev, t: new Date(ev.eventtime).getTime() }))
+    .filter(({ t }) => Number.isFinite(t) && t >= sinceMs && t <= sinceMs + matchWindowMs)
+    .sort((a, b) => a.t - b.t)
+    .map(({ ev }) => ev);
+}
+
+/**
  * Whether a Traccar commandResult event plausibly acknowledges a sent engine command.
  * @param {{ attributes?: object|string }} event
  * @param {string|null} commandType engineStop | engineResume | custom
@@ -41,7 +73,45 @@ export function commandResultLooksLikeAck(event, commandType = null) {
 }
 
 /**
+ * Whether another intent on the same device had its command delivered
+ * strictly between `fromMs` (exclusive) and `toMs` (inclusive). If so, a
+ * commandResult event landing at `toMs` is at least as plausibly that
+ * command's result as ours — Traccar gives us no way to tell them apart, so
+ * the honest move is to refuse the match rather than guess.
+ */
+export async function hasCompetingDeliveryBetween(deviceId, intentId, fromMs, toMs) {
+  const rows = await sequelize.query(
+    `SELECT id FROM vehicle_immobilization_intents
+     WHERE "deviceId" = :deviceId
+       AND id != :intentId
+       AND "traccarDeliveryAt" IS NOT NULL
+       AND "traccarDeliveryAt" > :fromDate
+       AND "traccarDeliveryAt" <= :toDate
+     LIMIT 1`,
+    {
+      replacements: {
+        deviceId,
+        intentId,
+        fromDate: new Date(fromMs),
+        toDate: new Date(toMs),
+      },
+      type: QueryTypes.SELECT,
+    },
+  );
+  return rows.length > 0;
+}
+
+/**
  * Upgrade confidence to relay_reported when Traccar reports commandResult after delivery.
+ *
+ * Correlation is inherently best-effort: Traccar's tc_events carries no
+ * command identifier, only deviceId + timestamp + raw protocol text. Two
+ * guards keep that honest rather than optimistic: (1) the event must land
+ * within a bounded window after our delivery, closest-first, not just be
+ * the most recent event ever seen on the device; (2) if any other intent on
+ * the same device was delivered in between, the event is ambiguous and is
+ * refused rather than attributed to us.
+ *
  * @param {object} intentRow DB row (completed, confidence sent)
  * @returns {Promise<boolean>}
  */
@@ -51,12 +121,16 @@ export async function probeDeviceCommandOutcome(intentRow) {
 
   const since = intentRow.traccarDeliveryAt || intentRow.executionStartedAt;
   if (!since) return false;
+  const sinceMs = new Date(since).getTime();
+  if (!Number.isFinite(sinceMs)) return false;
 
-  const events = await getTraccarCommandResultsSince(
-    intentRow.deviceId,
-    since,
-    10,
-  );
+  const events = await getTraccarCommandResultsSince(intentRow.deviceId, since, 10);
+  const candidates = selectPlausibleAckEvents(events, {
+    sinceMs,
+    matchWindowMs: getAckMatchWindowSec() * 1000,
+  });
+  if (candidates.length === 0) return false;
+
   let payload = intentRow.traccarCommandPayload;
   if (typeof payload === 'string') {
     try {
@@ -66,29 +140,46 @@ export async function probeDeviceCommandOutcome(intentRow) {
     }
   }
   const commandType = intentRow.traccarCommandType || payload?.type || null;
-  const ack = events.some((ev) => commandResultLooksLikeAck(ev, commandType));
-  if (!ack) return false;
 
-  const rows = await sequelize.query(
-    `UPDATE vehicle_immobilization_intents
-     SET confidence = 'relay_reported',
-         "updatedAt" = NOW()
-     WHERE id = :id AND status = 'completed' AND confidence = 'sent'
-     RETURNING id`,
-    {
-      replacements: { id: intentRow.id },
-      type: QueryTypes.SELECT,
-    },
-  );
-  const updated = Array.isArray(rows) && rows.length > 0;
-  if (updated) {
-    logImmobilization('immobilization.intent.ack', {
-      intentId: intentRow.id,
-      deviceId: intentRow.deviceId,
-      commandType,
-    });
+  for (const event of candidates) {
+    if (!commandResultLooksLikeAck(event, commandType)) continue;
+    const eventMs = new Date(event.eventtime).getTime();
+    // eslint-disable-next-line no-await-in-loop
+    const ambiguous = await hasCompetingDeliveryBetween(intentRow.deviceId, intentRow.id, sinceMs, eventMs);
+    if (ambiguous) {
+      logImmobilization('immobilization.intent.ack_ambiguous', {
+        intentId: intentRow.id,
+        deviceId: intentRow.deviceId,
+        eventId: event.id ?? null,
+      });
+      continue;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const rows = await sequelize.query(
+      `UPDATE vehicle_immobilization_intents
+       SET confidence = 'relay_reported',
+           "updatedAt" = NOW()
+       WHERE id = :id AND status = 'completed' AND confidence = 'sent'
+       RETURNING id`,
+      {
+        replacements: { id: intentRow.id },
+        type: QueryTypes.SELECT,
+      },
+    );
+    const updated = Array.isArray(rows) && rows.length > 0;
+    if (updated) {
+      logImmobilization('immobilization.intent.ack', {
+        intentId: intentRow.id,
+        deviceId: intentRow.deviceId,
+        commandType,
+        eventId: event.id ?? null,
+      });
+    }
+    return updated;
   }
-  return updated;
+
+  return false;
 }
 
 /**

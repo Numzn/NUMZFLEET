@@ -34,6 +34,9 @@ import {
 import { logImmobilization } from '../immobilization/immobilizationLog.js';
 import { transitionIntentState } from '../immobilization/transitionIntentState.js';
 import { notifyImmobilizationTransition } from '../notifications/immobilizationNotificationService.js';
+import { safeNotify } from '../immobilization/safeNotify.js';
+import { isUniqueConstraintError } from '../immobilization/uniqueConstraintError.js';
+import { computeEffectiveStatus, effectivelyActiveWhereClause } from '../immobilization/effectiveStatus.js';
 import sequelize from '../config/database.js';
 
 const ACTIVE_STATUSES = ['pending', 'monitoring', 'executing'];
@@ -48,6 +51,9 @@ export function serializeIntent(row) {
     deviceId: plain.deviceId,
     action: plain.action,
     status: plain.status,
+    // Real-time interpretation of `status`; the persisted value only advances
+    // on the next evaluator tick. See immobilization/effectiveStatus.js.
+    effectiveStatus: computeEffectiveStatus(plain),
     createdByUserId: plain.createdByUserId,
     cancelledByUserId: plain.cancelledByUserId,
     expiresAt: plain.expiresAt,
@@ -72,6 +78,17 @@ async function getActiveAssignment(vehicleId) {
   return DeviceAssignment.findOne({
     where: { vehicleId, isActive: true, unassignedAt: null },
   });
+}
+
+/**
+ * True when the vehicle's currently-active device assignment still points at
+ * the device a claimed intent was created for. A vehicle's device can be
+ * swapped between intent creation and claim; delivering to whatever device
+ * is *currently* assigned instead of the one the intent was authorized for
+ * would be a silent misdelivery, so the claim is only honored if this holds.
+ */
+export function deviceMatchesActiveAssignment(claimedRow, assignment) {
+  return Boolean(assignment) && Number(assignment.deviceId) === Number(claimedRow.deviceId);
 }
 
 async function loadTelemetryForDevice(deviceId) {
@@ -137,7 +154,7 @@ export async function getCapabilitiesForDevice(deviceId) {
 
 export async function getActiveIntent(vehicleId) {
   const row = await VehicleImmobilizationIntent.findOne({
-    where: { vehicleId, status: { [Op.in]: ACTIVE_STATUSES } },
+    where: { vehicleId, ...effectivelyActiveWhereClause() },
     order: [['createdAt', 'DESC']],
   });
   return serializeIntent(row);
@@ -228,13 +245,10 @@ export async function createIntent(vehicleId, action, user) {
 
   if (action !== MOBILIZE_ACTION) {
     const existing = await VehicleImmobilizationIntent.findOne({
-      where: { vehicleId, status: { [Op.in]: ACTIVE_STATUSES } },
+      where: { vehicleId, ...effectivelyActiveWhereClause() },
     });
     if (existing) {
-      const err = new Error('An immobilization request is already active for this vehicle');
-      err.statusCode = 409;
-      err.existingIntent = serializeIntent(existing);
-      throw err;
+      throw activeIntentConflictError(existing);
     }
   }
 
@@ -263,16 +277,36 @@ export async function createIntent(vehicleId, action, user) {
   };
 
   let intent;
-  if (action === MOBILIZE_ACTION) {
-    intent = await sequelize.transaction(async (t) => {
-      await cancelActiveIntentsForVehicle(vehicleId, user.id, 'superseded_by_mobilize', t);
-      return VehicleImmobilizationIntent.create(intentPayload, { transaction: t });
+  try {
+    if (action === MOBILIZE_ACTION) {
+      intent = await sequelize.transaction(async (t) => {
+        await cancelActiveIntentsForVehicle(vehicleId, user.id, 'superseded_by_mobilize', t);
+        return VehicleImmobilizationIntent.create(intentPayload, { transaction: t });
+      });
+    } else {
+      intent = await VehicleImmobilizationIntent.create(intentPayload);
+    }
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error;
+    // Lost the race at the database — the partial unique index
+    // (one active intent per vehicle) is the authority here, not the
+    // findOne() pre-check above, which cannot be made atomic with the
+    // insert. Translate it into the same conflict response.
+    const existing = await VehicleImmobilizationIntent.findOne({
+      where: { vehicleId, ...effectivelyActiveWhereClause() },
+      order: [['createdAt', 'DESC']],
     });
-  } else {
-    intent = await VehicleImmobilizationIntent.create(intentPayload);
+    throw activeIntentConflictError(existing);
   }
 
   return serializeIntent(intent);
+}
+
+function activeIntentConflictError(existingRow) {
+  const err = new Error('An immobilization request is already active for this vehicle');
+  err.statusCode = 409;
+  err.existingIntent = serializeIntent(existingRow);
+  return err;
 }
 
 export async function cancelIntent(intentId, user, reason = 'operator_cancelled') {
@@ -308,7 +342,9 @@ export async function cancelIntent(intentId, user, reason = 'operator_cancelled'
     throw err;
   }
   const serialized = serializeIntent(transitioned);
-  await notifyImmobilizationTransition(serialized, { status: 'cancelled' });
+  // Cancellation has already committed above — a notification failure here
+  // must not turn a successful cancel into an API-level error.
+  await safeNotify(notifyImmobilizationTransition, serialized, { status: 'cancelled' });
   return serialized;
 }
 
@@ -356,7 +392,7 @@ export async function evaluateActiveIntents() {
   return { evaluated: intents.length, executed, claimed };
 }
 
-async function evaluateOneIntent(intent) {
+export async function evaluateOneIntent(intent) {
   // 1. Expire
   const now = Date.now();
   if (new Date(intent.expiresAt).getTime() <= now) {
@@ -366,7 +402,7 @@ async function evaluateOneIntent(intent) {
       to: 'expired',
     });
     if (transitioned) {
-      await notifyImmobilizationTransition(transitioned, { status: 'expired' });
+      await safeNotify(notifyImmobilizationTransition, transitioned, { status: 'expired' });
     }
     return { claimed: false, delivered: false };
   }
@@ -428,7 +464,7 @@ async function evaluateOneIntent(intent) {
   }
 
   const assignment = await getActiveAssignment(intent.vehicleId);
-  if (!assignment || Number(assignment.deviceId) !== Number(claimedRow.deviceId)) {
+  if (!deviceMatchesActiveAssignment(claimedRow, assignment)) {
     const failedRow = await finalizeExecutingIntent(intent.id, {
       status: 'failed',
       executionError: 'device_reassigned',
@@ -436,7 +472,7 @@ async function evaluateOneIntent(intent) {
       deliveryPhase: 'delivery_unknown',
     });
     if (failedRow) {
-      await notifyImmobilizationTransition(failedRow, { status: 'failed', executionError: 'device_reassigned' });
+      await safeNotify(notifyImmobilizationTransition, failedRow, { status: 'failed', executionError: 'device_reassigned' });
     }
     return { claimed: true, delivered: false };
   }
@@ -461,7 +497,7 @@ async function evaluateOneIntent(intent) {
       traccarHttpStatus: delivery.httpStatus ?? null,
     });
     if (finalized) {
-      await notifyImmobilizationTransition(finalized, { status: 'completed' });
+      await safeNotify(notifyImmobilizationTransition, finalized, { status: 'completed' });
       try {
         await probeDeviceCommandOutcome(finalized);
       } catch (probeErr) {
@@ -470,17 +506,25 @@ async function evaluateOneIntent(intent) {
     }
     return { claimed: true, delivered: true };
   } catch (e) {
+    // A local HTTP timeout means we gave up waiting, not that Traccar
+    // rejected the command — the command may still have reached it. Record
+    // that honestly instead of collapsing it into "rejected". The state
+    // machine has no "unknown" terminal state, so this still lands on
+    // `failed`, but `executionError`/`deliveryPhase` say plainly that the
+    // outcome is unverified, not that delivery is known to have failed.
+    const timedOut = Boolean(e.timedOut);
+    const executionError = timedOut ? 'traccar_delivery_unknown_timeout' : 'traccar_http_rejected';
     const failedRow = await finalizeExecutingIntent(intent.id, {
       status: 'failed',
-      executionError: 'traccar_http_rejected',
+      executionError,
       confidence: 'unverified',
-      deliveryPhase: 'http_rejected',
+      deliveryPhase: timedOut ? 'delivery_unknown' : 'http_rejected',
       traccarHttpStatus: e.httpStatus ?? null,
     });
     if (failedRow) {
-      await notifyImmobilizationTransition(failedRow, {
+      await safeNotify(notifyImmobilizationTransition, failedRow, {
         status: 'failed',
-        executionError: 'traccar_http_rejected',
+        executionError,
       });
     }
     return { claimed: true, delivered: false };

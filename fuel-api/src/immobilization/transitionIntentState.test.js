@@ -26,6 +26,70 @@ describe('transitionIntentState transition rules', () => {
   });
 });
 
+describe('exhaustive state machine matrix — every (from, to) pair, not just the ones exercised elsewhere', () => {
+  const STATUSES = ['pending', 'monitoring', 'executing', 'completed', 'failed', 'expired', 'cancelled'];
+  const TERMINAL = ['completed', 'failed', 'expired', 'cancelled'];
+
+  // The full legal-transition table this module is frozen to (see IMMOBILIZATION.md
+  // "State machine (do not add states)"). Written out explicitly rather than
+  // re-deriving it from ALLOWED_TRANSITIONS, so a future edit to the table has to
+  // consciously change an assertion here too, not just move both in lockstep.
+  const LEGAL = new Set([
+    'pending->monitoring',
+    'pending->executing',
+    'pending->cancelled',
+    'pending->expired',
+    'monitoring->executing',
+    'monitoring->cancelled',
+    'monitoring->expired',
+    'executing->completed',
+    'executing->failed',
+  ]);
+
+  for (const from of STATUSES) {
+    for (const to of STATUSES) {
+      const key = `${from}->${to}`;
+      const expected = LEGAL.has(key);
+      it(`${key} is ${expected ? 'legal' : 'illegal'}`, () => {
+        assert.equal(isTransitionAllowed(from, to), expected, key);
+      });
+    }
+  }
+
+  it('every terminal status has zero outbound transitions', () => {
+    for (const status of TERMINAL) {
+      assert.deepEqual(ALLOWED_TRANSITIONS[status], [], `${status} must be a dead end`);
+    }
+  });
+
+  it('executing can only resolve to a terminal state, and only completed/failed — ' +
+    'critically, expired and cancelled are excluded so a TTL sweep or an operator ' +
+    'cancel can never reach into an in-flight physical command', () => {
+    assert.deepEqual(ALLOWED_TRANSITIONS.executing, ['completed', 'failed']);
+    assert.equal(isTransitionAllowed('executing', 'expired'), false);
+    assert.equal(isTransitionAllowed('executing', 'cancelled'), false);
+    assert.equal(isTransitionAllowed('executing', 'pending'), false);
+    assert.equal(isTransitionAllowed('executing', 'monitoring'), false);
+  });
+
+  it('rejects an unknown status on either side rather than treating it as permissive', () => {
+    assert.equal(isTransitionAllowed('bogus', 'cancelled'), false);
+    assert.equal(isTransitionAllowed('pending', 'bogus'), false);
+    assert.equal(isTransitionAllowed('bogus', 'bogus'), false);
+  });
+});
+
+describe('transitionIntentState rejects any attempt to move a terminal intent, not just executing', () => {
+  for (const from of ['completed', 'failed', 'expired', 'cancelled']) {
+    it(`throws for ${from} -> cancelled (terminal states are dead ends, not just executing)`, async () => {
+      await assert.rejects(
+        () => transitionIntentState({ id: 'intent-terminal', from, to: 'cancelled' }),
+        new RegExp(`disallowed transition: ${from} -> cancelled`),
+      );
+    });
+  }
+});
+
 describe('transitionIntentState guarded SQL behavior', () => {
   it('returns updated row for a valid guarded transition', async () => {
     const originalQuery = sequelize.query;
