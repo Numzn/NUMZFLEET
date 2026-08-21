@@ -149,6 +149,31 @@ describe('Phase 2 Consolidation Stage 1: organizationProvisioningService', () =>
       }
     });
 
+    it('a duplicate email surfaces as a clean 409, not Traccar\'s raw stack trace', { skip: SKIP_NO_TRACCAR }, async () => {
+      const company = await makeTestCompany();
+      const email = `org-provisioning-test-${uuid().substring(0, 8)}@example.test`;
+
+      const first = await provisionCompanyAdmin({
+        companyId: company.id,
+        admin: { name: 'First Admin', email, phone: null, password: 'temp1234' },
+      });
+      createdTraccarUserIds.push(first.traccarUserId);
+
+      const second = await makeTestCompany();
+      await assert.rejects(
+        () => provisionCompanyAdmin({
+          companyId: second.id,
+          admin: { name: 'Second Admin', email, phone: null, password: 'temp1234' },
+        }),
+        (err) => {
+          assert.equal(err.statusCode, 409);
+          assert.ok(!/Duplicate entry|SQLIntegrityConstraintViolation|at org\.traccar/.test(err.message), `error message leaked raw Traccar detail: ${err.message}`);
+          assert.match(err.message, /already exists/i);
+          return true;
+        },
+      );
+    });
+
     it('rejects invalid admin input before creating anything in Traccar', async () => {
       const company = await makeTestCompany();
       await assert.rejects(

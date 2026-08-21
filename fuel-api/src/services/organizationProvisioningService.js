@@ -23,6 +23,18 @@ function badRequest(message) {
   return err;
 }
 
+function conflict(message) {
+  const err = new Error(message);
+  err.statusCode = 409;
+  return err;
+}
+
+function traccarUnavailable(message) {
+  const err = new Error(message);
+  err.statusCode = 502;
+  return err;
+}
+
 /**
  * Validates the `admin` block of a create-organization request. Matches the
  * exact rules previously inlined in modules/platform/companiesService.js's
@@ -56,16 +68,32 @@ export function validateAdminInput(admin) {
 export async function provisionCompanyAdmin({ companyId, admin }) {
   const adminInput = validateAdminInput(admin);
 
-  const traccarUser = await traccarServiceFetch('/api/users', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: adminInput.name,
-      email: adminInput.email,
-      password: adminInput.password,
-      administrator: false,
-      attributes: { isManager: true },
-    }),
-  });
+  let traccarUser;
+  try {
+    traccarUser = await traccarServiceFetch('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: adminInput.name,
+        email: adminInput.email,
+        password: adminInput.password,
+        administrator: false,
+        attributes: { isManager: true },
+      }),
+    });
+  } catch (err) {
+    // Traccar validates uniqueness at the DB layer, not before — a duplicate
+    // email surfaces as a raw, unhandled SQLIntegrityConstraintViolation
+    // (a full Java stack trace as the response body), not a clean 400. Catch
+    // that specific, common, actionable case and translate it; anything else
+    // Traccar throws is logged in full server-side but never forwarded
+    // verbatim to the client (it can be arbitrarily large and leaks internal
+    // detail — stack traces, driver/class names, SQL).
+    if (/duplicate entry/i.test(err.message) && /email/i.test(err.message)) {
+      throw conflict(`An account with the email "${adminInput.email}" already exists — use a different email for this admin.`);
+    }
+    console.error('[provisionCompanyAdmin] Traccar user creation failed:', err);
+    throw traccarUnavailable('Failed to create the administrator account in Traccar. Try again, or contact support if this persists.');
+  }
 
   const numzUser = await createForTraccarUser({
     traccarUserId: traccarUser.id,
