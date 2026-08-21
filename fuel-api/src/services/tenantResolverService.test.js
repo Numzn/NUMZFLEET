@@ -71,13 +71,19 @@ async function makeNumzUser(traccarUserId, companyId) {
 }
 
 /**
- * Grants the already-seeded platform_super_admin role (companyId IS NULL) to
- * a numz user — the additive signal getHomeContext() ORs into isSuperAdmin.
+ * Grants the platform_super_admin role (companyId IS NULL) to a numz user —
+ * the additive signal getHomeContext() ORs into isSuperAdmin. Idempotently
+ * finds-or-creates the system role itself first, using the same shape as
+ * seedRolesAndPermissions.js, so this test doesn't depend on that script
+ * having been run against whatever DB the suite executes against (e.g. a CI
+ * database built via a bare model sync rather than the full seed path).
  */
 async function grantPlatformSuperAdminRole(numzUserId) {
   const { Role, UserRole } = await import('../models/index.js');
-  const role = await Role.findOne({ where: { key: 'platform_super_admin', companyId: null } });
-  assert.ok(role, 'platform_super_admin role must already be seeded (seedRolesAndPermissions.js)');
+  const [role] = await Role.findOrCreate({
+    where: { key: 'platform_super_admin', companyId: null },
+    defaults: { label: 'Platform Super Admin', isSystem: true },
+  });
   const [userRole] = await UserRole.findOrCreate({
     where: { numzUserId, roleId: role.id, companyId: null },
   });
