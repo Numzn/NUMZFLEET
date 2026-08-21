@@ -119,7 +119,7 @@ const PartnersPage = () => {
         <Box className={classes.loadingContainer}>
           <CircularProgress />
         </Box>
-      ) : partners.length === 0 ? (
+      ) : error ? null : partners.length === 0 ? (
         <Card>
           <CardContent>
             <Typography color="textSecondary">No partners yet. Create your first one!</Typography>

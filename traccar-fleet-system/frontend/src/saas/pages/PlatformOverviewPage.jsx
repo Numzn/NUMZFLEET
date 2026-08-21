@@ -140,7 +140,13 @@ const PlatformOverviewPage = () => {
         </Button>
       </Box>
 
-      {!overview ? (
+      {error ? (
+        <Card sx={{ backgroundColor: 'var(--error-light)', borderLeft: '4px solid red' }}>
+          <CardContent>
+            <Typography color="error">{error}</Typography>
+          </CardContent>
+        </Card>
+      ) : !overview ? (
         <Box className={classes.loadingContainer}>
           <CircularProgress />
         </Box>

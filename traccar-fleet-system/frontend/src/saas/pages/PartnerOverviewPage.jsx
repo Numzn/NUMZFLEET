@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   Card,
+  CardContent,
   CircularProgress,
   Typography,
 } from '@mui/material';
@@ -103,7 +104,13 @@ const PartnerOverviewPage = () => {
         </Button>
       </Box>
 
-      {!overview ? (
+      {error ? (
+        <Card sx={{ backgroundColor: 'var(--error-light)', borderLeft: '4px solid red' }}>
+          <CardContent>
+            <Typography color="error">{error}</Typography>
+          </CardContent>
+        </Card>
+      ) : !overview ? (
         <Box className={classes.loadingContainer}>
           <CircularProgress />
         </Box>

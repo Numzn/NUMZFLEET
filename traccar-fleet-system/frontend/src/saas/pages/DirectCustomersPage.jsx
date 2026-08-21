@@ -119,7 +119,7 @@ const DirectCustomersPage = () => {
         <Box className={classes.loadingContainer}>
           <CircularProgress />
         </Box>
-      ) : customers.length === 0 ? (
+      ) : error ? null : customers.length === 0 ? (
         <Card>
           <CardContent>
             <Typography color="textSecondary">No direct customers yet.</Typography>

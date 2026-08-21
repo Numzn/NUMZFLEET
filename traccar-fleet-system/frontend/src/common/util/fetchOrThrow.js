@@ -51,7 +51,15 @@ export default async (input, init = {}) => {
     if (allowRedirect) {
       handleUnauthorized();
     }
-    const err = new Error(await response.text());
+    const bodyText = await response.text();
+    let message = bodyText;
+    try {
+      const parsed = JSON.parse(bodyText);
+      message = parsed.error || parsed.message || bodyText;
+    } catch {
+      // Not JSON — surface the raw text as-is.
+    }
+    const err = new Error(message);
     err.status = response.status;
     throw err;
   }
