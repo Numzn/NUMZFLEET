@@ -18,13 +18,17 @@ import {
   deviceMatchesActiveAssignment,
 } from './immobilizationIntentService.js';
 
-const DEFAULT_COMPANY_ID = '00000000-0000-0000-0000-000000000001';
 const createdVehicleIds = [];
+let companyIdPromise = null;
 
 after(async () => {
-  const { Vehicle } = await import('../models/index.js');
+  const { Vehicle, Company } = await import('../models/index.js');
   if (createdVehicleIds.length) {
     await Vehicle.destroy({ where: { id: { [Op.in]: createdVehicleIds } } });
+  }
+  if (companyIdPromise) {
+    const companyId = await companyIdPromise;
+    await Company.destroy({ where: { id: companyId } });
   }
   // cancelIntent/evaluateOneIntent's real notifyImmobilizationTransition call resolves
   // its audience via getManagerUserIds(), which lazily opens a Traccar MySQL pool
@@ -35,11 +39,31 @@ after(async () => {
   await closeTraccarConnection();
 });
 
+// Own company row rather than the well-known default company id — that id is
+// only guaranteed to exist via a seed migration on a long-lived database, not
+// on a freshly-synced one (e.g. CI). Memoized: one company for the whole file.
+async function getCompanyId() {
+  if (!companyIdPromise) {
+    companyIdPromise = (async () => {
+      const { Company } = await import('../models/index.js');
+      const company = await Company.create({
+        slug: `state-machine-test-${uuid().substring(0, 10)}`,
+        name: 'StateMachine Test Co',
+        organizationType: 'customer',
+        parentCompanyId: null,
+        status: 'active',
+      });
+      return company.id;
+    })();
+  }
+  return companyIdPromise;
+}
+
 async function makeVehicle() {
   const { Vehicle } = await import('../models/index.js');
   const vehicle = await Vehicle.create({
     name: `StateMachine Test Vehicle ${uuid().substring(0, 8)}`,
-    companyId: DEFAULT_COMPANY_ID,
+    companyId: await getCompanyId(),
   });
   createdVehicleIds.push(vehicle.id);
   return vehicle;
