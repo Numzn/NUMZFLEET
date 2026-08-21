@@ -27,6 +27,25 @@ env:
 jobs:
   quality-checks:
     runs-on: ubuntu-latest
+    # fuel-api's test suite includes real-DB integration tests (not pure unit
+    # tests) — see e.g. src/vehicleEngine/vehicleEngineService.test.js,
+    # src/immobilization/executionClaim.test.js. This service container is
+    # what makes `npm test` connectable; without it every DB-touching test
+    # fails with SequelizeConnectionRefusedError.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: fuel_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     outputs:
       sha: ${{ steps.target.outputs.sha }}
     steps:
@@ -55,12 +74,22 @@ jobs:
       - name: Install and test fuel-api
         working-directory: fuel-api
         env:
-          # src/config/database.js throws at import time if this is unset, even
-          # though it only builds a lazy Sequelize pool (no connection attempt
-          # until a query actually runs) — no real Postgres needed for unit tests.
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_placeholder
+          # Real Postgres service above — a meaningful slice of this suite runs
+          # actual DB queries, not just pure unit tests.
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/fuel_ci
         run: |
           npm ci
+          # Build the test schema the same way the app bootstraps it at runtime
+          # (models/index.js's syncDatabase, called from server.js on startup) —
+          # deliberately not the raw SQL migration replay in
+          # deployment/utils/run-fuel-migrations.sh. That script targets an
+          # already-long-lived database (production has never been "fresh");
+          # replaying it against a truly empty DB surfaces old, unrelated
+          # idempotency quirks (case-folded constraint names, etc.) that have
+          # never mattered in the real deploy sequence and aren't this job's
+          # concern. Real production migrations still run for real at deploy
+          # time in deploy-oci, against the actual long-lived prod DB.
+          node -e "import('./src/models/index.js').then(m => m.syncDatabase()).then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); })"
           npm test
 
       - name: Validate MIGRATION_ORDER matches migration files
