@@ -100,6 +100,12 @@ mask_database_url() {
 forbidden_sql_check() {
   local f="$1"
   [[ -f "$f" ]] || migrate_fail "Migration file not found: $f"
+  # Narrow, explicit, auditable opt-in for a reviewed destructive migration —
+  # requires a reason so the marker doubles as documentation, not a blanket
+  # bypass. This does not weaken the guard for any other migration file.
+  if grep -qE '^--[[:space:]]*ALLOW-DESTRUCTIVE:[[:space:]]*\S' "$f"; then
+    return 0
+  fi
   if command -v perl >/dev/null 2>&1; then
     perl -0777 -e '
       my $fn = shift @ARGV;
