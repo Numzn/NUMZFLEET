@@ -43,3 +43,4 @@
 20260811_partner_reseller_model.sql
 20260811_remove_company_relationships.sql
 20260812_active_context_switching.sql
+20260821_remove_active_contexts.sql

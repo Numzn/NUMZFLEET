@@ -1,11 +1,13 @@
 # NUMZ Platform Architecture
 
-**Status:** Frozen v1.1  
+**Status:** Frozen v2.0  
 **Scope:** Platform identity, tenancy, context, permissions, service boundaries, provisioning, audit, UI modes, auth evolution  
 **Does not cover:** Implementation code, API endpoint specs, database migration SQL  
 **Applies to:** All work touching authentication, tenancy, company provisioning, platform navigation, or cross-tenant data access  
 
-**Governance:** This document is authoritative. Pull requests that change tenancy, authentication, permissions, provisioning, context switching, or platform navigation must be reviewed against this specification. Deviations require a version bump and amendment here — not silent drift in code.
+**Governance:** This document is authoritative. Pull requests that change tenancy, authentication, permissions, provisioning, or platform navigation must be reviewed against this specification. Deviations require a version bump and amendment here — not silent drift in code.
+
+**v2.0 amendment (supersedes v1.1's context-switching model):** v1.1 specified a session-level context switch — a platform admin could "enter" a partner's or customer's workspace from inside their own session (`activeContext.type` toggling between `platform`/`company`, an exit banner, audited enter/exit events). That model was built, then deliberately reversed: **there is no cross-company context switching.** Every organization is an independent environment with its own login/session; `activeContext` always equals the identity's own home context (never an override); to operate a different organization's fleet you log out and log in as that organization. This is the permanent model, not an interim state pending a future phase. See [Active Context](#active-context) and [One organization per session (frozen)](#one-organization-per-session-frozen) below — both fully rewritten for v2.0. Sections describing other, still-aspirational target architecture (`ExecutionContext`, Platform/Company Services boundary, Provisioning Engine, Platform Health, platform audit table) are unaffected by this amendment; they remain the same forward-looking target they always were.
 
 **Operational supplement:** [fuel-api/docs/ACCOUNTS_AND_TENANCY.md](../fuel-api/docs/ACCOUNTS_AND_TENANCY.md) (request flow, env vars, troubleshooting).
 
@@ -120,9 +122,11 @@ Every access decision answers four questions:
 
 ## Active Context
 
-Replace ad-hoc `impersonatedCompanyId`, `isSuperAdmin`, and silent company fallback with a single session concept.
+Replace ad-hoc `impersonatedCompanyId` and silent company fallback with a single session concept — but, per the v2.0 amendment above, **`activeContext` is derived once from identity and never overridden.** There is no session-level toggle, no "enter company," no "exit to platform." It is a read of the identity's own home context, not a piece of session state that can change value mid-session.
 
-### Platform mode
+### Platform-only identity
+
+A `numz_users` row with `company_id IS NULL` and `administrator: true` (or an explicit `platform_super_admin` role grant — see [Platform vs Company data model](#platform-vs-company-data-model)) has no home company at all:
 
 ```json
 {
@@ -136,16 +140,18 @@ Replace ad-hoc `impersonatedCompanyId`, `isSuperAdmin`, and silent company fallb
 }
 ```
 
-Routes: `/platform/*` — companies directory, health, provisioning, support tools.
+Routes: `/saas/platform/*` — partner/customer directory, overview, provisioning.
 
-### Company mode
+### Company identity (partner or customer)
+
+Every other identity has exactly one home company, and `activeContext` always equals it — including a **dual-capability identity** (a home company *and* `platform_super_admin`, e.g. the platform owner's own operational account): platform capability is reachable through Settings as a management surface, but it never becomes this session's `activeContext.type`.
 
 ```json
 {
   "userId": 42,
   "homeCompanyId": "abc-uuid",
   "activeContext": {
-    "type": "company",
+    "type": "customer",
     "companyId": "abc-uuid"
   },
   "permissions": ["vehicles.read", "fuel.approve"]
@@ -156,34 +162,27 @@ Routes: `/vehicles`, Fuel Day, vehicle workspace, company settings.
 
 ### Extensibility
 
-Future context types extend `activeContext.type` without redesigning auth:
-
-```text
-platform → company → branch → depot → workshop
-platform → partner → customer → fleet
-```
-
-v1 implements `platform` and `company` only.
+`activeContext.type` is `platform`, `partner`, or `customer` — the identity's own kind of organization, fixed for the life of the session. There is no per-request "which company am I acting as" question to answer; it does not need extending for deeper hierarchy (`branch`/`depot`/etc.) the way a switchable context would have, since operating a different organization is a different login, not a deeper context.
 
 ### UI modes
 
-| `activeContext.type` | UI | Banner |
+| `activeContext.type` | UI | Badge |
 |---------------------|-----|--------|
-| `platform` | Platform workspace | — |
-| `company` | Company workspace | Optional: `Viewing: ABC Logistics [Exit Company]` when entered from platform |
+| `platform` | Platform workspace | `NUMZ Platform` (informational only — never a dropdown or switcher) |
+| `partner` / `customer` | Company workspace | The identity's own organization name |
 
-Platform users enter Company Mode only by **explicit context switch**, never by silent fallback.
+A platform-capable identity that also has a home company sees their **own fleet as primary**, with Platform reachable under Settings — never the other way around, and never both at once in the same `activeContext`.
 
 ---
 
-## Context switching invariants (frozen)
+## One organization per session (frozen)
 
-1. **Platform → Enter Company:** After switch, `activeContext.type = company`. All Company Services behave **exactly** as if the user belonged to that company — same repository filters, feature flags, and UI. **No hidden bypasses.** No mixed platform+company queries in fleet UI.
-2. **Exit Company:** Restore `activeContext.type = platform`. Company-scoped routes redirect to `/platform`.
-3. **Platform APIs in platform context only:** `/api/platform/*` rejects requests where `activeContext.type !== platform` (except documented service-to-service paths).
-4. **Audit every switch:** `context.entered_company` and `context.exited_company` logged to platform audit.
-5. **One active context at a time (v1):** No nested context stack. Future `branch`/`depot` extends the same model.
-6. **Scope boundary, v1 (frozen, not a bug):** A context switch governs **fuel-api-owned, tenant-scoped tables only** (vehicles, fuel operations, service records, `numz_users`, etc. — everything filtered by `company_id`). It does **not** change what Traccar shows on the Live Map, device list, or Dashboard alerts — those are authorized purely by the operator's own real Traccar session and Traccar's own per-user device ACLs, which are managed separately (`company_devices` + Traccar groups, see [Data isolation rules](#data-isolation-rules)). Switching into Company X's workspace does **not** grant visibility into Company X's live devices unless the operator's Traccar account is separately permissioned for them. This is a deliberate v1 boundary — a future phase may unify the two (Traccar-side context-aware device ACL switching), but until then, UI that presents "switch workspace" as "enter their whole operation" must make this boundary visible, not silent.
+1. **No cross-company entry, ever.** There is no "enter company" action, no session-level override, no route that changes whose data the current session sees mid-session. `activeContext` is fixed at login for the life of the session.
+2. **To operate a different organization's fleet, log out and log in as that organization.** Each organization is a fully independent environment with its own login/session — not a deeper level of the same session.
+3. **The organization badge is purely informational.** No dropdown, no chevron, no workspace count, no switcher. It names which organization this session belongs to and nothing else.
+4. **Partner and Customer records are management records, not gateways.** From Platform or Partner workspace, partner/customer cards show read-only summary data (name, counts). There is no "Enter Fleet," "Open as," "Login as," or "Impersonate" affordance anywhere in the UI — a card can never become a way into another organization's session.
+5. **Route-based navigation gating, not context-based.** Since `activeContext.type` can never be `platform` for a dual-capability identity operating their own fleet, navigation resolves which nav group to show from the current route (`inPlatformArea`/`inPartnerAdmin`, see `common/util/navWorkspace.js`) in addition to `activeContext.type` — not from context alone.
+6. **Scope boundary (frozen, not a bug):** Business data (vehicles, fuel operations, service records, `numz_users`, etc.) is filtered by `req.auth.companyId`, which is always the session's own home company. This is independent of what Traccar shows on the Live Map, device list, or Dashboard alerts — those are authorized purely by the operator's own real Traccar session and Traccar's own per-user device ACLs, managed separately (`company_devices` + Traccar groups, see [Data isolation rules](#data-isolation-rules)). Since there is no cross-company session at all under this model, this boundary is largely moot for fuel-api-owned data, but remains true for Traccar: logging in as Partner X's own account shows Partner X's own Traccar-authorized devices, not a borrowed view into them.
 
 ---
 
@@ -293,7 +292,6 @@ Operate in `activeContext.type === platform` or cross-tenant with explicit audit
 | `CompanyDirectoryService` | List, search companies, summaries |
 | `LicenseService` | Feature flags, limits (v1: `companies.settings`) |
 | `PlatformHealthService` | Aggregated health for `/platform` |
-| `SupportService` | Context switch, support tools (future) |
 
 ### Company Services
 
@@ -419,13 +417,13 @@ Long-term: users log into NUMZFLEET, not Traccar. Traccar becomes an internal te
 | Field | Purpose |
 |-------|---------|
 | `actor_user_id` | Who |
-| `active_context` | Context snapshot at time of action |
-| `action` | e.g. `context.entered_company`, `company.provisioned` |
+| `active_context` | Context snapshot at time of action (always the actor's own home context — see v2.0 amendment) |
+| `action` | e.g. `company.provisioned`, `vehicle.deleted` |
 | `resource_type`, `resource_id` | What |
 | `payload` | JSON detail |
 | `ip`, `occurred_at` | Where, when |
 
-**First events:** context switch, company provision, vehicle delete, fuel approve.
+**First events:** company provision, vehicle delete, fuel approve.
 
 Module-level audit (operation sessions) remains; platform audit is additive.
 
@@ -434,26 +432,22 @@ Module-level audit (operation sessions) remains; platform audit is additive.
 ## UI navigation hierarchy
 
 ```text
-Platform (/platform)
-  Health dashboard
-  Companies
-    Company (explicit context switch)
-      Dashboard
-      Fleet / Vehicles
-        Vehicle workspace
-          Fuel | Maintenance | Trips | Documents
-      Fuel Operations
-      Drivers
-      Users and Roles
-      Settings
+Every user's own fleet is primary — vehicles, fuel, maintenance, drivers,
+trips, documents, all under their own home organization, no nesting.
+
+Settings
+  Platform (platformOwner only, jump-off point, not nested nav)
+    /saas/platform/overview — health, Partners (read-only records), Direct Customers (read-only records)
+  Business (partner-capability identities)
+    /saas/partner/overview — My Customers (read-only records)
 ```
 
-Breadcrumbs, permissions, and resource filters derive from `activeContext` + path + `resourceScope`.
+Partner/Customer entries are management records, never a nested "enter" path into another session — see [One organization per session (frozen)](#one-organization-per-session-frozen). Permissions and resource filters derive from `activeContext` + path + `resourceScope`; navigation *grouping* (Platform vs Business vs the user's own fleet) derives from route as well as `activeContext.type`, since a dual-capability identity's `activeContext.type` is always their home company's type, never `platform`.
 
 ### Frontend gap (today)
 
-- [`store/session.js`](../traccar-fleet-system/frontend/src/store/session.js) stores `user` only — no `activeContext` or `permissions`.
-- [`useSuperAdmin`](../traccar-fleet-system/frontend/src/common/util/permissions.js) checks Traccar `administrator` flag; backend `isSuperAdmin` requires `administrator` **and** no `numz_users.company_id`. UI and API can disagree until Phase 5 (frontend context store).
+- [`store/organizations.js`](../traccar-fleet-system/frontend/src/store/organizations.js) holds `currentContext`/`homeCompanyId` from `GET /api/context` — this part of the original gap is closed.
+- [`useSuperAdmin`](../traccar-fleet-system/frontend/src/common/util/permissions.js) still checks only the Traccar `administrator` flag; backend `isSuperAdmin` requires `administrator` **and** (no `numz_users.company_id` **or** an explicit `platform_super_admin` role grant). UI and API can still disagree for a dual-capability identity — this specific gap is not yet closed.
 
 ---
 
@@ -495,9 +489,9 @@ Do not start until this document is approved.
 | 2 | `resolveExecutionContext` + `req.context` (parallel to `req.auth`) |
 | 3 | `PlatformHealthService` + `/platform` API + UI |
 | 4 | `ExecutionContext.applySequelizeWhere` in repositories (vehicles, sessions, fuel first) |
-| 5 | Frontend context store + Platform/Company routing + switch banner |
+| 5 | Frontend context store + Platform/Company routing — **done, no switch banner**: `activeContext` is read-only per the v2.0 amendment, so there is nothing to bank a re-entry point on |
 | 6 | Company Provisioning Engine + domain event contracts |
-| 7 | Platform audit table + context-switch events |
+| 7 | Platform audit table + provisioning/deletion/approval events |
 | 8 | Resource ownership filters (drivers first) |
 | 9 | Auth strategy interface + JWT |
 
@@ -512,8 +506,7 @@ Honest mapping — code that contradicts this spec today:
 | Silent `DEFAULT_COMPANY_ID` fallback for unprovisioned users | `tenantResolverService.js` |
 | `req.auth` not `ExecutionContext` | `tenantContext.js` |
 | `listVehiclesMerged(companyId)` — single company only | `vehicleFleetService.js` |
-| No `/api/platform/*` routes | — |
-| No `activeContext` in frontend session | `store/session.js` |
+| No `/api/platform/*` routes (SaaS platform routes live under `routes/organizations.js`, not a dedicated `/api/platform/*` namespace) | — |
 | `useSuperAdmin` misaligned with backend | `permissions.js` vs `tenantResolverService.js` |
 | `companies.status` free string | `Company` model |
 | Audit operation-scoped only | `operation_audit_events` |

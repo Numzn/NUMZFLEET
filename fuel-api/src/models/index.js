@@ -14,7 +14,6 @@ import UserNotificationModel from './UserNotification.js';
 import VehicleImmobilizationIntentModel from './VehicleImmobilizationIntent.js';
 import CompanyModel, { DEFAULT_COMPANY_ID } from './Company.js';
 import NumzUserModel from './NumzUser.js';
-import ActiveContextModel from './ActiveContext.js';
 import CompanyDeviceModel from './CompanyDevice.js';
 import ServiceRecordModel from './ServiceRecord.js';
 import MaintenanceBudgetModel from './MaintenanceBudget.js';
@@ -47,7 +46,6 @@ const UserNotification = UserNotificationModel(sequelize);
 const VehicleImmobilizationIntent = VehicleImmobilizationIntentModel(sequelize);
 const Company = CompanyModel(sequelize);
 const NumzUser = NumzUserModel(sequelize);
-const ActiveContext = ActiveContextModel(sequelize);
 const CompanyDevice = CompanyDeviceModel(sequelize);
 const ServiceRecord = ServiceRecordModel(sequelize);
 const MaintenanceBudget = MaintenanceBudgetModel(sequelize);
@@ -69,8 +67,6 @@ Company.hasMany(Vehicle, { foreignKey: 'companyId' });
 Vehicle.belongsTo(Company, { foreignKey: 'companyId' });
 Company.hasMany(NumzUser, { foreignKey: 'companyId' });
 NumzUser.belongsTo(Company, { foreignKey: 'companyId' });
-Company.hasMany(ActiveContext, { foreignKey: 'companyId' });
-ActiveContext.belongsTo(Company, { foreignKey: 'companyId' });
 NumzUser.hasMany(NotificationPreference, { foreignKey: 'numzUserId', onDelete: 'CASCADE' });
 NotificationPreference.belongsTo(NumzUser, { foreignKey: 'numzUserId' });
 Company.hasMany(CompanyDevice, { foreignKey: 'companyId' });
@@ -273,7 +269,6 @@ export {
   VehicleImmobilizationIntent,
   Company,
   NumzUser,
-  ActiveContext,
   CompanyDevice,
   ServiceRecord,
   MaintenanceBudget,

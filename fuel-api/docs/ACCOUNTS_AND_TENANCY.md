@@ -128,7 +128,7 @@ When you onboard **Company B**:
 
 Relevant: `companyProvisioningService.js`.
 
-**This is why switching workspace doesn't change the Live Map.** `switchActiveContext`/`active_contexts` only override `req.auth.activeContext` for **fuel-api** requests — Traccar's own API calls (`/api/devices`, `/api/positions`, live map, dashboard alerts) go straight to Traccar authenticated by the operator's real Traccar session, which Traccar authorizes against its own per-user device ACLs (independent of `active_contexts`). A platform admin who switches into Partner X's workspace sees Partner X's fuel-api-owned data (vehicles registry, fuel ops, customers) correctly re-scoped, but the Live Map continues to reflect whatever devices the admin's own Traccar account can already see — not Partner X's fleet. See [PLATFORM_ARCHITECTURE.md's Context switching invariant #6](../../docs/PLATFORM_ARCHITECTURE.md#context-switching-invariants-frozen) — this is a deliberate v1 boundary, not a bug.
+**There is no cross-company context switching** (see [PLATFORM_ARCHITECTURE.md's v2.0 amendment](../../docs/PLATFORM_ARCHITECTURE.md#numz-platform-architecture)) — `req.auth.companyId` always equals the authenticated identity's own home company, never an override. To operate a different company's fleet, log out and log in as that company's own account: the Live Map, device list, and dashboard alerts then naturally reflect that account's own real Traccar session and Traccar's own per-user device ACLs (`company_devices` + Traccar groups). There is no separate boundary to reason about here — one login, one company, one set of Traccar permissions, all in agreement.
 
 ## Login paths
 
@@ -185,7 +185,7 @@ POSTGRES_CONTAINER=numzfleet-dev-db bash deployment/utils/run-fuel-migrations.sh
 
 Target state is defined in [PLATFORM_ARCHITECTURE.md](../../docs/PLATFORM_ARCHITECTURE.md). Summary of what is **not yet implemented**:
 
-- `ExecutionContext` / `activeContext` (replacing `req.auth` + silent fallback)
+- `ExecutionContext` as a full replacement for `req.auth` (`activeContext` itself already exists on `req.auth.activeContext` today — always the identity's own home context, no override, no silent fallback for provisioned users)
 - Platform Services vs Company Services boundary
 - `/platform` workspace and Platform Health
 - NumzTrak-native JWT login
