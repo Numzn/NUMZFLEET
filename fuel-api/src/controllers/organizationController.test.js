@@ -221,10 +221,6 @@ describe('organizationController — getContext', () => {
     const req = {
       auth: {
         activeContext: { type: 'customer', companyId: 'some-company-uuid', companyName: 'Acme' },
-        accessibleContexts: [
-          { type: 'customer', companyId: 'some-company-uuid', label: 'My Fleet' },
-          { type: 'platform', companyId: null, label: 'Platform' },
-        ],
         homeCompanyId: 'some-company-uuid',
         isSuperAdmin: true,
         roles: ['super_admin', 'company_admin'],
@@ -238,7 +234,6 @@ describe('organizationController — getContext', () => {
     assert.equal(res.body.homeCompanyId, 'some-company-uuid');
     assert.equal(res.body.isSuperAdmin, true);
     assert.deepEqual(res.body.roles, ['super_admin', 'company_admin']);
-    assert.equal(res.body.accessibleContexts.length, 2);
   });
 
   it('degrades gracefully to empty/null defaults when req.auth is missing', async () => {
@@ -248,7 +243,6 @@ describe('organizationController — getContext', () => {
     await getContext(req, res);
 
     assert.equal(res.body.activeContext, null);
-    assert.deepEqual(res.body.accessibleContexts, []);
     assert.equal(res.body.homeCompanyId, null);
     assert.equal(res.body.isSuperAdmin, false);
     assert.deepEqual(res.body.roles, []);

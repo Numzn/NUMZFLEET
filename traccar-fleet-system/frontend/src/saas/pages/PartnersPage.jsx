@@ -9,13 +9,11 @@ import {
 import { makeStyles } from 'tss-react/mui';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import { setPartners, setError, clearError } from '../../store/organizations';
 import { fetchPartners, createPartner } from '../organizationApi';
 import PageHeader from '../../common/components/PageHeader';
 import CreateOrganizationDialog from '../components/CreateOrganizationDialog';
-import { switchContextAndNavigate } from '../util/contextNavigation.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -34,14 +32,6 @@ const useStyles = makeStyles()((theme) => ({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
     gap: theme.spacing(2),
-  },
-  partnerCard: {
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      boxShadow: theme.shadows[4],
-      transform: 'translateY(-2px)',
-    },
   },
   stats: {
     display: 'flex',
@@ -76,9 +66,7 @@ const useStyles = makeStyles()((theme) => ({
 const PartnersPage = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const [openDialog, setOpenDialog] = useState(false);
-  const [switchingTo, setSwitchingTo] = useState(null);
 
   const user = useSelector((state) => state.session.user);
   const partners = useSelector((state) => state.organizations.partners);
@@ -96,21 +84,6 @@ const PartnersPage = () => {
       dispatch(setPartners(data));
     } catch (err) {
       dispatch(setError(err.message));
-    }
-  };
-
-  // Enter that partner's own workspace — the same switch ContextSelector's
-  // dropdown already performs, just reachable directly from the card instead
-  // of a hidden multi-click path through the top bar.
-  const handleOpenPartner = async (partnerId) => {
-    setSwitchingTo(partnerId);
-    try {
-      await switchContextAndNavigate({
-        dispatch, navigate, user, companyId: partnerId,
-      });
-    } catch (err) {
-      dispatch(setError(err.message));
-      setSwitchingTo(null);
     }
   };
 
@@ -155,16 +128,9 @@ const PartnersPage = () => {
       ) : (
         <Box className={classes.grid}>
           {partners.map((partner) => (
-            <Card
-              key={partner.id}
-              className={classes.partnerCard}
-              onClick={() => (switchingTo ? null : handleOpenPartner(partner.id))}
-            >
+            <Card key={partner.id}>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="h6">{partner.name}</Typography>
-                  {switchingTo === partner.id && <CircularProgress size={18} />}
-                </Box>
+                <Typography variant="h6">{partner.name}</Typography>
                 <Typography variant="caption" color="textSecondary">
                   {partner.slug}
                 </Typography>

@@ -1,6 +1,7 @@
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
@@ -15,6 +16,7 @@ import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import { isPartnerAdminArea, isPlatformArea } from '../../common/util/navWorkspace.js';
 
 /**
  * Single source of truth for the Settings Center's section nav — mirrors the
@@ -49,6 +51,7 @@ export const SETTINGS_CATEGORIES = {
   integrations: 'Integrations',
   system: 'System',
   platform: 'Platform',
+  business: 'Business',
 };
 
 export const SETTINGS_SECTION_IDS = {
@@ -56,6 +59,7 @@ export const SETTINGS_SECTION_IDS = {
   profile: 'profile',
   security: 'security',
   platformAccess: 'platformAccess',
+  businessAccess: 'businessAccess',
   team: 'team',
   roles: 'roles',
   devices: 'devices',
@@ -111,13 +115,34 @@ export const SETTINGS_SECTIONS = [
     id: SETTINGS_SECTION_IDS.platformAccess,
     label: 'Platform',
     icon: BusinessOutlinedIcon,
-    path: '/settings/platform',
-    match: (pathname) => pathname.startsWith('/settings/platform'),
+    // A plain link, not a context switch — Platform is a management
+    // capability of this identity (isSuperAdmin), never a second
+    // organization the session operates inside. See
+    // fuel-api/src/services/tenantResolverService.js.
+    path: '/saas/platform/overview',
+    match: isPlatformArea,
     live: true,
     requiresRole: 'platformOwner',
     category: 'platform',
-    description: 'Jump into the Platform workspace — partners, direct customers, platform-wide stats.',
+    description: 'Manage partners, direct customers, and platform-wide settings.',
     keywords: ['platform', 'partners', 'direct customers', 'tenants'],
+  },
+  {
+    id: SETTINGS_SECTION_IDS.businessAccess,
+    label: 'Business',
+    icon: StorefrontOutlinedIcon,
+    path: '/saas/partner/overview',
+    match: isPartnerAdminArea,
+    live: true,
+    // Not a role — the active context's own organizationType, which for a
+    // partner identity is always their own home company (no context switch
+    // exists to make it otherwise). See navigationResolver.js
+    // (`inPartnerAdmin`) for why /saas/partner/* shows Overview/Customers
+    // here instead of the fleet nav.
+    requiresContextType: 'partner',
+    category: 'business',
+    description: 'Manage the customers under your reseller business.',
+    keywords: ['business', 'partner', 'reseller', 'customers'],
   },
   {
     id: SETTINGS_SECTION_IDS.team,
@@ -300,7 +325,7 @@ export function resolveActiveSettingsSection(pathname) {
  * re-implementing the same three-role/one-feature check.
  */
 export function isSettingsSectionVisible(section, {
-  manager, admin, technician, platformOwner, features,
+  manager, admin, technician, platformOwner, features, currentContextType,
 } = {}) {
   if (section.requiresRole === 'manager' && !manager) return false;
   if (section.requiresRole === 'admin' && !admin) return false;
@@ -312,6 +337,11 @@ export function isSettingsSectionVisible(section, {
   // context store) — good enough to decide whether to show the nav entry,
   // not what actually gates the API.
   if (section.requiresRole === 'platformOwner' && !platformOwner) return false;
+  // Real enforcement is server-side too (GET/POST /api/partner/* require
+  // req.auth.activeContext.type === 'partner'). currentContextType is the
+  // same Redux value the primary sidebar already renders from — showing and
+  // enforcing agree by construction, there's no separate guess here.
+  if (section.requiresContextType && section.requiresContextType !== currentContextType) return false;
   if (section.requiresFeature && features?.[section.requiresFeature]) return false;
   return true;
 }

@@ -19,8 +19,6 @@ import {
   listDirectCustomersOrg,
   listMyCustomers,
   createMyCustomer,
-  switchContext,
-  resetContext,
   getContext,
   getPlatformOverview,
   getMyOverview,
@@ -96,30 +94,6 @@ router.get(
   attachTenantContext,
   requireAuth,
   getContext
-);
-
-// POST /api/context/switch/:companyId — Switch active context. Authorization is
-// enforced inside switchActiveContext (identity-aware: platform can switch
-// anywhere, a partner only into itself or its own customers, a customer
-// nowhere else) — NOT gated to platform owners only, since partners must be
-// able to switch into their own customers too (see Phase 2D).
-router.post(
-  '/context/switch/:companyId',
-  authenticate,
-  attachTenantContext,
-  requireAuth,
-  switchContext
-);
-
-// POST /api/context/reset — Explicitly return to the caller's default (home)
-// context — platform for a super admin, their own company otherwise. Does not
-// require a browser reload.
-router.post(
-  '/context/reset',
-  authenticate,
-  attachTenantContext,
-  requireAuth,
-  resetContext
 );
 
 /**

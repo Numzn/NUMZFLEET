@@ -276,7 +276,7 @@ const PlatformOverviewPage = () => {
                   ✓ View and manage <strong>Direct Customers</strong> for independent customer accounts
                 </Typography>
                 <Typography variant="body2">
-                  ✓ Use the <strong>Context Selector</strong> to switch between organizations and access their fleet dashboards
+                  ✓ To operate a partner's or customer's fleet, log out and sign in with their account
                 </Typography>
               </Box>
             </Card>

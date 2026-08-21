@@ -17,6 +17,8 @@ export const NAV_WORKSPACES = {
 };
 
 export const SETTINGS_ROOT = '/settings';
+export const PLATFORM_ROOT = '/saas/platform';
+export const PARTNER_ADMIN_ROOT = '/saas/partner';
 
 /** Where "Exit Settings" goes when there is no operational page to return to. */
 export const OPERATIONAL_HOME = '/';
@@ -31,6 +33,26 @@ export function resolveNavWorkspace(pathname) {
 
 export function isSettingsWorkspace(pathname) {
   return resolveNavWorkspace(pathname) === NAV_WORKSPACES.settings;
+}
+
+/**
+ * Reached via Settings -> Platform — a plain link, not a context switch (a
+ * platform admin's activeContext stays their own home company the whole
+ * time they're here; Platform is a management capability, not a second
+ * organization the session operates inside). See navigationResolver.js's
+ * `inPlatformArea` for why this route shows the platform-management nav
+ * (Overview/Partners/Direct Customers) instead of the fleet nav.
+ */
+export function isPlatformArea(pathname) {
+  return pathname === PLATFORM_ROOT || pathname.startsWith(`${PLATFORM_ROOT}/`);
+}
+
+/**
+ * Reached via Settings -> Business — likewise a plain link, not a context
+ * switch. See navigationResolver.js's `inPartnerAdmin`.
+ */
+export function isPartnerAdminArea(pathname) {
+  return pathname === PARTNER_ADMIN_ROOT || pathname.startsWith(`${PARTNER_ADMIN_ROOT}/`);
 }
 
 /**

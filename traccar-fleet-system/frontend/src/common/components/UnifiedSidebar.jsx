@@ -42,7 +42,7 @@ import LogoImage from '../../login/LogoImage';
 import { TOPBAR_HEIGHT } from '../styles/topbarStyles';
 import { useTranslation } from './LocalizationProvider';
 import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
-import { isSettingsWorkspace, resolveExitTarget } from '../util/navWorkspace.js';
+import { isSettingsWorkspace, isPartnerAdminArea, isPlatformArea, resolveExitTarget } from '../util/navWorkspace.js';
 import { buildSettingsNavGroups } from '../../settings/center/settingsSectionRegistry.js';
 import { useSuperAdmin, useTechnician } from '../util/permissions';
 import { resolveNavigation } from '../util/navigationResolver';
@@ -229,6 +229,8 @@ const UnifiedSidebar = ({
   const technician = useTechnician();
   const platformOwner = useSuperAdmin();
   const inSettings = isSettingsWorkspace(location.pathname);
+  const inPartnerAdmin = isPartnerAdminArea(location.pathname);
+  const inPlatformArea = isPlatformArea(location.pathname);
 
   // Where "Exit Settings" returns to. Held in a ref rather than state because it
   // must not re-render the sidebar as the user moves around the app — it is only
@@ -247,7 +249,7 @@ const UnifiedSidebar = ({
   const settingsNavGroups = useMemo(() => {
     if (!inSettings) return [];
     const groups = buildSettingsNavGroups({
-      manager, admin, technician, platformOwner, features,
+      manager, admin, technician, platformOwner, features, currentContextType: currentContext?.type,
     });
     return [
       {
@@ -271,7 +273,7 @@ const UnifiedSidebar = ({
         })),
       })),
     ];
-  }, [admin, features, inSettings, manager, platformOwner, technician]);
+  }, [admin, features, inSettings, manager, platformOwner, technician, currentContext?.type]);
 
   // External system items (billing/support links) are added to all contexts
   const externalSystemItems = useMemo(() => {
@@ -313,9 +315,13 @@ const UnifiedSidebar = ({
       readonly,
       features,
       externalSystemItems,
+      inPartnerAdmin,
+      inPlatformArea,
     });
   }, [
     inSettings,
+    inPartnerAdmin,
+    inPlatformArea,
     currentContext,
     alertsBadgeCount,
     pendingFuelCount,

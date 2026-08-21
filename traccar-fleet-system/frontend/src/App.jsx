@@ -46,7 +46,7 @@ const App = () => {
     dispatch(sessionActions.updateUser(await response.json()));
   });
 
-  // Initialize organization context (Platform/Partner/Customer)
+  // Initialize organization context (identity's own home company)
   useOrganizationContext(user);
 
   useEffectAsync(async () => {

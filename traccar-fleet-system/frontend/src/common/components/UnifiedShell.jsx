@@ -11,7 +11,7 @@ import { useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import MenuIcon from '@mui/icons-material/Menu';
 import UnifiedSidebar from './UnifiedSidebar';
-import ContextSelector from '../../saas/components/ContextSelector';
+import OrganizationBadge from '../../saas/components/OrganizationBadge';
 import { TopBarTitleProvider, useTopBarTitle } from './TopBarTitleContext';
 import LiveMapTopBar from '../../main/components/LiveMapTopBar';
 import FleetSidebar from '../../main/fleet/FleetSidebar';
@@ -105,14 +105,6 @@ function UnifiedShellContent() {
   const { chrome } = useLiveMapChrome();
   const { title: topBarTitle } = useTopBarTitle();
   const fleetSidebarCollapsed = useSelector((s) => s.fleetInteraction.sidebarCollapsed);
-  // ContextSelector is only worth showing when there's actually something to
-  // switch between — previously it was gated purely on topBarTitle, which no
-  // saas/platform or saas/partner page sets, so on desktop the selector was
-  // invisible exactly on the pages where switching workspace matters most.
-  const accessibleContextCount = useSelector(
-    (s) => s.organizations?.accessibleContexts?.length || 0
-  );
-  const hasSwitchableContexts = accessibleContextCount > 1;
 
   // One flag for the single temporary nav drawer. The default workspace, the
   // live map and fullscreen pages never show it at the same time, so they do
@@ -250,7 +242,7 @@ function UnifiedShellContent() {
     <Box className={classes.mainColumn}>
       {!isLive && (
         <Box ref={topbarRef} sx={{ flexShrink: 0, pt: isFullscreen ? 'env(safe-area-inset-top, 0px)' : 0 }}>
-          {workspaceType === 'default' && (!desktop || topBarTitle || hasSwitchableContexts) && (
+          {workspaceType === 'default' && (
             <Box
               sx={{
                 display: 'flex',
@@ -273,7 +265,7 @@ function UnifiedShellContent() {
                   <MenuIcon />
                 </IconButton>
               )}
-              <ContextSelector />
+              <OrganizationBadge />
               {topBarTitle && (
                 <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ flex: 1 }}>
                   {topBarTitle}

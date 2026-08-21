@@ -41,6 +41,7 @@ import {
 } from './utils/operationDayUtils.js';
 import { resolveVehicleDisplayFromFleetRow } from '../fleet/display/resolveVehicleDisplay.js';
 import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
+import { useManager } from '../common/util/permissions.js';
 
 
 const SectionHeading = ({ label, count, action }) => (
@@ -75,7 +76,7 @@ const ForecastPage = () => {
   const user = useSelector((state) => state.session.user);
   const devicesItems = useSelector((state) => state.devices.items || {});
   const { getDisplayForDevice } = useVehicleDisplayContext();
-  const isManager = Boolean(user?.administrator || user?.isManager);
+  const isManager = useManager();
 
   const { todayOperation, todayDetails, loading: todayLoading, reload: reloadToday } = useTodayOperation();
 

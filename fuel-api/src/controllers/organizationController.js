@@ -10,8 +10,6 @@
  * - GET /api/my-customers (Partner only)
  * - POST /api/my-customers (Partner only)
  * - GET /api/context (any authenticated user — read-only)
- * - POST /api/context/switch/:companyId (identity-aware, see switchActiveContext)
- * - POST /api/context/reset (any authenticated user)
  * - GET /api/platform/overview (NUMZ only)
  * - GET /api/partner/overview (Partner only)
  *
@@ -32,7 +30,6 @@ import {
   getOrganizationOverview,
   getPartnerOverview,
 } from '../services/organizationService.js';
-import { switchActiveContext, resetActiveContext } from '../services/tenantResolverService.js';
 import { handleError } from '../utils/handleError.js';
 
 /**
@@ -217,67 +214,16 @@ export const createMyCustomer = async (req, res) => {
 };
 
 /**
- * POST /api/context/switch/:companyId
- * Switch the caller's ACTIVE CONTEXT to another organization. Authorization is
- * enforced server-side by switchActiveContext (identity-aware — platform can
- * switch anywhere, a partner only into itself or its own customers, a customer
- * nowhere else) — the companyId param is never trusted as authorization by
- * itself. The override is persisted (active_contexts table) so it is
- * recognized by every subsequent request, not just reflected in the response.
- */
-export const switchContext = async (req, res) => {
-  try {
-    const { companyId } = req.params;
-    // 'platform' is the frontend's sentinel for "switch to platform" — a real
-    // URL path segment can't be empty/null, and switchActiveContext treats
-    // any truthy string (including the literal "null") as a real company id
-    // to look up. Translate the sentinel to the falsy value it expects.
-    const targetCompanyId = companyId === 'platform' ? null : companyId;
-
-    const newContext = await switchActiveContext(req.user, targetCompanyId);
-
-    // Audit trail
-    console.log(`[AUDIT] Traccar user ${req.user?.id} switched active context to ${newContext.type} (${newContext.companyId || 'platform'})`);
-
-    return res.json({ switched: true, ...newContext });
-  } catch (error) {
-    return handleError(res, error, 'Switch context error', 'Failed to switch context');
-  }
-};
-
-/**
- * POST /api/context/reset
- * Reset the caller's ACTIVE CONTEXT back to their default (home) context —
- * platform for a super admin, their own company otherwise. Does not require a
- * browser reload; this is the backend-supported "back to platform"/"back to
- * home" path.
- */
-export const resetContext = async (req, res) => {
-  try {
-    const newContext = await resetActiveContext(req.user);
-
-    console.log(`[AUDIT] Traccar user ${req.user?.id} reset active context to ${newContext.type} (${newContext.companyId || 'platform'})`);
-
-    return res.json({ switched: true, ...newContext });
-  } catch (error) {
-    return handleError(res, error, 'Reset context error', 'Failed to reset context');
-  }
-};
-
-/**
  * GET /api/context
- * Read-only projection of req.auth — the current activeContext plus the
- * identity facts (isSuperAdmin, roles, homeCompanyId, accessibleContexts)
- * needed to render navigation. No mutation, no side effects; safe to call on
- * every page load. This is the endpoint the frontend was missing entirely —
- * previously only POST /context/switch and /context/reset returned context,
- * and only as a side effect of changing it.
+ * Read-only projection of req.auth — the identity's activeContext (always
+ * their own home company) plus isSuperAdmin/roles/homeCompanyId needed to
+ * render navigation. No mutation, no side effects; safe to call on every
+ * page load.
  */
 export const getContext = async (req, res) => {
   try {
     return res.json({
       activeContext: req.auth?.activeContext ?? null,
-      accessibleContexts: req.auth?.accessibleContexts ?? [],
       homeCompanyId: req.auth?.homeCompanyId ?? null,
       isSuperAdmin: req.auth?.isSuperAdmin === true,
       roles: req.auth?.roles ?? [],

@@ -55,6 +55,7 @@ const CommandPalette = () => {
   const technician = useTechnician();
   const platformOwner = useSuperAdmin();
   const features = useFeatures();
+  const currentContext = useSelector((state) => state.organizations?.currentContext);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -127,7 +128,7 @@ const CommandPalette = () => {
     SETTINGS_SECTIONS.forEach((section) => {
       if (!section.live) return;
       if (!isSettingsSectionVisible(section, {
-        manager, admin, technician, platformOwner, features,
+        manager, admin, technician, platformOwner, features, currentContextType: currentContext?.type,
       })) return;
       const haystack = [section.label, section.description, ...(section.keywords || [])]
         .join(' ')
@@ -144,7 +145,7 @@ const CommandPalette = () => {
     });
 
     return out.slice(0, MAX_RESULTS);
-  }, [admin, devices, drivers, features, getDisplayForDevice, groups, manager, navigate, platformOwner, query, technician]);
+  }, [admin, currentContext?.type, devices, drivers, features, getDisplayForDevice, groups, manager, navigate, platformOwner, query, technician]);
 
   const handlePick = useCallback((item) => {
     item.action();

@@ -34,6 +34,7 @@ export default function OverviewSection() {
   const technician = useTechnician();
   const platformOwner = useSuperAdmin();
   const features = useFeatures();
+  const currentContext = useSelector((state) => state.organizations?.currentContext);
 
   const devices = useSelector((state) => state.devices.items);
   const offlineCount = useMemo(
@@ -52,10 +53,10 @@ export default function OverviewSection() {
       section.category
       && section.live
       && isSettingsSectionVisible(section, {
-        manager, admin, technician, platformOwner, features,
+        manager, admin, technician, platformOwner, features, currentContextType: currentContext?.type,
       })
     )),
-    [admin, features, manager, platformOwner, technician],
+    [admin, features, manager, platformOwner, technician, currentContext?.type],
   );
 
   const quickAccess = useMemo(() => {

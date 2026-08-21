@@ -5,6 +5,8 @@ import {
   NAV_WORKSPACES,
   OPERATIONAL_HOME,
   isSettingsWorkspace,
+  isPlatformArea,
+  isPartnerAdminArea,
   resolveExitTarget,
   resolveNavWorkspace,
 } from './navWorkspace.js';
@@ -44,4 +46,22 @@ test('exiting falls back to the dashboard when there is nowhere to return to', (
   assert.equal(resolveExitTarget(''), OPERATIONAL_HOME);
   // Never bounce back into Settings.
   assert.equal(resolveExitTarget('/settings/team'), OPERATIONAL_HOME);
+});
+
+test('every /saas/platform route is the platform area, and nothing else is', () => {
+  const platformRoutes = ROUTES.filter((route) => route.startsWith('/saas/platform'));
+  assert.ok(platformRoutes.length > 0, 'expected the /saas/platform routes from the manifest');
+  platformRoutes.forEach((route) => assert.equal(isPlatformArea(route), true, route));
+  ROUTES.filter((route) => !route.startsWith('/saas/platform')).forEach((route) => {
+    assert.equal(isPlatformArea(route), false, route);
+  });
+});
+
+test('every /saas/partner route is the partner-admin area, and nothing else is', () => {
+  const partnerRoutes = ROUTES.filter((route) => route.startsWith('/saas/partner'));
+  assert.ok(partnerRoutes.length > 0, 'expected the /saas/partner routes from the manifest');
+  partnerRoutes.forEach((route) => assert.equal(isPartnerAdminArea(route), true, route));
+  ROUTES.filter((route) => !route.startsWith('/saas/partner')).forEach((route) => {
+    assert.equal(isPartnerAdminArea(route), false, route);
+  });
 });

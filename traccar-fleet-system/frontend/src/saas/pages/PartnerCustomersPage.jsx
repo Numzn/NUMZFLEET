@@ -9,13 +9,11 @@ import {
 import { makeStyles } from 'tss-react/mui';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import { setMyCustomers, setError, clearError } from '../../store/organizations';
 import { fetchMyCustomers, createMyCustomer } from '../organizationApi';
 import PageHeader from '../../common/components/PageHeader';
 import CreateOrganizationDialog from '../components/CreateOrganizationDialog';
-import { switchContextAndNavigate } from '../util/contextNavigation.js';
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -34,14 +32,6 @@ const useStyles = makeStyles()((theme) => ({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
     gap: theme.spacing(2),
-  },
-  customerCard: {
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      boxShadow: theme.shadows[4],
-      transform: 'translateY(-2px)',
-    },
   },
   stats: {
     display: 'flex',
@@ -77,9 +67,7 @@ const useStyles = makeStyles()((theme) => ({
 const PartnerCustomersPage = () => {
   const { classes } = useStyles();
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const [openDialog, setOpenDialog] = useState(false);
-  const [switchingTo, setSwitchingTo] = useState(null);
 
   const user = useSelector((state) => state.session.user);
   const customers = useSelector((state) => state.organizations.myCustomers);
@@ -97,20 +85,6 @@ const PartnerCustomersPage = () => {
       dispatch(setMyCustomers(data));
     } catch (err) {
       dispatch(setError(err.message));
-    }
-  };
-
-  // Enter that customer's own fleet — same switch ContextSelector's dropdown
-  // already performs, reachable directly from the card.
-  const handleOpenCustomer = async (companyId) => {
-    setSwitchingTo(companyId);
-    try {
-      await switchContextAndNavigate({
-        dispatch, navigate, user, companyId,
-      });
-    } catch (err) {
-      dispatch(setError(err.message));
-      setSwitchingTo(null);
     }
   };
 
@@ -155,16 +129,9 @@ const PartnerCustomersPage = () => {
       ) : (
         <Box className={classes.grid}>
           {customers.map((customer) => (
-            <Card
-              key={customer.id}
-              className={classes.customerCard}
-              onClick={() => (switchingTo ? null : handleOpenCustomer(customer.id))}
-            >
+            <Card key={customer.id}>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="h6">{customer.name}</Typography>
-                  {switchingTo === customer.id && <CircularProgress size={18} />}
-                </Box>
+                <Typography variant="h6">{customer.name}</Typography>
                 <Typography variant="caption" color="textSecondary">
                   {customer.slug}
                 </Typography>

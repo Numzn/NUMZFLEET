@@ -54,14 +54,6 @@ export const createDirectCustomer = async (user, data) => {
   return response.json();
 };
 
-export const switchContext = async (user, companyId) => {
-  const response = await fetchOrThrow(`/api/context/switch/${companyId}`, {
-    method: 'POST',
-    headers: fuelApiAuthHeaders(user),
-  });
-  return response.json();
-};
-
 export const fetchMyCustomers = async (user) => {
   const response = await fetchOrThrow('/api/my-customers', { headers: fuelApiAuthHeaders(user) });
   return response.json();

@@ -208,13 +208,30 @@ export function getCustomerNavigation({
  * Main navigation resolver
  * Returns the appropriate navigation structure based on context type
  *
- * Workspace switching (My Fleet <-> Platform <-> Partner) lives in
- * Settings -> Platform (settings/center/sections/PlatformAccessSection.jsx)
- * and ContextSelector's dropdown, not here — this resolver only ever
- * returns ONE context's nav tree.
+ * The user's own fleet is always the primary experience — a 'partner'-typed
+ * active context (their own home company) gets the SAME fleet nav a
+ * 'customer' context gets, not a separate management tree. Partner business
+ * management (Overview, Customers) is reached only via Settings -> Business
+ * (settings/center/settingsSectionRegistry.js), a plain link to
+ * /saas/partner/* that does not change activeContext — `options.inPartnerAdmin`
+ * (set by UnifiedSidebar from the route, see common/util/navWorkspace.js)
+ * is what shows getPartnerNavigation() there instead of the fleet nav.
+ *
+ * 'platform' needs the identical route-based split, for a different reason:
+ * there is no cross-company context switching at all (see
+ * fuel-api/src/services/tenantResolverService.js), so a platform admin who
+ * ALSO has a home company never has activeContext.type === 'platform' — it
+ * stays their home type the entire time they're on /saas/platform/* pages,
+ * which are plain Settings -> Platform links, not a switch. `options.inPlatformArea`
+ * (also route-derived) is what shows getPlatformNavigation() there. The bare
+ * `currentContext.type === 'platform'` check still matters on its own for a
+ * genuinely home-less platform-only identity, whose type IS 'platform' on
+ * every route because they have no other company to default to.
  *
  * @param {Object} currentContext - Redux organizations.currentContext
  * @param {Object} options - Configuration options
+ * @param {boolean} options.inPartnerAdmin - true on /saas/partner/* routes
+ * @param {boolean} options.inPlatformArea - true on /saas/platform/* routes
  * @param {Array} options.externalSystemItems - External items to add to system section (billing, support)
  * @returns {Array} Navigation group structure
  */
@@ -226,17 +243,12 @@ export function resolveNavigation(currentContext, options = {}) {
 
   let navGroups;
 
-  switch (currentContext.type) {
-    case 'platform':
-      navGroups = getPlatformNavigation(options.badges || {});
-      break;
-    case 'partner':
-      navGroups = getPartnerNavigation(options.badges || {});
-      break;
-    case 'customer':
-    default:
-      navGroups = getCustomerNavigation(options);
-      break;
+  if (currentContext.type === 'platform' || options.inPlatformArea) {
+    navGroups = getPlatformNavigation(options.badges || {});
+  } else if (currentContext.type === 'partner' && options.inPartnerAdmin) {
+    navGroups = getPartnerNavigation(options.badges || {});
+  } else {
+    navGroups = getCustomerNavigation(options);
   }
 
   // Supplement system section with external items (billing, support links)

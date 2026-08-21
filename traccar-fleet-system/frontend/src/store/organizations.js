@@ -3,8 +3,8 @@ import { createSlice } from '@reduxjs/toolkit';
 const organizationsSlice = createSlice({
   name: 'organizations',
   initialState: {
-    currentContext: null, // { id, name, type: 'platform' | 'partner' | 'customer' }
-    accessibleContexts: [], // every workspace this identity may enter (from GET /api/context)
+    currentContext: null, // { id, name, type: 'platform' | 'partner' | 'customer' } — always the identity's own home company (from GET /api/context)
+    homeCompanyId: null, // identity fact (from GET /api/context)
     partners: [],
     directCustomers: [],
     myCustomers: [], // Partner's own customers (from /api/my-customers)
@@ -16,8 +16,8 @@ const organizationsSlice = createSlice({
     setCurrentContext: (state, action) => {
       state.currentContext = action.payload;
     },
-    setAccessibleContexts: (state, action) => {
-      state.accessibleContexts = action.payload;
+    setHomeCompanyId: (state, action) => {
+      state.homeCompanyId = action.payload;
     },
     setPartners: (state, action) => {
       state.partners = action.payload;
@@ -45,7 +45,7 @@ const organizationsSlice = createSlice({
 
 export const {
   setCurrentContext,
-  setAccessibleContexts,
+  setHomeCompanyId,
   setPartners,
   setDirectCustomers,
   setMyCustomers,

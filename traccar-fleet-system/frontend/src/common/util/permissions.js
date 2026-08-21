@@ -6,9 +6,18 @@ export const useAdministrator = () => useSelector((state) => {
 });
 
 export const useManager = () => useSelector((state) => {
-  const admin = state.session.user.administrator;
-  // Keep frontend manager semantics aligned with fuel-api requireManager gate.
-  const manager = state.session.user.isManager || false;
+  const user = state.session.user;
+  const admin = user.administrator;
+  // Keep frontend manager semantics aligned with fuel-api's roleFlagsFromTraccar
+  // (services/userService.js): Traccar's native /api/session response only ever
+  // nests this under attributes — a bare top-level user.isManager never actually
+  // arrives from Traccar itself, only from fuel-api's own synthetic/bridge user
+  // shapes. Checking both here (not just the top-level field) is what makes
+  // organizationProvisioningService.js's `attributes: { isManager: true }`
+  // convention for a company's first admin actually show up as "manager" in
+  // the UI, not just at the API layer.
+  const attrManager = user.attributes?.isManager === true || user.attributes?.isManager === 'true';
+  const manager = user.isManager === true || attrManager;
   return admin || manager;
 });
 

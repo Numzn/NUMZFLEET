@@ -2,15 +2,17 @@ import { resolveCompanyContextForTraccarUser } from '../services/tenantResolverS
 
 /**
  * Attach req.auth with extended context after authenticate.
- * 
+ *
  * Populates:
- * - companyId (backward compat — the ACTIVE context's company)
+ * - companyId (the identity's own company — activeContext's company)
  * - homeCompanyId (identity fact — the user's own company, if any, independent
- *   of platform capability; never changed by active context)
- * - activeContext: { type, companyId, parentCompanyId }
+ *   of platform capability)
+ * - activeContext: { type, companyId, parentCompanyId } — always equal to the
+ *   identity's own home company (platform for a home-less platform-only
+ *   identity). There is no cross-company switching; see
+ *   tenantResolverService.js.
  * - organizationType: 'customer' | 'partner' | null
  * - accessibleCustomerIds: [] (if partner)
- * - accessibleContexts: [] (identity fact — every workspace this user may enter)
  * - roles, isSuperAdmin, numzUserId
  */
 export async function attachTenantContext(req, res, next) {
@@ -23,13 +25,12 @@ export async function attachTenantContext(req, res, next) {
     const ctx = await resolveCompanyContextForTraccarUser(req.user);
     req.auth = {
       userId: req.user.id,
-      companyId: ctx.companyId, // Backward compat
-      homeCompanyId: ctx.homeCompanyId, // Identity fact — never changed by active context
+      companyId: ctx.companyId,
+      homeCompanyId: ctx.homeCompanyId, // Identity fact
       numzUserId: ctx.numzUserId,
       activeContext: ctx.activeContext,
       organizationType: ctx.organizationType,
       accessibleCustomerIds: ctx.accessibleCustomerIds || [],
-      accessibleContexts: ctx.accessibleContexts || [], // Identity fact — never changed by active context
       roles: ctx.roles,
       isSuperAdmin: ctx.isSuperAdmin,
       traccarUserId: req.user.id,
@@ -51,7 +52,6 @@ export async function attachTenantContext(req, res, next) {
       },
       organizationType: null,
       accessibleCustomerIds: [],
-      accessibleContexts: [],
       roles: [],
       isSuperAdmin: req.user?.administrator === true,
       traccarUserId: req.user?.id ?? null,
