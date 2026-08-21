@@ -41,6 +41,16 @@ const TEST_SLUG_PREFIX = 'org-svc-stage2-';
 const createdCompanyIds = [];
 const createdTraccarUserIds = [];
 
+// CI's quality-checks job runs against a real Postgres service but has no
+// Traccar service/credentials (see .github/workflows/main.yml) — only the
+// dev stack has a real Traccar reachable. Skip just the subtests that need
+// it there rather than faking a Traccar client; tracked to add a Traccar
+// service (or a proper mock) to CI so this integration coverage runs there
+// too.
+const SKIP_NO_TRACCAR = (process.env.TRACCAR_API_USER && process.env.TRACCAR_API_PASSWORD)
+  ? false
+  : 'requires a live Traccar (TRACCAR_API_USER/TRACCAR_API_PASSWORD not set) — not available in CI yet';
+
 after(async () => {
   const { Company, NumzUser, UserRole, Vehicle } = await import('../models/index.js');
 
@@ -120,7 +130,7 @@ describe('Phase 2 Consolidation Stage 2: organizationService optional admin prov
     });
   });
 
-  describe('admin supplied — provisions a real, login-capable administrator', () => {
+  describe('admin supplied — provisions a real, login-capable administrator', { skip: SKIP_NO_TRACCAR }, () => {
     it('createPartner() provisions an admin when supplied, connected to the correct company', async () => {
       const admin = testAdmin();
       const partner = await createPartner({ name: 'Stage2 Partner With Admin', slug: slug(), admin });

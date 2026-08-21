@@ -25,6 +25,16 @@ const TEST_SLUG_PREFIX = 'org-provisioning-test-';
 const createdCompanyIds = [];
 const createdTraccarUserIds = [];
 
+// CI's quality-checks job runs against a real Postgres service but has no
+// Traccar service/credentials (see .github/workflows/main.yml) — only the
+// dev stack has a real Traccar reachable. Skip just the subtests that need
+// it there rather than faking a Traccar client; tracked to add a Traccar
+// service (or a proper mock) to CI so this integration coverage runs there
+// too.
+const SKIP_NO_TRACCAR = (process.env.TRACCAR_API_USER && process.env.TRACCAR_API_PASSWORD)
+  ? false
+  : 'requires a live Traccar (TRACCAR_API_USER/TRACCAR_API_PASSWORD not set) — not available in CI yet';
+
 after(async () => {
   const { Company, NumzUser, UserRole } = await import('../models/index.js');
 
@@ -93,7 +103,7 @@ describe('Phase 2 Consolidation Stage 1: organizationProvisioningService', () =>
     });
   });
 
-  describe('ensureTraccarGroupForCompany', () => {
+  describe('ensureTraccarGroupForCompany', { skip: SKIP_NO_TRACCAR }, () => {
     it('assigns a Traccar group id to a company that has none', async () => {
       const company = await makeTestCompany({ traccarGroupId: null });
       assert.equal(company.traccarGroupId, null);
@@ -107,7 +117,7 @@ describe('Phase 2 Consolidation Stage 1: organizationProvisioningService', () =>
   });
 
   describe('provisionCompanyAdmin', () => {
-    it('creates a real Traccar user, a numz_users row, and assigns company_admin — returns the temp password once', async () => {
+    it('creates a real Traccar user, a numz_users row, and assigns company_admin — returns the temp password once', { skip: SKIP_NO_TRACCAR }, async () => {
       const company = await makeTestCompany();
       const email = `org-provisioning-test-${uuid().substring(0, 8)}@example.test`;
 

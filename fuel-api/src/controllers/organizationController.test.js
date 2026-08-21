@@ -37,6 +37,16 @@ const TEST_SLUG_PREFIX = 'org-ctrl-admin-';
 const createdCompanyIds = [];
 const createdTraccarUserIds = [];
 
+// CI's quality-checks job runs against a real Postgres service but has no
+// Traccar service/credentials (see .github/workflows/main.yml) — only the
+// dev stack has a real Traccar reachable. Skip just the subtests that need
+// it there rather than faking a Traccar client; tracked to add a Traccar
+// service (or a proper mock) to CI so this integration coverage runs there
+// too.
+const SKIP_NO_TRACCAR = (process.env.TRACCAR_API_USER && process.env.TRACCAR_API_PASSWORD)
+  ? false
+  : 'requires a live Traccar (TRACCAR_API_USER/TRACCAR_API_PASSWORD not set) — not available in CI yet';
+
 after(async () => {
   const { Company, NumzUser, UserRole } = await import('../models/index.js');
 
@@ -82,7 +92,7 @@ function mockRes() {
 }
 
 describe('organizationController — admin passthrough', () => {
-  it('createPartnerOrg forwards req.body.admin to the service', async () => {
+  it('createPartnerOrg forwards req.body.admin to the service', { skip: SKIP_NO_TRACCAR }, async () => {
     const admin = testAdmin();
     const req = { body: { name: 'Ctrl Partner', slug: slug(), admin }, user: { id: 1 } };
     const res = mockRes();
@@ -97,7 +107,7 @@ describe('organizationController — admin passthrough', () => {
     assert.equal(res.body.status, 'active');
   });
 
-  it('createDirectCustomerOrg forwards req.body.admin to the service', async () => {
+  it('createDirectCustomerOrg forwards req.body.admin to the service', { skip: SKIP_NO_TRACCAR }, async () => {
     const admin = testAdmin();
     const req = { body: { name: 'Ctrl Direct Customer', slug: slug(), admin }, user: { id: 1 } };
     const res = mockRes();
@@ -110,7 +120,7 @@ describe('organizationController — admin passthrough', () => {
     createdTraccarUserIds.push(res.body.admin.traccarUserId);
   });
 
-  it('createCustomerUnderPartnerOrg forwards req.body.admin to the service', async () => {
+  it('createCustomerUnderPartnerOrg forwards req.body.admin to the service', { skip: SKIP_NO_TRACCAR }, async () => {
     const partnerRes = mockRes();
     await createPartnerOrg({ body: { name: 'Ctrl Parent Partner', slug: slug() }, user: { id: 1 } }, partnerRes);
     createdCompanyIds.push(partnerRes.body.id);
@@ -132,7 +142,7 @@ describe('organizationController — admin passthrough', () => {
     assert.equal(res.body.parentCompanyId, partnerRes.body.id);
   });
 
-  it('createMyCustomer (partner self-service) forwards req.body.admin to the service', async () => {
+  it('createMyCustomer (partner self-service) forwards req.body.admin to the service', { skip: SKIP_NO_TRACCAR }, async () => {
     const partnerRes = mockRes();
     await createPartnerOrg({ body: { name: 'Ctrl Self-Service Partner', slug: slug() }, user: { id: 1 } }, partnerRes);
     createdCompanyIds.push(partnerRes.body.id);
