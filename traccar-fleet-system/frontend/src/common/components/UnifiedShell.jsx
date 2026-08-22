@@ -10,7 +10,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import MenuIcon from '@mui/icons-material/Menu';
-import UnifiedSidebar from './UnifiedSidebar';
+import UnifiedSidebar, { SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED } from './UnifiedSidebar';
 import OrganizationBadge from '../../saas/components/OrganizationBadge';
 import { TopBarTitleProvider, useTopBarTitle } from './TopBarTitleContext';
 import LiveMapTopBar from '../../main/components/LiveMapTopBar';
@@ -27,8 +27,6 @@ import { LiveMapChromeProvider, useLiveMapChrome } from '../../main/fleet/LiveMa
 import { fleetInteractionActions } from '../../store';
 import { RUNTIME_WORKSPACE_PT, RUNTIME_WORKSPACE_PX } from '../styles/runtimeDensity';
 
-const DRAWER_WIDTH_EXPANDED = 260;
-const DRAWER_WIDTH_COLLAPSED = 72;
 const CHROME_GAP = 8;
 
 /** Paper size for the temporary nav drawer, on every surface that opens one. */
@@ -44,8 +42,14 @@ const useStyles = makeStyles()(() => ({
     height: '100svh',
     overflow: 'hidden',
   },
-  rootLiveStacked: {
+  // The spine sits outside this entirely, full-height, as a sibling — this is
+  // only the topbar-above-fleet-rail-and-map column to its right.
+  liveStack: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
     flexDirection: 'column',
+    overflow: 'hidden',
   },
   bodyRow: {
     display: 'flex',
@@ -125,7 +129,12 @@ function UnifiedShellContent() {
   }, [dispatch, fleetSidebarCollapsed]);
 
   // Only read by the permanent desktop rail — the temporary drawer sizes itself.
-  const appDrawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
+  // Live map forces the rail to its icon-only width regardless of the user's
+  // own expand/collapse preference on the default workspace — map real estate
+  // matters more here than a labeled list the user rarely needs mid-operation.
+  // The preference itself (`collapsed`) is untouched, so returning to the
+  // default workspace still shows whatever the user actually chose.
+  const appDrawerWidth = (isLive || collapsed) ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
   const liveDrawerWidth = desktop
     ? (fleetSidebarCollapsed ? FLEET_SIDEBAR_RAIL_WIDTH_PX : FLEET_SIDEBAR_WIDTH_PX)
@@ -163,11 +172,12 @@ function UnifiedShellContent() {
 
   const sidebarFleetProps = chrome?.sidebarFleetProps;
 
-  const renderAppSidebar = () => (
+  const renderAppSidebar = ({ forceCollapsed = false } = {}) => (
     <UnifiedSidebar
       collapsed={collapsed}
       setCollapsed={setCollapsed}
       forceExpanded={!desktop}
+      forceCollapsed={forceCollapsed}
       showHeaderLogo={desktop}
       onNavigate={handleSidebarNavigate}
     />
@@ -181,9 +191,6 @@ function UnifiedShellContent() {
       <FleetSidebar
         {...sidebarFleetProps}
         collapsed={fleetSidebarCollapsed}
-        variant="desktop"
-        hideHeader
-        hideOperationalPills
       />
     );
   };
@@ -222,20 +229,22 @@ function UnifiedShellContent() {
     </Drawer>
   );
 
-  const renderNavRails = () => (
-    <>
-      {showLiveFleetPermanentDrawer && (
-        <Box className={classes.navRail} sx={{ width: liveDrawerWidth }}>
-          {renderLiveFleetSidebar()}
-        </Box>
-      )}
+  // The spine — the one rail every workspace shares. Always the outermost
+  // leftmost element, full height, a sibling to everything else (never
+  // nested inside the live map's topbar-plus-body column) so it reads as one
+  // continuous rail rather than something that stops short under the topbar.
+  const renderAppRail = () => showDefaultPermanentNav && (
+    <Box className={classes.navRail} sx={{ width: appDrawerWidth }}>
+      {renderAppSidebar({ forceCollapsed: isLive })}
+    </Box>
+  );
 
-      {showDefaultPermanentNav && (
-        <Box className={classes.navRail} sx={{ width: appDrawerWidth }}>
-          {renderAppSidebar()}
-        </Box>
-      )}
-    </>
+  // The live map's own device list — a second, workspace-specific panel,
+  // never the app nav, only ever rendered to the right of the spine.
+  const renderFleetRail = () => showLiveFleetPermanentDrawer && (
+    <Box className={classes.navRail} sx={{ width: liveDrawerWidth }}>
+      {renderLiveFleetSidebar()}
+    </Box>
   );
 
   const renderMainColumn = () => (
@@ -317,14 +326,17 @@ function UnifiedShellContent() {
 
   if (isLive) {
     return (
-      <Box className={`${classes.root} ${classes.rootLiveStacked}`}>
-        <Box ref={topbarRef} sx={{ flexShrink: 0, width: '100%' }}>
-          {renderLiveMapTopBar()}
-        </Box>
-        <Box className={classes.bodyRow}>
-          {renderNavRails()}
-          {renderDrawers()}
-          {renderMainColumn()}
+      <Box className={classes.root}>
+        {renderAppRail()}
+        {renderDrawers()}
+        <Box className={classes.liveStack}>
+          <Box ref={topbarRef} sx={{ flexShrink: 0, width: '100%' }}>
+            {renderLiveMapTopBar()}
+          </Box>
+          <Box className={classes.bodyRow}>
+            {renderFleetRail()}
+            {renderMainColumn()}
+          </Box>
         </Box>
       </Box>
     );
@@ -332,7 +344,7 @@ function UnifiedShellContent() {
 
   return (
     <Box className={classes.root}>
-      {renderNavRails()}
+      {renderAppRail()}
       {renderDrawers()}
       {renderMainColumn()}
     </Box>

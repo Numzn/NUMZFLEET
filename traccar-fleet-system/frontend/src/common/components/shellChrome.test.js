@@ -49,8 +49,15 @@ test('at most one of the three legacy drawers ever applied at once', () => {
   });
 });
 
-test('every surface except the live map can reach the app nav from the shell', () => {
-  MATRIX.filter(({ workspaceType }) => workspaceType !== 'live').forEach((input) => {
+test('every surface can reach the app nav from the shell', () => {
+  // Live map used to be the one exception (see the "One Shell, Two Speeds"
+  // design doc) — desktop live map had neither a permanent rail nor a drawer,
+  // only a single unlabeled "Back to fleet dashboard" icon in LiveMapTopBar as
+  // its sole route out. That exception is gone: live map now gets the same
+  // permanent rail as every other desktop surface, just forced into its
+  // collapsed (icon-only) rendering by UnifiedShell — see shellChrome and
+  // UnifiedShell's `forceCollapsed`.
+  MATRIX.forEach((input) => {
     const { showPermanentNav, showTemporaryNav } = resolveShellChrome(input);
     assert.ok(
       showPermanentNav || showTemporaryNav,
@@ -59,15 +66,14 @@ test('every surface except the live map can reach the app nav from the shell', (
   });
 });
 
-test('the live map owns its own navigation and never gets the app rail', () => {
-  // Deliberate: on desktop the live map is a full-bleed canvas with no app rail
-  // and no drawer — LiveMapTopBar.jsx:258 supplies a "Back to fleet dashboard"
-  // button instead. On mobile it falls back to the shared drawer, opened from
-  // that same top bar. Asserted so a future change to resolveShellChrome cannot
-  // quietly strand the map without noticing this is the arrangement.
+test('the live map gets the same permanent rail as every other desktop surface, plus its own fleet rail', () => {
+  // Desktop: the app rail (forced collapsed by UnifiedShell) and the fleet
+  // rail render together — spine leftmost, fleet rail to its right, map last.
+  // Mobile: unchanged — falls back to the shared drawer, opened from
+  // LiveMapTopBar's app-menu button, same as before this change.
   const desktopLive = resolveShellChrome({ workspaceType: 'live', desktop: true });
   assert.deepEqual(desktopLive, {
-    showPermanentNav: false,
+    showPermanentNav: true,
     showTemporaryNav: false,
     showLiveFleetRail: true,
   });

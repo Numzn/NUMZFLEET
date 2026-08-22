@@ -1,4 +1,4 @@
-import { Box, Typography } from '@mui/material';
+import { Box, Tooltip, Typography } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useSelector } from 'react-redux';
 
@@ -22,6 +22,20 @@ const useStyles = makeStyles()((theme) => ({
     color: 'var(--text-secondary)',
     marginTop: theme.spacing(0.25),
   },
+  compactMark: {
+    width: 30,
+    height: 30,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    backgroundColor: 'var(--color-primary-light)',
+    color: 'var(--color-primary)',
+    flexShrink: 0,
+    userSelect: 'none',
+  },
 }));
 
 const TYPE_LABEL = { platform: 'Platform', partner: 'Partner', customer: 'My Fleet' };
@@ -35,8 +49,13 @@ const TYPE_LABEL = { platform: 'Platform', partner: 'Partner', customer: 'My Fle
  * equals the identity's own home context). To operate a different
  * organization's fleet, log out and authenticate into that organization's
  * own account.
+ *
+ * `compact` renders a small initial mark with the full name and type in a
+ * tooltip instead of the two-line format above — for the sidebar's
+ * icon-only rail, which has nowhere to put a wide badge. Both read the same
+ * `state.organizations.currentContext`, so they can never disagree.
  */
-const OrganizationBadge = () => {
+const OrganizationBadge = ({ compact = false }) => {
   const { classes } = useStyles();
   const currentContext = useSelector((state) => state.organizations.currentContext);
 
@@ -44,13 +63,27 @@ const OrganizationBadge = () => {
     return null;
   }
 
+  const name = currentContext.name || 'NUMZ Platform';
+  const typeLabel = TYPE_LABEL[currentContext.type] || 'My Fleet';
+
+  if (compact) {
+    const initial = name.trim().charAt(0).toUpperCase() || 'N';
+    return (
+      <Tooltip title={`${name} — ${typeLabel}`} placement="right">
+        <Box className={classes.compactMark} aria-label={`${name}, ${typeLabel}`}>
+          {initial}
+        </Box>
+      </Tooltip>
+    );
+  }
+
   return (
     <Box className={classes.badge}>
       <Typography className={classes.contextName}>
-        {currentContext.name || 'NUMZ Platform'}
+        {name}
       </Typography>
       <Typography className={classes.contextType}>
-        {TYPE_LABEL[currentContext.type] || 'My Fleet'}
+        {typeLabel}
       </Typography>
     </Box>
   );

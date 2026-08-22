@@ -2,13 +2,10 @@ import {
   Box,
   IconButton,
   Tooltip,
-  Typography,
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
-import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import FleetOperationalPills from '../fleet/FleetOperationalPills';
 import NotificationCenter from '../../notifications/NotificationCenter';
@@ -17,9 +14,14 @@ import { TOPBAR_HEIGHT } from '../../common/styles/topbarStyles';
 
 /**
  * Single operational command surface for `/map`.
- * Left: FLEET · LIVE + feed connection dot + rail collapse (desktop).
- * Center: FleetOperationalPills. Right: dashboard (desktop), notifications, user.
- * Surfaces: --surface-card / --surface-border only (no gradient/cyan chrome).
+ * Left: feed connection dot + rail collapse (desktop). Center: FleetOperationalPills.
+ * Right: notifications, user. Surfaces: --surface-card / --surface-border only
+ * (no gradient/cyan chrome).
+ *
+ * No identity block and no "back to dashboard" control here — both moved to
+ * the app shell's own spine, which now renders (icon-only) on this workspace
+ * too, so Dashboard is just the first icon in it and organization identity is
+ * shown once, consistently, instead of duplicated in this bar.
  */
 
 const BAR_SX = {
@@ -122,28 +124,6 @@ const pillsScrollSx = {
   scrollbarWidth: 'none',
 };
 
-const FleetLiveIdentity = ({ socketConnected, compact = false }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, flexShrink: 0 }}>
-    {!compact && (
-      <Typography
-        component="span"
-        noWrap
-        sx={{
-          fontWeight: 700,
-          fontSize: { xs: '10px', sm: '12px' },
-          lineHeight: 1.2,
-          letterSpacing: '0.07em',
-          textTransform: 'uppercase',
-          color: 'var(--text-on-surface-primary)',
-        }}
-      >
-        FLEET · LIVE
-      </Typography>
-    )}
-    <ConnectionIndicator socketConnected={socketConnected} />
-  </Box>
-);
-
 const LiveMapTopBar = ({
   desktop = true,
   fleetCollapsed = false,
@@ -158,9 +138,7 @@ const LiveMapTopBar = ({
   showAppNavMenuButton = false,
   onOpenAppNavMenu,
 }) => {
-  const navigate = useNavigate();
   const socketConnected = useSelector((state) => !!state.session.socket);
-  const compactIdentity = !desktop && showAppNavMenuButton;
 
   return (
     <Box
@@ -203,7 +181,7 @@ const LiveMapTopBar = ({
           </Tooltip>
         )}
         {(!desktop || !fleetCollapsed) && (
-          <FleetLiveIdentity socketConnected={socketConnected} compact={compactIdentity} />
+          <ConnectionIndicator socketConnected={socketConnected} />
         )}
 
         {desktop && (
@@ -252,19 +230,6 @@ const LiveMapTopBar = ({
           flexShrink: 0,
         }}
       >
-        <Tooltip title="Fleet dashboard">
-          <IconButton
-            size="small"
-            onClick={() => navigate('/')}
-            aria-label="Back to fleet dashboard"
-            sx={{
-              color: 'var(--text-on-surface-secondary)',
-              '&:hover': { bgcolor: 'var(--surface-card-hover)' },
-            }}
-          >
-            <DashboardOutlinedIcon sx={{ fontSize: '1.2rem' }} />
-          </IconButton>
-        </Tooltip>
         <NotificationCenter />
         <UserMenuDropdown />
       </Box>

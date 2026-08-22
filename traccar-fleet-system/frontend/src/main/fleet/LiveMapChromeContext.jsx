@@ -6,16 +6,23 @@ import {
  * Live map workspace contract (`/map`, workspaceType `live`)
  *
  * LiveMapPage registers `{ sidebarFleetProps }` here. UnifiedShell reads it and renders:
- * - LiveMapTopBar — full-width 56px operational chrome (identity, pills, account)
- * - FleetSidebar — rail only (search, filters, vehicle list); no duplicate header/pills
+ * - The app shell's own spine (UnifiedSidebar), forced icon-only — the same
+ *   permanent rail every other desktop workspace gets, not a live-map-only
+ *   concept. See shellChrome.js and UnifiedShell's `forceCollapsed`.
+ * - LiveMapTopBar — operational chrome (connection status, pills, account) to
+ *   the spine's right, spanning the fleet rail + map columns
+ * - FleetSidebar — rail only (search, filters, vehicle list); no header/pills
+ *   of its own, no identity block — those live in the spine and LiveMapTopBar
  *
- * Layout (UnifiedShell) — mobile and desktop:
- *   [ LiveMapTopBar — full width ]
- *   [ Fleet rail 280px | 44px collapsed (desktop only) ] [ MainMap via <Outlet /> ]
+ * Layout (UnifiedShell) — desktop:
+ *   [ Spine 56px, own header ] [ LiveMapTopBar — remaining width ]
+ *   [ Spine ] [ Fleet rail 280px | 44px collapsed ] [ MainMap via <Outlet /> ]
  *
  * Mobile: fleet list drawer + app nav drawer owned by UnifiedShell (not FleetLayout).
  *
- * Do not reintroduce a second map-only title bar or PremiumTopBar on this route.
+ * Do not reintroduce a second map-only identity block or a "back to
+ * dashboard" control on this route — organization identity and the path to
+ * every other destination live in the spine now, exactly once, app-wide.
  */
 const LiveMapChromeContext = createContext({
   chrome: null,
