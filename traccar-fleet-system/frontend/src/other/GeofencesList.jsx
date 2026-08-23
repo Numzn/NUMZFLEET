@@ -1,11 +1,8 @@
-import { Fragment } from 'react';
 import { traccarPath } from '../config/traccarApi.js';
 
 import { useDispatch, useSelector } from 'react-redux';
 import { makeStyles } from 'tss-react/mui';
-import {
-  Divider, List, ListItemButton, ListItemText,
-} from '@mui/material';
+import { List, ListItemButton, ListItemText } from '@mui/material';
 
 import { geofencesActions } from '../store';
 import CollectionActions from '../settings/components/CollectionActions';
@@ -16,11 +13,21 @@ const useStyles = makeStyles()(() => ({
   list: {
     flexGrow: 1,
     overflow: 'auto',
+    padding: 'var(--space-2)',
   },
-  icon: {
-    width: '25px',
-    height: '25px',
-    filter: 'brightness(0) invert(1)',
+  item: {
+    borderRadius: 'var(--radius-md)',
+    marginBottom: 2,
+    minHeight: 44,
+    '&:hover': {
+      backgroundColor: 'var(--surface-card-hover)',
+    },
+  },
+  itemText: {
+    '& .MuiListItemText-primary': {
+      fontSize: '0.875rem',
+      fontWeight: 500,
+    },
   },
 }));
 
@@ -36,15 +43,12 @@ const GeofencesList = ({ onGeofenceSelected }) => {
   }, [dispatch]);
 
   return (
-    <List className={classes.list}>
-      {Object.values(items).map((item, index, list) => (
-        <Fragment key={item.id}>
-          <ListItemButton key={item.id} onClick={() => onGeofenceSelected(item.id)}>
-            <ListItemText primary={item.name} />
-            <CollectionActions itemId={item.id} editPath="/settings/geofence" endpoint="geofences" setTimestamp={refreshGeofences} />
-          </ListItemButton>
-          {index < list.length - 1 ? <Divider /> : null}
-        </Fragment>
+    <List className={classes.list} disablePadding>
+      {Object.values(items).map((item) => (
+        <ListItemButton key={item.id} className={classes.item} onClick={() => onGeofenceSelected(item.id)}>
+          <ListItemText primary={item.name} className={classes.itemText} />
+          <CollectionActions itemId={item.id} editPath="/settings/geofence" endpoint="geofences" setTimestamp={refreshGeofences} />
+        </ListItemButton>
       ))}
     </List>
   );

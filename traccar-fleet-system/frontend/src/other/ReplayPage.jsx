@@ -47,6 +47,14 @@ const floatingSurfaceSx = {
 
 const TICK_COLOR = { stop: '#1976d2', event: '#ed6c02' };
 
+// Same hover treatment as every other header icon button in the app
+// (GeofencesPage, LiveMapTopBar, UnifiedSidebar) — this file predated that
+// convention and used bare default IconButton styling instead.
+const headerIconButtonSx = {
+  color: 'var(--color-text-secondary)',
+  '&:hover': { bgcolor: 'var(--surface-card-hover)' },
+};
+
 const useStyles = makeStyles()((theme) => ({
   root: {
     // Positioning context for the header below — `main` (UnifiedShell.jsx) is already a flex
@@ -406,7 +414,7 @@ const ReplayPage = () => {
 
       {/* Compact top-left header — back / title / vehicle / export / change-route */}
       <Paper elevation={0} className={classes.header} sx={floatingSurfaceSx} ref={headerRef}>
-        <IconButton size="small" onClick={() => navigate(REPORTS_HOME)}>
+        <IconButton size="small" onClick={() => navigate(REPORTS_HOME)} sx={headerIconButtonSx}>
           <BackIcon />
         </IconButton>
         <Box className={classes.headerText}>
@@ -421,13 +429,14 @@ const ReplayPage = () => {
         </Box>
         {loaded && (
           <>
-            <IconButton size="small" onClick={handleDownload} title={t('reportExport')}>
+            <IconButton size="small" onClick={handleDownload} title={t('reportExport')} sx={headerIconButtonSx}>
               <DownloadIcon fontSize="small" />
             </IconButton>
             <IconButton
               size="small"
               onClick={() => updateReportParams(searchParams, setSearchParams, 'ignore', [])}
               title={t('replayChangeRoute')}
+              sx={headerIconButtonSx}
             >
               <TuneIcon fontSize="small" />
             </IconButton>

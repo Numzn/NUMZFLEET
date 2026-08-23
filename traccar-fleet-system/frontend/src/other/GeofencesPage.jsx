@@ -3,10 +3,8 @@ import { traccarPath } from '../config/traccarApi.js';
 
 import { useDispatch } from 'react-redux';
 import {
-  Divider, Typography, IconButton, Toolbar,
-  Paper,
+  Box, Typography, IconButton, Tooltip,
 } from '@mui/material';
-import Tooltip from '@mui/material/Tooltip';
 import { makeStyles } from 'tss-react/mui';
 import UploadFileIcon from '@mui/icons-material/FileUpload';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +19,15 @@ import MapScale from '../map/MapScale';
 import BackIcon from '../common/components/BackIcon';
 import fetchOrThrow from '../common/util/fetchOrThrow';
 import { FLEET_VEHICLES } from '../common/util/navigationParents';
+import { FLEET_SIDEBAR_WIDTH_PX } from '../main/fleet/fleetLayoutConstants';
+
+// Same surface language as FleetSidebar/ReplayPage — a real panel beside a
+// real map, not a floating overlay, so it takes actual layout width rather
+// than MapChromePadding's overlay-inset trick.
+const iconButtonSx = {
+  color: 'var(--color-text-secondary)',
+  '&:hover': { bgcolor: 'var(--surface-card-hover)' },
+};
 
 const useStyles = makeStyles()((theme) => ({
   root: {
@@ -40,17 +47,34 @@ const useStyles = makeStyles()((theme) => ({
   drawer: {
     display: 'flex',
     flexDirection: 'column',
+    minHeight: 0,
+    bgcolor: 'var(--surface-card)',
+    borderRight: '1px solid var(--surface-border)',
     [theme.breakpoints.up('sm')]: {
-      width: theme.dimensions.drawerWidthDesktop,
+      width: FLEET_SIDEBAR_WIDTH_PX,
+      flexShrink: 0,
     },
     [theme.breakpoints.down('sm')]: {
-      height: theme.dimensions.drawerHeightPhone,
+      height: 280,
+      borderRight: 'none',
+      borderBottom: '1px solid var(--surface-border)',
     },
   },
-  mapContainer: {
-    flexGrow: 1,
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+    padding: theme.spacing(1, 1.5),
+    minHeight: 52,
+    flexShrink: 0,
+    borderBottom: '1px solid var(--surface-border-subtle)',
+    bgcolor: 'var(--surface-workspace)',
   },
   title: {
+    flexGrow: 1,
+    minWidth: 0,
+  },
+  mapContainer: {
     flexGrow: 1,
   },
   fileInput: {
@@ -117,24 +141,25 @@ const GeofencesPage = () => {
   return (
     <div className={classes.root}>
       <div className={classes.content}>
-        <Paper square className={classes.drawer}>
-          <Toolbar>
-            <IconButton edge="start" sx={{ mr: 2 }} onClick={() => navigate(FLEET_VEHICLES)}>
+        <Box className={classes.drawer}>
+          <Box className={classes.header}>
+            <IconButton size="small" onClick={() => navigate(FLEET_VEHICLES)} sx={iconButtonSx}>
               <BackIcon />
             </IconButton>
-            <Typography variant="h6" className={classes.title}>{t('sharedGeofences')}</Typography>
+            <Typography variant="subtitle1" fontWeight={700} noWrap className={classes.title}>
+              {t('sharedGeofences')}
+            </Typography>
             <label htmlFor="upload-gpx">
               <input accept=".gpx" id="upload-gpx" type="file" className={classes.fileInput} onChange={handleFile} />
-              <IconButton edge="end" component="span" onClick={() => {}}>
-                <Tooltip title={t('sharedUpload')}>
-                  <UploadFileIcon />
-                </Tooltip>
-              </IconButton>
+              <Tooltip title={t('sharedUpload')}>
+                <IconButton size="small" component="span" sx={iconButtonSx}>
+                  <UploadFileIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </label>
-          </Toolbar>
-          <Divider />
+          </Box>
           <GeofencesList onGeofenceSelected={setSelectedGeofenceId} />
-        </Paper>
+        </Box>
         <div className={classes.mapContainer}>
           <MapView>
             <MapGeofenceEdit selectedGeofenceId={selectedGeofenceId} />

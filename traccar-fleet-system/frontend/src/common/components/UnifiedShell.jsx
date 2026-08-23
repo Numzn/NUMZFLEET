@@ -129,12 +129,13 @@ function UnifiedShellContent() {
   }, [dispatch, fleetSidebarCollapsed]);
 
   // Only read by the permanent desktop rail — the temporary drawer sizes itself.
-  // Live map forces the rail to its icon-only width regardless of the user's
-  // own expand/collapse preference on the default workspace — map real estate
-  // matters more here than a labeled list the user rarely needs mid-operation.
-  // The preference itself (`collapsed`) is untouched, so returning to the
-  // default workspace still shows whatever the user actually chose.
-  const appDrawerWidth = (isLive || collapsed) ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
+  // Live map and fullscreen both force the rail to its icon-only width
+  // regardless of the user's own expand/collapse preference on the default
+  // workspace — map/canvas real estate matters more here than a labeled list
+  // the user rarely needs mid-operation. The preference itself (`collapsed`)
+  // is untouched, so returning to the default workspace still shows whatever
+  // the user actually chose.
+  const appDrawerWidth = (isLive || isFullscreen || collapsed) ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
   const liveDrawerWidth = desktop
     ? (fleetSidebarCollapsed ? FLEET_SIDEBAR_RAIL_WIDTH_PX : FLEET_SIDEBAR_WIDTH_PX)
@@ -235,7 +236,7 @@ function UnifiedShellContent() {
   // continuous rail rather than something that stops short under the topbar.
   const renderAppRail = () => showDefaultPermanentNav && (
     <Box className={classes.navRail} sx={{ width: appDrawerWidth }}>
-      {renderAppSidebar({ forceCollapsed: isLive })}
+      {renderAppSidebar({ forceCollapsed: isLive || isFullscreen })}
     </Box>
   );
 
@@ -283,7 +284,9 @@ function UnifiedShellContent() {
             </Box>
           )}
 
-          {isFullscreen && (
+          {/* Desktop now has the real spine (forced collapsed, same as live
+              map) instead of this hamburger — mobile-only from here on. */}
+          {isFullscreen && !desktop && (
             <Box
               sx={{
                 display: 'flex',

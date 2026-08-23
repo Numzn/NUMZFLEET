@@ -22,19 +22,20 @@
  */
 export function resolveShellChrome({ workspaceType, desktop }) {
   const isLive = workspaceType === 'live';
-  const isFullscreen = workspaceType === 'fullscreen';
 
   return {
     // The app's own sidebar — the spine. Present on every workspace at
-    // desktop width; live map forces it to render collapsed (see
-    // UnifiedShell's `forceCollapsed`) rather than excluding it, so
-    // organization identity and primary navigation are never fully absent.
-    // Fullscreen genuinely has no room for it at any width.
-    showPermanentNav: !isFullscreen && desktop,
-    // Below `md` neither the default workspace nor the live map has room for a
-    // permanent rail, and fullscreen pages have no rail at any width — so all
-    // three fall back to the same drawer.
-    showTemporaryNav: !desktop || isFullscreen,
+    // desktop width, full stop — live map and fullscreen both force it to
+    // render collapsed (see UnifiedShell's `forceCollapsed`) rather than
+    // excluding it, so organization identity and primary navigation are
+    // never fully absent anywhere. Workspace type no longer decides whether
+    // the spine shows, only what the content area beyond it looks like —
+    // that's a real simplification: nav visibility was never actually a
+    // workspace-specific concern, only density was.
+    showPermanentNav: desktop,
+    // Below `md` nothing has room for a permanent rail — every workspace
+    // falls back to the same drawer, uniformly.
+    showTemporaryNav: !desktop,
     // The live map's own device list, which is not the app nav.
     showLiveFleetRail: isLive && desktop,
   };
