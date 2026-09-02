@@ -76,11 +76,18 @@ services:
       - "5009:5009"
       - "5013:5013"
       - "5020:5020"
+    # Must target 127.0.0.1, not localhost: this container's /etc/hosts resolves
+    # localhost to ::1 first, but traccar-entrypoint.sh runs the JVM with
+    # -Djava.net.preferIPv4Stack=true (needed for Gmail SMTP — see that file),
+    # so Jetty binds 0.0.0.0 only. A localhost check hits the IPv6 loopback,
+    # where nothing listens, and always reports connection-refused even though
+    # the server is genuinely healthy on IPv4 — confirmed by hand 2026-09-02
+    # after an extended false-positive "Traccar is down" investigation.
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "if command -v wget >/dev/null 2>&1; then wget -qO- http://localhost:8082/ >/dev/null; elif command -v nc >/dev/null 2>&1; then nc -z localhost 8082; else exit 1; fi",
+          "if command -v wget >/dev/null 2>&1; then wget -qO- http://127.0.0.1:8082/ >/dev/null; elif command -v nc >/dev/null 2>&1; then nc -z 127.0.0.1 8082; else exit 1; fi",
         ]
       interval: 15s
       timeout: 10s
