@@ -25,6 +25,7 @@ import notificationsRouter from './modules/notifications/routes.js';
 import meRouter from './modules/profile/routes.js';
 import rolesRouter from './modules/roles/routes.js';
 import notificationPreferencesRouter from './modules/notificationPreferences/routes.js';
+import pushSubscriptionsRouter from './modules/pushSubscriptions/routes.js';
 import telemetryIngestionRouter from './routes/telemetryIngestion.js';
 import organizationsRouter from './routes/organizations.js';
 import { initializeSocket } from './socket/socketHandler.js';
@@ -410,6 +411,7 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/me', meRouter);
 app.use('/api/roles', rolesRouter);
 app.use('/api/notification-preferences', notificationPreferencesRouter);
+app.use('/api/push-subscriptions', pushSubscriptionsRouter);
 app.use('/api/vehicle-specs', vehicleSpecsRouter);
 app.use('/api/vehicles', vehiclesRouter);
 // Nested path registered on app first so it is never missed if an older router snapshot omits it.

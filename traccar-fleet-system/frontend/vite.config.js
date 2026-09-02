@@ -357,6 +357,25 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      // Added 2026-09-01 — was missing entirely, so it fell through to the
+      // catch-all /api rule below (Traccar) and 404'd there. Same pattern
+      // as its sibling /api/notification-preferences above.
+      '/api/push-subscriptions': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
       '/api/roles': {
         target: fuelApiUrl,
         changeOrigin: true,

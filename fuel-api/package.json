@@ -26,10 +26,12 @@
     "helmet": "^7.1.0",
     "multer": "^2.2.0",
     "mysql2": "^3.6.5",
+    "nodemailer": "^6.10.1",
     "pg": "^8.11.3",
     "sequelize": "^6.35.1",
     "socket.io": "^4.6.1",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

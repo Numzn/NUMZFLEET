@@ -26,6 +26,7 @@ import VehicleActivityStateModel from './VehicleActivityState.js';
 import VehicleStateAuditEventModel from './VehicleStateAuditEvent.js';
 import LoginAuditEventModel from './LoginAuditEvent.js';
 import NotificationPreferenceModel from './NotificationPreference.js';
+import PushSubscriptionModel from './PushSubscription.js';
 import RoleModel from './Role.js';
 import PermissionModel from './Permission.js';
 import RolePermissionModel from './RolePermission.js';
@@ -58,6 +59,7 @@ const VehicleActivityState = VehicleActivityStateModel(sequelize);
 const VehicleStateAuditEvent = VehicleStateAuditEventModel(sequelize);
 const LoginAuditEvent = LoginAuditEventModel(sequelize);
 const NotificationPreference = NotificationPreferenceModel(sequelize);
+const PushSubscription = PushSubscriptionModel(sequelize);
 const Role = RoleModel(sequelize);
 const Permission = PermissionModel(sequelize);
 const RolePermission = RolePermissionModel(sequelize);
@@ -69,6 +71,8 @@ Company.hasMany(NumzUser, { foreignKey: 'companyId' });
 NumzUser.belongsTo(Company, { foreignKey: 'companyId' });
 NumzUser.hasMany(NotificationPreference, { foreignKey: 'numzUserId', onDelete: 'CASCADE' });
 NotificationPreference.belongsTo(NumzUser, { foreignKey: 'numzUserId' });
+NumzUser.hasMany(PushSubscription, { foreignKey: 'numzUserId', onDelete: 'CASCADE' });
+PushSubscription.belongsTo(NumzUser, { foreignKey: 'numzUserId' });
 Company.hasMany(CompanyDevice, { foreignKey: 'companyId' });
 CompanyDevice.belongsTo(Company, { foreignKey: 'companyId' });
 Company.hasMany(ServiceRecord, { foreignKey: 'companyId', as: 'serviceRecords' });
@@ -281,6 +285,7 @@ export {
   VehicleStateAuditEvent,
   LoginAuditEvent,
   NotificationPreference,
+  PushSubscription,
   Role,
   Permission,
   RolePermission,

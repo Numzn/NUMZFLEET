@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import {
   Box, Table, TableHead, TableRow, TableCell, TableBody, Switch, CircularProgress, Chip,
+  Button, Typography, Alert,
 } from '@mui/material';
 import SettingsCenterShell from '../SettingsCenterShell.jsx';
 import SettingsSectionPanel from '../components/SettingsSectionPanel.jsx';
 import SettingsSaveBar from '../components/SettingsSaveBar.jsx';
 import { fetchNotificationPreferences, updateNotificationPreferences } from '../notificationPreferencesApi.js';
 import { useSetTopBarTitle } from '../../../common/components/TopBarTitleContext';
+import { usePushSubscription } from '../../../hooks/usePushSubscription.js';
 
 const CATEGORY_LABELS = {
   fuel: 'Fuel & fueling day',
@@ -27,10 +29,51 @@ const CHANNEL_LABELS = {
   push: 'Push',
 };
 
-// email/push have no delivery provider wired up anywhere in fuel-api today
-// (both are explicit placeholders in notifications/channels/*.js) — labeled
-// "Soon" so this doesn't imply functionality that doesn't exist yet.
-const CHANNEL_NOT_YET_ACTIVE = new Set(['email', 'push']);
+// Both email (2026-08-31) and push (2026-09-01) now have a real delivery
+// provider — see fuel-api/src/notifications/channels/{email,push}Channel.js.
+// Kept as an empty set, not removed: the next stub channel (if any) has a
+// place to go without re-inventing this UI treatment.
+const CHANNEL_NOT_YET_ACTIVE = new Set([]);
+
+/**
+ * The per-category matrix above controls WHICH events use push, once this
+ * device has one. This control is the OTHER half — the actual browser
+ * subscription — which the matrix has no way to represent, since it's a
+ * per-device grant, not a per-category preference.
+ */
+function PushSubscriptionControl() {
+  const {
+    isSupported, permission, isSubscribed, loading, error, subscribe, unsubscribe,
+  } = usePushSubscription();
+
+  if (!isSupported) {
+    return (
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Push notifications are not supported in this browser.
+      </Alert>
+    );
+  }
+
+  return (
+    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+      <Typography variant="body2">
+        Push on this device:
+        {' '}
+        <strong>{isSubscribed ? 'Enabled' : 'Disabled'}</strong>
+        {permission === 'denied' && ' (blocked in browser settings)'}
+      </Typography>
+      <Button
+        variant="outlined"
+        size="small"
+        disabled={loading || permission === 'denied'}
+        onClick={() => (isSubscribed ? unsubscribe() : subscribe())}
+      >
+        {isSubscribed ? 'Disable push on this device' : 'Enable push on this device'}
+      </Button>
+      {error && <Alert severity="error" sx={{ flexBasis: '100%' }}>{error}</Alert>}
+    </Box>
+  );
+}
 
 export default function NotificationsSection() {
   useSetTopBarTitle('Settings');
@@ -103,8 +146,9 @@ export default function NotificationsSection() {
     <SettingsCenterShell>
       <SettingsSectionPanel
         title="Notifications"
-        description="Choose which events notify you, and how. Email and push aren't wired up to deliver yet — in-app and SMS (where configured) are live."
+        description="Choose which events notify you, and how. Email currently only applies to compliance and maintenance alerts; push currently only applies to security and tracking alerts."
       >
+        <PushSubscriptionControl />
         <Box sx={{ overflowX: 'auto' }}>
           <Table size="small">
             <TableHead>

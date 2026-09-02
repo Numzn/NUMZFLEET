@@ -2,6 +2,7 @@ import * as repo from '../../modules/notifications/notificationRepository.js';
 import { CHANNELS } from '../contracts/notificationContract.js';
 import { DEFAULT_COMPANY_ID } from '../../models/index.js';
 import { resolveAudience } from './audienceResolver.js';
+import { resolveEffectiveChannels } from './effectiveChannelsResolver.js';
 import { dispatchNotificationChannels } from '../dispatcher/notificationDispatcher.js';
 import { createNotification } from '../canonicalNotification.js';
 
@@ -73,7 +74,12 @@ export async function publishNotification(spec, ctx = {}) {
         });
         continue;
       }
-      await dispatchNotificationChannels(io, row.userId, apiRow, realtimeChannels);
+      // Per-user gate: policy decides which channels are candidates,
+      // preferences decide which of those this specific user actually wants
+      // (email only — see effectiveChannelsResolver.js for why inbox/
+      // websocket/sms are deliberately excluded from this gate).
+      const effectiveChannels = await resolveEffectiveChannels(row.userId, category, realtimeChannels);
+      await dispatchNotificationChannels(io, row.userId, apiRow, effectiveChannels);
     }
   }
 

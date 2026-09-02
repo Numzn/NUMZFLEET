@@ -223,14 +223,14 @@ describe('immobilizationTransitionPolicy', () => {
     assert.equal(immobilizationTransitionPolicy({ intentId: 'x', status: 'failed' }).clientDedupKey, 'immobilization:x:failed');
   });
 
-  it('completed and failed include SMS — these are the only statuses where a command actually reached the vehicle', () => {
+  it('completed and failed include SMS and PUSH — these are the only statuses where a command actually reached the vehicle (PUSH added 2026-09-01, same gate as SMS)', () => {
     assert.deepEqual(
       immobilizationTransitionPolicy({ intentId: 'x', status: 'completed' }).channels,
-      [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.SMS],
+      [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.SMS, CHANNELS.PUSH],
     );
     assert.deepEqual(
       immobilizationTransitionPolicy({ intentId: 'x', status: 'failed' }).channels,
-      [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.SMS],
+      [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.SMS, CHANNELS.PUSH],
     );
   });
 

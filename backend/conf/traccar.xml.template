@@ -67,4 +67,24 @@
     <entry key='event.forward.enable'>true</entry>
     <entry key='event.forward.url'>http://backend:3000/internal/telemetry/traccar-events</entry>
     <entry key='event.forward.header'>__EVENT_FORWARD_HEADER__</entry>
+
+    <!-- Traccar's own native SMTP mailer (org.traccar.mail.SmtpMailManager) —
+         powers the native Notifications page's "Mail" notificator and system
+         messages (e.g. password reset). Completely separate from NUMZFLEET's
+         own fuel-api email system (notifications/channels/emailChannel.js) —
+         different backend, different code, do not confuse the two.
+         Keys verified against org.traccar.config.Keys in the actual installed
+         version (6.14.5), not assumed from convention.
+         Username/password are placeholders, unlike this file's dev-only
+         database.password above — a real external Gmail credential shouldn't
+         be committed even to this already-gitignored-adjacent template.
+         Substituted by traccar-entrypoint.sh from TRACCAR_MAIL_SMTP_USERNAME /
+         TRACCAR_MAIL_SMTP_PASSWORD in backend/.env. -->
+    <entry key='mail.smtp.host'>smtp.gmail.com</entry>
+    <entry key='mail.smtp.port'>587</entry>
+    <entry key='mail.transport.protocol'>smtp</entry>
+    <entry key='mail.smtp.starttls.enable'>true</entry>
+    <entry key='mail.smtp.username'>__MAIL_SMTP_USERNAME__</entry>
+    <entry key='mail.smtp.password'>__MAIL_SMTP_PASSWORD__</entry>
+    <entry key='mail.smtp.from'>info.numztech@gmail.com</entry>
 </properties>

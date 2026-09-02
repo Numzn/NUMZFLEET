@@ -78,6 +78,8 @@ export function escalationPolicy({ deviceId, alertId }) {
     entityType: 'tracking',
     severity: 'critical',
     audience: { managers: true },
+    // PUSH was already in this list — previously inert (pushChannel.js was
+    // a stub until 2026-09-01), now real, gated per-user same as email.
     channels: [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.PUSH, CHANNELS.SMS],
     // Manual escalations (no alertId) are intentionally NEVER deduped —
     // every click creates a fresh notification. Do not "fix" this.
@@ -263,7 +265,12 @@ export function complianceFindingPolicy({ fleetVehicleId, type, status }) {
     entityType: 'compliance',
     severity: complianceSeverity(status),
     audience: { managers: true },
-    channels: STANDARD_CHANNELS,
+    // Email added 2026-08-31 — one of the initial, intentionally small set
+    // of email-eligible policies (see maintenanceRoutineStatePolicy for the
+    // other). Compliance findings are infrequent and benefit from a
+    // persistent record; still gated per-user by effectiveChannelsResolver.js,
+    // so this alone does not turn email on for anyone.
+    channels: [...STANDARD_CHANNELS, CHANNELS.EMAIL],
     // Intentional daily repeat while the finding stays in this status — not a bug.
     clientDedupKey: `compliance:${fleetVehicleId}:${type}:${status}:${dayStamp}`,
   };
@@ -285,9 +292,16 @@ export function complianceFindingPolicy({ fleetVehicleId, type, status }) {
 // current call site (dead defensively-handled value) — excluded too.
 const IMMOBILIZATION_SMS_STATUSES = new Set(['completed', 'failed']);
 
+// Push added 2026-09-01 alongside the existing SMS gate, same statuses,
+// same reasoning — a real command outcome, not a never-executed state.
+// Kept deliberately paired with SMS rather than added to every policy (see
+// effectiveChannelsResolver.js and the "initial policies" note in
+// pushChannel.js's own history) — this and escalationPolicy (which already
+// listed PUSH, previously inert) are the only two channels arrays that
+// carry it.
 function immobilizationChannels(status) {
   return IMMOBILIZATION_SMS_STATUSES.has(status)
-    ? [...STANDARD_CHANNELS, CHANNELS.SMS]
+    ? [...STANDARD_CHANNELS, CHANNELS.SMS, CHANNELS.PUSH]
     : STANDARD_CHANNELS;
 }
 
@@ -327,7 +341,8 @@ export function maintenanceRoutineStatePolicy({ fleetVehicleId, mappedType }) {
     entityType: 'maintenance',
     severity: mappedType === 'overdue' ? 'warning' : 'info',
     audience: { managers: true },
-    channels: STANDARD_CHANNELS,
+    // Email added 2026-08-31 — see complianceFindingPolicy's identical note.
+    channels: [...STANDARD_CHANNELS, CHANNELS.EMAIL],
     // Same Lusaka day-boundary helper compliance uses — intentionally shared,
     // not duplicated. This is one half of a known duplicate-producer overlap
     // with complianceFindingPolicy's ROUTINE_SERVICE finding type — Phase 4
