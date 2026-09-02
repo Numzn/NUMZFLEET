@@ -241,7 +241,12 @@ export function erbPricesPolicy({ timestamp }) {
     entityType: 'system',
     severity: 'info',
     audience: { managers: true },
-    channels: STANDARD_CHANNELS,
+    // Email, SMS, and push added 2026-09-02 — fuel price changes are
+    // infrequent and time-sensitive enough to warrant every channel.
+    // Still gated per-user by effectiveChannelsResolver.js/the Settings
+    // "System" row for email and push; SMS dispatches unconditionally
+    // like every other SMS-carrying policy (see notificationDispatcher.js).
+    channels: [...STANDARD_CHANNELS, CHANNELS.EMAIL, CHANNELS.SMS, CHANNELS.PUSH],
     // Reused as both entityId and dedup key at the call site, exactly as today.
     clientDedupKey: key,
     resolvedAt: at,

@@ -176,6 +176,11 @@ describe('erbPricesPolicy', () => {
     assert.equal(p.clientDedupKey, 'erb:2026-07-01T00:00:00Z');
     assert.equal(p.resolvedAt, '2026-07-01T00:00:00Z');
   });
+
+  it('carries all four channels (email/SMS/push added 2026-09-02) — email and push still gated per-user by effectiveChannelsResolver.js', () => {
+    const p = erbPricesPolicy({ timestamp: '2026-07-01T00:00:00Z' });
+    assert.deepEqual(p.channels, [CHANNELS.INBOX, CHANNELS.WEBSOCKET, CHANNELS.EMAIL, CHANNELS.SMS, CHANNELS.PUSH]);
+  });
 });
 
 describe('complianceFindingPolicy', () => {
