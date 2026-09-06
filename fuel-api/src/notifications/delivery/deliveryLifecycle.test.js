@@ -43,9 +43,19 @@ const TEST_NOW = new Date(Date.now() + 40 * 60 * 60 * 1000);
 // instead of TEST_NOW closes it the same way: computed fresh at call time,
 // not as a module constant, so it is never already stale by the time
 // execution reaches these tests.
+//
+// +13s/+14s, not the identical +3s/+4s deliveryWorker.test.js/
+// deliveryHardening.test.js also use: Node's test runner executes files
+// concurrently, so three files all computing "now" within the same overall
+// suite run and all targeting the same few-second slice reliably collide
+// with EACH OTHER's genuinely-wide, unscoped claims — confirmed by
+// reproducing this locally (~80% failure rate on the full suite). `now` is
+// always explicitly passed to the query rather than read live, so the exact
+// offset is arbitrary; each of the three files just needs its own
+// non-overlapping band. This file owns +10-19s.
 function wideClaimWindow() {
   const now = Date.now();
-  return { parkAt: new Date(now + 3000), claimNow: new Date(now + 4000) };
+  return { parkAt: new Date(now + 13000), claimNow: new Date(now + 14000) };
 }
 
 after(async () => {

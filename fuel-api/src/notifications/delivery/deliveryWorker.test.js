@@ -85,6 +85,15 @@ const TEST_NOW = new Date(Date.now() + 20.5 * 60 * 60 * 1000);
 // already be in the past — and so immediately due for the REAL live
 // background worker's real-time claims — by the time execution actually
 // reaches them.
+//
+// This file owns the +0-9s band. deliveryLifecycle.test.js/
+// deliveryHardening.test.js have their own identical helpers (copy-pasted
+// from this one) and originally used this exact same offset, which — since
+// Node's test runner executes files concurrently — let their genuinely-wide,
+// unscoped claims collide with each other (confirmed by reproducing it
+// locally, ~80% failure rate on the full suite). They now use +10-19s/
+// +20-29s respectively; if you add a fourth file with this pattern, give it
+// its own decade too.
 function wideClaimWindow() {
   const now = Date.now();
   return { parkAt: new Date(now + 3000), claimNow: new Date(now + 4000) };

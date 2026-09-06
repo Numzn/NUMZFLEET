@@ -99,9 +99,19 @@ async function mkDelivery(channel, { companyId = COMPANY_A, userId = 8001, parkA
 // Computed fresh at call time, not as a module constant — a fixed value would
 // already be stale (and so immediately due for the live worker) by the time
 // execution reaches this describe block.
+//
+// +23s/+24s, not the identical +3s/+4s deliveryWorker.test.js/
+// deliveryLifecycle.test.js also use: Node's test runner executes files
+// concurrently, so three files all computing "now" within the same overall
+// suite run and all targeting the same few-second slice reliably collide
+// with EACH OTHER's genuinely-wide, unscoped claims — confirmed by
+// reproducing this locally (~80% failure rate on the full suite). `now` is
+// always explicitly passed to the query rather than read live, so the exact
+// offset is arbitrary; each of the three files just needs its own
+// non-overlapping band. This file owns +20-29s.
 function wideClaimWindow() {
   const now = Date.now();
-  return { parkAt: new Date(now + 3000), claimNow: new Date(now + 4000) };
+  return { parkAt: new Date(now + 23000), claimNow: new Date(now + 24000) };
 }
 
 async function claimMine(delivery, now = TEST_NOW) {
