@@ -1,7 +1,8 @@
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { isGeofenceTrackingEvent, resolveCompanyIdForDevice } from './deviceAudienceResolver.js';
-import sequelize, { CompanyDevice, DEFAULT_COMPANY_ID } from '../../models/index.js';
+import sequelize, { Company, CompanyDevice } from '../../models/index.js';
 
 describe('isGeofenceTrackingEvent', () => {
   it('matches geofence event types regardless of casing', () => {
@@ -31,6 +32,23 @@ try {
 
 describe('resolveCompanyIdForDevice — tenant isolation for Traccar tracking alarms', { skip: !dbReachable }, () => {
   const TEST_DEVICE_ID = 900301;
+  // A real Company row, not DEFAULT_COMPANY_ID — that id is only a real row
+  // in environments seeded with "Default Fleet" history (true in dev, false
+  // in a fresh CI database), and company_devices.company_id is a real FK.
+  let testCompany;
+
+  before(async () => {
+    testCompany = await Company.create({
+      slug: `device-audience-test-${randomUUID().slice(0, 8)}`,
+      name: 'Device Audience Test Co',
+      organizationType: 'customer',
+      status: 'active',
+    });
+  });
+
+  after(async () => {
+    if (testCompany) await testCompany.destroy();
+  });
 
   it('returns null for a device with no company_devices link (legacy/unprovisioned) rather than throwing', async () => {
     assert.equal(await resolveCompanyIdForDevice(999999), null);
@@ -43,13 +61,13 @@ describe('resolveCompanyIdForDevice — tenant isolation for Traccar tracking al
 
   it('resolves the real companyId once the device is linked via company_devices', async () => {
     const row = await CompanyDevice.create({
-      companyId: DEFAULT_COMPANY_ID,
+      companyId: testCompany.id,
       traccarDeviceId: TEST_DEVICE_ID,
       isActive: true,
     });
     try {
       const companyId = await resolveCompanyIdForDevice(TEST_DEVICE_ID);
-      assert.equal(companyId, DEFAULT_COMPANY_ID);
+      assert.equal(companyId, testCompany.id);
     } finally {
       await row.destroy();
     }
@@ -57,7 +75,7 @@ describe('resolveCompanyIdForDevice — tenant isolation for Traccar tracking al
 
   it('ignores an inactive company_devices row — same as the rest of the codebase\'s isActive convention', async () => {
     const row = await CompanyDevice.create({
-      companyId: DEFAULT_COMPANY_ID,
+      companyId: testCompany.id,
       traccarDeviceId: TEST_DEVICE_ID,
       isActive: false,
     });
