@@ -43,6 +43,8 @@ import {
 import { startComplianceNotificationScheduler } from './jobs/complianceNotificationScheduler.js';
 import { startTelemetryReconciliationScheduler } from './jobs/telemetryReconciliationScheduler.js';
 import { startDailyMileageScheduler } from './jobs/dailyMileageScheduler.js';
+import { startNotificationDeliveryScheduler } from './jobs/notificationDeliveryScheduler.js';
+import { getDeliveryWorkerStatus } from './notifications/delivery/deliveryWorkerStatus.js';
 import {
   reconcileStuckExecuting,
   shouldReconcileOnStartup,
@@ -266,7 +268,19 @@ app.use((req, res, next) => {
 // verified from the public edge through the frontend nginx /api proxy without
 // a separate edge route.
 const healthHandler = (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'numztrak-fuel-api' });
+  // Notification delivery status is in-memory only — /health is polled by the
+  // container probe, so it must stay DB-free. Queue depth lives behind
+  // GET /api/notifications/delivery-stats instead.
+  //
+  // A disabled or stalled worker does NOT fail the probe: the API itself is
+  // healthy and failing here would break container health and deploys. It is
+  // surfaced as `notifications.degraded` so it cannot pass unnoticed either.
+  const notifications = getDeliveryWorkerStatus();
+  res.status(200).json({
+    status: 'ok',
+    service: 'numztrak-fuel-api',
+    notifications,
+  });
 };
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
@@ -477,6 +491,7 @@ let stopVehicleStateReconciliationScheduler = () => {};
 let stopComplianceNotificationScheduler = () => {};
 let stopTelemetryReconciliationScheduler = () => {};
 let stopDailyMileageScheduler = () => {};
+let stopNotificationDeliveryScheduler = () => {};
 
 async function runImmobilizationStartupReconcile() {
   if (!shouldReconcileOnStartup()) return;
@@ -598,6 +613,7 @@ const startServer = async () => {
       stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
       stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
       stopDailyMileageScheduler = startDailyMileageScheduler();
+      stopNotificationDeliveryScheduler = startNotificationDeliveryScheduler();
       void runVehicleStateStartupReconcile().finally(() => {
         stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
       });
@@ -637,6 +653,7 @@ const startServer = async () => {
     stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
     stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
     stopDailyMileageScheduler = startDailyMileageScheduler();
+    stopNotificationDeliveryScheduler = startNotificationDeliveryScheduler();
     void runVehicleStateStartupReconcile().finally(() => {
       stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
     });
@@ -674,6 +691,7 @@ process.on('SIGTERM', () => {
   stopComplianceNotificationScheduler();
   stopTelemetryReconciliationScheduler();
   stopDailyMileageScheduler();
+  stopNotificationDeliveryScheduler();
   stopVehicleStateReconciliationScheduler();
   httpServer.close(() => {
     if (isDev) {

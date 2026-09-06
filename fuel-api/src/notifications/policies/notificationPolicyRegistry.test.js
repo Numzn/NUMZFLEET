@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHANNELS } from '../contracts/notificationContract.js';
+import { CHANNELS, URGENCY } from '../contracts/notificationContract.js';
 import {
   fuelRequestPolicy,
   escalationPolicy,
@@ -277,5 +277,75 @@ describe('maintenanceRoutineStatePolicy', () => {
   it('dedup key includes a day-stamp, same pattern as compliance (intentional shared helper)', () => {
     const p = maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'overdue' });
     assert.match(p.clientDedupKey, /^routine-service:1:overdue:\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('urgency is stated explicitly by every policy', () => {
+  // Each entry: a label plus a zero-argument invocation with the minimum
+  // arguments that policy needs. Kept exhaustive on purpose — a new policy
+  // added without an urgency should fail here, not ship silently.
+  const invocations = [
+    ['fuelRequestPolicy(created/emergency)', () => fuelRequestPolicy({ kind: 'created', changeType: 'created', request: { id: 1, urgency: 'emergency' } })],
+    ['fuelRequestPolicy(approved)', () => fuelRequestPolicy({ kind: 'updated', changeType: 'approved', request: { id: 1, userId: 2 } })],
+    ['escalationPolicy', () => escalationPolicy({ deviceId: 5, alertId: 9 })],
+    ['operationPlanReadyPolicy', () => operationPlanReadyPolicy({ operationId: 1 })],
+    ['operationApprovedPolicy', () => operationApprovedPolicy({ operationId: 1 })],
+    ['operationUnlockedPolicy', () => operationUnlockedPolicy({ operationId: 1, expiresAt: 'x' })],
+    ['operationLockApproachingPolicy', () => operationLockApproachingPolicy({ operationId: 1 })],
+    ['operationRecordingIncompletePolicy', () => operationRecordingIncompletePolicy({ operationId: 1 })],
+    ['operationRefuelRecordedPolicy', () => operationRefuelRecordedPolicy({ sessionId: 1, refuelId: 2, driverId: 3 })],
+    ['vehicleAssignmentPolicy', () => vehicleAssignmentPolicy({ vehicleId: 1, deviceId: 2, assignedAt: 'x' })],
+    ['erbPricesPolicy', () => erbPricesPolicy({ timestamp: 'x' })],
+    ['complianceFindingPolicy', () => complianceFindingPolicy({ fleetVehicleId: 1, type: 'roadtax', status: 'expired' })],
+    ['immobilizationTransitionPolicy(failed)', () => immobilizationTransitionPolicy({ intentId: 'x', status: 'failed' })],
+    ['maintenanceCompletedPolicy', () => maintenanceCompletedPolicy({ recordId: 1, completedAt: 'x' })],
+    ['maintenanceRoutineStatePolicy', () => maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'overdue' })],
+  ];
+
+  for (const [label, invoke] of invocations) {
+    it(`${label} returns a valid urgency`, () => {
+      const p = invoke();
+      assert.ok(
+        Object.values(URGENCY).includes(p.urgency),
+        `${label} returned urgency=${p.urgency}`,
+      );
+    });
+  }
+});
+
+describe('urgency is not merely a copy of severity', () => {
+  it('an emergency fuel request is critical AND immediate', () => {
+    const p = fuelRequestPolicy({ kind: 'created', changeType: 'created', request: { id: 1, urgency: 'emergency' } });
+    assert.equal(p.severity, 'critical');
+    assert.equal(p.urgency, URGENCY.IMMEDIATE);
+  });
+
+  it('a non-emergency fuel request is warning but only normal urgency', () => {
+    const p = fuelRequestPolicy({ kind: 'created', changeType: 'created', request: { id: 1 } });
+    assert.equal(p.severity, 'warning');
+    assert.equal(p.urgency, URGENCY.NORMAL);
+  });
+
+  it('a failed immobilization is immediate; a completed one is not', () => {
+    assert.equal(immobilizationTransitionPolicy({ intentId: 'x', status: 'failed' }).urgency, URGENCY.IMMEDIATE);
+    assert.equal(immobilizationTransitionPolicy({ intentId: 'x', status: 'completed' }).urgency, URGENCY.NORMAL);
+  });
+
+  it('high-volume routine records are deferred even though they are not errors', () => {
+    assert.equal(
+      operationRefuelRecordedPolicy({ sessionId: 1, refuelId: 2, driverId: 3 }).urgency,
+      URGENCY.DEFERRED,
+    );
+    assert.equal(
+      maintenanceCompletedPolicy({ recordId: 1, completedAt: 'x' }).urgency,
+      URGENCY.DEFERRED,
+    );
+  });
+
+  it('a success-severity notification is not automatically low urgency', () => {
+    // operation.approved is 'success' but people are waiting on it to start fuelling
+    const p = operationApprovedPolicy({ operationId: 1 });
+    assert.equal(p.severity, 'success');
+    assert.equal(p.urgency, URGENCY.NORMAL);
   });
 });

@@ -20,13 +20,19 @@
  * overriding a value a specific call site relies on.
  *
  * Traccar tracking events are NOT represented here — resolveTraccarTrackingPolicy()
- * in ./notificationPolicyService.js stays exactly as-is; it decides from raw
- * external event data with a different signature and a different channel
- * vocabulary ('bell'/'push' strings), and folding it into this registry's
- * shape would be a lossy translation for no benefit.
+ * in ./notificationPolicyService.js keeps its own signature, because it decides
+ * from raw external event data and folding it into this registry's shape would
+ * be a lossy translation for no benefit. It does, however, now speak the same
+ * CHANNELS/SEVERITY/URGENCY vocabulary as this file — the 'bell'/'push'/'sms'
+ * strings it used to return were a second representation of the same concepts.
+ *
+ * Every policy states `urgency` explicitly. It is not derived from severity
+ * here (canonicalNotification.resolveUrgency only supplies a default for
+ * callers that omit it) because "how serious" and "how fast" are genuinely
+ * different questions and each policy is the right place to answer both.
  */
 
-import { CHANNELS } from '../contracts/notificationContract.js';
+import { CHANNELS, IN_APP_CHANNELS, URGENCY } from '../contracts/notificationContract.js';
 import { localDateString } from '../../utils/businessDay.js';
 import { buildFuelDedupKey, buildEscalationDedupKey } from '../../modules/notifications/notificationService.js';
 import { severityForStatus, PUBLISH_STATUS } from '../immobilizationNotificationService.js';
@@ -36,7 +42,7 @@ import { severityForStatus, PUBLISH_STATUS } from '../immobilizationNotification
 // deliberately use it (manual escalation, operation-unlock).
 export { buildFuelDedupKey, buildEscalationDedupKey, severityForStatus, PUBLISH_STATUS };
 
-const STANDARD_CHANNELS = [CHANNELS.INBOX, CHANNELS.WEBSOCKET];
+const STANDARD_CHANNELS = IN_APP_CHANNELS;
 
 // ---------------------------------------------------------------------------
 // #1 Fuel request lifecycle (notificationService.js — persistFuelSocketEvent)
@@ -58,10 +64,14 @@ function fuelRequestAudience(kind, request) {
 }
 
 export function fuelRequestPolicy({ kind, changeType, request }) {
+  const severity = fuelRequestSeverity(changeType, request);
   return {
     type: `fuel.request.${changeType}`,
     entityType: 'fuel',
-    severity: fuelRequestSeverity(changeType, request),
+    severity,
+    // An emergency fuel request (the only path to 'critical' here) is someone
+    // waiting on a decision; every other lifecycle change is a status update.
+    urgency: severity === 'critical' ? URGENCY.IMMEDIATE : URGENCY.NORMAL,
     audience: fuelRequestAudience(kind, request),
     channels: STANDARD_CHANNELS,
     clientDedupKey: buildFuelDedupKey(request.id, changeType),
@@ -77,6 +87,8 @@ export function escalationPolicy({ deviceId, alertId }) {
     type: 'tracking.alert.escalated',
     entityType: 'tracking',
     severity: 'critical',
+    // A human deliberately pressed escalate — by definition it cannot wait.
+    urgency: URGENCY.IMMEDIATE,
     audience: { managers: true },
     // PUSH was already in this list — previously inert (pushChannel.js was
     // a stub until 2026-09-01), now real, gated per-user same as email.
@@ -99,6 +111,7 @@ export function operationPlanReadyPolicy({ operationId }) {
   return {
     type: 'operation.plan.ready',
     severity: 'info',
+    urgency: URGENCY.NORMAL,
     clientDedupKey: `operation:${operationId}:plan-ready`,
   };
 }
@@ -107,6 +120,7 @@ export function operationApprovedPolicy({ operationId }) {
   return {
     type: 'operation.approved',
     severity: 'success',
+    urgency: URGENCY.NORMAL,
     clientDedupKey: `operation:${operationId}:approved`,
   };
 }
@@ -121,6 +135,9 @@ export function operationUnlockedPolicy({ operationId, expiresAt }) {
   return {
     type: 'operation.unlocked',
     severity: 'info',
+    // A grant opens a bounded write window — useful promptly, but it is not
+    // an incident and must not be allowed to wake anyone in a later phase.
+    urgency: URGENCY.NORMAL,
     clientDedupKey: `operation:${operationId}:unlocked:${resolvedKey}`,
     resolvedKey,
   };
@@ -130,6 +147,7 @@ export function operationLockApproachingPolicy({ operationId }) {
   return {
     type: 'operation.lock.approaching',
     severity: 'warning',
+    urgency: URGENCY.NORMAL,
     clientDedupKey: `operation:${operationId}:lock-approaching`,
   };
 }
@@ -138,6 +156,7 @@ export function operationRecordingIncompletePolicy({ operationId }) {
   return {
     type: 'operation.recording.incomplete',
     severity: 'warning',
+    urgency: URGENCY.NORMAL,
     clientDedupKey: `operation:${operationId}:recording-incomplete`,
   };
 }
@@ -151,6 +170,10 @@ export function operationRefuelRecordedPolicy({ sessionId, refuelId, driverId })
     type: 'operation.refuel.recorded',
     entityType: 'fuel',
     severity: 'info',
+    // Highest-volume producer in the system and purely a log entry — the
+    // clearest legitimate case for deferred, so a busy fuel day cannot turn
+    // into a stream of interruptions once the delivery planner reads this.
+    urgency: URGENCY.DEFERRED,
     audience: { includeDriverWithManagers: true, driverId: Number(driverId) },
     channels: STANDARD_CHANNELS,
     clientDedupKey: `operation:${sessionId}:refuel:${refuelId}:recorded`,
@@ -170,6 +193,7 @@ export function operationRefuelArrivedPolicy({ sessionId, refuelId, driverId }) 
     type: 'operation.refuel.arrived',
     entityType: 'fuel',
     severity: 'info',
+    urgency: URGENCY.DEFERRED,
     audience: { includeDriverWithManagers: true, driverId: Number(driverId) },
     channels: STANDARD_CHANNELS,
     clientDedupKey: `operation:${sessionId}:refuel:${refuelId}:arrived`,
@@ -181,6 +205,7 @@ export function operationRefuelSkippedPolicy({ sessionId, refuelId, driverId }) 
     type: 'operation.refuel.skipped',
     entityType: 'fuel',
     severity: 'warning',
+    urgency: URGENCY.NORMAL,
     audience: { includeDriverWithManagers: true, driverId: Number(driverId) },
     channels: STANDARD_CHANNELS,
     clientDedupKey: `operation:${sessionId}:refuel:${refuelId}:skipped`,
@@ -192,6 +217,7 @@ export function operationInvoiceReconciledPolicy({ sessionId, invoiceId, driverI
     type: 'operation.invoice.reconciled',
     entityType: 'fuel',
     severity: 'success',
+    urgency: URGENCY.NORMAL,
     audience: { includeDriverWithManagers: true, driverId: Number(driverId) },
     channels: STANDARD_CHANNELS,
     clientDedupKey: `operation:${sessionId}:invoice:${invoiceId}:reconciled`,
@@ -203,6 +229,8 @@ export function vehicleDocumentOcrCompletedPolicy({ fleetVehicleId, documentId }
     type: 'vehicle.document.ocr.completed',
     entityType: 'vehicle',
     severity: 'info',
+    // A background job finishing — nobody is waiting on the notification.
+    urgency: URGENCY.DEFERRED,
     audience: { managers: true },
     channels: STANDARD_CHANNELS,
     clientDedupKey: `vehicle:${fleetVehicleId}:document:${documentId}:ocr-completed`,
@@ -222,6 +250,7 @@ export function vehicleAssignmentPolicy({ vehicleId, deviceId, assignedAt }) {
     type: 'assignment.vehicle.updated',
     entityType: 'assignment',
     severity: 'info',
+    urgency: URGENCY.NORMAL,
     audience: { managers: true },
     channels: STANDARD_CHANNELS,
     clientDedupKey: `assignment:${vehicleId}:${deviceId}:${resolvedAssignedAt}`,
@@ -240,6 +269,9 @@ export function erbPricesPolicy({ timestamp }) {
     type: 'erb.prices.updated',
     entityType: 'system',
     severity: 'info',
+    // Infrequent and time-sensitive (pricing decisions depend on it), but not
+    // an incident — normal, despite already carrying every channel.
+    urgency: URGENCY.NORMAL,
     audience: { managers: true },
     // Email, SMS, and push added 2026-09-02 — fuel price changes are
     // infrequent and time-sensitive enough to warrant every channel.
@@ -269,6 +301,9 @@ export function complianceFindingPolicy({ fleetVehicleId, type, status }) {
     type: `compliance.${String(type).toLowerCase()}.${String(status).toLowerCase()}`,
     entityType: 'compliance',
     severity: complianceSeverity(status),
+    // Compliance findings are date-driven — an expiry known today is equally
+    // actionable tomorrow morning. Never immediate.
+    urgency: URGENCY.NORMAL,
     audience: { managers: true },
     // Email added 2026-08-31 — one of the initial, intentionally small set
     // of email-eligible policies (see maintenanceRoutineStatePolicy for the
@@ -315,6 +350,11 @@ export function immobilizationTransitionPolicy({ intentId, status }) {
     type: `immobilization.${status}`,
     entityType: 'security',
     severity: severityForStatus(status),
+    // A failed command means a vehicle is not in the state an operator
+    // believes it is in — the one immobilization outcome that cannot wait.
+    // 'completed' is the reassuring case; cancelled/expired/blocked never
+    // reached the vehicle at all (see IMMOBILIZATION_SMS_STATUSES above).
+    urgency: status === 'failed' ? URGENCY.IMMEDIATE : URGENCY.NORMAL,
     audience: { managers: true },
     channels: immobilizationChannels(status),
     clientDedupKey: `immobilization:${intentId}:${status}`,
@@ -332,6 +372,8 @@ export function maintenanceCompletedPolicy({ recordId, completedAt }) {
     type: 'maintenance.routine.completed',
     entityType: 'maintenance',
     severity: 'success',
+    // A record of work already done.
+    urgency: URGENCY.DEFERRED,
     audience: { managers: true },
     channels: STANDARD_CHANNELS,
     clientDedupKey: `routine-service:${recordId}:completed:${at}`,
@@ -345,6 +387,8 @@ export function maintenanceRoutineStatePolicy({ fleetVehicleId, mappedType }) {
     type: `maintenance.routine.${mappedType}`,
     entityType: 'maintenance',
     severity: mappedType === 'overdue' ? 'warning' : 'info',
+    // Service intervals are measured in days/kilometres, not minutes.
+    urgency: URGENCY.NORMAL,
     audience: { managers: true },
     // Email added 2026-08-31 — see complianceFindingPolicy's identical note.
     channels: [...STANDARD_CHANNELS, CHANNELS.EMAIL],

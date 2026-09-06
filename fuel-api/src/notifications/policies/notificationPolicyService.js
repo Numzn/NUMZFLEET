@@ -1,7 +1,17 @@
 /**
  * Central notification behavior registry for Traccar tracking events.
  * Aligns with frontend vehicleAlertUtils for map/ops display (not bell ingest).
+ *
+ * Keeps its own signature (it decides from raw external event data, unlike the
+ * keyword-argument policies in notificationPolicyRegistry.js) but speaks the
+ * same vocabulary: CHANNELS/SEVERITY/URGENCY. It previously returned
+ * 'bell'/'push'/'sms' strings, a second representation of the same concepts
+ * that trackingNotificationService.js had to translate at the call site.
+ * 'bell' meant in-app, which is the inbox row plus the socket emit — exactly
+ * IN_APP_CHANNELS.
  */
+
+import { CHANNELS, IN_APP_CHANNELS, URGENCY } from '../contracts/notificationContract.js';
 
 const GEOFENCE_ALARM_TYPES = new Set(['geofenceenter', 'geofenceexit', 'geofence']);
 const CRITICAL_TYPES = new Set(['panic', 'sos', 'emergency', 'fault']);
@@ -13,6 +23,11 @@ const WARNING_PERSIST_TYPES = new Set([
   'fueldrop',
 ]);
 const SKIP_TYPES = new Set(['deviceonline', 'deviceoffline', 'devicemoving', 'devicestopped']);
+
+// The two channel sets this registry emits, named once. ALERT_CHANNELS is the
+// escalated set used for genuine security events (restricted-geofence breach,
+// alarms, panic/SOS) — in-app plus the two out-of-band channels.
+const ALERT_CHANNELS = Object.freeze([...IN_APP_CHANNELS, CHANNELS.PUSH, CHANNELS.SMS]);
 
 function parseAttributes(raw) {
   if (!raw) return {};
@@ -57,11 +72,13 @@ function isGeofenceEvent(resolvedType, attributes) {
  *   persist: boolean,
  *   ingestClient: boolean,
  *   severity: string,
+ *   urgency: string,
  *   category: string,
  *   notificationType: string,
  *   resolvedType: string,
  *   channels: string[],
- * }}
+ * }} `channels` are CHANNELS enum values, ready to pass straight to
+ *   publishNotification() — no call-site translation needed.
  */
 /**
  * @param {{ type?: string, attributes?: object }} traccarEvent
@@ -81,6 +98,7 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       persist: false,
       ingestClient: false,
       severity: 'info',
+      urgency: URGENCY.NORMAL,
       category: 'tracking',
       notificationType: `traccar.${resolvedType}`,
       resolvedType,
@@ -95,10 +113,13 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       persist: true,
       ingestClient: true,
       severity: restricted ? 'critical' : 'warning',
+      // A restricted-zone breach is happening now and a vehicle is moving;
+      // an ordinary geofence crossing is a movement record.
+      urgency: restricted ? URGENCY.IMMEDIATE : URGENCY.NORMAL,
       category: restricted ? 'security' : 'tracking',
       notificationType: isExit ? 'tracking.geofence.exited' : 'tracking.geofence.entered',
       resolvedType,
-      channels: restricted ? ['bell', 'push', 'sms'] : ['bell'],
+      channels: restricted ? ALERT_CHANNELS : IN_APP_CHANNELS,
     };
   }
 
@@ -110,20 +131,22 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
         persist: true,
         ingestClient: true,
         severity: 'warning',
+        urgency: URGENCY.NORMAL,
         category: 'tracking',
         notificationType: isExit ? 'tracking.geofence.exited' : 'tracking.geofence.entered',
         resolvedType,
-        channels: ['bell'],
+        channels: IN_APP_CHANNELS,
       };
     }
     return {
       persist: true,
       ingestClient: true,
       severity: 'critical',
+      urgency: URGENCY.IMMEDIATE,
       category: 'security',
       notificationType: 'tracking.alarm',
       resolvedType,
-      channels: ['bell', 'push', 'sms'],
+      channels: ALERT_CHANNELS,
     };
   }
 
@@ -132,10 +155,12 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       persist: true,
       ingestClient: true,
       severity: 'critical',
+      // panic / SOS / emergency / fault — someone or something needs help now.
+      urgency: URGENCY.IMMEDIATE,
       category: 'security',
       notificationType: `tracking.${resolvedLower}`,
       resolvedType,
-      channels: ['bell', 'push', 'sms'],
+      channels: ALERT_CHANNELS,
     };
   }
 
@@ -144,10 +169,11 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       persist: true,
       ingestClient: true,
       severity: 'warning',
+      urgency: URGENCY.NORMAL,
       category: resolvedLower === 'maintenance' ? 'maintenance' : 'tracking',
       notificationType: `tracking.${resolvedLower}`,
       resolvedType,
-      channels: ['bell'],
+      channels: IN_APP_CHANNELS,
     };
   }
 
@@ -155,6 +181,7 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
     persist: false,
     ingestClient: true,
     severity: 'info',
+    urgency: URGENCY.NORMAL,
     category: 'tracking',
     notificationType: `traccar.${resolvedType}`,
     resolvedType,

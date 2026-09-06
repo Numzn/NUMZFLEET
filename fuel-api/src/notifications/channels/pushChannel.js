@@ -81,14 +81,20 @@ export async function deliverPushNotification(payload, deps = {}) {
           userId: payload?.userId,
           subscriptionId: sub.id,
         });
-        return { ok: false, reason: 'expired_removed', id: sub.id };
+        return { ok: false, reason: 'expired_removed', id: sub.id, expired: true, statusCode: error?.statusCode };
       }
       console.error('[pushChannel] push delivery failed', {
         userId: payload?.userId,
         subscriptionId: sub.id,
         message: error?.message || String(error),
       });
-      return { ok: false, reason: 'send_failed', id: sub.id, error: error?.message };
+      return {
+        ok: false,
+        reason: 'send_failed',
+        id: sub.id,
+        statusCode: error?.statusCode,
+        error: error?.message,
+      };
     }
   }));
 

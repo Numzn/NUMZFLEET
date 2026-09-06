@@ -1,16 +1,50 @@
-/** @typedef {'info'|'success'|'warning'|'critical'} NotificationSeverity */
+import { SEVERITY, URGENCY } from './contracts/notificationContract.js';
 
-const ALLOWED_SEVERITIES = new Set(['info', 'success', 'warning', 'critical']);
+/** @typedef {'info'|'success'|'warning'|'critical'} NotificationSeverity */
+/** @typedef {'immediate'|'normal'|'deferred'} NotificationUrgency */
+
+const ALLOWED_SEVERITIES = new Set(Object.values(SEVERITY));
+const ALLOWED_URGENCIES = new Set(Object.values(URGENCY));
 
 /**
  * @param {string} [severity]
  * @returns {NotificationSeverity}
  */
 export function normalizeSeverity(severity) {
-  const s = String(severity || 'info').toLowerCase();
+  const s = String(severity || SEVERITY.INFO).toLowerCase();
   if (ALLOWED_SEVERITIES.has(s)) return /** @type {NotificationSeverity} */ (s);
-  if (s === 'error') return 'critical';
-  return 'info';
+  if (s === 'error') return SEVERITY.CRITICAL;
+  return SEVERITY.INFO;
+}
+
+/**
+ * @param {string} [urgency]
+ * @returns {NotificationUrgency}
+ */
+export function normalizeUrgency(urgency) {
+  const u = String(urgency || '').toLowerCase();
+  if (ALLOWED_URGENCIES.has(u)) return /** @type {NotificationUrgency} */ (u);
+  return URGENCY.NORMAL;
+}
+
+/**
+ * Urgency is a policy decision, not a function of severity — but every policy
+ * predates the field, so an explicit value wins and severity only supplies a
+ * default for anything that has not stated one yet.
+ *
+ * `critical` defaults to `immediate`; everything else to `normal`. Note that
+ * `info` deliberately does NOT default to `deferred`: deferring is a real
+ * behavior change (batching, quiet-hours holding) and must be opted into by a
+ * policy that means it, never inferred from low severity.
+ *
+ * @param {{ severity?: string, urgency?: string }} input
+ * @returns {NotificationUrgency}
+ */
+export function resolveUrgency({ severity, urgency } = {}) {
+  if (urgency != null && String(urgency).length) return normalizeUrgency(urgency);
+  return normalizeSeverity(severity) === SEVERITY.CRITICAL
+    ? URGENCY.IMMEDIATE
+    : URGENCY.NORMAL;
 }
 
 /**
@@ -60,6 +94,7 @@ export function createNotification(input) {
     entityType,
     entityId,
     severity: normalizeSeverity(input.severity),
+    urgency: resolveUrgency(input),
     title: String(input.title || ''),
     message: String(input.message || ''),
     source,
@@ -67,6 +102,7 @@ export function createNotification(input) {
     metadata,
     clientDedupKey: input.clientDedupKey,
     channels: input.channels,
+    mandatory: Boolean(input.mandatory),
   };
 }
 
@@ -93,6 +129,7 @@ export function toCanonicalPayload(row) {
     id: row.id,
     type: row.type,
     severity: normalizeSeverity(row.severity),
+    urgency: resolveUrgency(row),
     title: row.title || '',
     message: row.message || '',
     userId: row.userId,

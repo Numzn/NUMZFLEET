@@ -1,6 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveTraccarTrackingPolicy } from './notificationPolicyService.js';
+import { CHANNELS, IN_APP_CHANNELS, URGENCY } from '../contracts/notificationContract.js';
+
+// This registry used to return 'bell'/'push'/'sms' strings; it now returns
+// CHANNELS enum values, so 'bell' has become the [inbox, websocket] pair.
+const IN_APP = [...IN_APP_CHANNELS];
+const ALERT = [...IN_APP_CHANNELS, CHANNELS.PUSH, CHANNELS.SMS];
 
 describe('resolveTraccarTrackingPolicy', () => {
   it('persists geofence enter', () => {
@@ -45,7 +51,7 @@ describe('resolveTraccarTrackingPolicy', () => {
     const p = resolveTraccarTrackingPolicy({ type: 'alarm', attributes: { alarm: 'sos' } });
     assert.equal(p.persist, true);
     assert.equal(p.severity, 'critical');
-    assert.deepEqual(p.channels, ['bell', 'push', 'sms']);
+    assert.deepEqual(p.channels, ALERT);
   });
 
   it('non-geofence alarm sub-types (tampering, power cut, jamming) all include sms via the generic alarm catch-all', () => {
@@ -60,7 +66,7 @@ describe('resolveTraccarTrackingPolicy', () => {
     for (const type of ['panic', 'sos', 'emergency', 'fault']) {
       const p = resolveTraccarTrackingPolicy({ type, attributes: {} });
       assert.equal(p.severity, 'critical', `expected ${type} to be critical`);
-      assert.deepEqual(p.channels, ['bell', 'push', 'sms']);
+      assert.deepEqual(p.channels, ALERT);
     }
   });
 
@@ -72,7 +78,7 @@ describe('resolveTraccarTrackingPolicy', () => {
       );
       assert.equal(p.severity, 'critical');
       assert.equal(p.category, 'security');
-      assert.deepEqual(p.channels, ['bell', 'push', 'sms']);
+      assert.deepEqual(p.channels, ALERT);
       assert.equal(p.notificationType, 'tracking.geofence.entered');
     });
 
@@ -82,7 +88,7 @@ describe('resolveTraccarTrackingPolicy', () => {
         { isRestrictedGeofence: true },
       );
       assert.equal(p.severity, 'critical');
-      assert.deepEqual(p.channels, ['bell', 'push', 'sms']);
+      assert.deepEqual(p.channels, ALERT);
       assert.equal(p.notificationType, 'tracking.geofence.exited');
     });
 
@@ -93,13 +99,13 @@ describe('resolveTraccarTrackingPolicy', () => {
       );
       assert.equal(p.severity, 'warning');
       assert.equal(p.category, 'tracking');
-      assert.deepEqual(p.channels, ['bell']);
+      assert.deepEqual(p.channels, IN_APP);
     });
 
     it('omitting the context argument entirely is identical to today\'s existing behavior (regression guard)', () => {
       const p = resolveTraccarTrackingPolicy({ type: 'geofenceEnter', attributes: {} });
       assert.equal(p.severity, 'warning');
-      assert.deepEqual(p.channels, ['bell']);
+      assert.deepEqual(p.channels, IN_APP);
     });
 
     it('isRestrictedGeofence is ignored for non-geofence event types', () => {
@@ -109,6 +115,69 @@ describe('resolveTraccarTrackingPolicy', () => {
       );
       const withoutFlag = resolveTraccarTrackingPolicy({ type: 'overspeed', attributes: {} });
       assert.deepEqual(withFlag, withoutFlag);
+    });
+  });
+
+  describe('urgency (separate from severity)', () => {
+    it('security events that are happening now are immediate', () => {
+      assert.equal(
+        resolveTraccarTrackingPolicy({ type: 'alarm', attributes: { alarm: 'sos' } }).urgency,
+        URGENCY.IMMEDIATE,
+      );
+      assert.equal(
+        resolveTraccarTrackingPolicy({ type: 'panic', attributes: {} }).urgency,
+        URGENCY.IMMEDIATE,
+      );
+      assert.equal(
+        resolveTraccarTrackingPolicy(
+          { type: 'geofenceEnter', attributes: {} },
+          { isRestrictedGeofence: true },
+        ).urgency,
+        URGENCY.IMMEDIATE,
+      );
+    });
+
+    it('ordinary movement and overspeed records are normal, not immediate', () => {
+      assert.equal(
+        resolveTraccarTrackingPolicy({ type: 'geofenceEnter', attributes: {} }).urgency,
+        URGENCY.NORMAL,
+      );
+      assert.equal(
+        resolveTraccarTrackingPolicy({ type: 'overspeed', attributes: {} }).urgency,
+        URGENCY.NORMAL,
+      );
+    });
+
+    it('every branch returns a urgency value, including the non-persisting ones', () => {
+      for (const type of ['deviceMoving', 'somethingUnknown', 'fueldrop', 'maintenance']) {
+        const p = resolveTraccarTrackingPolicy({ type, attributes: {} });
+        assert.ok(
+          Object.values(URGENCY).includes(p.urgency),
+          `expected ${type} to carry a valid urgency, got ${p.urgency}`,
+        );
+      }
+    });
+  });
+
+  describe('channel vocabulary convergence', () => {
+    it('never emits the legacy bell string', () => {
+      const samples = [
+        { type: 'geofenceEnter', attributes: {} },
+        { type: 'alarm', attributes: { alarm: 'sos' } },
+        { type: 'overspeed', attributes: {} },
+        { type: 'panic', attributes: {} },
+        { type: 'deviceMoving', attributes: {} },
+      ];
+      for (const ev of samples) {
+        const p = resolveTraccarTrackingPolicy(ev);
+        assert.equal(p.channels.includes('bell'), false, `${ev.type} still emits 'bell'`);
+        for (const c of p.channels) {
+          assert.ok(
+            Object.values(CHANNELS).includes(c),
+            `${ev.type} emitted non-CHANNELS value ${c}`,
+          );
+        }
+      }
     });
   });
 });

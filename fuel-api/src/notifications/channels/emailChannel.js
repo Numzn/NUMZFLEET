@@ -8,7 +8,7 @@ import { sendEmail, isEmailConfigured } from '../providers/emailProvider.js';
 const PLACEHOLDER_EMAIL_DOMAIN = '@fleet.local';
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function isDeliverableEmail(address) {
+export function isDeliverableEmail(address) {
   if (!address || typeof address !== 'string') return false;
   if (address.toLowerCase().endsWith(PLACEHOLDER_EMAIL_DOMAIN)) return false;
   return EMAIL_FORMAT.test(address);
@@ -96,6 +96,13 @@ export async function deliverEmailNotification(payload) {
       resolvedVia,
       message: error?.message || String(error),
     });
-    return { ok: false, reason: 'send_failed', error: error?.message, resolvedVia };
+    return {
+      ok: false,
+      reason: 'send_failed',
+      // See smsChannel.js — structured status for the worker's classifier.
+      statusCode: error?.statusCode,
+      error: error?.message,
+      resolvedVia,
+    };
   }
 }

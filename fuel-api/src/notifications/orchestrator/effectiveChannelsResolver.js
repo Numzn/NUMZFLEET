@@ -2,22 +2,30 @@ import { findByTraccarUserId } from '../../modules/profile/profileRepository.js'
 import { listForNumzUser } from '../../modules/notificationPreferences/notificationPreferencesRepository.js';
 import { CHANNELS } from '../contracts/notificationContract.js';
 
-// Deliberately scoped to EMAIL and PUSH. Inbox, websocket, and SMS dispatch
-// unconditionally today (see notificationDispatcher.js) and must keep doing
-// so — retroactively enforcing long-dormant preferences on channels that
-// already work would be a real behavior change for anyone who toggled one
-// off assuming (correctly, until now) that it was a no-op. Email and push
-// are the two channels this resolver has any opinion about, because they
-// are the two channels that have newly become real (2026-08-31 and
-// 2026-09-01 respectively) — see each channel file's own header comment.
+// Inbox and websocket dispatch unconditionally and must keep doing so — ther
+// is no external cost/risk to gate against, and no Settings row is even
+// collected for the collapsed 'inapp' toggle's two underlying channels.
 //
-// Default-when-missing for both is intentionally NOT the shared "true"
-// default the Settings UI's toFullMatrix() uses for inapp/sms — see that
-// function's own comment for the matching exception. A user who has never
-// touched Settings must not start receiving email or push the moment
-// delivery for either one goes live.
-const GATED_CHANNELS = new Set([CHANNELS.EMAIL, CHANNELS.PUSH]);
-const DEFAULT_ENABLED_WHEN_MISSING = { [CHANNELS.EMAIL]: false, [CHANNELS.PUSH]: false };
+// SMS joined the gated set in Phase 5 (delivery planner): the Settings UI has
+// rendered a real, clickable SMS column in the preference matrix since before
+// SMS delivery existed (NotificationsSection.jsx's channel list came from the
+// same NOTIFICATION_CHANNELS constants.js already used for inapp/email/push),
+// so a user who toggled it off had every reason to believe it already worked
+// — this closes that gap rather than perpetuating it. Default-when-missing
+// for SMS is `true`, matching toFullMatrix()'s own default for every channel
+// except email/push, so a user who never touched Settings sees no change.
+//
+// Email and push stay `false` when missing: each was only a display-only stub
+// until its own ship date (2026-08-31 / 2026-09-01), so a missing row must
+// NOT be read as "this existing user wants this channel" the moment real
+// delivery went live — that would have silently opted in every user who
+// never touched Settings. See each channel file's own header comment.
+const GATED_CHANNELS = new Set([CHANNELS.EMAIL, CHANNELS.PUSH, CHANNELS.SMS]);
+const DEFAULT_ENABLED_WHEN_MISSING = {
+  [CHANNELS.EMAIL]: false,
+  [CHANNELS.PUSH]: false,
+  [CHANNELS.SMS]: true,
+};
 
 /**
  * @param {number} userId Traccar user id (same id space publishNotification
@@ -27,12 +35,24 @@ const DEFAULT_ENABLED_WHEN_MISSING = { [CHANNELS.EMAIL]: false, [CHANNELS.PUSH]:
  * @param {string[]} channels the policy's own channel list for this notification.
  * @param {{ findUser?: typeof findByTraccarUserId, listPreferences?: typeof listForNumzUser }} [deps]
  *   Injection seam for tests only — every real call site uses the defaults.
- * @returns {Promise<string[]>} channels, with any gated channel (email,
- *   push) removed if this user has it disabled (or unset) for this
- *   category. Ungated channels (inbox, websocket, sms) always pass through
- *   untouched. Never throws — a lookup failure fails closed (drops every
- *   gated channel, keeps every ungated one) rather than risking an
- *   unwanted send.
+ * @returns {Promise<string[]>} channels, with any gated channel (email, push,
+ *   sms) removed if this user has it disabled for this category. Ungated
+ *   channels (inbox, websocket) always pass through untouched.
+ *
+ *   No identifiable user (`userId` missing) or no numz_users row at all (most
+ *   of the fleet — the Default-Fleet legacy-fallback path, see
+ *   ACCOUNTS_AND_TENANCY.md) is treated exactly like "a numz_users row
+ *   exists but has no preference row for this channel/category": each
+ *   channel falls back to ITS OWN DEFAULT_ENABLED_WHEN_MISSING value, not a
+ *   blanket drop. That distinction matters now that SMS defaults to
+ *   enabled — dropping every gated channel unconditionally here would have
+ *   silently suppressed SMS for most of the fleet, the exact silent
+ *   reinterpretation Phase 5 is required not to do.
+ *
+ *   A genuine lookup FAILURE (the catch below) stays a strict, unconditional
+ *   fail-closed regardless of channel defaults — an error is not the same as
+ *   cleanly determining there is no data, and risking an unwanted send on an
+ *   error is worse than risking a suppressed one.
  */
 export async function resolveEffectiveChannels(userId, category, channels, deps = {}) {
   const findUser = deps.findUser || findByTraccarUserId;
@@ -45,14 +65,17 @@ export async function resolveEffectiveChannels(userId, category, channels, deps 
   if (!gatedInPlay) {
     return channels;
   }
+  const defaultFiltered = (list) => list.filter(
+    (c) => !GATED_CHANNELS.has(c) || DEFAULT_ENABLED_WHEN_MISSING[c],
+  );
   if (userId == null) {
-    return channels.filter((c) => !GATED_CHANNELS.has(c));
+    return defaultFiltered(channels);
   }
 
   try {
     const numzUser = await findUser(userId);
     if (!numzUser) {
-      return channels.filter((c) => !GATED_CHANNELS.has(c));
+      return defaultFiltered(channels);
     }
 
     const rows = await listPreferences(numzUser.id);

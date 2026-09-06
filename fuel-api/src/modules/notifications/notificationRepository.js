@@ -32,6 +32,7 @@ function toApi(row) {
     entityType,
     entityId,
     severity: j.severity,
+    urgency: j.urgency || 'normal',
     title: j.title,
     message: j.message,
     source: j.source,

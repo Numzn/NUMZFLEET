@@ -115,6 +115,14 @@ export async function deliverSmsNotification(payload) {
       resolvedVia,
       message: error?.message || String(error),
     });
-    return { ok: false, reason: 'send_failed', error: error?.message, resolvedVia };
+    return {
+      ok: false,
+      reason: 'send_failed',
+      // Carried through so the delivery worker classifies on the provider's
+      // structured status (504 timeout vs 400 bad number) instead of text.
+      statusCode: error?.statusCode,
+      error: error?.message,
+      resolvedVia,
+    };
   }
 }

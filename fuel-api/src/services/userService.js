@@ -1,31 +1,10 @@
-import mysql from 'mysql2/promise';
+import { getTraccarPool } from '../config/traccar.js';
 import { authConfig } from '../config/auth.config.js';
 
 /**
  * User Service
  * Handles lookups and validation against Traccar MySQL
  */
-
-let traccarPool = null;
-
-/**
- * Get Traccar MySQL connection pool
- */
-const getTraccarPool = () => {
-  if (!traccarPool) {
-    traccarPool = mysql.createPool({
-      host: authConfig.TRACCAR.MYSQL_HOST,
-      port: authConfig.TRACCAR.MYSQL_PORT,
-      database: authConfig.TRACCAR.MYSQL_DATABASE,
-      user: authConfig.TRACCAR.MYSQL_USER,
-      password: authConfig.TRACCAR.MYSQL_PASSWORD,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
-  }
-  return traccarPool;
-};
 
 function parseTcUserAttributes(raw) {
   if (!raw) return {};

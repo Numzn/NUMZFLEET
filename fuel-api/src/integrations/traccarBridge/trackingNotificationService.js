@@ -1,6 +1,5 @@
 import { enrichNotificationCopyWithVehicle } from '../../services/vehicleDisplayLookupService.js';
 import { publishNotification } from '../../notifications/orchestrator/publishNotification.js';
-import { CHANNELS } from '../../notifications/contracts/notificationContract.js';
 import {
   buildTraccarNotificationCopy,
   resolveTraccarTrackingPolicy,
@@ -61,6 +60,7 @@ export async function pollAndPersistTrackingNotifications(io) {
         entityType: policy.category,
         entityId: String(ev.id),
         severity: policy.severity,
+        urgency: policy.urgency,
         title,
         message,
         source: 'traccar',
@@ -74,12 +74,9 @@ export async function pollAndPersistTrackingNotifications(io) {
           dedupKey: `traccar:${ev.id}`,
         },
         clientDedupKey: `traccar:${ev.id}`,
-        channels: [
-          CHANNELS.INBOX,
-          CHANNELS.WEBSOCKET,
-          ...(policy.channels.includes('push') ? [CHANNELS.PUSH] : []),
-          ...(policy.channels.includes('sms') ? [CHANNELS.SMS] : []),
-        ],
+        // The policy already returns CHANNELS enum values — it used to return
+        // 'bell'/'push'/'sms' strings that had to be translated here.
+        channels: policy.channels,
       }, { io });
 
       persisted += result.persisted || 0;

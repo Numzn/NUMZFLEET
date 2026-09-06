@@ -27,6 +27,8 @@ import VehicleStateAuditEventModel from './VehicleStateAuditEvent.js';
 import LoginAuditEventModel from './LoginAuditEvent.js';
 import NotificationPreferenceModel from './NotificationPreference.js';
 import PushSubscriptionModel from './PushSubscription.js';
+import NotificationDeliveryModel from './NotificationDelivery.js';
+import NotificationDeliveryAttemptModel from './NotificationDeliveryAttempt.js';
 import RoleModel from './Role.js';
 import PermissionModel from './Permission.js';
 import RolePermissionModel from './RolePermission.js';
@@ -60,6 +62,8 @@ const VehicleStateAuditEvent = VehicleStateAuditEventModel(sequelize);
 const LoginAuditEvent = LoginAuditEventModel(sequelize);
 const NotificationPreference = NotificationPreferenceModel(sequelize);
 const PushSubscription = PushSubscriptionModel(sequelize);
+const NotificationDelivery = NotificationDeliveryModel(sequelize);
+const NotificationDeliveryAttempt = NotificationDeliveryAttemptModel(sequelize);
 const Role = RoleModel(sequelize);
 const Permission = PermissionModel(sequelize);
 const RolePermission = RolePermissionModel(sequelize);
@@ -73,6 +77,10 @@ NumzUser.hasMany(NotificationPreference, { foreignKey: 'numzUserId', onDelete: '
 NotificationPreference.belongsTo(NumzUser, { foreignKey: 'numzUserId' });
 NumzUser.hasMany(PushSubscription, { foreignKey: 'numzUserId', onDelete: 'CASCADE' });
 PushSubscription.belongsTo(NumzUser, { foreignKey: 'numzUserId' });
+UserNotification.hasMany(NotificationDelivery, { foreignKey: 'notificationId', as: 'deliveries', onDelete: 'CASCADE' });
+NotificationDelivery.belongsTo(UserNotification, { foreignKey: 'notificationId', as: 'notification' });
+NotificationDelivery.hasMany(NotificationDeliveryAttempt, { foreignKey: 'deliveryId', as: 'attempts', onDelete: 'CASCADE' });
+NotificationDeliveryAttempt.belongsTo(NotificationDelivery, { foreignKey: 'deliveryId', as: 'delivery' });
 Company.hasMany(CompanyDevice, { foreignKey: 'companyId' });
 CompanyDevice.belongsTo(Company, { foreignKey: 'companyId' });
 Company.hasMany(ServiceRecord, { foreignKey: 'companyId', as: 'serviceRecords' });
@@ -286,6 +294,8 @@ export {
   LoginAuditEvent,
   NotificationPreference,
   PushSubscription,
+  NotificationDelivery,
+  NotificationDeliveryAttempt,
   Role,
   Permission,
   RolePermission,

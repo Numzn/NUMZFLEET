@@ -28,6 +28,11 @@ export default (sequelize) => {
         allowNull: false,
         defaultValue: 'info',
       },
+      urgency: {
+        type: DataTypes.STRING(16),
+        allowNull: false,
+        defaultValue: 'normal',
+      },
       title: {
         type: DataTypes.STRING(512),
         allowNull: false,

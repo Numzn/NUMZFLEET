@@ -13,17 +13,23 @@ import { toCanonicalPayload } from '../canonicalNotification.js';
  */
 export async function dispatchNotificationChannels(io, userId, apiRow, channels) {
   const payload = toCanonicalPayload(apiRow);
+  /** @type {Record<string, object>} per-channel outcome, keyed by CHANNELS value */
+  const results = {};
 
   if (channels.includes(CHANNELS.WEBSOCKET)) {
-    deliverWebsocketNotification(io, userId, payload);
+    results[CHANNELS.WEBSOCKET] = deliverWebsocketNotification(io, userId, payload);
   }
   if (channels.includes(CHANNELS.PUSH)) {
-    await deliverPushNotification(payload);
+    results[CHANNELS.PUSH] = await deliverPushNotification(payload);
   }
   if (channels.includes(CHANNELS.SMS)) {
-    await deliverSmsNotification(payload);
+    results[CHANNELS.SMS] = await deliverSmsNotification(payload);
   }
   if (channels.includes(CHANNELS.EMAIL)) {
-    await deliverEmailNotification(payload);
+    results[CHANNELS.EMAIL] = await deliverEmailNotification(payload);
   }
+
+  // Returned so the caller can persist what actually happened. Nothing about
+  // what gets sent, or to whom, changed here.
+  return results;
 }

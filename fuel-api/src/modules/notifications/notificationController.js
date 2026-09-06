@@ -1,4 +1,6 @@
 import * as svc from './notificationService.js';
+import { getDeliveryQueueStats } from '../../notifications/delivery/deliveryRepository.js';
+import { getDeliveryWorkerStatus } from '../../notifications/delivery/deliveryWorkerStatus.js';
 
 export const syncNotifications = async (req, res) => {
   try {
@@ -70,5 +72,20 @@ export const postEscalate = async (req, res) => {
   } catch (e) {
     const status = e.statusCode || 500;
     res.status(status).json({ error: e.message || 'Failed to escalate alert' });
+  }
+};
+
+/**
+ * Operational view of notification delivery for this company: worker health
+ * (in-memory) plus queue depth (database). Tenant-scoped via req.auth like
+ * every other read in this module — an operator sees their own backlog only.
+ */
+export const getDeliveryStats = async (req, res) => {
+  try {
+    const stats = await getDeliveryQueueStats(req.auth.companyId);
+    res.json({ worker: getDeliveryWorkerStatus(), queue: stats });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load delivery stats' });
   }
 };
