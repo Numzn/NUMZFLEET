@@ -42,6 +42,9 @@ try {
 
 const COMPANY_A = randomUUID();
 const COMPANY_B = randomUUID();
+// Its own company, not COMPANY_A/B — see "worker batches are bounded"
+// below for why a claim needs to be scoped this exclusively.
+const COMPANY_WIDE_CLAIM_TEST = randomUUID();
 const createdNotificationIds = [];
 // Test rows are future-dated so the live background worker in this dev
 // container cannot claim them. See deliveryWorker.test.js's ROOT CAUSE note
@@ -133,13 +136,18 @@ before(async () => {
   await Company.bulkCreate([
     { id: COMPANY_A, name: 'Hardening Co A', slug: `hard-a-${COMPANY_A.slice(0, 8)}` },
     { id: COMPANY_B, name: 'Hardening Co B', slug: `hard-b-${COMPANY_B.slice(0, 8)}` },
+    {
+      id: COMPANY_WIDE_CLAIM_TEST,
+      name: 'Hardening Co Wide Claim',
+      slug: `hard-wc-${COMPANY_WIDE_CLAIM_TEST.slice(0, 8)}`,
+    },
   ], { ignoreDuplicates: true });
 });
 
 after(async () => {
   if (!dbReachable) return;
   await UserNotification.destroy({ where: { id: createdNotificationIds } });
-  await Company.destroy({ where: { id: [COMPANY_A, COMPANY_B] } });
+  await Company.destroy({ where: { id: [COMPANY_A, COMPANY_B, COMPANY_WIDE_CLAIM_TEST] } });
   __resetDeliveryWorkerStatus();
 });
 
@@ -675,18 +683,32 @@ describe('delivery queue stats', { skip: !dbReachable }, () => {
 
 describe('worker batches are bounded', { skip: !dbReachable }, () => {
   it('a backlog larger than the limit is processed in bounded chunks', async () => {
-    // Small, near-immediate window — see wideClaimWindow. This claim is
-    // genuinely wide across WORKER_CHANNELS with no channel restriction.
+    // COMPANY_WIDE_CLAIM_TEST, not COMPANY_A/B — this proves the LIMIT clause
+    // itself bounds one tick's claim, which a shared, unscoped claim window
+    // cannot demonstrate reliably regardless of how far apart in time it sits
+    // from sibling tests/files: any not-yet-cleaned PENDING row anywhere
+    // (this file's own earlier concurrency test releases "collateral" back
+    // to PENDING rather than deleting it) is, eventually, just as legitimately
+    // due as this test's own fixtures once enough real wall-clock time has
+    // passed — a timing offset only reduces how often that collides, it
+    // cannot eliminate it. Scoping the claim itself to a companyId nothing
+    // else in the suite can ever use does. (A per-test randomUUID() doesn't
+    // work here the way it does for tenantId — notification_deliveries.
+    // company_id has a real FK to companies(id), so the id must exist as a
+    // real row first; see COMPANY_WIDE_CLAIM_TEST's own seed in before().)
     const { parkAt, claimNow } = wideClaimWindow();
     const mineIds = new Set();
     for (let i = 0; i < 7; i += 1) {
-      const { delivery } = await mkDelivery(CHANNELS.EMAIL, { userId: 8300 + i, parkAt });
+      const { delivery } = await mkDelivery(CHANNELS.EMAIL, {
+        userId: 8300 + i, parkAt, companyId: COMPANY_WIDE_CLAIM_TEST,
+      });
       mineIds.add(delivery.id);
     }
 
     const summary = await runDeliveryWorkerOnce({
       limit: 3,
       now: claimNow,
+      claim: (opts) => claimDueDeliveries({ ...opts, companyId: COMPANY_WIDE_CLAIM_TEST }),
       process: async (d) => {
         if (!mineIds.has(d.id)) {
           // Not ours — release rather than fake-complete a row this test

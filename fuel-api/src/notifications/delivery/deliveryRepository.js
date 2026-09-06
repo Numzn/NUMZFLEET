@@ -211,10 +211,17 @@ export async function listAttemptsForDelivery(deliveryId, companyId) {
  * companyId (recordAttempt inherits it from the delivery), so an attempt can
  * never be written under the wrong company regardless of claim order.
  *
- * @param {{ channels: string[], limit?: number, lockedBy: string, now?: Date }} opts
+ * `companyId` was documented above as an accepted filter before this fix but
+ * was never actually wired into the query — genuinely optional and normally
+ * omitted for the reasons above, but tests that need to prove claim-limit
+ * behavior without a shared, unscoped table as their collision surface now
+ * have a real way to ask for it (see deliveryHardening.test.js's "worker
+ * batches are bounded").
+ *
+ * @param {{ channels: string[], limit?: number, lockedBy: string, now?: Date, companyId?: string|null }} opts
  */
 export async function claimDueDeliveries({
-  channels, limit = 25, lockedBy, now = new Date(),
+  channels, limit = 25, lockedBy, now = new Date(), companyId = null,
 }) {
   if (!Array.isArray(channels) || !channels.length) return [];
   if (!lockedBy) throw new Error('[deliveries] lockedBy is required to claim work');
@@ -233,6 +240,7 @@ export async function claimDueDeliveries({
         WHERE status IN (:claimable)
           AND channel IN (:channels)
           AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
+          AND (:companyId::uuid IS NULL OR company_id = :companyId)
         ORDER BY created_at
         LIMIT :limit
         -- Skip rows another transaction is already claiming instead of queueing
@@ -246,6 +254,20 @@ export async function claimDueDeliveries({
        -- re-evaluates only the OUTER predicate against the new row version.
        -- With the status test living solely in the subquery, that re-check
        -- would still pass and the row would be claimed twice.
+       --
+       -- company_id is deliberately NOT re-stated here (unlike status and
+       -- next_attempt_at above): it is write-once on this table (nothing
+       -- ever changes a delivery's company after creation), so the snapshot
+       -- read inside the subquery can never go stale the way a mutable
+       -- column could — there is no race for an outer re-check to guard
+       -- against. It also cannot be added as a harmless-but-redundant extra
+       -- safety net the way it might look: an outer clause matching a column
+       -- already filtered on inside a LIMITed subquery hits a real Postgres
+       -- planner quirk that silently drops the LIMIT (confirmed by direct,
+       -- bisected SQL testing — every other single-clause outer re-check
+       -- preserves the LIMIT correctly; this specific one does not, and it
+       -- is not about the NULL-check or the ::uuid cast, a plain
+       -- AND company_id = :companyId reproduces it too).
        AND status IN (:claimable)
        AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
      RETURNING id
@@ -257,6 +279,7 @@ export async function claimDueDeliveries({
         channels,
         now,
         lockedBy,
+        companyId,
         limit,
       },
       type: QueryTypes.SELECT,
