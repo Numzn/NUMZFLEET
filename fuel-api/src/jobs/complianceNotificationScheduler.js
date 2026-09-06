@@ -5,6 +5,7 @@ import { listComplianceForCompany } from '../services/vehicleComplianceService.j
 import { evaluateCompliance } from '../compliance/complianceEvaluator.js';
 import { notifyComplianceFinding } from '../notifications/complianceNotificationService.js';
 import { runIntervalJob } from './schedulerRuntime.js';
+import { LOCK_KEYS } from './lockKeys.js';
 
 function isEnabled() {
   const raw = String(process.env.COMPLIANCE_NOTIFICATION_SCHEDULER || '0').toLowerCase();
@@ -37,18 +38,34 @@ async function runOnce() {
 
     for (const vehicle of companyVehicles) {
       const fleetVehicleId = String(vehicle.id);
-      const findings = evaluateCompliance({
-        fleetVehicleId,
-        companyId,
-        routineNextService: routineByVehicle.get(fleetVehicleId) || null,
-        complianceItems: complianceByVehicle.get(fleetVehicleId) || [],
-      });
-      for (const finding of findings) {
-        await notifyComplianceFinding({
-          finding,
-          vehicle: { name: vehicle.name, plateNumber: vehicle.plateNumber },
+      try {
+        const findings = evaluateCompliance({
+          fleetVehicleId,
           companyId,
+          routineNextService: routineByVehicle.get(fleetVehicleId) || null,
+          complianceItems: complianceByVehicle.get(fleetVehicleId) || [],
         });
+        for (const finding of findings) {
+          // evaluateCompliance() bundles a ROUTINE_SERVICE finding (from
+          // routineNextService) into the same array as its date-based
+          // compliance items — needed here only because vehicleEngineService.js
+          // shares this same evaluateCompliance() call for the dashboard, so
+          // its signature can't drop routineNextService. Notifying on it here
+          // too would double-notify against maintenanceNotificationScheduler.js,
+          // which now owns routine-service notifications on its own interval.
+          if (finding.type === 'ROUTINE_SERVICE') continue;
+          // eslint-disable-next-line no-await-in-loop -- a handful of findings per vehicle; not worth Promise.all's complexity here.
+          await notifyComplianceFinding({
+            finding,
+            vehicle: { name: vehicle.name, plateNumber: vehicle.plateNumber },
+            companyId,
+          });
+        }
+      } catch (err) {
+        // One vehicle's failure must not skip every other vehicle still left
+        // in this company for this tick — same reasoning as
+        // maintenanceNotificationScheduler.js's identical guard.
+        console.error('[compliance-notify] vehicle failed', fleetVehicleId, err?.message || err);
       }
     }
   }
@@ -64,6 +81,7 @@ export function startComplianceNotificationScheduler() {
   return runIntervalJob({
     name: 'compliance-notify',
     intervalMs,
+    lockKey: LOCK_KEYS.COMPLIANCE_NOTIFICATION,
     task: () => runOnce(),
   });
 }

@@ -1,6 +1,7 @@
 import { getTraccarPool } from '../../config/traccar.js';
 import { getManagerUserIds } from '../../services/userService.js';
 import { fetchFleetConfigByDeviceId } from './vehicleConfigLookup.js';
+import { CompanyDevice } from '../../models/index.js';
 
 function uniqIds(ids) {
   return [...new Set(ids.filter((x) => Number.isFinite(Number(x))).map((x) => Number(x)))];
@@ -45,12 +46,35 @@ export async function getDeviceLinkedUserIds(deviceId) {
 }
 
 /**
+ * Owning company for a Traccar device, via company_devices — the same
+ * mapping ensureDeviceInCompany()/getCompanyDeviceIds() maintain elsewhere.
+ * Null when the device isn't (yet) linked to a company — legacy/unprovisioned
+ * installs fall back to the instance-wide behavior this always had, rather
+ * than silently dropping the notification.
+ * @param {number} deviceId
+ */
+export async function resolveCompanyIdForDevice(deviceId) {
+  if (deviceId == null) return null;
+  try {
+    const row = await CompanyDevice.findOne({
+      where: { traccarDeviceId: Number(deviceId), isActive: true },
+      attributes: ['companyId'],
+    });
+    return row?.companyId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Resolve notification audience for a tracking event on a device.
  * @param {number} deviceId
  * @param {{ respectGeofenceMute?: boolean, traccarType?: string, attributes?: object }} [opts]
+ * @returns {Promise<{ userIds: number[], companyId: string|null }>}
  */
 export async function resolveTrackingEventAudience(deviceId, opts = {}) {
-  const managerIds = await getManagerUserIds();
+  const companyId = await resolveCompanyIdForDevice(deviceId);
+  const managerIds = await getManagerUserIds(companyId);
   const deviceUserIds = await getDeviceLinkedUserIds(deviceId);
   const fleetConfig = await fetchFleetConfigByDeviceId(deviceId);
 
@@ -59,18 +83,18 @@ export async function resolveTrackingEventAudience(deviceId, opts = {}) {
     const alarm = String(opts.attributes?.alarm || '').toLowerCase();
 
     if (fleetConfig.alerts?.geofence === false && isGeofenceTrackingEvent(opts.traccarType, opts.attributes)) {
-      return [];
+      return { userIds: [], companyId };
     }
     if (fleetConfig.alerts?.speeding === false && (type.includes('overspeed') || type === 'deviceoverspeed')) {
-      return [];
+      return { userIds: [], companyId };
     }
     if (fleetConfig.alerts?.lowFuel === false && (type.includes('fuel') || alarm.includes('fuel'))) {
-      return [];
+      return { userIds: [], companyId };
     }
     if (fleetConfig.alerts?.engineCut === false && (alarm.includes('powercut') || alarm.includes('ignition'))) {
-      return [];
+      return { userIds: [], companyId };
     }
   }
 
-  return uniqIds([...managerIds, ...deviceUserIds]);
+  return { userIds: uniqIds([...managerIds, ...deviceUserIds]), companyId };
 }

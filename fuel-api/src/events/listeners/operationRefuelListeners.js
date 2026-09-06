@@ -9,7 +9,13 @@ import {
   operationRefuelSkippedPolicy,
   operationInvoiceReconciledPolicy,
   vehicleDocumentOcrCompletedPolicy,
+  fuelAnomalyPolicy,
 } from '../../notifications/policies/notificationPolicyRegistry.js';
+
+function isFuelAnomalyEnabled() {
+  const raw = String(process.env.FUEL_ANOMALY_NOTIFICATIONS_ENABLED || '0').toLowerCase();
+  return raw === '1' || raw === 'true';
+}
 
 async function notifyRefuelRecorded({ session, refuel, actorUserId, io }) {
   const litres = refuel?.actualFuelLitres;
@@ -23,6 +29,7 @@ async function notifyRefuelRecorded({ session, refuel, actorUserId, io }) {
     entityType: policy.entityType,
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Refuel recorded',
     message: `Vehicle ${refuel?.vehicleId} — ${litres != null ? `${litres} L` : 'fuel captured'}`,
     audience: policy.audience,
@@ -40,6 +47,47 @@ async function notifyRefuelRecorded({ session, refuel, actorUserId, io }) {
   }, { io });
 }
 
+/**
+ * Same "exceeds tank capacity" formula RefuelEngine.js already computes live
+ * on every refuel completion (actualFuelLitres > tankCapacitySnapshot) —
+ * recomputed here rather than trusting the persisted `status` column, since
+ * that column also gets set to 'flagged' by an unrelated variance check
+ * (ValidationEngine.js) and conflating the two would mislabel a legitimate
+ * high-variance-but-within-capacity refuel as a capacity anomaly.
+ */
+async function notifyFuelAnomaly({ session, refuel, io }) {
+  if (!isFuelAnomalyEnabled()) return;
+  const litres = Number(refuel?.actualFuelLitres);
+  const cap = Number(refuel?.tankCapacitySnapshot);
+  if (!Number.isFinite(litres) || !Number.isFinite(cap) || cap <= 0 || litres <= cap) return;
+
+  const policy = fuelAnomalyPolicy({ sessionId: session?.id, refuelId: refuel?.id });
+  await publishNotification({
+    source: 'fuel-api',
+    entityType: policy.entityType,
+    type: policy.type,
+    severity: policy.severity,
+    urgency: policy.urgency,
+    title: 'Refuel exceeds tank capacity',
+    message: `Vehicle ${refuel?.vehicleId} — ${litres} L recorded against a ${cap} L tank`,
+    audience: policy.audience,
+    companyId: session?.companyId ?? null,
+    entityId: String(session?.id),
+    clientDedupKey: policy.clientDedupKey,
+    channels: policy.channels,
+    metadata: {
+      operationId: session?.id,
+      sessionId: session?.id,
+      refuelId: refuel?.id,
+      vehicleId: refuel?.vehicleId,
+      actualFuelLitres: litres,
+      tankCapacitySnapshot: cap,
+      deepLink: `/fleet/operation-sessions/fuel/${session?.id}`,
+      event: 'fuel.anomaly.exceeds_capacity',
+    },
+  }, { io });
+}
+
 async function notifyRefuelArrived({ session, refuel, io }) {
   const policy = operationRefuelArrivedPolicy({
     sessionId: session?.id,
@@ -51,6 +99,7 @@ async function notifyRefuelArrived({ session, refuel, io }) {
     entityType: policy.entityType,
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Vehicle arrived',
     message: `Vehicle ${refuel?.vehicleId} has arrived for fueling`,
     audience: policy.audience,
@@ -79,6 +128,7 @@ async function notifyRefuelSkipped({ session, refuel, reason, io }) {
     entityType: policy.entityType,
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Vehicle skipped',
     message: `Vehicle ${refuel?.vehicleId} was skipped${reason ? `: ${reason}` : ''}`,
     audience: policy.audience,
@@ -108,6 +158,7 @@ async function notifyInvoiceReconciled({ session, invoiceId, io }) {
     entityType: policy.entityType,
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Invoice reconciled',
     message: `Operation invoice reconciled for session ${session?.id}`,
     audience: policy.audience,
@@ -131,6 +182,7 @@ async function notifyVehicleDocumentOcrCompleted({ fleetVehicleId, documentId, o
     entityType: policy.entityType,
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Document OCR completed',
     message: `Vehicle document OCR ${ocrStatus || 'completed'}`,
     audience: policy.audience,
@@ -160,7 +212,17 @@ export const registerOperationRefuelListeners = (io) => {
   eventBus.on(
     EVENT_NAMES.OPERATION_REFUEL_RECORDED,
     withSafeListener(EVENT_NAMES.OPERATION_REFUEL_RECORDED, 'persist-notification', async (payload) => {
-      await notifyRefuelRecorded(payload);
+      // io was previously never passed here (payload itself carries no io) —
+      // meaning this notification's realtime websocket push silently never
+      // fired, only the persisted row + queued external-channel delivery.
+      await notifyRefuelRecorded({ ...payload, io });
+    }),
+  );
+
+  eventBus.on(
+    EVENT_NAMES.OPERATION_REFUEL_RECORDED,
+    withSafeListener(EVENT_NAMES.OPERATION_REFUEL_RECORDED, 'fuel-anomaly-check', async (payload) => {
+      await notifyFuelAnomaly({ ...payload, io });
     }),
   );
 

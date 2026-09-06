@@ -295,14 +295,42 @@ function complianceSeverity(status) {
   return (s === 'overdue' || s === 'expired' || s === 'due') ? 'warning' : 'info';
 }
 
-export function complianceFindingPolicy({ fleetVehicleId, type, status }) {
+// A finding overdue this many days (or more) gets its own, more severe tier
+// rather than reading identically to one that just crossed into overdue.
+// 30 is not a tuned model — it mirrors evaluateDueDateStatus's own
+// reminderLeadDays default (30 days advance notice on the way in, 30 days
+// overdue for "critical" on the way out).
+const COMPLIANCE_CRITICALLY_OVERDUE_DAYS = 30;
+
+// Returns 'overdue'/'due'/'upcoming'/etc unchanged UNLESS status is overdue
+// AND daysRemaining is a known, sufficiently negative number — daysRemaining
+// is null for the Traccar-routine-service finding type and for any caller
+// that doesn't pass it, so those are structurally exempt, not silently
+// downgraded.
+function complianceEscalationTier(status, daysRemaining) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'overdue' && Number.isFinite(daysRemaining) && daysRemaining <= -COMPLIANCE_CRITICALLY_OVERDUE_DAYS) {
+    return 'critically_overdue';
+  }
+  return s;
+}
+
+/**
+ * @param {{ fleetVehicleId: string, type: string, status: string, daysRemaining?: number|null }} args
+ *   `daysRemaining` is optional — omit it (or pass null) to preserve the
+ *   exact previous type/dedup-key/severity shape for a status.
+ */
+export function complianceFindingPolicy({ fleetVehicleId, type, status, daysRemaining = null }) {
   const dayStamp = localDateString(new Date());
+  const tier = complianceEscalationTier(status, daysRemaining);
   return {
-    type: `compliance.${String(type).toLowerCase()}.${String(status).toLowerCase()}`,
+    type: `compliance.${String(type).toLowerCase()}.${tier}`,
     entityType: 'compliance',
-    severity: complianceSeverity(status),
+    severity: tier === 'critically_overdue' ? 'critical' : complianceSeverity(status),
     // Compliance findings are date-driven — an expiry known today is equally
-    // actionable tomorrow morning. Never immediate.
+    // actionable tomorrow morning. Never immediate, even at the critically
+    // overdue tier, which is why this never becomes a mandatory/escalation
+    // candidate.
     urgency: URGENCY.NORMAL,
     audience: { managers: true },
     // Email added 2026-08-31 — one of the initial, intentionally small set
@@ -311,8 +339,13 @@ export function complianceFindingPolicy({ fleetVehicleId, type, status }) {
     // persistent record; still gated per-user by effectiveChannelsResolver.js,
     // so this alone does not turn email on for anyone.
     channels: [...STANDARD_CHANNELS, CHANNELS.EMAIL],
-    // Intentional daily repeat while the finding stays in this status — not a bug.
-    clientDedupKey: `compliance:${fleetVehicleId}:${type}:${status}:${dayStamp}`,
+    // Intentional daily repeat while the finding stays in this status — not a
+    // bug. Keying on `tier` rather than the raw `status` means crossing into
+    // critically-overdue gets a fresh notification the same day, instead of
+    // silently waiting for tomorrow's bucket because the raw status ('overdue')
+    // never changed.
+    clientDedupKey: `compliance:${fleetVehicleId}:${type}:${tier}:${dayStamp}`,
+    tier,
   };
 }
 
@@ -355,6 +388,10 @@ export function immobilizationTransitionPolicy({ intentId, status }) {
     // 'completed' is the reassuring case; cancelled/expired/blocked never
     // reached the vehicle at all (see IMMOBILIZATION_SMS_STATUSES above).
     urgency: status === 'failed' ? URGENCY.IMMEDIATE : URGENCY.NORMAL,
+    // Same reasoning as urgency: a failed immobilize/mobilize command must
+    // reach a manager regardless of preferences or quiet hours — it is not
+    // a status update, it is "the vehicle is not where you think it is."
+    mandatory: status === 'failed',
     audience: { managers: true },
     channels: immobilizationChannels(status),
     clientDedupKey: `immobilization:${intentId}:${status}`,
@@ -381,13 +418,26 @@ export function maintenanceCompletedPolicy({ recordId, completedAt }) {
   };
 }
 
+// mappedType now carries the full upcoming/due_soon/prepare/due_now/overdue/
+// critically_overdue ladder (see maintenanceNotificationService.js's
+// mapRoutineStatusToType) instead of collapsing due_soon/prepare/due_now
+// into one 'due' bucket — 'due' itself is kept mapped to 'info' for exact
+// backward compatibility, though no live caller produces it anymore.
+function maintenanceRoutineSeverity(mappedType) {
+  if (mappedType === 'critically_overdue') return 'critical';
+  if (mappedType === 'overdue' || mappedType === 'due_now' || mappedType === 'prepare') return 'warning';
+  return 'info'; // upcoming, due_soon, due (legacy)
+}
+
 export function maintenanceRoutineStatePolicy({ fleetVehicleId, mappedType }) {
   const dayStamp = localDateString(new Date());
   return {
     type: `maintenance.routine.${mappedType}`,
     entityType: 'maintenance',
-    severity: mappedType === 'overdue' ? 'warning' : 'info',
-    // Service intervals are measured in days/kilometres, not minutes.
+    severity: maintenanceRoutineSeverity(mappedType),
+    // Service intervals are measured in days/kilometres, not minutes — true
+    // even at the critically-overdue tier, which is why this stays NORMAL
+    // rather than becoming a mandatory/escalation candidate.
     urgency: URGENCY.NORMAL,
     audience: { managers: true },
     // Email added 2026-08-31 — see complianceFindingPolicy's identical note.
@@ -397,5 +447,145 @@ export function maintenanceRoutineStatePolicy({ fleetVehicleId, mappedType }) {
     // with complianceFindingPolicy's ROUTINE_SERVICE finding type — Phase 4
     // consolidates that; this entry represents current behavior as-is.
     clientDedupKey: `routine-service:${fleetVehicleId}:${mappedType}:${dayStamp}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// #10 Vehicle fleet-state alerts (vehicleStateNotificationService.js)
+// Threshold/transition-driven, computed from vehicle_activity_state — never
+// from raw Traccar online/offline events (those stay deliberately skipped,
+// see notificationPolicyService.js's SKIP_TYPES). companyId stays call-site-local.
+// ---------------------------------------------------------------------------
+
+export function vehicleGpsLostPolicy({ fleetVehicleId, stateEnteredAt }) {
+  return {
+    type: 'vehicle.gps.lost',
+    entityType: 'tracking',
+    severity: 'warning',
+    // A connectivity gap, not a security incident — worth knowing promptly,
+    // never worth waking someone or bypassing preferences for.
+    urgency: URGENCY.NORMAL,
+    audience: { managers: true },
+    channels: STANDARD_CHANNELS,
+    // One-shot per transition instant, not a daily repeat: this fires once
+    // when the vehicle actually goes offline, not again on every sweep while
+    // it stays offline — see vehicleExtendedOfflinePolicy for the "still
+    // offline after a while" case, which IS a deliberate daily repeat.
+    clientDedupKey: `vehicle:${fleetVehicleId}:gps-lost:${stateEnteredAt}`,
+  };
+}
+
+export function vehicleGpsRecoveredPolicy({ fleetVehicleId, stateEnteredAt }) {
+  return {
+    type: 'vehicle.gps.recovered',
+    entityType: 'tracking',
+    severity: 'info',
+    urgency: URGENCY.NORMAL,
+    audience: { managers: true },
+    channels: STANDARD_CHANNELS,
+    clientDedupKey: `vehicle:${fleetVehicleId}:gps-recovered:${stateEnteredAt}`,
+  };
+}
+
+export function vehicleExtendedOfflinePolicy({ fleetVehicleId }) {
+  const dayStamp = localDateString(new Date());
+  return {
+    type: 'vehicle.offline.extended',
+    entityType: 'tracking',
+    severity: 'warning',
+    urgency: URGENCY.NORMAL,
+    audience: { managers: true },
+    channels: STANDARD_CHANNELS,
+    // Same daily-repeat-while-ongoing convention as maintenance/compliance —
+    // one reminder per vehicle per day for as long as it stays offline past
+    // the threshold, not a fresh notification every 15-minute sweep tick.
+    clientDedupKey: `vehicle:${fleetVehicleId}:offline-extended:${dayStamp}`,
+  };
+}
+
+export function vehicleExcessiveIdlePolicy({ fleetVehicleId }) {
+  const dayStamp = localDateString(new Date());
+  return {
+    type: 'vehicle.idle.excessive',
+    entityType: 'tracking',
+    severity: 'warning',
+    urgency: URGENCY.NORMAL,
+    audience: { managers: true },
+    channels: STANDARD_CHANNELS,
+    clientDedupKey: `vehicle:${fleetVehicleId}:idle-excessive:${dayStamp}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// #11 Vehicle intelligence findings (vehicleIntelligenceNotificationService.js)
+// Wires 3 already-computed intelligenceBuilder.js findings that never reached
+// publishNotification(): fuel.efficiency_declining, HEALTH_ATTENTION/
+// HEALTH_CRITICAL. Non-routine MAINTENANCE_OVERDUE/DUE_SOON is deliberately
+// NOT here — that one is cheap to batch (loadCompanyMaintenanceDueState
+// already has the per-vehicle counts), so it's wired into
+// maintenanceNotificationScheduler.js instead, scheduler-driven like the rest
+// of that file, rather than page-view-triggered like this pair.
+// ---------------------------------------------------------------------------
+
+const INTELLIGENCE_FINDING_SEVERITY = {
+  'fuel.efficiency_declining': 'warning',
+  HEALTH_ATTENTION: 'warning',
+  HEALTH_CRITICAL: 'critical',
+};
+
+export function vehicleIntelligenceFindingPolicy({ fleetVehicleId, code }) {
+  const dayStamp = localDateString(new Date());
+  return {
+    type: `vehicle.intelligence.${code}`,
+    entityType: 'vehicle',
+    severity: INTELLIGENCE_FINDING_SEVERITY[code] || 'info',
+    // Trend/health-score deterioration develops over days, not minutes — real
+    // and worth a manager's attention, but never an "acknowledge now" event.
+    urgency: URGENCY.NORMAL,
+    audience: { managers: true },
+    channels: STANDARD_CHANNELS,
+    // Same daily-repeat-while-ongoing convention as maintenance/compliance —
+    // one notification per vehicle per finding per day for as long as the
+    // page is viewed AND the condition still holds, not a fresh one per view.
+    clientDedupKey: `vehicle-intelligence:${fleetVehicleId}:${code}:${dayStamp}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// #12 Non-routine maintenance risk (maintenanceNotificationScheduler.js)
+// Distinct from maintenanceRoutineStatePolicy — this is the intelligence
+// engine's MAINTENANCE_OVERDUE/DUE_SOON signal: OTHER (non-routine-tagged)
+// Traccar maintenance schedules on the vehicle, aggregated as a count.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// #13 Fuel anomaly — tank capacity exceeded (operationRefuelListeners.js)
+// Keyed on the specific refuel record: a fact about one historical fill, not
+// an ongoing status, so (unlike maintenance/compliance) this is never
+// day-stamped — one notification per anomalous refuel, ever.
+// ---------------------------------------------------------------------------
+
+export function fuelAnomalyPolicy({ sessionId, refuelId }) {
+  return {
+    type: 'fuel.anomaly.exceeds_capacity',
+    entityType: 'fuel',
+    severity: 'warning',
+    urgency: URGENCY.NORMAL,
+    audience: { managers: true },
+    channels: STANDARD_CHANNELS,
+    clientDedupKey: `operation:${sessionId}:refuel:${refuelId}:anomaly-exceeds-capacity`,
+  };
+}
+
+export function maintenanceRiskPolicy({ fleetVehicleId, tier }) {
+  const dayStamp = localDateString(new Date());
+  return {
+    type: `maintenance.risk.${tier}`,
+    entityType: 'maintenance',
+    severity: tier === 'overdue' ? 'error' : 'warning',
+    urgency: URGENCY.NORMAL,
+    audience: { managers: true },
+    channels: STANDARD_CHANNELS,
+    clientDedupKey: `maintenance-risk:${fleetVehicleId}:${tier}:${dayStamp}`,
   };
 }

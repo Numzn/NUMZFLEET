@@ -46,9 +46,11 @@ export async function notifyImmobilizationTransition(intent, extra = {}) {
       entityType: policy.entityType,
       entityId: String(intent.id),
       severity: policy.severity,
+      urgency: policy.urgency,
       title,
       message: String(message),
       source: 'fuel-api',
+      companyId: intent.companyId ?? null,
       audience: policy.audience,
       metadata: {
         intentId: intent.id,
@@ -61,6 +63,7 @@ export async function notifyImmobilizationTransition(intent, extra = {}) {
       },
       clientDedupKey: policy.clientDedupKey,
       channels: policy.channels,
+      mandatory: policy.mandatory,
     }, { io });
   }
 }

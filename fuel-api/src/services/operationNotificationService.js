@@ -54,10 +54,11 @@ export async function deliverOperationNotification({ operation, spec }) {
 // `dedupKey` and `event` are now supplied by the caller (from the policy
 // registry) rather than derived here — the registry is the single source of
 // truth for the dedup pattern; this function just assembles the publish spec.
-function buildSpec(operation, { type, severity, title, message, event, dedupKey, extraMeta = {} }) {
+function buildSpec(operation, { type, severity, urgency, title, message, event, dedupKey, extraMeta = {} }) {
   return {
     type,
     severity,
+    urgency,
     title,
     message,
     audience: ownerAndManagersAudience(operation),
@@ -80,6 +81,7 @@ export async function notifyPlanReady(operation, actorUserId) {
   await publish(buildSpec(operation, {
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Fuel plan ready for approval',
     message: `${operationLabel(operation)} has vehicles planned and is ready to approve.`,
     event: 'plan-ready',
@@ -94,6 +96,7 @@ export async function notifyOperationApproved(operation, actorUserId) {
   await publish(buildSpec(operation, {
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Fuel operation approved',
     message: `${operationLabel(operation)} was approved and is now open for recording.`,
     event: 'approved',
@@ -111,6 +114,7 @@ export async function notifyOperationUnlocked(operation, actorUserId, { expiresA
   await publish(buildSpec(operation, {
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Fuel operation unlocked',
     message: `${operationLabel(operation)} was unlocked for edits${reason ? ` (${reason})` : ''}.`,
     // Reuses the policy's resolvedKey (not a second, independently-computed
@@ -127,6 +131,7 @@ export async function notifyLockApproaching(operation, minutesRemaining) {
   await publish(buildSpec(operation, {
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Fuel operation locks soon',
     message: `${operationLabel(operation)} locks in about ${minutesRemaining} minutes. Finish recording before it closes.`,
     event: 'lock-approaching',
@@ -141,6 +146,7 @@ export async function notifyRecordingIncompleteAtLock(operation, { incomplete, t
   await publish(buildSpec(operation, {
     type: policy.type,
     severity: policy.severity,
+    urgency: policy.urgency,
     title: 'Fuel recording incomplete',
     message: `${incomplete} of ${total} vehicles are still unrecorded as ${operationLabel(operation)} approaches lock.`,
     event: 'recording-incomplete',

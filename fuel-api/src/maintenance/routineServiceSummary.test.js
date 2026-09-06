@@ -21,6 +21,37 @@ test('buildRoutineServiceSummaryByVehicle: schedule exists -> authoritative entr
   assert.equal(entry.nextServiceAtKm, 6166);
 });
 
+test('buildRoutineServiceSummaryByVehicle: carries the schedule id as maintenanceId', () => {
+  const map = buildRoutineServiceSummaryByVehicle({
+    items: [
+      {
+        id: 77,
+        fleetVehicleId: 'veh-3',
+        attributes: { numzServicePackage: true },
+        type: 'totalDistance',
+        period: 5000000,
+        nextDue: 6166000,
+        remaining: 5000000,
+      },
+    ],
+  });
+  assert.equal(map.get('veh-3').maintenanceId, 77);
+});
+
+test('buildRoutineServiceSummaryByVehicle: missing schedule id -> maintenanceId is null, not undefined', () => {
+  const map = buildRoutineServiceSummaryByVehicle({
+    items: [
+      {
+        fleetVehicleId: 'veh-4',
+        attributes: { numzServicePackage: true },
+        type: 'totalDistance',
+        period: 5000000,
+      },
+    ],
+  });
+  assert.equal(map.get('veh-4').maintenanceId, null);
+});
+
 test('buildRoutineServiceSummaryByVehicle: no tagged schedule -> no entry (authoritative absence)', () => {
   const map = buildRoutineServiceSummaryByVehicle({
     items: [

@@ -2,13 +2,14 @@ import { publishNotification } from './orchestrator/publishNotification.js';
 import { getNotificationIo } from './notificationContext.js';
 import { complianceFindingPolicy } from './policies/notificationPolicyRegistry.js';
 
-function toTitle(type, status) {
+function toTitle(type, tier) {
   const label = String(type || 'Compliance').replaceAll('_', ' ').toLowerCase();
   const titled = label.charAt(0).toUpperCase() + label.slice(1);
-  const st = String(status || '').toLowerCase();
-  if (st === 'overdue') return `${titled} overdue`;
-  if (st === 'expired') return `${titled} expired`;
-  if (st === 'due') return `${titled} due`;
+  const t = String(tier || '').toLowerCase();
+  if (t === 'critically_overdue') return `${titled} critically overdue`;
+  if (t === 'overdue') return `${titled} overdue`;
+  if (t === 'expired') return `${titled} expired`;
+  if (t === 'due') return `${titled} due`;
   return `${titled} upcoming`;
 }
 
@@ -38,6 +39,7 @@ export async function notifyComplianceFinding({
     fleetVehicleId: finding.fleetVehicleId,
     type: finding.type,
     status: finding.status,
+    daysRemaining: finding.daysRemaining,
   });
   // Delivery boundary: all compliance notifications go through the existing
   // publishNotification orchestrator (no parallel notification pipeline).
@@ -46,7 +48,8 @@ export async function notifyComplianceFinding({
     entityType: policy.entityType,
     entityId: String(finding.complianceId || `${finding.fleetVehicleId}:${finding.type}`),
     severity: policy.severity,
-    title: toTitle(finding.type, finding.status),
+    urgency: policy.urgency,
+    title: toTitle(finding.type, policy.tier),
     message: toMessage(finding, vehicle),
     source: 'fuel-api',
     companyId,

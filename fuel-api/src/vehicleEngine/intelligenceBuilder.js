@@ -77,7 +77,12 @@ export function buildIntelligence(engine, options = {}) {
   const registry = options.registry ?? {};
   const hub = options.hub ?? {};
 
-  if (fuel.trend === 'declining' && (fuel.confidence ?? 0) >= 40) {
+  // hub.fuel.trend (vehicleFuelStatisticsService.computeTrend) produces
+  // 'increasing'/'decreasing'/'stable'; only the separate EWMA learning-engine
+  // fallback (learningEngine.js, consulted when no device is assigned) ever
+  // produces the literal 'declining'. Accept both so this actually fires for
+  // the common case (a tracked vehicle) instead of only the rare untracked one.
+  if ((fuel.trend === 'declining' || fuel.trend === 'decreasing') && (fuel.confidence ?? 0) >= 40) {
     findings.push({
       domain: 'fuel',
       severity: 'warning',
@@ -163,12 +168,24 @@ export function buildIntelligence(engine, options = {}) {
   }
 
   if (engine?.health?.overall != null && engine.health.overall < 70) {
-    findings.push({
-      domain: 'health',
-      severity: 'warning',
-      code: 'HEALTH_ATTENTION',
-      text: `Vehicle health ${engine.health.overall}% — attention needed`,
-    });
+    // 60 is not a new number — it's healthEngine.js's own healthLabel()
+    // Fair/Poor boundary (Excellent >=90, Good >=75, Fair >=60, Poor <60),
+    // already computed and already meaningful, just not tiered here before.
+    if (engine.health.overall < 60) {
+      findings.push({
+        domain: 'health',
+        severity: 'error',
+        code: 'HEALTH_CRITICAL',
+        text: `Vehicle health ${engine.health.overall}% — critical, needs immediate attention`,
+      });
+    } else {
+      findings.push({
+        domain: 'health',
+        severity: 'warning',
+        code: 'HEALTH_ATTENTION',
+        text: `Vehicle health ${engine.health.overall}% — attention needed`,
+      });
+    }
   }
 
   for (const item of complianceFindings) {

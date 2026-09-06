@@ -16,6 +16,13 @@ import {
   immobilizationTransitionPolicy,
   maintenanceCompletedPolicy,
   maintenanceRoutineStatePolicy,
+  vehicleGpsLostPolicy,
+  vehicleGpsRecoveredPolicy,
+  vehicleExtendedOfflinePolicy,
+  vehicleExcessiveIdlePolicy,
+  vehicleIntelligenceFindingPolicy,
+  maintenanceRiskPolicy,
+  fuelAnomalyPolicy,
 } from './notificationPolicyRegistry.js';
 
 const STANDARD_CHANNELS = [CHANNELS.INBOX, CHANNELS.WEBSOCKET];
@@ -207,6 +214,32 @@ describe('complianceFindingPolicy', () => {
     const p = complianceFindingPolicy({ fleetVehicleId: 1, type: 'insurance', status: 'overdue' });
     assert.match(p.clientDedupKey, /^compliance:1:insurance:overdue:\d{4}-\d{2}-\d{2}$/);
   });
+
+  it('overdue by 30+ days => critical, distinct type and dedup key', () => {
+    const p = complianceFindingPolicy({ fleetVehicleId: 1, type: 'insurance', status: 'overdue', daysRemaining: -30 });
+    assert.equal(p.severity, 'critical');
+    assert.equal(p.type, 'compliance.insurance.critically_overdue');
+    assert.match(p.clientDedupKey, /^compliance:1:insurance:critically_overdue:\d{4}-\d{2}-\d{2}$/);
+    assert.equal(p.tier, 'critically_overdue');
+  });
+
+  it('overdue by fewer than 30 days stays plain overdue, not critical', () => {
+    const p = complianceFindingPolicy({ fleetVehicleId: 1, type: 'insurance', status: 'overdue', daysRemaining: -29 });
+    assert.equal(p.severity, 'warning');
+    assert.equal(p.type, 'compliance.insurance.overdue');
+  });
+
+  it('daysRemaining omitted (e.g. the Traccar-routine finding type) never escalates to critical', () => {
+    const p = complianceFindingPolicy({ fleetVehicleId: 1, type: 'insurance', status: 'overdue' });
+    assert.equal(p.severity, 'warning');
+    assert.equal(p.tier, 'overdue');
+  });
+
+  it('a non-overdue status is never escalated to critical regardless of daysRemaining', () => {
+    const p = complianceFindingPolicy({ fleetVehicleId: 1, type: 'insurance', status: 'due', daysRemaining: -90 });
+    assert.equal(p.severity, 'warning');
+    assert.equal(p.tier, 'due');
+  });
 });
 
 describe('immobilizationTransitionPolicy', () => {
@@ -278,6 +311,23 @@ describe('maintenanceRoutineStatePolicy', () => {
     const p = maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'overdue' });
     assert.match(p.clientDedupKey, /^routine-service:1:overdue:\d{4}-\d{2}-\d{2}$/);
   });
+
+  it('due_soon => info, prepare/due_now => warning (previously all three collapsed into one info-level "due")', () => {
+    assert.equal(maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'due_soon' }).severity, 'info');
+    assert.equal(maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'prepare' }).severity, 'warning');
+    assert.equal(maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'due_now' }).severity, 'warning');
+  });
+
+  it('critically_overdue => critical, with its own type and dedup key', () => {
+    const p = maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'critically_overdue' });
+    assert.equal(p.severity, 'critical');
+    assert.equal(p.type, 'maintenance.routine.critically_overdue');
+    assert.match(p.clientDedupKey, /^routine-service:1:critically_overdue:\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('legacy mappedType "due" (no live caller produces it anymore) still resolves to info, unchanged', () => {
+    assert.equal(maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'due' }).severity, 'info');
+  });
 });
 
 describe('urgency is stated explicitly by every policy', () => {
@@ -300,6 +350,13 @@ describe('urgency is stated explicitly by every policy', () => {
     ['immobilizationTransitionPolicy(failed)', () => immobilizationTransitionPolicy({ intentId: 'x', status: 'failed' })],
     ['maintenanceCompletedPolicy', () => maintenanceCompletedPolicy({ recordId: 1, completedAt: 'x' })],
     ['maintenanceRoutineStatePolicy', () => maintenanceRoutineStatePolicy({ fleetVehicleId: 1, mappedType: 'overdue' })],
+    ['vehicleGpsLostPolicy', () => vehicleGpsLostPolicy({ fleetVehicleId: 1, stateEnteredAt: 'x' })],
+    ['vehicleGpsRecoveredPolicy', () => vehicleGpsRecoveredPolicy({ fleetVehicleId: 1, stateEnteredAt: 'x' })],
+    ['vehicleExtendedOfflinePolicy', () => vehicleExtendedOfflinePolicy({ fleetVehicleId: 1 })],
+    ['vehicleExcessiveIdlePolicy', () => vehicleExcessiveIdlePolicy({ fleetVehicleId: 1 })],
+    ['vehicleIntelligenceFindingPolicy', () => vehicleIntelligenceFindingPolicy({ fleetVehicleId: 1, code: 'HEALTH_CRITICAL' })],
+    ['maintenanceRiskPolicy', () => maintenanceRiskPolicy({ fleetVehicleId: 1, tier: 'overdue' })],
+    ['fuelAnomalyPolicy', () => fuelAnomalyPolicy({ sessionId: 1, refuelId: 2 })],
   ];
 
   for (const [label, invoke] of invocations) {
@@ -347,5 +404,79 @@ describe('urgency is not merely a copy of severity', () => {
     const p = operationApprovedPolicy({ operationId: 1 });
     assert.equal(p.severity, 'success');
     assert.equal(p.urgency, URGENCY.NORMAL);
+  });
+});
+
+describe('vehicleGpsLostPolicy / vehicleGpsRecoveredPolicy', () => {
+  it('lost is warning, recovered is info — both normal urgency, never mandatory', () => {
+    const lost = vehicleGpsLostPolicy({ fleetVehicleId: 1, stateEnteredAt: '2026-09-06T10:00:00.000Z' });
+    const recovered = vehicleGpsRecoveredPolicy({ fleetVehicleId: 1, stateEnteredAt: '2026-09-06T11:00:00.000Z' });
+    assert.equal(lost.severity, 'warning');
+    assert.equal(lost.urgency, URGENCY.NORMAL);
+    assert.equal(recovered.severity, 'info');
+    assert.equal(recovered.urgency, URGENCY.NORMAL);
+  });
+
+  it('dedup key is one-shot per transition instant, not day-stamped', () => {
+    const a = vehicleGpsLostPolicy({ fleetVehicleId: 1, stateEnteredAt: '2026-09-06T10:00:00.000Z' });
+    const b = vehicleGpsLostPolicy({ fleetVehicleId: 1, stateEnteredAt: '2026-09-06T10:05:00.000Z' });
+    assert.notEqual(a.clientDedupKey, b.clientDedupKey, 'a different transition instant must not collapse to the same key');
+    assert.match(a.clientDedupKey, /^vehicle:1:gps-lost:2026-09-06T10:00:00\.000Z$/);
+  });
+});
+
+describe('vehicleExtendedOfflinePolicy / vehicleExcessiveIdlePolicy', () => {
+  it('both are warning/normal, day-stamped for intentional daily repeat', () => {
+    const offline = vehicleExtendedOfflinePolicy({ fleetVehicleId: 1 });
+    const idle = vehicleExcessiveIdlePolicy({ fleetVehicleId: 1 });
+    assert.equal(offline.severity, 'warning');
+    assert.equal(idle.severity, 'warning');
+    assert.match(offline.clientDedupKey, /^vehicle:1:offline-extended:\d{4}-\d{2}-\d{2}$/);
+    assert.match(idle.clientDedupKey, /^vehicle:1:idle-excessive:\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('vehicleIntelligenceFindingPolicy', () => {
+  it('maps each wired code to its own severity', () => {
+    assert.equal(vehicleIntelligenceFindingPolicy({ fleetVehicleId: 1, code: 'fuel.efficiency_declining' }).severity, 'warning');
+    assert.equal(vehicleIntelligenceFindingPolicy({ fleetVehicleId: 1, code: 'HEALTH_ATTENTION' }).severity, 'warning');
+    assert.equal(vehicleIntelligenceFindingPolicy({ fleetVehicleId: 1, code: 'HEALTH_CRITICAL' }).severity, 'critical');
+  });
+
+  it('an unrecognized code defaults to info rather than throwing', () => {
+    assert.equal(vehicleIntelligenceFindingPolicy({ fleetVehicleId: 1, code: 'something_new' }).severity, 'info');
+  });
+
+  it('dedup key includes the code and a day-stamp for daily repeat', () => {
+    const p = vehicleIntelligenceFindingPolicy({ fleetVehicleId: 1, code: 'HEALTH_CRITICAL' });
+    assert.match(p.clientDedupKey, /^vehicle-intelligence:1:HEALTH_CRITICAL:\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('maintenanceRiskPolicy', () => {
+  it('overdue tier is error severity, due_soon is warning', () => {
+    assert.equal(maintenanceRiskPolicy({ fleetVehicleId: 1, tier: 'overdue' }).severity, 'error');
+    assert.equal(maintenanceRiskPolicy({ fleetVehicleId: 1, tier: 'due_soon' }).severity, 'warning');
+  });
+
+  it('dedup key includes the tier and a day-stamp', () => {
+    const p = maintenanceRiskPolicy({ fleetVehicleId: 1, tier: 'overdue' });
+    assert.match(p.clientDedupKey, /^maintenance-risk:1:overdue:\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('fuelAnomalyPolicy', () => {
+  it('is fixed warning/normal/managers, keyed per refuel record (not day-stamped)', () => {
+    const p = fuelAnomalyPolicy({ sessionId: 10, refuelId: 20 });
+    assert.equal(p.severity, 'warning');
+    assert.equal(p.urgency, URGENCY.NORMAL);
+    assert.deepEqual(p.audience, { managers: true });
+    assert.equal(p.clientDedupKey, 'operation:10:refuel:20:anomaly-exceeds-capacity');
+  });
+
+  it('dedup key is stable across calls for the same refuel — one notification per anomalous refuel, ever', () => {
+    const a = fuelAnomalyPolicy({ sessionId: 10, refuelId: 20 });
+    const b = fuelAnomalyPolicy({ sessionId: 10, refuelId: 20 });
+    assert.equal(a.clientDedupKey, b.clientDedupKey);
   });
 });

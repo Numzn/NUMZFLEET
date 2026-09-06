@@ -16,6 +16,7 @@ import { buildStatusEngine } from './engine/statusEngine.js';
 import { buildIntelligence } from './intelligenceBuilder.js';
 import { buildTimeline } from './timelineBuilder.js';
 import { notifyRoutineServiceState } from '../notifications/maintenanceNotificationService.js';
+import { notifyIntelligenceFindings } from '../notifications/vehicleIntelligenceNotificationService.js';
 import { evaluateCompliance } from '../compliance/complianceEvaluator.js';
 import { buildActivityHub } from './activity/buildActivityHub.js';
 import { buildActivityEngine } from './activity/buildActivityEngine.js';
@@ -137,6 +138,16 @@ export async function getVehicleEngine(fleetVehicleId, auth) {
     });
   } catch (error) {
     console.error('Failed to publish routine service state notification:', error?.message || error);
+  }
+
+  try {
+    await notifyIntelligenceFindings(snapshot.intelligence?.findings, {
+      fleetVehicleId,
+      vehicle: { name: merged?.name ?? null, plateNumber: merged?.plateNumber ?? null },
+      companyId,
+    });
+  } catch (error) {
+    console.error('Failed to publish vehicle intelligence notification:', error?.message || error);
   }
 
   return snapshot;

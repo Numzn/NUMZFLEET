@@ -58,6 +58,7 @@ const registerPersistNotificationListener = (io) => {
           entityType: policy.entityType,
           entityId: String(vehicleId),
           severity: policy.severity,
+          urgency: policy.urgency,
           title: 'Vehicle assignment updated',
           message: vehicleName
             ? `${vehicleName} assigned to device ${deviceId}`

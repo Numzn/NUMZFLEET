@@ -20,6 +20,10 @@ export function buildRoutineServiceSummaryByVehicle(dueState) {
     const { status, statusLabel } = deriveRoutineServiceStatus(remainingKm);
     map.set(String(item.fleetVehicleId), {
       label: ROUTINE_SERVICE_LABEL,
+      // Traccar's own tc_maintenances.id — same value maintenanceHub.js's
+      // mapSchedule() calls maintenanceId. Needed by anything that must
+      // reference this specific schedule (e.g. notifyRoutineServiceState).
+      maintenanceId: item.id ?? null,
       status,
       statusLabel,
       remainingKm,

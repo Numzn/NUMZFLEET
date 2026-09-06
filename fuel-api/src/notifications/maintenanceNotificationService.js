@@ -1,7 +1,11 @@
 import { publishNotification } from './orchestrator/publishNotification.js';
 import { getNotificationIo } from './notificationContext.js';
 import { ROUTINE_SERVICE_LABEL } from '../maintenance/routineServiceStatus.js';
-import { maintenanceCompletedPolicy, maintenanceRoutineStatePolicy } from './policies/notificationPolicyRegistry.js';
+import {
+  maintenanceCompletedPolicy,
+  maintenanceRoutineStatePolicy,
+  maintenanceRiskPolicy,
+} from './policies/notificationPolicyRegistry.js';
 
 function vehicleLabel(vehicle) {
   if (!vehicle) return 'Vehicle';
@@ -13,16 +17,40 @@ function formatOdometer(km) {
   return `${Math.round(Number(km)).toLocaleString()} km`;
 }
 
-function mapRoutineStatusToType(status) {
-  if (status === 'overdue') return 'overdue';
+// A vehicle this far past due (km) gets its own, more severe notification
+// tier rather than reading identically to one that just crossed into
+// overdue. Same style as the engine's own upcoming/due_soon/prepare/due_now
+// ladder (100/500/1000 km) — round numbers, not a tuned model.
+const CRITICALLY_OVERDUE_KM = 500;
+
+// Previously due_now/prepare/due_soon all collapsed into one 'due' bucket
+// (same severity, same notification, regardless of whether a vehicle was
+// 500km out or due today) and overdue had no escalation of its own. Each
+// engine state (routineServiceStatus.js's RoutineServiceStatus) now maps to
+// its own notification type, so severity actually tracks urgency:
+//   upcoming/due_soon -> info, prepare/due_now/overdue -> warning,
+//   critically overdue -> critical.
+// 'due' is kept mapped (not produced by this function anymore, but still
+// accepted) for exact backward compatibility with any existing caller/test.
+export function mapRoutineStatusToType(status, remainingKm) {
+  if (status === 'overdue') {
+    return (Number.isFinite(remainingKm) && remainingKm <= -CRITICALLY_OVERDUE_KM)
+      ? 'critically_overdue'
+      : 'overdue';
+  }
+  if (status === 'due_now') return 'due_now';
+  if (status === 'prepare') return 'prepare';
+  if (status === 'due_soon') return 'due_soon';
   if (status === 'upcoming') return 'upcoming';
-  if (['due_now', 'prepare', 'due_soon'].includes(status)) return 'due';
   return null;
 }
 
-function routineTitleForType(type) {
+export function routineTitleForType(type) {
+  if (type === 'critically_overdue') return `${ROUTINE_SERVICE_LABEL} critically overdue`;
   if (type === 'overdue') return `${ROUTINE_SERVICE_LABEL} overdue`;
-  if (type === 'due') return `${ROUTINE_SERVICE_LABEL} due`;
+  if (type === 'due_now') return `${ROUTINE_SERVICE_LABEL} due now`;
+  if (type === 'prepare') return `${ROUTINE_SERVICE_LABEL} — prepare for service`;
+  if (type === 'due_soon' || type === 'due') return `${ROUTINE_SERVICE_LABEL} due soon`;
   return `${ROUTINE_SERVICE_LABEL} upcoming`;
 }
 
@@ -55,6 +83,7 @@ export async function notifyRoutineServiceCompleted({
     entityType: policy.entityType,
     entityId: String(record.maintenanceId),
     severity: policy.severity,
+    urgency: policy.urgency,
     title: `${ROUTINE_SERVICE_LABEL} completed`,
     message,
     source: 'fuel-api',
@@ -86,7 +115,7 @@ export async function notifyRoutineServiceState({
   vehicle = null,
   companyId = null,
 }) {
-  const mappedType = mapRoutineStatusToType(nextService?.status);
+  const mappedType = mapRoutineStatusToType(nextService?.status, Number(nextService?.remainingKm));
   if (!mappedType || !fleetVehicleId || nextService?.maintenanceId == null) return;
 
   const label = vehicleLabel(vehicle);
@@ -102,6 +131,7 @@ export async function notifyRoutineServiceState({
     entityType: policy.entityType,
     entityId: String(nextService.maintenanceId),
     severity: policy.severity,
+    urgency: policy.urgency,
     title: routineTitleForType(mappedType),
     message,
     source: 'fuel-api',
@@ -114,6 +144,57 @@ export async function notifyRoutineServiceState({
       statusLabel: nextService.statusLabel ?? null,
       dueLabel: nextService.dueLabel ?? null,
       remainingKm: nextService.remainingKm ?? null,
+      plateNumber: vehicle?.plateNumber ?? null,
+      vehicleName: vehicle?.name ?? null,
+      observedAt: new Date().toISOString(),
+    },
+    clientDedupKey: policy.clientDedupKey,
+    channels: policy.channels,
+  }, { io });
+}
+
+/**
+ * Non-routine maintenance risk: OTHER (non-routine-tagged) Traccar maintenance
+ * schedules on this vehicle, aggregated as a count — distinct from the
+ * routine-service due-date ladder above. Mirrors intelligenceBuilder.js's own
+ * overdueCount/dueSoonCount branching (overdue takes priority over due-soon),
+ * but scheduler-driven per vehicle rather than page-view-triggered.
+ */
+export async function notifyMaintenanceRisk({
+  fleetVehicleId,
+  overdueCount = 0,
+  dueSoonCount = 0,
+  vehicle = null,
+  companyId = null,
+}) {
+  if (!fleetVehicleId) return;
+  const tier = overdueCount > 0 ? 'overdue' : (dueSoonCount > 0 ? 'due_soon' : null);
+  if (!tier) return;
+
+  const label = vehicleLabel(vehicle);
+  const count = tier === 'overdue' ? overdueCount : dueSoonCount;
+  const message = tier === 'overdue'
+    ? `${label} — ${count} maintenance service(s) overdue`
+    : `${label} — ${count} maintenance service(s) due soon`;
+  const io = getNotificationIo();
+  const policy = maintenanceRiskPolicy({ fleetVehicleId, tier });
+
+  await publishNotification({
+    type: policy.type,
+    entityType: policy.entityType,
+    entityId: String(fleetVehicleId),
+    severity: policy.severity,
+    urgency: policy.urgency,
+    title: tier === 'overdue' ? 'Maintenance overdue' : 'Maintenance due soon',
+    message,
+    source: 'fuel-api',
+    companyId,
+    audience: policy.audience,
+    metadata: {
+      fleetVehicleId,
+      tier,
+      overdueCount,
+      dueSoonCount,
       plateNumber: vehicle?.plateNumber ?? null,
       vehicleName: vehicle?.name ?? null,
       observedAt: new Date().toISOString(),

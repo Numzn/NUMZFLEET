@@ -42,6 +42,7 @@ import {
   runVehicleStateStartupReconcile,
 } from './jobs/vehicleStateReconciliationScheduler.js';
 import { startComplianceNotificationScheduler } from './jobs/complianceNotificationScheduler.js';
+import { startMaintenanceNotificationScheduler } from './jobs/maintenanceNotificationScheduler.js';
 import { startTelemetryReconciliationScheduler } from './jobs/telemetryReconciliationScheduler.js';
 import { startDailyMileageScheduler } from './jobs/dailyMileageScheduler.js';
 import { startNotificationDeliveryScheduler } from './jobs/notificationDeliveryScheduler.js';
@@ -500,6 +501,7 @@ let stopOperationLockNotificationScheduler = () => {};
 let stopOperationAutoCloseScheduler = () => {};
 let stopVehicleStateReconciliationScheduler = () => {};
 let stopComplianceNotificationScheduler = () => {};
+let stopMaintenanceNotificationScheduler = () => {};
 let stopTelemetryReconciliationScheduler = () => {};
 let stopDailyMileageScheduler = () => {};
 let stopNotificationDeliveryScheduler = () => {};
@@ -624,6 +626,7 @@ const startServer = async () => {
       stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
       stopOperationAutoCloseScheduler = startOperationAutoCloseScheduler();
       stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
+      stopMaintenanceNotificationScheduler = startMaintenanceNotificationScheduler();
       stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
       stopDailyMileageScheduler = startDailyMileageScheduler();
       stopNotificationDeliveryScheduler = startNotificationDeliveryScheduler();
@@ -666,6 +669,7 @@ const startServer = async () => {
     stopOperationLockNotificationScheduler = startOperationLockNotificationScheduler();
     stopOperationAutoCloseScheduler = startOperationAutoCloseScheduler();
     stopComplianceNotificationScheduler = startComplianceNotificationScheduler();
+    stopMaintenanceNotificationScheduler = startMaintenanceNotificationScheduler();
     stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
     stopDailyMileageScheduler = startDailyMileageScheduler();
     stopNotificationDeliveryScheduler = startNotificationDeliveryScheduler();
@@ -706,6 +710,7 @@ process.on('SIGTERM', () => {
   stopOperationLockNotificationScheduler();
   stopOperationAutoCloseScheduler();
   stopComplianceNotificationScheduler();
+  stopMaintenanceNotificationScheduler();
   stopTelemetryReconciliationScheduler();
   stopDailyMileageScheduler();
   stopNotificationDeliveryScheduler();

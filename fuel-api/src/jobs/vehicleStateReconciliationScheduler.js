@@ -6,6 +6,12 @@ import { getTraccarDevicesByIds, getTraccarLatestPositionsByDeviceIds } from '..
 import { evaluateAndHeal } from '../vehicleEngine/activity/evaluateAndHeal.js';
 import { persistActivityState } from '../vehicleEngine/activity/activityStateService.js';
 import { recordVehicleStateCorrection } from '../vehicleEngine/activity/vehicleStateAuditService.js';
+import {
+  notifyVehicleGpsLost,
+  notifyVehicleGpsRecovered,
+  notifyVehicleExtendedOffline,
+  notifyVehicleExcessiveIdle,
+} from '../notifications/vehicleStateNotificationService.js';
 import { runIntervalJob } from './schedulerRuntime.js';
 import { LOCK_KEYS } from './lockKeys.js';
 
@@ -13,6 +19,57 @@ const isDev = process.env.NODE_ENV === 'development';
 
 function isEnabled() {
   return String(process.env.VEHICLE_STATE_RECONCILE ?? '1') !== '0';
+}
+
+// Separate from isEnabled(): reconciliation/self-healing must keep running
+// even when the newer notification layer is off (default) — this only gates
+// the notify calls added below, never the state repair itself.
+function alertsEnabled() {
+  const raw = String(process.env.VEHICLE_STATE_ALERTS_ENABLED || '0').toLowerCase();
+  return raw === '1' || raw === 'true';
+}
+
+// Meaningfully longer than the 5-minute "is this vehicle offline right now"
+// freshness window in resolveActivityState.js — this is "has it been offline
+// long enough that someone should know," a separate, deliberately coarser
+// question.
+const EXTENDED_OFFLINE_MS = Math.max(600000, Number(process.env.VEHICLE_EXTENDED_OFFLINE_THRESHOLD_MS) || 2 * 60 * 60 * 1000);
+// Longer than any normal stop (fuel, delivery, traffic) — round number, not a
+// tuned model, same spirit as the maintenance engine's own km thresholds.
+const EXCESSIVE_IDLE_MS = Math.max(600000, Number(process.env.VEHICLE_EXCESSIVE_IDLE_THRESHOLD_MS) || 45 * 60 * 1000);
+
+/**
+ * Pure decision function, extracted for direct unit testing: given the prior
+ * persisted row (or null) and this tick's freshly-evaluated transition,
+ * decide which (if any) of the 4 fleet-state alerts should fire. Never does
+ * any I/O itself — runOnce() is the only caller, applying the result.
+ *
+ * @param {{ existing: {state:string}|null, transition: {state:string, changed:boolean, stateEnteredAt:string|Date}, now: number, extendedOfflineMs: number, excessiveIdleMs: number }} args
+ */
+export function determineVehicleStateAlerts({ existing, transition, now, extendedOfflineMs, excessiveIdleMs }) {
+  const previousState = existing?.state ?? null;
+  const enteredAtMs = transition?.stateEnteredAt ? new Date(transition.stateEnteredAt).getTime() : null;
+  const durationMs = enteredAtMs != null && Number.isFinite(enteredAtMs) ? now - enteredAtMs : null;
+
+  // Transition-instant events (one-shot) — only when the state actually
+  // changed this tick, never on a sweep that just confirms "still
+  // offline"/"still fine". Also requires a real prior row (existing != null):
+  // a vehicle's very first-ever observation is not a transition, just an
+  // initial reading, and must not read as "just lost connectivity."
+  const gpsLost = existing != null && Boolean(transition?.changed)
+    && previousState !== 'offline' && transition?.state === 'offline';
+  const gpsRecovered = existing != null && Boolean(transition?.changed)
+    && previousState === 'offline' && transition?.state !== 'offline';
+
+  // Sustained-duration thresholds (daily repeat while ongoing) — independent
+  // of whether this tick changed anything. Naturally mutually exclusive
+  // already: transition.state can only be one value at a time.
+  const extendedOffline = transition?.state === 'offline' && durationMs != null && durationMs >= extendedOfflineMs;
+  const excessiveIdle = transition?.state === 'idle' && durationMs != null && durationMs >= excessiveIdleMs;
+
+  return {
+    gpsLost, gpsRecovered, extendedOffline, excessiveIdle, durationMs,
+  };
 }
 
 function logTick(fields) {
@@ -40,12 +97,14 @@ async function withVehicleLock(vehicleId, fn) {
  * @param {{ source?: 'reconciliation'|'startup' }} [options]
  */
 export async function runOnce({ source = 'reconciliation' } = {}) {
-  const vehicles = await Vehicle.findAll({ attributes: ['id'] });
+  const vehicles = await Vehicle.findAll({ attributes: ['id', 'companyId', 'name', 'plateNumber'] });
   const vehicleIds = vehicles.map((v) => v.id);
   if (!vehicleIds.length) {
     logTick({ scanned: 0, repaired: 0, source });
     return;
   }
+  const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
+  const alertsOn = alertsEnabled();
 
   const assignments = await DeviceAssignment.findAll({
     where: { vehicleId: vehicleIds, isActive: true },
@@ -110,6 +169,34 @@ export async function runOnce({ source = 'reconciliation' } = {}) {
             source,
             payload: { deviceId, issues: transition.issues },
           });
+        }
+
+        if (alertsOn) {
+          const vehicle = vehicleById.get(vehicleId);
+          const companyId = vehicle?.companyId ?? null;
+          const alerts = determineVehicleStateAlerts({
+            existing, transition, now, extendedOfflineMs: EXTENDED_OFFLINE_MS, excessiveIdleMs: EXCESSIVE_IDLE_MS,
+          });
+
+          if (alerts.gpsLost) {
+            await notifyVehicleGpsLost({
+              fleetVehicleId: vehicleId, deviceId, stateEnteredAt: transition.stateEnteredAt, vehicle, companyId,
+            });
+          } else if (alerts.gpsRecovered) {
+            await notifyVehicleGpsRecovered({
+              fleetVehicleId: vehicleId, deviceId, stateEnteredAt: transition.stateEnteredAt, vehicle, companyId,
+            });
+          }
+
+          if (alerts.extendedOffline) {
+            await notifyVehicleExtendedOffline({
+              fleetVehicleId: vehicleId, deviceId, durationMs: alerts.durationMs, vehicle, companyId,
+            });
+          } else if (alerts.excessiveIdle) {
+            await notifyVehicleExcessiveIdle({
+              fleetVehicleId: vehicleId, deviceId, durationMs: alerts.durationMs, vehicle, companyId,
+            });
+          }
         }
       } catch (err) {
         console.error('[vehicle-state-reconciliation] vehicle failed', vehicleId, err?.message || err);

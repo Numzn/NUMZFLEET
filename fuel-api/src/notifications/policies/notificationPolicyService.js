@@ -77,8 +77,12 @@ function isGeofenceEvent(resolvedType, attributes) {
  *   notificationType: string,
  *   resolvedType: string,
  *   channels: string[],
+ *   mandatory: boolean,
  * }} `channels` are CHANNELS enum values, ready to pass straight to
- *   publishNotification() — no call-site translation needed.
+ *   publishNotification() — no call-site translation needed. `mandatory`
+ *   is true only for the security-critical branches (restricted-geofence
+ *   breach, panic/SOS/emergency/fault, and any other device alarm) — see
+ *   each branch's own comment for why.
  */
 /**
  * @param {{ type?: string, attributes?: object }} traccarEvent
@@ -103,6 +107,7 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       notificationType: `traccar.${resolvedType}`,
       resolvedType,
       channels: [],
+      mandatory: false,
     };
   }
 
@@ -120,6 +125,11 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       notificationType: isExit ? 'tracking.geofence.exited' : 'tracking.geofence.entered',
       resolvedType,
       channels: restricted ? ALERT_CHANNELS : IN_APP_CHANNELS,
+      // A restricted-zone breach is the one geofence outcome that must not
+      // silently sit unread — bypass preference/quiet-hours the same way
+      // every other immediate-urgency security event here does. An ordinary
+      // crossing is a movement record, never mandatory.
+      mandatory: restricted,
     };
   }
 
@@ -136,6 +146,7 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
         notificationType: isExit ? 'tracking.geofence.exited' : 'tracking.geofence.entered',
         resolvedType,
         channels: IN_APP_CHANNELS,
+        mandatory: false,
       };
     }
     return {
@@ -147,6 +158,10 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       notificationType: 'tracking.alarm',
       resolvedType,
       channels: ALERT_CHANNELS,
+      // Every non-geofence Traccar alarm (tamper, power-cut, jamming,
+      // low-battery, shock, ...) lands here — an unresolved device alarm
+      // must not go silent because of a preference toggle or quiet hours.
+      mandatory: true,
     };
   }
 
@@ -161,6 +176,11 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       notificationType: `tracking.${resolvedLower}`,
       resolvedType,
       channels: ALERT_CHANNELS,
+      // Someone pressed panic/SOS, or the device reports an emergency/fault
+      // condition — this must reach a human regardless of preferences or
+      // quiet hours, and is the canonical escalation candidate for this
+      // whole domain.
+      mandatory: true,
     };
   }
 
@@ -174,6 +194,7 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
       notificationType: `tracking.${resolvedLower}`,
       resolvedType,
       channels: IN_APP_CHANNELS,
+      mandatory: false,
     };
   }
 
@@ -186,6 +207,7 @@ export function resolveTraccarTrackingPolicy(traccarEvent, context = {}) {
     notificationType: `traccar.${resolvedType}`,
     resolvedType,
     channels: [],
+    mandatory: false,
   };
 }
 

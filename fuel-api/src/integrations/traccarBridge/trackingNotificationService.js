@@ -45,7 +45,7 @@ export async function pollAndPersistTrackingNotifications(io) {
       );
       if (!policy.persist) continue;
 
-      const audienceIds = await resolveTrackingEventAudience(ev.deviceid, {
+      const { userIds: audienceIds, companyId } = await resolveTrackingEventAudience(ev.deviceid, {
         respectGeofenceMute: true,
         traccarType: ev.type,
         attributes: ev.attributes,
@@ -64,6 +64,7 @@ export async function pollAndPersistTrackingNotifications(io) {
         title,
         message,
         source: 'traccar',
+        companyId,
         audience: { userIds: audienceIds },
         metadata: {
           traccarEventId: ev.id,
@@ -77,6 +78,7 @@ export async function pollAndPersistTrackingNotifications(io) {
         // The policy already returns CHANNELS enum values — it used to return
         // 'bell'/'push'/'sms' strings that had to be translated here.
         channels: policy.channels,
+        mandatory: policy.mandatory,
       }, { io });
 
       persisted += result.persisted || 0;
