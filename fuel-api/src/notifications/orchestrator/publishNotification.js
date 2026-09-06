@@ -58,6 +58,7 @@ export async function publishNotification(spec, ctx = {}) {
     metadata,
     read: false,
     archived: false,
+    mandatory: Boolean(mandatory),
     tenantId: spec.companyId || metadata?.companyId || DEFAULT_COMPANY_ID,
     clientDedupKey: `${userId}:${clientDedupKey}`,
     createdAt: now,

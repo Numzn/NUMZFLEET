@@ -100,7 +100,7 @@ describe('deliverPushNotification — fan-out and expiry handling (mocked deps, 
           }
           return { ok: true };
         },
-        removeExpired: async (endpoint) => { removed.push(endpoint); },
+        deactivateExpired: async (endpoint) => { removed.push(endpoint); },
         touch: async () => {},
       },
     );
@@ -130,7 +130,7 @@ describe('deliverPushNotification — fan-out and expiry handling (mocked deps, 
           }
           return { ok: true };
         },
-        removeExpired: async (endpoint) => { removed.push(endpoint); },
+        deactivateExpired: async (endpoint) => { removed.push(endpoint); },
         touch: async () => {},
       },
     );

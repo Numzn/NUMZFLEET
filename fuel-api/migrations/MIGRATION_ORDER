@@ -49,3 +49,5 @@
 20260903_notification_urgency.sql
 20260903_notification_deliveries.sql
 20260903_fix_notification_delivery_company_fk.sql
+20260906_push_subscription_lifecycle.sql
+20260906_notification_escalation.sql

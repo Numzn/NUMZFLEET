@@ -27,6 +27,7 @@ import rolesRouter from './modules/roles/routes.js';
 import notificationPreferencesRouter from './modules/notificationPreferences/routes.js';
 import pushSubscriptionsRouter from './modules/pushSubscriptions/routes.js';
 import telemetryIngestionRouter from './routes/telemetryIngestion.js';
+import providerWebhooksRouter from './routes/providerWebhooks.js';
 import organizationsRouter from './routes/organizations.js';
 import { initializeSocket } from './socket/socketHandler.js';
 import { registerEventListeners } from './events/registerEventListeners.js';
@@ -44,6 +45,8 @@ import { startComplianceNotificationScheduler } from './jobs/complianceNotificat
 import { startTelemetryReconciliationScheduler } from './jobs/telemetryReconciliationScheduler.js';
 import { startDailyMileageScheduler } from './jobs/dailyMileageScheduler.js';
 import { startNotificationDeliveryScheduler } from './jobs/notificationDeliveryScheduler.js';
+import { startSmsDeliveryReconciliationScheduler } from './jobs/smsDeliveryReconciliationScheduler.js';
+import { startNotificationEscalationScheduler } from './jobs/notificationEscalationScheduler.js';
 import { getDeliveryWorkerStatus } from './notifications/delivery/deliveryWorkerStatus.js';
 import {
   reconcileStuckExecuting,
@@ -440,6 +443,14 @@ app.use('/api', organizationsRouter);
 // public /api proxy; reachable only on the docker-internal network. Auth is
 // the shared-secret header, not a session (see middleware/telemetrySharedSecret.js).
 app.use('/internal/telemetry', telemetryIngestionRouter);
+// Same shared-secret, server-to-server shape as telemetry above — but note
+// the caller here (the SMS gateway's own Android device) is NOT on the
+// docker-internal network the way Traccar is; it reaches SMS_GATEWAY_BASE_URL
+// via the LAN/docker bridge gateway. Whether this route needs a different
+// exposure path (an nginx location, a different port) to be reachable FROM
+// that device is an open operational question for whoever actually registers
+// the webhook — see the Phase 6 report.
+app.use('/internal/provider-webhooks', providerWebhooksRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -492,6 +503,8 @@ let stopComplianceNotificationScheduler = () => {};
 let stopTelemetryReconciliationScheduler = () => {};
 let stopDailyMileageScheduler = () => {};
 let stopNotificationDeliveryScheduler = () => {};
+let stopSmsDeliveryReconciliationScheduler = () => {};
+let stopNotificationEscalationScheduler = () => {};
 
 async function runImmobilizationStartupReconcile() {
   if (!shouldReconcileOnStartup()) return;
@@ -614,6 +627,8 @@ const startServer = async () => {
       stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
       stopDailyMileageScheduler = startDailyMileageScheduler();
       stopNotificationDeliveryScheduler = startNotificationDeliveryScheduler();
+      stopSmsDeliveryReconciliationScheduler = startSmsDeliveryReconciliationScheduler();
+      stopNotificationEscalationScheduler = startNotificationEscalationScheduler();
       void runVehicleStateStartupReconcile().finally(() => {
         stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
       });
@@ -654,6 +669,8 @@ const startServer = async () => {
     stopTelemetryReconciliationScheduler = startTelemetryReconciliationScheduler();
     stopDailyMileageScheduler = startDailyMileageScheduler();
     stopNotificationDeliveryScheduler = startNotificationDeliveryScheduler();
+    stopSmsDeliveryReconciliationScheduler = startSmsDeliveryReconciliationScheduler();
+    stopNotificationEscalationScheduler = startNotificationEscalationScheduler();
     void runVehicleStateStartupReconcile().finally(() => {
       stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
     });
@@ -692,6 +709,8 @@ process.on('SIGTERM', () => {
   stopTelemetryReconciliationScheduler();
   stopDailyMileageScheduler();
   stopNotificationDeliveryScheduler();
+  stopSmsDeliveryReconciliationScheduler();
+  stopNotificationEscalationScheduler();
   stopVehicleStateReconciliationScheduler();
   httpServer.close(() => {
     if (isDev) {

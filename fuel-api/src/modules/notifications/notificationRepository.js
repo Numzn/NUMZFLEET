@@ -43,6 +43,8 @@ function toApi(row) {
     viewedAt,
     acknowledgedAt: iso(j.acknowledgedAt),
     resolvedAt: iso(j.resolvedAt),
+    mandatory: !!j.mandatory,
+    escalatedAt: iso(j.escalatedAt),
     createdAt: iso(j.createdAt),
     updatedAt: iso(j.updatedAt),
     clientDedupKey: j.clientDedupKey ?? j.client_dedup_key ?? null,

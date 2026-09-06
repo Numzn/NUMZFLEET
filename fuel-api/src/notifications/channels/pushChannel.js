@@ -1,5 +1,5 @@
 import { findByTraccarUserId } from '../../modules/profile/profileRepository.js';
-import { listForNumzUser, removeByEndpoint, touchLastUsed } from '../../modules/pushSubscriptions/pushSubscriptionsRepository.js';
+import { listForNumzUser, deactivateByEndpoint, touchLastUsed } from '../../modules/pushSubscriptions/pushSubscriptionsRepository.js';
 import { sendWebPush, isWebPushConfigured } from '../providers/webPushProvider.js';
 
 function buildPushPayload(payload) {
@@ -25,13 +25,15 @@ function buildPushPayload(payload) {
  *   - WHERE: every push_subscriptions row for that user's numz_users.id —
  *     not a single stored address, since a phone and a laptop are both valid.
  *   - An expired/invalid subscription (the push service's own 404/410) is
- *     removed automatically here — the standard signal per RFC 8030 that a
- *     subscription is gone, not a transient failure to retry.
+ *     deactivated automatically here — the standard signal per RFC 8030 that
+ *     a subscription is gone, not a transient failure to retry. Deactivated,
+ *     not deleted (Phase 6): the row survives as audit history and
+ *     listForNumzUser excludes it from future attempts.
  *   - HOW the message actually reaches a device is webPushProvider.js.
  *
  * @param {import('../contracts/notificationContract.js').CanonicalNotificationPayload} payload
  * @param {{ findUser?: typeof findByTraccarUserId, listSubscriptions?: typeof listForNumzUser,
- *   send?: typeof sendWebPush, removeExpired?: typeof removeByEndpoint, touch?: typeof touchLastUsed,
+ *   send?: typeof sendWebPush, deactivateExpired?: typeof deactivateByEndpoint, touch?: typeof touchLastUsed,
  *   isConfigured?: typeof isWebPushConfigured }} [deps]
  *   Injection seam for tests only — every real call site uses the defaults.
  *   isConfigured exists here (unlike email/smsChannel, which check their own
@@ -46,7 +48,7 @@ export async function deliverPushNotification(payload, deps = {}) {
   const findUser = deps.findUser || findByTraccarUserId;
   const listSubscriptions = deps.listSubscriptions || listForNumzUser;
   const send = deps.send || sendWebPush;
-  const removeExpired = deps.removeExpired || removeByEndpoint;
+  const deactivateExpired = deps.deactivateExpired || deactivateByEndpoint;
   const touch = deps.touch || touchLastUsed;
   const isConfigured = deps.isConfigured || isWebPushConfigured;
 
@@ -76,8 +78,8 @@ export async function deliverPushNotification(payload, deps = {}) {
       return { ok: true, id: sub.id };
     } catch (error) {
       if (error.expired) {
-        await removeExpired(sub.endpoint);
-        console.warn('[pushChannel] removed expired subscription', {
+        await deactivateExpired(sub.endpoint);
+        console.warn('[pushChannel] deactivated expired subscription', {
           userId: payload?.userId,
           subscriptionId: sub.id,
         });

@@ -146,5 +146,7 @@ export function toCanonicalPayload(row) {
     viewedAt: row.viewedAt ?? null,
     acknowledgedAt: row.acknowledgedAt ?? null,
     resolvedAt: row.resolvedAt ?? null,
+    mandatory: !!row.mandatory,
+    escalatedAt: row.escalatedAt ?? null,
   };
 }

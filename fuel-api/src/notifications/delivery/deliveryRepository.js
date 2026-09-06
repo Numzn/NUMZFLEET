@@ -365,11 +365,34 @@ export async function getDeliveryQueueStats(companyId, { now = new Date() } = {}
   };
 }
 
-/** Correlate a provider callback back to the attempt that produced it. */
+/** Correlate a provider callback back to the attempt that produced it, once the caller already knows the tenant. */
 export async function findAttemptByProviderMessage(provider, providerMessageId, companyId) {
   if (!companyId) throw new Error('[deliveries] companyId is required');
   if (!provider || !providerMessageId) return null;
   return NotificationDeliveryAttempt.findOne({
     where: { provider, providerMessageId, companyId },
+  });
+}
+
+/**
+ * Phase 6: the webhook-safe counterpart to findAttemptByProviderMessage — a
+ * raw provider callback carries no NUMZFLEET tenant identity at all (the
+ * gateway has never heard of "company"), so correlation cannot require a
+ * companyId up front the way the tenant-scoped lookup does. This IS how the
+ * tenant gets known: the found attempt's own companyId. `(provider,
+ * providerMessageId)` together are the identity — never providerMessageId
+ * alone, since two different providers could coincidentally reuse the same
+ * id space (see this file's own idx_notification_delivery_attempts_provider_msg
+ * index, which is likewise composite, not on providerMessageId alone).
+ *
+ * Callers of this function are trusted, authenticated provider-webhook/
+ * reconciliation code ONLY (see deliveryLifecycleService.js) — anything
+ * reachable from a normal request must keep using the tenant-scoped version
+ * above.
+ */
+export async function findAttemptByProviderMessageForCallback(provider, providerMessageId) {
+  if (!provider || !providerMessageId) return null;
+  return NotificationDeliveryAttempt.findOne({
+    where: { provider, providerMessageId },
   });
 }

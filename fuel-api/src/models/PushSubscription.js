@@ -38,6 +38,24 @@ export default (sequelize) => sequelize.define(
       allowNull: true,
       field: 'last_used_at',
     },
+    // Phase 6: 'active' | 'expired'. The push service reporting a subscription
+    // gone (404/410, RFC 8030) deactivates the row rather than deleting it —
+    // see pushSubscriptionsRepository.js's removeByEndpoint.
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'active',
+    },
+    deactivatedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'deactivated_at',
+    },
+    deactivationReason: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
+      field: 'deactivation_reason',
+    },
   },
   {
     tableName: 'push_subscriptions',

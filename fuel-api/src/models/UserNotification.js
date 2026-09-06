@@ -78,6 +78,20 @@ export default (sequelize) => {
         allowNull: true,
         field: 'resolved_at',
       },
+      // Phase 7: persisted so the escalation scheduler can find
+      // still-unacknowledged mandatory notifications after publish time —
+      // see canonicalNotification.js/publishNotification.js for where this
+      // is set (Phase 5's planner only consumed it in-request before now).
+      mandatory: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      escalatedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'escalated_at',
+      },
       clientDedupKey: {
         type: DataTypes.STRING(512),
         allowNull: true,
