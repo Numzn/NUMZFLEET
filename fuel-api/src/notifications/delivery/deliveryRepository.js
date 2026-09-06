@@ -190,33 +190,44 @@ export async function listAttemptsForDelivery(deliveryId, companyId) {
 /**
  * Atomically claim a batch of due deliveries for one worker tick.
  *
- * The UPDATE ... WHERE id IN (SELECT ...) RETURNING form is the claim: a
- * delivery moves to 'processing' and gains a lock stamp in a single statement,
- * so two concurrent callers cannot both take the same row — the second one's
- * subquery no longer matches it. attempt_count is incremented here too, which
- * is what makes the attempt number deterministic and collision-free: the
- * claiming statement, not the worker, decides which attempt this is.
+ * A CTE-based UPDATE ... FROM (WITH claimable AS (SELECT ... LIMIT ...
+ * FOR UPDATE SKIP LOCKED)) — a delivery moves to 'processing' and gains a
+ * lock stamp in a single statement, so two concurrent callers cannot both
+ * take the same row (SKIP LOCKED means the second one's CTE simply never
+ * sees it). attempt_count is incremented here too, which is what makes the
+ * attempt number deterministic and collision-free: the claiming statement,
+ * not the worker, decides which attempt this is.
  *
  * runIntervalJob's advisory lock already serialises ticks fleet-wide; this is
  * the second layer, and the one that survives a lock being lost or a future
  * decision to run several workers.
  *
- * `companyId` is optional and normally omitted: the worker is a background
- * process that legitimately serves every tenant. Passing it restricts the claim
- * to one company, which is useful for draining or inspecting a single tenant
- * Deliberately NOT company-scoped: this is a background process, not a
- * request, and claims across every tenant in one pass — the same shape as
- * complianceNotificationScheduler.js's own sweep. Tenant isolation is
- * enforced downstream instead: every row it touches already carries its own
- * companyId (recordAttempt inherits it from the delivery), so an attempt can
- * never be written under the wrong company regardless of claim order.
+ * Previously written as `UPDATE ... WHERE id IN (SELECT ... LIMIT ...)`,
+ * with the eligibility columns re-stated in an outer WHERE alongside the
+ * subquery as a defensive re-check. That shape hit a genuine PostgreSQL
+ * planner quirk: adding company_id as a third such outer re-check (see below)
+ * caused the UPDATE to silently claim far more rows than the subquery's own
+ * LIMIT — confirmed by bisecting the SQL directly, outside Sequelize and
+ * outside any test, and reproduced in CI's from-scratch schema even after
+ * removing that one outer clause locally fixed it (index/statistics
+ * differences between a long-lived dev DB and CI's syncDatabase()-built one
+ * are the likely reason the same query behaved differently in each). A CTE
+ * does not have this failure mode: `WITH ... AS (... LIMIT ... FOR UPDATE
+ * SKIP LOCKED)` is optimizer-opaque in Postgres (a locking clause inside a
+ * CTE blocks the planner from inlining/flattening it into the outer query,
+ * which is exactly the flattening this bug depended on), so the claimed set
+ * is materialized once, exactly as the CTE computed it, before the outer
+ * UPDATE ever runs — no outer re-check of any column is needed at all.
  *
- * `companyId` was documented above as an accepted filter before this fix but
- * was never actually wired into the query — genuinely optional and normally
- * omitted for the reasons above, but tests that need to prove claim-limit
- * behavior without a shared, unscoped table as their collision surface now
- * have a real way to ask for it (see deliveryHardening.test.js's "worker
- * batches are bounded").
+ * `companyId` is optional and normally omitted: the worker is a background
+ * process that legitimately serves every tenant. Passing it restricts the
+ * claim to one company — not used by the real worker (WORKER_CHANNELS claims
+ * across every tenant in one pass, the same shape as
+ * complianceNotificationScheduler.js's own sweep; tenant isolation is
+ * enforced downstream instead, since every row already carries its own
+ * companyId) — but it gives a test a real way to prove claim-limit behavior
+ * without a shared, unscoped table as its collision surface (see
+ * deliveryHardening.test.js's "worker batches are bounded").
  *
  * @param {{ channels: string[], limit?: number, lockedBy: string, now?: Date, companyId?: string|null }} opts
  */
@@ -228,49 +239,29 @@ export async function claimDueDeliveries({
 
   const rows = await sequelize.query(
     `
-    UPDATE notification_deliveries
+    WITH claimable_rows AS (
+      SELECT id FROM notification_deliveries
+       WHERE status IN (:claimable)
+         AND channel IN (:channels)
+         AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
+         AND (:companyId::uuid IS NULL OR company_id = :companyId)
+       ORDER BY created_at
+       LIMIT :limit
+       -- Skip rows another transaction is already claiming instead of queueing
+       -- behind their locks. Without this, two concurrent claims serialise on
+       -- the row lock rather than diverging.
+       FOR UPDATE SKIP LOCKED
+    )
+    UPDATE notification_deliveries AS d
        SET status = :processing,
            locked_at = :now,
            locked_by = :lockedBy,
-           attempt_count = attempt_count + 1,
+           attempt_count = d.attempt_count + 1,
            last_attempt_at = :now,
            updated_at = :now
-     WHERE id IN (
-       SELECT id FROM notification_deliveries
-        WHERE status IN (:claimable)
-          AND channel IN (:channels)
-          AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
-          AND (:companyId::uuid IS NULL OR company_id = :companyId)
-        ORDER BY created_at
-        LIMIT :limit
-        -- Skip rows another transaction is already claiming instead of queueing
-        -- behind their locks. Without this, two concurrent claims serialise on
-        -- the row lock rather than diverging.
-        FOR UPDATE SKIP LOCKED
-     )
-       -- Re-stated outside the subquery on purpose. Under READ COMMITTED the
-       -- subquery's id list is computed from a snapshot; if a concurrent claim
-       -- commits while this statement waits on the row lock, PostgreSQL
-       -- re-evaluates only the OUTER predicate against the new row version.
-       -- With the status test living solely in the subquery, that re-check
-       -- would still pass and the row would be claimed twice.
-       --
-       -- company_id is deliberately NOT re-stated here (unlike status and
-       -- next_attempt_at above): it is write-once on this table (nothing
-       -- ever changes a delivery's company after creation), so the snapshot
-       -- read inside the subquery can never go stale the way a mutable
-       -- column could — there is no race for an outer re-check to guard
-       -- against. It also cannot be added as a harmless-but-redundant extra
-       -- safety net the way it might look: an outer clause matching a column
-       -- already filtered on inside a LIMITed subquery hits a real Postgres
-       -- planner quirk that silently drops the LIMIT (confirmed by direct,
-       -- bisected SQL testing — every other single-clause outer re-check
-       -- preserves the LIMIT correctly; this specific one does not, and it
-       -- is not about the NULL-check or the ::uuid cast, a plain
-       -- AND company_id = :companyId reproduces it too).
-       AND status IN (:claimable)
-       AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
-     RETURNING id
+      FROM claimable_rows
+     WHERE d.id = claimable_rows.id
+     RETURNING d.id
     `,
     {
       replacements: {
