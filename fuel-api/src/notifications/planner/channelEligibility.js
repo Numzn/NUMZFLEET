@@ -36,24 +36,34 @@ import { CHANNELS } from '../contracts/notificationContract.js';
  * @param {number} traccarUserId
  * @param {Record<string, unknown>} [metadata] the notification's own metadata
  * @param {{ findUser?: typeof findByTraccarUserId, getPhone?: typeof getUserPhoneNumber,
- *   listSubscriptions?: typeof listPushSubscriptions }} [deps]
+ *   listSubscriptions?: typeof listPushSubscriptions,
+ *   isSmsConfigured?: typeof isSmsGatewayConfigured, isEmailConfigured?: typeof isEmailConfigured,
+ *   isPushConfigured?: typeof isWebPushConfigured }} [deps]
  *   Injection seam for tests only — every real call site uses the defaults.
  *   Same pattern as effectiveChannelsResolver.js/pushChannel.js: push has no
  *   metadata-override escape hatch (unlike sms/email), so an "eligible push"
- *   test case cannot avoid a DB round trip any other way.
+ *   test case cannot avoid a DB round trip any other way. The three
+ *   isXConfigured overrides exist for the same reason: whether a provider is
+ *   configured is a real env-var read, not something a test's metadata
+ *   override can route around, and this function's own tests should be able
+ *   to prove destination-resolution logic without needing real provider
+ *   credentials present in whatever environment runs them.
  * @returns {Promise<{ eligible: true } | { eligible: false, reason: string }>}
  */
 export async function checkChannelEligibility(channel, traccarUserId, metadata = {}, deps = {}) {
   const findUser = deps.findUser || findByTraccarUserId;
   const getPhone = deps.getPhone || getUserPhoneNumber;
   const listSubscriptions = deps.listSubscriptions || listPushSubscriptions;
+  const isSmsConfigured = deps.isSmsConfigured || isSmsGatewayConfigured;
+  const isEmailConfiguredFn = deps.isEmailConfigured || isEmailConfigured;
+  const isPushConfigured = deps.isPushConfigured || isWebPushConfigured;
 
   if (channel === CHANNELS.INBOX || channel === CHANNELS.WEBSOCKET) {
     return { eligible: true };
   }
 
   if (channel === CHANNELS.SMS) {
-    if (!isSmsGatewayConfigured()) return { eligible: false, reason: 'not_configured' };
+    if (!isSmsConfigured()) return { eligible: false, reason: 'not_configured' };
     const rawPhone = metadata?.smsTo || await getPhone(traccarUserId);
     if (!rawPhone) return { eligible: false, reason: 'no_recipient_phone' };
     const normalized = normalizeZambianPhone(rawPhone);
@@ -62,7 +72,7 @@ export async function checkChannelEligibility(channel, traccarUserId, metadata =
   }
 
   if (channel === CHANNELS.EMAIL) {
-    if (!isEmailConfigured()) return { eligible: false, reason: 'not_configured' };
+    if (!isEmailConfiguredFn()) return { eligible: false, reason: 'not_configured' };
     let address = metadata?.emailTo || null;
     if (!address) {
       const numzUser = await findUser(traccarUserId);
@@ -74,7 +84,7 @@ export async function checkChannelEligibility(channel, traccarUserId, metadata =
   }
 
   if (channel === CHANNELS.PUSH) {
-    if (!isWebPushConfigured()) return { eligible: false, reason: 'not_configured' };
+    if (!isPushConfigured()) return { eligible: false, reason: 'not_configured' };
     const numzUser = await findUser(traccarUserId);
     if (!numzUser) return { eligible: false, reason: 'no_recipient' };
     const subscriptions = await listSubscriptions(numzUser.id);

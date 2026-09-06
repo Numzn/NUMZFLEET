@@ -17,6 +17,18 @@ try {
 const COMPANY = '00000000-0000-0000-0000-000000000001';
 const createdNumzUserIds = [];
 
+// numz_users.company_id is a real FK to companies(id) (unlike notifications.
+// tenant_id, which is a plain column) — a long-lived dev DB already has the
+// "Default Fleet" row from earlier migrations, but a fresh DB (CI's
+// syncDatabase-from-models, which runs no seed data) does not. findOrCreate
+// is a no-op wherever the row already exists.
+if (dbReachable) {
+  await Company.findOrCreate({
+    where: { id: COMPANY },
+    defaults: { id: COMPANY, slug: 'push-subs-test-default', name: 'Default Fleet (test seed)' },
+  });
+}
+
 async function makeNumzUser() {
   const u = await NumzUser.create({
     companyId: COMPANY,

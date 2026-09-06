@@ -13,6 +13,7 @@ import { publishNotification } from '../orchestrator/publishNotification.js';
 import { recoverStaleProcessing } from './deliveryRepository.js';
 import { processDelivery, runDeliveryWorkerOnce } from './deliveryWorker.js';
 import { claimById, createParkedDeliveries } from './__testHelpers.js';
+import { isSmsGatewayConfigured } from '../providers/smsProvider.js';
 
 let dbReachable = false;
 try {
@@ -57,7 +58,17 @@ after(async () => {
 // proving the pieces work TOGETHER, not only independently.
 // ---------------------------------------------------------------------------
 
-describe('complete lifecycle: business event to delivery state', { skip: !dbReachable }, () => {
+// This suite proves the pipeline through a real, unfaked publishNotification()
+// call, with only the WORKER's actual provider send stubbed (via processDelivery's
+// senders override, per test below) — planning itself is untouched, so it now
+// genuinely needs isSmsGatewayConfigured() to be true, the same real env-var
+// read every other caller of channelEligibility.js's SMS branch depends on.
+// CI has no real SMS gateway credentials (correctly — it shouldn't need any),
+// so this integration proof only runs in an environment where SMS actually is
+// configured, same reasoning as the dbReachable guard beside it.
+describe('complete lifecycle: business event to delivery state', {
+  skip: !dbReachable || !isSmsGatewayConfigured(),
+}, () => {
   it('success path: publish -> pending delivery -> worker claims -> attempt -> sent', async () => {
     // "Business event" — a real, unfaked call to the actual publish API used
     // by every real producer (fuelRequestPolicy, immobilizationTransitionPolicy,
