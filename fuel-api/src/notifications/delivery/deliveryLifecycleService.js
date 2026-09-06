@@ -1,4 +1,4 @@
-import { NotificationDelivery } from '../../models/index.js';
+import sequelize, { NotificationDelivery } from '../../models/index.js';
 import { canTransition, isTerminal } from './deliveryStates.js';
 import { findAttemptByProviderMessageForCallback, transitionDelivery } from './deliveryRepository.js';
 
@@ -42,51 +42,67 @@ export async function applyProviderEvent(event) {
     toStatus: event.status,
   };
 
-  const attempt = await findAttemptByProviderMessageForCallback(event.provider, event.providerMessageId);
-  if (!attempt) {
-    return { outcome: 'unknown_delivery', ...base };
-  }
+  // The whole read-check-write sequence runs inside one transaction with the
+  // attempt and delivery rows locked FOR UPDATE — same reasoning as
+  // claimDueDeliveries elsewhere in this file's sibling deliveryRepository.js.
+  // Without this, the webhook and the reconciliation sweep can both read the
+  // same pre-transition status, both pass canTransition, and both write —
+  // whichever commits last silently wins with no indication the other was
+  // ever applied.
+  return sequelize.transaction(async (t) => {
+    const attempt = await findAttemptByProviderMessageForCallback(
+      event.provider,
+      event.providerMessageId,
+      t,
+    );
+    if (!attempt) {
+      return { outcome: 'unknown_delivery', ...base };
+    }
 
-  const delivery = await NotificationDelivery.findByPk(attempt.deliveryId);
-  if (!delivery) {
-    // The attempt survived (it is deliberately not cascade-linked in a way
-    // that would ever remove it silently); the parent delivery genuinely
-    // does not exist. Same "cannot act, must not crash" handling.
-    return {
-      outcome: 'unknown_delivery', ...base, attemptId: attempt.id, companyId: attempt.companyId,
+    const delivery = await NotificationDelivery.findByPk(attempt.deliveryId, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!delivery) {
+      // The attempt survived (it is deliberately not cascade-linked in a way
+      // that would ever remove it silently); the parent delivery genuinely
+      // does not exist. Same "cannot act, must not crash" handling.
+      return {
+        outcome: 'unknown_delivery', ...base, attemptId: attempt.id, companyId: attempt.companyId,
+      };
+    }
+
+    const audit = {
+      ...base,
+      deliveryId: delivery.id,
+      attemptId: attempt.id,
+      companyId: delivery.companyId,
+      fromStatus: delivery.status,
     };
-  }
 
-  const audit = {
-    ...base,
-    deliveryId: delivery.id,
-    attemptId: attempt.id,
-    companyId: delivery.companyId,
-    fromStatus: delivery.status,
-  };
+    if (!canTransition(delivery.status, event.status)) {
+      return { outcome: 'ignored_stale_transition', ...audit };
+    }
 
-  if (!canTransition(delivery.status, event.status)) {
-    return { outcome: 'ignored_stale_transition', ...audit };
-  }
+    const isDuplicate = delivery.status === event.status;
 
-  const isDuplicate = delivery.status === event.status;
+    // Attempt-level record first: full audit fidelity for "which attempt did
+    // this event relate to, and what did it say" even if the delivery-level
+    // write below were to fail for some unrelated reason.
+    await attempt.update({
+      status: event.status,
+      failureCode: event.failureCode,
+      failureReason: event.failureReason,
+      completedAt: event.occurredAt || new Date(),
+    }, { transaction: t });
 
-  // Attempt-level record first: full audit fidelity for "which attempt did
-  // this event relate to, and what did it say" even if the delivery-level
-  // write below were to fail for some unrelated reason.
-  await attempt.update({
-    status: event.status,
-    failureCode: event.failureCode,
-    failureReason: event.failureReason,
-    completedAt: event.occurredAt || new Date(),
+    await transitionDelivery(delivery, event.status, {
+      failureCode: event.failureCode,
+      failureReason: event.failureReason,
+    }, t);
+
+    return { outcome: isDuplicate ? 'duplicate' : 'applied', ...audit };
   });
-
-  await transitionDelivery(delivery, event.status, {
-    failureCode: event.failureCode,
-    failureReason: event.failureReason,
-  });
-
-  return { outcome: isDuplicate ? 'duplicate' : 'applied', ...audit };
 }
 
 /**

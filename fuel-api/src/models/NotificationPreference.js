@@ -15,6 +15,15 @@ export default (sequelize) => sequelize.define(
       references: { model: 'numz_users', key: 'id' },
       onDelete: 'CASCADE',
     },
+    // Plain UUID, no inline references — the FK lives solely in
+    // 20260906_notification_preferences_company_id.sql (see that migration's
+    // own note on why: Sequelize dev autosync can create this column ahead
+    // of the migration and would then be missing the FK).
+    companyId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'company_id',
+    },
     channel: {
       type: DataTypes.STRING(20),
       allowNull: false,

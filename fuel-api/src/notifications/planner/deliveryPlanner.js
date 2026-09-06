@@ -3,6 +3,22 @@ import { resolveEffectiveChannels } from '../orchestrator/effectiveChannelsResol
 import { checkRecipientEligibility } from './recipientEligibility.js';
 import { checkChannelEligibility } from './channelEligibility.js';
 import { isWithinQuietHours, quietHoursEndAfter } from './quietHours.js';
+import { findByTraccarUserId } from '../../modules/profile/profileRepository.js';
+
+/**
+ * checkRecipientEligibility, resolveEffectiveChannels, and
+ * checkChannelEligibility (for email/push) each independently look up the
+ * same numz_users row for one planDeliveries() call. Wrapping the lookup so
+ * every caller within one call shares a single in-flight/resolved promise
+ * avoids re-querying Postgres 3-4 times per recipient for identical data.
+ */
+function memoizeSingleCall(fn) {
+  let promise;
+  return (...args) => {
+    if (!promise) promise = fn(...args);
+    return promise;
+  };
+}
 
 /**
  * The one authoritative place that decides, per recipient, which requested
@@ -42,7 +58,8 @@ import { isWithinQuietHours, quietHoursEndAfter } from './quietHours.js';
  * }} args
  * @param {{ checkRecipient?: typeof checkRecipientEligibility,
  *   resolvePreferences?: typeof resolveEffectiveChannels,
- *   checkChannel?: typeof checkChannelEligibility }} [deps]
+ *   checkChannel?: typeof checkChannelEligibility,
+ *   findUser?: typeof findByTraccarUserId }} [deps]
  *   Injection seam for tests only — every real call site uses the defaults.
  * @returns {Promise<Array<{
  *   channel: string,
@@ -65,6 +82,7 @@ export async function planDeliveries({
   const checkRecipient = deps.checkRecipient || checkRecipientEligibility;
   const resolvePreferences = deps.resolvePreferences || resolveEffectiveChannels;
   const checkChannel = deps.checkChannel || checkChannelEligibility;
+  const findUser = memoizeSingleCall(deps.findUser || findByTraccarUserId);
 
   if (!Array.isArray(channels) || !channels.length) return [];
 
@@ -72,7 +90,7 @@ export async function planDeliveries({
     traccarUserId: userId,
     companyId,
     explicitCompanyId,
-  });
+  }, { findUser });
   if (!recipientCheck.eligible) {
     return channels.map((channel) => ({
       channel,
@@ -81,7 +99,7 @@ export async function planDeliveries({
     }));
   }
 
-  const preferenceApproved = new Set(await resolvePreferences(userId, category, channels));
+  const preferenceApproved = new Set(await resolvePreferences(userId, category, channels, { findUser }));
 
   const plan = [];
   for (const channel of channels) {
@@ -91,8 +109,23 @@ export async function planDeliveries({
       continue;
     }
 
-    // eslint-disable-next-line no-await-in-loop -- one recipient's few channels; not worth a Promise.all's added complexity here.
-    const channelCheck = await checkChannel(channel, userId, metadata);
+    let channelCheck;
+    try {
+      // eslint-disable-next-line no-await-in-loop -- one recipient's few channels; not worth a Promise.all's added complexity here.
+      channelCheck = await checkChannel(channel, userId, metadata, { findUser });
+    } catch (error) {
+      // A transient failure checking THIS channel (e.g. a DB blip resolving
+      // push subscriptions) must suppress only this channel, not the whole
+      // plan — the enclosing try/catch in publishNotification.js has no
+      // per-channel granularity, so an unhandled throw here would otherwise
+      // drop every channel, including inbox/websocket, for one channel's
+      // transient error.
+      console.error('[deliveryPlanner] channel eligibility check failed', {
+        channel, userId, message: error?.message || error,
+      });
+      plan.push({ channel, decision: 'suppress', reason: 'channel_check_failed' });
+      continue;
+    }
     if (!channelCheck.eligible) {
       plan.push({ channel, decision: 'suppress', reason: channelCheck.reason });
       continue;

@@ -1,5 +1,6 @@
 import { Op } from 'sequelize';
 import { UserNotification } from '../../models/index.js';
+import { resolveEntityIdFromMetadata } from '../../notifications/canonicalNotification.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -15,11 +16,7 @@ function toApi(row) {
   const entityType = j.category || metadata.entityType || 'system';
   const entityId = metadata.entityId != null
     ? String(metadata.entityId)
-    : (metadata.requestId != null ? String(metadata.requestId)
-      : metadata.traccarEventId != null ? String(metadata.traccarEventId)
-        : metadata.intentId != null ? String(metadata.intentId)
-          : metadata.vehicleId != null ? String(metadata.vehicleId)
-            : String(j.id));
+    : (resolveEntityIdFromMetadata(metadata) || String(j.id));
   const read = !!j.read;
   const viewedAt = iso(j.viewedAt);
   const readAt = read ? (viewedAt || iso(j.updatedAt)) : null;
@@ -187,21 +184,21 @@ export async function persistNotificationRows(rows) {
 
   const { rows: insertedRows } = await bulkInsertNotifications(rows);
 
-  const byUser = new Map();
-  for (const row of rows) {
-    if (!row.clientDedupKey) continue;
-    if (!byUser.has(row.userId)) byUser.set(row.userId, []);
-    byUser.get(row.userId).push(row.clientDedupKey);
-  }
-
   const byId = new Map();
   for (const apiRow of insertedRows) {
     if (apiRow?.id) byId.set(apiRow.id, apiRow);
   }
 
-  for (const [userId, keys] of byUser) {
-    const found = await findByClientDedupKeys(userId, keys);
-    for (const apiRow of found) {
+  // clientDedupKey already embeds the userId (`${userId}:${baseKey}`), so one
+  // batched query across every row's key covers every recipient — no need to
+  // group by userId and issue a separate lookup per recipient.
+  const allKeys = [...new Set(rows.map((r) => r.clientDedupKey).filter(Boolean))];
+  if (allKeys.length) {
+    const found = await UserNotification.findAll({
+      where: { clientDedupKey: { [Op.in]: allKeys }, archived: false },
+    });
+    for (const row of found) {
+      const apiRow = toApi(row);
       if (apiRow?.id) byId.set(apiRow.id, apiRow);
     }
   }

@@ -33,17 +33,21 @@ export async function publishNotification(spec, ctx = {}) {
     mandatory,
   } = notification;
 
-  const userIds = await resolveAudience(audience);
-  if (!userIds.length) {
-    return { userIds: [], persisted: 0 };
-  }
-
   // Distinct from the DEFAULT_COMPANY_ID fallback below: the planner's tenant/
   // company eligibility check only applies when the CALLER itself scoped this
   // notification to a real company (compliance, maintenance today) — not to
   // every other producer that still lands on the legacy default. See
-  // recipientEligibility.js's own doc comment for the full reasoning.
-  const explicitCompanyId = Boolean(spec.companyId || metadata?.companyId);
+  // recipientEligibility.js's own doc comment for the full reasoning. Also
+  // used to scope a managers:true audience to that company's own managers
+  // (see audienceResolver.js/getManagerUserIds) rather than every manager
+  // instance-wide.
+  const explicitCompanyIdValue = spec.companyId || metadata?.companyId || null;
+  const explicitCompanyId = Boolean(explicitCompanyIdValue);
+
+  const userIds = await resolveAudience(audience, explicitCompanyIdValue);
+  if (!userIds.length) {
+    return { userIds: [], persisted: 0 };
+  }
 
   const now = new Date();
   const rows = userIds.map((userId) => ({
@@ -65,8 +69,13 @@ export async function publishNotification(spec, ctx = {}) {
     updatedAt: now,
   }));
 
+  // Every requested channel needs this row as its delivery-record anchor
+  // (notification_deliveries.notification_id is NOT NULL) — not just inbox.
+  // A caller requesting e.g. channels:[SMS] alone must still get a real SMS
+  // delivery, which requires this row to exist regardless of whether inbox
+  // itself was requested.
   let persistedApiRows = [];
-  if (channels.includes(CHANNELS.INBOX) && rows.length) {
+  if (rows.length) {
     persistedApiRows = await repo.persistNotificationRows(rows);
   }
 
@@ -78,6 +87,7 @@ export async function publishNotification(spec, ctx = {}) {
   }
 
   const { io } = ctx;
+  let anyDelivered = false;
   for (const row of rows) {
     const apiRow = persistedByUserDedup.get(`${row.userId}:${row.clientDedupKey}`);
     if (!apiRow?.id) {
@@ -125,6 +135,7 @@ export async function publishNotification(spec, ctx = {}) {
     }
 
     const deliverable = new Set(plan.filter((p) => p.decision === 'deliver').map((p) => p.channel));
+    if (deliverable.size > 0) anyDelivered = true;
 
     // Websocket only. Push/SMS/email are now left as pending delivery rows for
     // the delivery worker — the request path no longer waits on an external
@@ -146,5 +157,5 @@ export async function publishNotification(spec, ctx = {}) {
     }
   }
 
-  return { userIds, persisted: persistedApiRows.length };
+  return { userIds, persisted: persistedApiRows.length, anyDelivered };
 }

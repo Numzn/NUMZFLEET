@@ -1,5 +1,7 @@
+import { Op } from 'sequelize';
 import { getTraccarPool } from '../config/traccar.js';
 import { authConfig } from '../config/auth.config.js';
+import { NumzUser } from '../models/index.js';
 
 /**
  * User Service
@@ -191,12 +193,34 @@ let managerIdCache = { at: 0, ids: [] };
 const MANAGER_ID_CACHE_MS = 60000;
 
 /**
- * Traccar user ids that should receive manager-scoped notifications (administrator or isManager).
+ * Excludes only managers with POSITIVE evidence of belonging to a different
+ * company (a numz_users row whose companyId is known and does not match) —
+ * same conservative philosophy as recipientEligibility.js: an unprovisioned
+ * manager (no numz_users row, still most of the fleet) is never excluded,
+ * since treating "unprovisioned" as "wrong company" would silently drop
+ * most manager-audience notifications.
  */
-export const getManagerUserIds = async () => {
+async function filterManagerIdsByCompany(ids, companyId) {
+  if (!companyId || !ids.length) return ids;
+  const mismatched = await NumzUser.findAll({
+    where: { traccarUserId: { [Op.in]: ids }, companyId: { [Op.ne]: companyId } },
+    attributes: ['traccarUserId'],
+  });
+  const exclude = new Set(mismatched.map((u) => u.traccarUserId));
+  return ids.filter((id) => !exclude.has(id));
+}
+
+/**
+ * Traccar user ids that should receive manager-scoped notifications
+ * (administrator or isManager). Pass the notification's own explicit
+ * companyId (never the DEFAULT_COMPANY_ID fallback) to scope the result to
+ * that company; omit it to get every manager across the whole instance,
+ * unchanged from before this filter existed.
+ */
+export const getManagerUserIds = async (companyId = null) => {
   const now = Date.now();
   if (now - managerIdCache.at < MANAGER_ID_CACHE_MS && managerIdCache.ids.length) {
-    return managerIdCache.ids;
+    return filterManagerIdsByCompany(managerIdCache.ids, companyId);
   }
   const pool = getTraccarPool();
   const [rows] = await pool.execute(
@@ -214,7 +238,7 @@ export const getManagerUserIds = async () => {
     }
   }
   managerIdCache = { at: now, ids };
-  return ids;
+  return filterManagerIdsByCompany(ids, companyId);
 };
 
 /**

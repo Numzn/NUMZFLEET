@@ -3,6 +3,9 @@ import { getUserPhoneNumber } from '../../services/userService.js';
 import { normalizeZambianPhone } from '../../utils/phoneNumber.js';
 import { listForNumzUser as listPushSubscriptions } from '../../modules/pushSubscriptions/pushSubscriptionsRepository.js';
 import { isDeliverableEmail } from '../channels/emailChannel.js';
+import { isSmsGatewayConfigured } from '../providers/smsProvider.js';
+import { isEmailConfigured } from '../providers/emailProvider.js';
+import { isWebPushConfigured } from '../providers/webPushProvider.js';
 import { CHANNELS } from '../contracts/notificationContract.js';
 
 /**
@@ -50,6 +53,7 @@ export async function checkChannelEligibility(channel, traccarUserId, metadata =
   }
 
   if (channel === CHANNELS.SMS) {
+    if (!isSmsGatewayConfigured()) return { eligible: false, reason: 'not_configured' };
     const rawPhone = metadata?.smsTo || await getPhone(traccarUserId);
     if (!rawPhone) return { eligible: false, reason: 'no_recipient_phone' };
     const normalized = normalizeZambianPhone(rawPhone);
@@ -58,6 +62,7 @@ export async function checkChannelEligibility(channel, traccarUserId, metadata =
   }
 
   if (channel === CHANNELS.EMAIL) {
+    if (!isEmailConfigured()) return { eligible: false, reason: 'not_configured' };
     let address = metadata?.emailTo || null;
     if (!address) {
       const numzUser = await findUser(traccarUserId);
@@ -69,6 +74,7 @@ export async function checkChannelEligibility(channel, traccarUserId, metadata =
   }
 
   if (channel === CHANNELS.PUSH) {
+    if (!isWebPushConfigured()) return { eligible: false, reason: 'not_configured' };
     const numzUser = await findUser(traccarUserId);
     if (!numzUser) return { eligible: false, reason: 'no_recipient' };
     const subscriptions = await listSubscriptions(numzUser.id);

@@ -3,18 +3,20 @@ import sequelize from '../config/database.js';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-async function tryAcquireAdvisoryLock(lockKey) {
+async function tryAcquireAdvisoryLock(lockKey, transaction) {
   const rows = await sequelize.query('SELECT pg_try_advisory_lock(:key) AS locked', {
     replacements: { key: lockKey },
     type: QueryTypes.SELECT,
+    transaction,
   });
   return rows[0]?.locked === true;
 }
 
-async function releaseAdvisoryLock(lockKey) {
+async function releaseAdvisoryLock(lockKey, transaction) {
   await sequelize.query('SELECT pg_advisory_unlock(:key)', {
     replacements: { key: lockKey },
     type: QueryTypes.SELECT,
+    transaction,
   });
 }
 
@@ -47,9 +49,22 @@ export function runIntervalJob({
       return;
     }
     tickInFlight = true;
+    // The acquire and release must run on the SAME physical connection:
+    // Postgres session-level advisory locks can only be released by the
+    // session that took them, and separate sequelize.query() calls can each
+    // be handed a different connection from the shared pool. An explicit
+    // (unmanaged) transaction pins one connection for both calls without
+    // wrapping task() itself in it — task() keeps using the normal pool for
+    // its own queries, unchanged.
     let lockAcquired = false;
+    let lockTransaction = null;
     try {
-      lockAcquired = lockKey == null ? true : await tryAcquireAdvisoryLock(lockKey);
+      if (lockKey != null) {
+        lockTransaction = await sequelize.transaction();
+        lockAcquired = await tryAcquireAdvisoryLock(lockKey, lockTransaction);
+      } else {
+        lockAcquired = true;
+      }
       if (!lockAcquired) {
         if (isDev) console.log(`[${name}] tick skipped (advisory lock held)`);
         return;
@@ -58,12 +73,17 @@ export function runIntervalJob({
     } catch (err) {
       console.error(`[${name}]`, err?.message || err);
     } finally {
-      if (lockAcquired && lockKey != null) {
-        try {
-          await releaseAdvisoryLock(lockKey);
-        } catch (unlockErr) {
-          console.error(`[${name}] advisory unlock failed:`, unlockErr?.message || unlockErr);
+      if (lockTransaction) {
+        if (lockAcquired) {
+          try {
+            await releaseAdvisoryLock(lockKey, lockTransaction);
+          } catch (unlockErr) {
+            console.error(`[${name}] advisory unlock failed:`, unlockErr?.message || unlockErr);
+          }
         }
+        await lockTransaction.commit().catch((commitErr) => {
+          console.error(`[${name}] lock transaction commit failed:`, commitErr?.message || commitErr);
+        });
       }
       tickInFlight = false;
     }

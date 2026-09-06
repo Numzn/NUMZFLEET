@@ -127,7 +127,7 @@ export async function recordAttempt({
  * or resurrect a terminal row. Timestamps are set from the target state so the
  * lifecycle is readable without reconstructing it from attempts.
  */
-export async function transitionDelivery(delivery, toStatus, patch = {}) {
+export async function transitionDelivery(delivery, toStatus, patch = {}, transaction) {
   assertTransition(delivery.status, toStatus);
 
   const now = new Date();
@@ -152,7 +152,7 @@ export async function transitionDelivery(delivery, toStatus, patch = {}) {
     update.nextAttemptAt = null;
   }
 
-  await delivery.update(update);
+  await delivery.update(update, transaction ? { transaction } : undefined);
   return delivery;
 }
 
@@ -390,9 +390,10 @@ export async function findAttemptByProviderMessage(provider, providerMessageId, 
  * reachable from a normal request must keep using the tenant-scoped version
  * above.
  */
-export async function findAttemptByProviderMessageForCallback(provider, providerMessageId) {
+export async function findAttemptByProviderMessageForCallback(provider, providerMessageId, transaction) {
   if (!provider || !providerMessageId) return null;
   return NotificationDeliveryAttempt.findOne({
     where: { provider, providerMessageId },
+    ...(transaction ? { transaction, lock: transaction.LOCK.UPDATE } : {}),
   });
 }

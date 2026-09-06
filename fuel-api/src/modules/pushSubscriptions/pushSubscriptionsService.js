@@ -1,6 +1,7 @@
 import { ensureNumzUserRow } from '../../services/numzUserProvisioning.js';
 import * as repo from './pushSubscriptionsRepository.js';
 import { getVapidPublicKey, isWebPushConfigured } from '../../notifications/providers/webPushProvider.js';
+import { DEFAULT_COMPANY_ID } from '../../models/index.js';
 
 export async function getPublicKey() {
   return { vapidPublicKey: isWebPushConfigured() ? getVapidPublicKey() : null };
@@ -21,6 +22,7 @@ export async function subscribe(req) {
 
   await repo.upsertSubscription({
     numzUserId: numzUser.id,
+    companyId: numzUser.companyId || DEFAULT_COMPANY_ID,
     endpoint,
     p256dh,
     auth,

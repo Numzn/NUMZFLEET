@@ -20,19 +20,19 @@ export async function listForNumzUser(numzUserId) {
  * it — the browser proves the subscription works by successfully creating it.
  */
 export async function upsertSubscription({
-  numzUserId, endpoint, p256dh, auth, userAgent,
+  numzUserId, companyId, endpoint, p256dh, auth, userAgent,
 }) {
   const [row, created] = await PushSubscription.findOrCreate({
     where: { endpoint },
     defaults: {
-      numzUserId, endpoint, p256dh, auth, userAgent, status: ACTIVE,
+      numzUserId, companyId, endpoint, p256dh, auth, userAgent, status: ACTIVE,
     },
   });
   if (!created) {
     // Re-subscription on the same device/browser (e.g. key rotation) —
     // refresh keys and ownership rather than leaving stale ones in place.
     await row.update({
-      numzUserId, p256dh, auth, userAgent, status: ACTIVE, deactivatedAt: null, deactivationReason: null,
+      numzUserId, companyId, p256dh, auth, userAgent, status: ACTIVE, deactivatedAt: null, deactivationReason: null,
     });
   }
   return row;

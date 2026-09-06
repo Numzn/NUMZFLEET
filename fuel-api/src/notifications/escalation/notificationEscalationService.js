@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { UserNotification } from '../../models/index.js';
+import { UserNotification, DEFAULT_COMPANY_ID } from '../../models/index.js';
 import { CHANNELS, URGENCY } from '../contracts/notificationContract.js';
 import { publishNotification } from '../orchestrator/publishNotification.js';
 import { getNotificationIo } from '../notificationContext.js';
@@ -59,11 +59,35 @@ export async function findEscalationCandidates({
  * @param {import('../../models/UserNotification.js').default} original a
  *   live UserNotification Sequelize instance (as returned by
  *   findEscalationCandidates), not the toApi() shape.
+ * @returns {Promise<{ escalated: boolean, reason?: string }>}
  */
 export async function escalateNotification(original) {
+  // Re-check immediately before acting: findEscalationCandidates() took a
+  // query snapshot, and escalateOverdueNotifications() processes a whole
+  // batch sequentially (each step doing several awaited DB/network calls) —
+  // the recipient may have acknowledged this exact notification in the time
+  // since that snapshot was taken.
+  await original.reload();
+  if (original.acknowledgedAt || original.escalatedAt) {
+    return { escalated: false, reason: 'already_settled' };
+  }
+
   const reminderDedupKey = `escalation:${original.id}`;
 
-  await publishNotification({
+  // Mirror the ORIGINAL's own explicit-vs-fallback company semantics rather
+  // than passing original.tenantId directly: publishNotification.js always
+  // stamps a real tenantId (falling back to DEFAULT_COMPANY_ID when no
+  // producer set one), so original.tenantId is never falsy. Passing it
+  // unconditionally would make explicitCompanyId true for every escalation
+  // reminder — including for a provisioned recipient whose original
+  // notification landed on the legacy default-tenant fallback — and
+  // recipientEligibility.js's tenant-match check would then suppress the
+  // reminder on every channel for a mismatch that never affected the original.
+  const explicitCompanyIdValue = original.tenantId && original.tenantId !== DEFAULT_COMPANY_ID
+    ? original.tenantId
+    : null;
+
+  const result = await publishNotification({
     type: `${original.type}.escalation`,
     entityType: original.category,
     entityId: original.id,
@@ -72,7 +96,7 @@ export async function escalateNotification(original) {
     title: `Reminder: ${original.title}`,
     message: `${original.message} — still requires your acknowledgement.`,
     source: original.source,
-    companyId: original.tenantId,
+    companyId: explicitCompanyIdValue,
     audience: { userIds: [original.userId] },
     metadata: {
       ...(original.metadata || {}),
@@ -83,6 +107,15 @@ export async function escalateNotification(original) {
     channels: ALL_CHANNELS,
     mandatory: true,
   }, { io: getNotificationIo() });
+
+  // Only mark this escalation "done" if the reminder actually reached the
+  // recipient on at least one channel. Marking it unconditionally would let
+  // a fully-suppressed reminder (no eligible channel, tenant mismatch, etc.)
+  // silently remove the original from all future escalation sweeps even
+  // though nobody was ever actually notified.
+  if (!result.persisted || !result.anyDelivered) {
+    return { escalated: false, reason: 'not_delivered' };
+  }
 
   const now = new Date();
 
@@ -101,6 +134,7 @@ export async function escalateNotification(original) {
   );
 
   await original.update({ escalatedAt: now });
+  return { escalated: true };
 }
 
 /**
@@ -125,8 +159,8 @@ export async function escalateOverdueNotifications({
   for (const original of candidates) {
     try {
       // eslint-disable-next-line no-await-in-loop -- a bounded batch of escalations, each independent; not worth a Promise.all's partial-failure complexity here.
-      await escalate(original);
-      escalated += 1;
+      const result = await escalate(original);
+      if (result?.escalated) escalated += 1;
     } catch (error) {
       errors += 1;
       console.error('[notification-escalation] failed to escalate', {

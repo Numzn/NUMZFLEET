@@ -12,11 +12,11 @@ export async function listForNumzUser(numzUserId) {
  * verbose but unambiguous, and the write volume (a few dozen rows, only on
  * explicit save) doesn't need upsert's single-statement performance.
  */
-export async function upsertForNumzUser(numzUserId, entries) {
+export async function upsertForNumzUser(numzUserId, entries, companyId) {
   await Promise.all(entries.map(async (entry) => {
     const [row, created] = await NotificationPreference.findOrCreate({
       where: { numzUserId, channel: entry.channel, category: entry.category },
-      defaults: { enabled: entry.enabled },
+      defaults: { companyId, enabled: entry.enabled },
     });
     if (!created && row.enabled !== entry.enabled) {
       await row.update({ enabled: entry.enabled });

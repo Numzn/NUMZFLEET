@@ -1,6 +1,7 @@
 import { ensureNumzUserRow } from '../../services/numzUserProvisioning.js';
 import * as repo from './notificationPreferencesRepository.js';
 import { NOTIFICATION_CHANNELS, NOTIFICATION_CATEGORIES } from './constants.js';
+import { DEFAULT_COMPANY_ID } from '../../models/index.js';
 
 // Default when no row exists, per channel. Every channel but email/push
 // defaults to true, matching the notification_preferences column's own DB
@@ -62,7 +63,7 @@ export async function putPreferences(req) {
     throw err;
   }
 
-  const rows = await repo.upsertForNumzUser(numzUser.id, valid);
+  const rows = await repo.upsertForNumzUser(numzUser.id, valid, numzUser.companyId || DEFAULT_COMPANY_ID);
   return {
     items: toFullMatrix(rows),
     channels: NOTIFICATION_CHANNELS,

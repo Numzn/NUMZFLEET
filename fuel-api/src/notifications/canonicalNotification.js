@@ -50,7 +50,7 @@ export function resolveUrgency({ severity, urgency } = {}) {
 /**
  * @param {Record<string, unknown>} [metadata]
  */
-function resolveEntityIdFromMetadata(metadata) {
+export function resolveEntityIdFromMetadata(metadata) {
   if (!metadata) return null;
   if (metadata.requestId != null) return String(metadata.requestId);
   if (metadata.traccarEventId != null) return String(metadata.traccarEventId);

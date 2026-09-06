@@ -51,3 +51,6 @@
 20260903_fix_notification_delivery_company_fk.sql
 20260906_push_subscription_lifecycle.sql
 20260906_notification_escalation.sql
+20260906_push_subscriptions_company_id.sql
+20260906_notification_preferences_company_id.sql
+20260906_delivery_attempt_provider_message_unique.sql

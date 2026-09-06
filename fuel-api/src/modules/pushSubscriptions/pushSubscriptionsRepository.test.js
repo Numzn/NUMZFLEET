@@ -39,7 +39,7 @@ describe('pushSubscriptionsRepository — Phase 6 lifecycle', { skip: !dbReachab
     const user = await makeNumzUser();
     const endpoint = `https://push.example.com/${randomUUID()}`;
     await repo.upsertSubscription({
-      numzUserId: user.id, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
+      numzUserId: user.id, companyId: COMPANY, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
     });
     const list = await repo.listForNumzUser(user.id);
     assert.equal(list.length, 1);
@@ -50,7 +50,7 @@ describe('pushSubscriptionsRepository — Phase 6 lifecycle', { skip: !dbReachab
     const user = await makeNumzUser();
     const endpoint = `https://push.example.com/${randomUUID()}`;
     await repo.upsertSubscription({
-      numzUserId: user.id, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
+      numzUserId: user.id, companyId: COMPANY, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
     });
 
     const deactivated = await repo.deactivateByEndpoint(endpoint, 'expired');
@@ -72,7 +72,7 @@ describe('pushSubscriptionsRepository — Phase 6 lifecycle', { skip: !dbReachab
     const user = await makeNumzUser();
     const endpoint = `https://push.example.com/${randomUUID()}`;
     await repo.upsertSubscription({
-      numzUserId: user.id, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
+      numzUserId: user.id, companyId: COMPANY, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
     });
     const first = await repo.deactivateByEndpoint(endpoint, 'expired');
     const second = await repo.deactivateByEndpoint(endpoint, 'expired');
@@ -89,13 +89,13 @@ describe('pushSubscriptionsRepository — Phase 6 lifecycle', { skip: !dbReachab
     const user = await makeNumzUser();
     const endpoint = `https://push.example.com/${randomUUID()}`;
     await repo.upsertSubscription({
-      numzUserId: user.id, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
+      numzUserId: user.id, companyId: COMPANY, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
     });
     await repo.deactivateByEndpoint(endpoint, 'expired');
     assert.equal((await repo.listForNumzUser(user.id)).length, 0);
 
     await repo.upsertSubscription({
-      numzUserId: user.id, endpoint, p256dh: 'k2', auth: 'a2', userAgent: 'test-2',
+      numzUserId: user.id, companyId: COMPANY, endpoint, p256dh: 'k2', auth: 'a2', userAgent: 'test-2',
     });
     const list = await repo.listForNumzUser(user.id);
     assert.equal(list.length, 1);
@@ -108,7 +108,7 @@ describe('pushSubscriptionsRepository — Phase 6 lifecycle', { skip: !dbReachab
     const user = await makeNumzUser();
     const endpoint = `https://push.example.com/${randomUUID()}`;
     await repo.upsertSubscription({
-      numzUserId: user.id, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
+      numzUserId: user.id, companyId: COMPANY, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
     });
     assert.ok(await repo.findByEndpointForNumzUser(user.id, endpoint));
 
@@ -120,7 +120,7 @@ describe('pushSubscriptionsRepository — Phase 6 lifecycle', { skip: !dbReachab
     const user = await makeNumzUser();
     const endpoint = `https://push.example.com/${randomUUID()}`;
     await repo.upsertSubscription({
-      numzUserId: user.id, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
+      numzUserId: user.id, companyId: COMPANY, endpoint, p256dh: 'k', auth: 'a', userAgent: 'test',
     });
     await repo.removeForNumzUser(user.id, endpoint);
     const row = await PushSubscription.findOne({ where: { endpoint } });
