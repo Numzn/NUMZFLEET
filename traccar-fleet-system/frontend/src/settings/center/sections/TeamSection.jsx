@@ -1,54 +1,49 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import {
-  Box, Typography, Chip, Switch, FormControlLabel, TextField, CircularProgress, Stack,
+  Box, Typography, Switch, FormControlLabel, TextField, CircularProgress, Stack,
 } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
-import LinkIcon from '@mui/icons-material/Link';
-import BadgeIcon from '@mui/icons-material/Badge';
 import { traccarPath } from '../../../config/traccarApi.js';
 import { useCatch, useEffectAsync } from '../../../reactHelper';
 import { useTranslation } from '../../../common/components/LocalizationProvider';
 import { useManager } from '../../../common/util/permissions';
+import { derivePersonRoles, derivePersonStatus } from '../../../common/util/personRoles';
+import usePersonDriverLinks from '../../../common/util/usePersonDriverLinks';
+import PersonRoleChips from '../../../common/components/PersonRoleChips';
+import PersonStatusChip from '../../../common/components/PersonStatusChip';
 import { formatTime } from '../../../common/util/formatter';
 import fetchOrThrow from '../../../common/util/fetchOrThrow';
 import { useSetTopBarTitle } from '../../../common/components/TopBarTitleContext';
 import SettingsCenterShell from '../SettingsCenterShell.jsx';
 import SettingsSectionPanel from '../components/SettingsSectionPanel.jsx';
 import SettingsCard from '../components/SettingsCard.jsx';
-import EditRolesDialog from '../components/EditRolesDialog.jsx';
 import CollectionActions from '../../components/CollectionActions';
 import CollectionFab from '../../components/CollectionFab';
 import { filterByKeyword } from '../../components/SearchHeader';
-import { fetchSystemRoles, fetchRoleAssignments } from '../rolesApi.js';
 
 /**
- * Restyled UsersPage.jsx — same data source, same CollectionActions/CollectionFab
- * logic, only the list chrome changed (SettingsCard rows instead of a raw Table),
- * per the app-wide UI/UX audit's finding that this page's List pattern is
- * mechanically restyleable without touching its underlying logic.
+ * The people directory. Roles and status shown here are derived from the fields
+ * that actually gate access (see common/util/personRoles.js), not from the
+ * roles/permissions tables, whose assignments do not yet change what anyone can
+ * do — showing both at once would present two contradictory answers to "what is
+ * this person allowed to do?".
+ *
+ * Tenancy: /api/users and /api/drivers are read straight from Traccar and are
+ * not scoped to the caller's company. Pre-existing, and tracked for the later
+ * migration behind NUMZFLEET APIs.
  */
 export default function TeamSection() {
   useSetTopBarTitle('Settings');
   const navigate = useNavigate();
   const t = useTranslation();
   const manager = useManager();
-  const currentUser = useSelector((state) => state.session.user);
 
   const [timestamp, setTimestamp] = useState(Date.now());
   const [items, setItems] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [temporary, setTemporary] = useState(false);
-
-  const [roles, setRoles] = useState([]);
-  const [assignments, setAssignments] = useState([]);
-  const [editingMember, setEditingMember] = useState(null);
-
-  const refreshAssignments = useCatch(async () => {
-    setAssignments(await fetchRoleAssignments(currentUser));
-  });
 
   const handleLogin = useCatch(async (userId) => {
     await fetchOrThrow(traccarPath(`/api/session/${userId}`));
@@ -62,43 +57,26 @@ export default function TeamSection() {
     handler: handleLogin,
   };
 
-  const actionConnections = {
-    key: 'connections',
-    title: t('sharedConnections'),
-    icon: <LinkIcon fontSize="small" />,
-    handler: (userId) => navigate(`/settings/user/${userId}/connections`),
-  };
-
-  const actionEditRoles = {
-    key: 'editRoles',
-    title: 'Edit roles',
-    icon: <BadgeIcon fontSize="small" />,
-    handler: (userId) => setEditingMember(items.find((item) => item.id === userId) || null),
-  };
-
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow(traccarPath('/api/users?excludeAttributes=true'));
+      // Attributes carry the role signals (isManager, numzRole), so unlike the
+      // previous version this cannot request excludeAttributes.
+      const response = await fetchOrThrow(traccarPath('/api/users'));
       setItems(await response.json());
     } finally {
       setLoading(false);
     }
   }, [timestamp]);
 
-  useEffectAsync(async () => {
-    setRoles(await fetchSystemRoles(currentUser));
-    setAssignments(await fetchRoleAssignments(currentUser));
-    return null;
-  }, []);
-
   const visible = items.filter((u) => temporary || !u.temporary).filter(filterByKeyword(searchKeyword));
+  const { driverByPerson } = usePersonDriverLinks(visible.map((item) => item.id));
 
   return (
     <SettingsCenterShell>
       <SettingsSectionPanel
-        title="Team"
-        description="Manage who has access to your fleet."
+        title="People"
+        description="Everyone in your fleet — their roles, status, and driver profiles."
         actions={(
           <TextField
             size="small"
@@ -120,7 +98,10 @@ export default function TeamSection() {
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2,
                 }}
                 >
-                  <Box sx={{ minWidth: 0 }}>
+                  <Box
+                    sx={{ minWidth: 0, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                    onClick={() => navigate(`/settings/people/user/${item.id}`)}
+                  >
                     <Typography fontWeight={600} noWrap>{item.name}</Typography>
                     <Typography variant="body2" color="text.secondary" noWrap>{item.email}</Typography>
                   </Box>
@@ -128,17 +109,11 @@ export default function TeamSection() {
                     display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0,
                   }}
                   >
-                    {assignments
-                      .filter((a) => a.traccarUserId === item.id)
-                      .map((a) => (
-                        <Chip key={a.userRoleId} size="small" label={a.roleLabel} variant="outlined" />
-                      ))}
-                    {item.administrator && (
-                      <Chip size="small" label={t('userAdmin')} color="primary" variant="outlined" />
-                    )}
-                    {item.disabled && (
-                      <Chip size="small" label={t('sharedDisabled')} variant="outlined" />
-                    )}
+                    <PersonRoleChips
+                      roles={derivePersonRoles(item)}
+                      isDriver={!!driverByPerson[item.id]}
+                    />
+                    <PersonStatusChip status={derivePersonStatus(item)} />
                     {item.expirationTime && (
                       <Typography variant="caption" color="text.secondary">
                         {formatTime(item.expirationTime, 'date')}
@@ -146,17 +121,17 @@ export default function TeamSection() {
                     )}
                     <CollectionActions
                       itemId={item.id}
-                      editPath="/settings/user"
+                      editPath="/settings/people/user"
                       endpoint="users"
                       setTimestamp={setTimestamp}
-                      customActions={manager ? [actionEditRoles, actionLogin, actionConnections] : [actionConnections]}
+                      customActions={manager ? [actionLogin] : []}
                     />
                   </Box>
                 </Box>
               </SettingsCard>
             ))}
             {!visible.length && (
-              <Typography variant="body2" color="text.secondary">No team members found.</Typography>
+              <Typography variant="body2" color="text.secondary">No people found.</Typography>
             )}
           </Stack>
         )}
@@ -173,14 +148,6 @@ export default function TeamSection() {
         />
       </SettingsSectionPanel>
       <CollectionFab editPath="/settings/user" />
-      <EditRolesDialog
-        open={!!editingMember}
-        member={editingMember}
-        roles={roles}
-        assignments={assignments}
-        onClose={() => setEditingMember(null)}
-        onChanged={refreshAssignments}
-      />
     </SettingsCenterShell>
   );
 }

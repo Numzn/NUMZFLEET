@@ -16,6 +16,7 @@ import OverviewSection from './settings/center/sections/OverviewSection.jsx';
 import ProfileSection from './settings/center/sections/ProfileSection';
 import SecuritySection from './settings/center/sections/SecuritySection';
 import TeamSection from './settings/center/sections/TeamSection';
+import PersonProfilePage from './settings/center/people/PersonProfilePage.jsx';
 import RolesSection from './settings/center/sections/RolesSection';
 import DevicesSection from './settings/center/sections/DevicesSection';
 import NotificationsSection from './settings/center/sections/NotificationsSection';
@@ -155,7 +156,8 @@ const Navigation = () => {
           <Route index element={<DashboardPage />} />
           <Route path="map" element={<LiveMapPage />} />
           <Route path="fuel-requests" element={<FuelRequestsRouteGuard />} />
-          <Route path="fleet/drivers/new" element={<FleetDriverPage />} />
+          {/* Adding a driver is a dialog on the list now, not its own page. */}
+          <Route path="fleet/drivers/new" element={<Navigate to="/fleet/drivers" replace />} />
           <Route path="fleet/drivers/:id" element={<FleetDriverPage />} />
           <Route path="fleet/drivers" element={<FleetDriversPage />} />
           <Route path="fleet/vehicles/:vehicleId/setup" element={<VehicleSetupPage />} />
@@ -234,7 +236,12 @@ const Navigation = () => {
           <Route path="notification" element={<SettingsCenterShell><NotificationPage /></SettingsCenterShell>} />
           <Route path="preferences" element={<PreferencesSection />} />
           <Route path="server" element={<SettingsCenterShell><ServerPage /></SettingsCenterShell>} />
-          <Route path="users" element={<TeamSection />} />
+          <Route path="people" element={<TeamSection />} />
+          <Route path="people/user/:userId" element={<PersonProfilePage />} />
+          <Route path="people/driver/:driverId" element={<PersonProfilePage />} />
+          {/* Renamed to People. Redirect keeps existing links and bookmarks
+              working, same pattern as /settings/drivers above. */}
+          <Route path="users" element={<Navigate to="/settings/people" replace />} />
           <Route path="roles" element={<RolesSection />} />
           <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
