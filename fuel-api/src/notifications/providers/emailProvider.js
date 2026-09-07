@@ -15,6 +15,10 @@ const EMAIL_SECURE = String(process.env.EMAIL_SECURE || '').toLowerCase() === 't
 const EMAIL_USER = process.env.EMAIL_USER || '';
 const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || EMAIL_USER;
+// Optional — a bare address (today's behavior) is still valid. Set to give
+// automated mail a recognizable sender name instead of just an address,
+// which providers/spam filters treat as a trust signal.
+const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || '';
 const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 10000);
 
 const logEmail = (level, msg, extra = {}) => {
@@ -80,11 +84,17 @@ export async function sendEmail({
   try {
     const info = await Promise.race([
       getTransport().sendMail({
-        from: EMAIL_FROM,
+        from: EMAIL_FROM_NAME ? { name: EMAIL_FROM_NAME, address: EMAIL_FROM } : EMAIL_FROM,
         to,
         subject,
         text,
         html: html || undefined,
+        // Its absence is itself a negative signal to Gmail/Yahoo's spam
+        // classifiers for automated mail — a mailto target, not an HTTPS
+        // one-click link (numz.site has no MX record to receive replies to
+        // a real unsubscribe endpoint), so List-Unsubscribe-Post is
+        // deliberately not set — that header only applies to the HTTPS variant.
+        headers: { 'List-Unsubscribe': `<mailto:${EMAIL_FROM}?subject=unsubscribe>` },
       }),
       timeoutPromise,
     ]);

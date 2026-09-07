@@ -102,6 +102,75 @@ describe('sendEmail — transport interaction (mocked, no real network I/O)', ()
     });
   });
 
+  it('EMAIL_FROM_NAME unset -> from is the plain address, unchanged from before this option existed', async () => {
+    await withEnv({
+      EMAIL_PROVIDER: 'smtp',
+      EMAIL_HOST: 'smtp.example.com',
+      EMAIL_USER: 'alerts@example.com',
+      EMAIL_PASSWORD: 'app-password',
+      EMAIL_FROM: 'alerts@example.com',
+    }, async () => {
+      delete process.env.EMAIL_FROM_NAME;
+      let capturedArgs;
+      const createTransportMock = mock.method(nodemailer, 'createTransport', () => ({
+        sendMail: async (args) => { capturedArgs = args; return { messageId: '<x@example.com>' }; },
+      }));
+      try {
+        const { sendEmail } = await freshProvider();
+        await sendEmail({ to: 'user@example.com', subject: 'Test', text: 'Body' });
+        assert.equal(capturedArgs.from, 'alerts@example.com');
+      } finally {
+        createTransportMock.mock.restore();
+      }
+    });
+  });
+
+  it('EMAIL_FROM_NAME set -> from is a {name, address} object, not a string', async () => {
+    await withEnv({
+      EMAIL_PROVIDER: 'smtp',
+      EMAIL_HOST: 'smtp.example.com',
+      EMAIL_USER: 'alerts@example.com',
+      EMAIL_PASSWORD: 'app-password',
+      EMAIL_FROM: 'alerts@example.com',
+    }, async () => {
+      process.env.EMAIL_FROM_NAME = 'NUMZ TECHNOLOGIES';
+      let capturedArgs;
+      const createTransportMock = mock.method(nodemailer, 'createTransport', () => ({
+        sendMail: async (args) => { capturedArgs = args; return { messageId: '<x@example.com>' }; },
+      }));
+      try {
+        const { sendEmail } = await freshProvider();
+        await sendEmail({ to: 'user@example.com', subject: 'Test', text: 'Body' });
+        assert.deepEqual(capturedArgs.from, { name: 'NUMZ TECHNOLOGIES', address: 'alerts@example.com' });
+      } finally {
+        createTransportMock.mock.restore();
+        delete process.env.EMAIL_FROM_NAME;
+      }
+    });
+  });
+
+  it('always sets a List-Unsubscribe header — its absence is itself a spam signal for automated mail', async () => {
+    await withEnv({
+      EMAIL_PROVIDER: 'smtp',
+      EMAIL_HOST: 'smtp.example.com',
+      EMAIL_USER: 'alerts@example.com',
+      EMAIL_PASSWORD: 'app-password',
+      EMAIL_FROM: 'alerts@example.com',
+    }, async () => {
+      let capturedArgs;
+      const createTransportMock = mock.method(nodemailer, 'createTransport', () => ({
+        sendMail: async (args) => { capturedArgs = args; return { messageId: '<x@example.com>' }; },
+      }));
+      try {
+        const { sendEmail } = await freshProvider();
+        await sendEmail({ to: 'user@example.com', subject: 'Test', text: 'Body' });
+        assert.equal(capturedArgs.headers['List-Unsubscribe'], '<mailto:alerts@example.com?subject=unsubscribe>');
+      } finally {
+        createTransportMock.mock.restore();
+      }
+    });
+  });
+
   it('a transport failure is caught and rethrown as a clean error, not left as a raw network exception', async () => {
     await withEnv({
       EMAIL_PROVIDER: 'smtp',

@@ -14,25 +14,39 @@ export function isDeliverableEmail(address) {
   return EMAIL_FORMAT.test(address);
 }
 
+const SENDER_FOOTER_TEXT = 'NUMZ Technologies — automated fleet notification. '
+  + 'Manage what you receive by email in NUMZFLEET Settings > Notifications.';
+
 /**
  * Builds a plain-text body. Deliberately simple — this is a notification
  * relay, not a templated marketing/transactional email system; the same
  * title/message every other channel already renders, in the recipient's inbox.
+ * Carries a short sender/footer line (who this is from, how to manage it) —
+ * its absence reads as an incomplete/auto-generated message to spam filters,
+ * independent of the actual content.
  * @param {import('../contracts/notificationContract.js').CanonicalNotificationPayload} payload
  */
-function buildEmailBody(payload) {
+export function buildEmailBody(payload) {
   const lines = [payload.message || ''];
   if (payload.metadata && Object.keys(payload.metadata).length) {
     lines.push('', '—', `Reference: ${payload.entityType || 'notification'}/${payload.entityId || ''}`);
   }
+  lines.push('', '--', SENDER_FOOTER_TEXT);
   return lines.join('\n');
 }
 
-function buildEmailHtml(payload) {
+export function buildEmailHtml(payload) {
   const escape = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
-  return `<p>${escape(payload.message)}</p>`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"></head>
+<body style="font-family:sans-serif;font-size:14px;color:#1a1a1a;line-height:1.5;">
+<p>${escape(payload.message)}</p>
+<p style="margin-top:24px;padding-top:12px;border-top:1px solid #ddd;font-size:12px;color:#666;">${escape(SENDER_FOOTER_TEXT)}</p>
+</body>
+</html>`;
 }
 
 /**
