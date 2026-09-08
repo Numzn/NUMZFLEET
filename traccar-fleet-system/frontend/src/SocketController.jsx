@@ -2,6 +2,8 @@ import {
   useCallback, useEffect, useRef,
 } from 'react';
 import { traccarPath, traccarFetch } from './config/traccarApi.js';
+import fetchOrThrow from './common/util/fetchOrThrow.js';
+import { fuelApiAuthHeaders } from './config/fuelApiAuth.js';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { devicesActions, sessionActions } from './store';
@@ -20,7 +22,8 @@ const SocketController = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const authenticated = useSelector((state) => Boolean(state.session.user));
+  const user = useSelector((state) => state.session.user);
+  const authenticated = Boolean(user);
   const includeLogs = useSelector((state) => state.session.includeLogs);
   const unified = useSelector(isUnifiedNotificationsEnabled);
 
@@ -32,27 +35,34 @@ const SocketController = () => {
 
   const features = useFeatures();
 
+  // Device/position snapshot comes from fuel-api (company-scoped, same
+  // boundary as the Vehicles registry — Vehicle Visibility Audit, D2), not
+  // Traccar directly. A lightweight /api/session probe first, purely to
+  // detect a dead Traccar session: fuel-api 401s do NOT mean that (see
+  // fetchOrThrow's isNonTraccarUnauthorizedPath), so that signal would
+  // otherwise be lost by moving off the direct Traccar calls this replaces.
+  // Live incremental updates still arrive over the Traccar WebSocket below
+  // (connectSocket) — closing that gap for non-admin accounts depends on
+  // their Traccar-side group/permission grants being correct (D1), not on
+  // this snapshot fetch.
   const refreshSnapshot = useCallback(async () => {
     try {
-      const [devicesResponse, positionsResponse] = await Promise.all([
-        traccarFetch('/api/devices'),
-        traccarFetch('/api/positions'),
-      ]);
-
-      if (devicesResponse.ok) {
-        dispatch(devicesActions.refresh(await devicesResponse.json()));
-      }
-      if (positionsResponse.ok) {
-        dispatch(sessionActions.updatePositions(await positionsResponse.json()));
-      }
-
-      if (devicesResponse.status === 401 || positionsResponse.status === 401) {
+      const sessionCheck = await traccarFetch('/api/session');
+      if (sessionCheck.status === 401) {
         navigate('/login');
+        return;
       }
+
+      const response = await fetchOrThrow('/api/fleet/devices', {
+        headers: fuelApiAuthHeaders(user),
+      });
+      const { devices, positions } = await response.json();
+      dispatch(devicesActions.refresh(devices));
+      dispatch(sessionActions.updatePositions(positions));
     } catch {
       // ignore refresh errors; websocket will retry independently
     }
-  }, [dispatch, navigate]);
+  }, [dispatch, navigate, user]);
 
   const handleEvents = useCallback((events) => {
     if (!features.disableEvents) {

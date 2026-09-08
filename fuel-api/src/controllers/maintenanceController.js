@@ -8,6 +8,8 @@ import {
   listTraccarMaintenances,
   resetTraccarMaintenanceSchedule,
 } from '../services/traccarMaintenanceProxyService.js';
+import { assertVehicleDeviceInTenant } from '../services/vehicleFleetService.js';
+import { deviceOwnsMaintenanceId } from '../maintenance/routineServiceTraccarService.js';
 
 export async function getDashboard(req, res) {
   try {
@@ -58,6 +60,17 @@ export async function resetTraccarMaintenanceHandler(req, res) {
     if (!name || !type || start == null || period == null) {
       return res.status(400).json({ error: 'name, type, start, and period are required' });
     }
+
+    // This endpoint acts on a Traccar maintenanceId, not the vehicle id in
+    // the URL — without this check, any manager could reset an arbitrary
+    // maintenance schedule by guessing its id, regardless of which vehicle
+    // (or company) it actually belongs to (Vehicle Visibility Audit, B4 / D3).
+    const deviceId = await assertVehicleDeviceInTenant(req.params.id, req.auth?.companyId);
+    const owned = await deviceOwnsMaintenanceId(deviceId, maintenanceId);
+    if (!owned) {
+      return res.status(404).json({ error: 'Maintenance schedule not found for this vehicle' });
+    }
+
     const data = await resetTraccarMaintenanceSchedule(maintenanceId, {
       id: maintenanceId,
       name,

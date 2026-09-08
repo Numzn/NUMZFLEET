@@ -14,7 +14,7 @@
  */
 import { Role, UserRole } from '../models/index.js';
 import { traccarServiceFetch } from './traccarServiceClient.js';
-import { ensureCompanyTraccarGroup } from './companyProvisioningService.js';
+import { ensureCompanyTraccarGroup, ensureUserInCompanyTraccarGroup } from './companyProvisioningService.js';
 import { createForTraccarUser } from '../modules/profile/profileRepository.js';
 
 function badRequest(message) {
@@ -106,6 +106,17 @@ export async function provisionCompanyAdmin({ companyId, admin }) {
     await UserRole.findOrCreate({
       where: { numzUserId: numzUser.id, roleId: companyAdminRole.id, companyId },
     });
+  }
+
+  // Put this new admin in their company's Traccar group so Traccar's own
+  // visibility follows company_id from the start — the missing step this
+  // workflow never had (Vehicle Visibility Audit, B3 / D1). Best-effort: a
+  // Traccar permission-grant failure here must not fail account creation
+  // itself, which has already succeeded in both Traccar and Postgres.
+  try {
+    await ensureUserInCompanyTraccarGroup(companyId, traccarUser.id);
+  } catch (err) {
+    console.warn('[provisionCompanyAdmin] Traccar group grant failed (non-fatal):', err?.message || err);
   }
 
   return {

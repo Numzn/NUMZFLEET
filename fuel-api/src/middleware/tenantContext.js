@@ -53,7 +53,14 @@ export async function attachTenantContext(req, res, next) {
       organizationType: null,
       accessibleCustomerIds: [],
       roles: [],
-      isSuperAdmin: req.user?.administrator === true,
+      // Fail closed: the happy path only grants isSuperAdmin when the
+      // identity has no home company (or an explicit platform role) — data
+      // this catch block never got to look up, since resolution itself
+      // failed. Trusting the raw Traccar administrator flag here would grant
+      // platform capability on the one code path that couldn't verify the
+      // condition the rest of the app requires for it (see Vehicle
+      // Visibility Audit, B7 / D6).
+      isSuperAdmin: false,
       traccarUserId: req.user?.id ?? null,
     };
     next();

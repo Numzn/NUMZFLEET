@@ -1,6 +1,6 @@
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
-import { Vehicle, DeviceAssignment, VehicleSpec, VehicleDailyMileage, DEFAULT_COMPANY_ID } from '../models/index.js';
+import { Vehicle, DeviceAssignment, VehicleSpec, VehicleDailyMileage, CompanyDevice, DEFAULT_COMPANY_ID } from '../models/index.js';
 import {
   getTraccarDevice,
   getTraccarDevicesByIds,
@@ -10,7 +10,7 @@ import {
   updateTraccarDeviceName,
 } from '../config/traccar.js';
 import { resolveVehicleDisplayFromModels } from '../utils/resolveVehicleDisplay.js';
-import { ensureDeviceInCompany } from './companyProvisioningService.js';
+import { ensureDeviceInCompany, reconcileCompanyTraccarUsers } from './companyProvisioningService.js';
 import { emitDomainEvent } from '../events/eventBus.js';
 import { EVENT_NAMES } from '../events/eventNames.js';
 import { normalizePositionTelemetry } from '../utils/normalizeTelemetry.js';
@@ -209,12 +209,35 @@ export async function assertVehicleInTenant(vehicleId, companyId = DEFAULT_COMPA
     err.statusCode = 404;
     throw err;
   }
-  if (companyId && vehicle.companyId && vehicle.companyId !== companyId) {
+  // vehicle.companyId is NOT NULL as of the 20260908 migration — no longer
+  // possible for a companyless vehicle to silently skip this comparison
+  // (Vehicle Visibility Audit, B6 / D5). companyId itself may still be
+  // falsy here (platform callers pass null/undefined for "no scoping").
+  if (companyId && vehicle.companyId !== companyId) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
   }
   return vehicle;
+}
+
+/**
+ * Resolves the active Traccar device id for a vehicle already confirmed to
+ * belong to companyId. Used by callers that act on a Traccar-side id keyed
+ * to a device (e.g. a maintenance schedule) rather than the vehicle itself —
+ * see maintenanceController.js's resetTraccarMaintenanceHandler, which needs
+ * this to confirm a caller-supplied maintenanceId actually belongs to their
+ * own vehicle's device before touching it (Vehicle Visibility Audit, D3).
+ */
+export async function assertVehicleDeviceInTenant(vehicleId, companyId = DEFAULT_COMPANY_ID) {
+  await assertVehicleInTenant(vehicleId, companyId);
+  const assignment = await DeviceAssignment.findOne({ where: { vehicleId, isActive: true } });
+  if (!assignment) {
+    const err = new Error('Vehicle has no assigned device');
+    err.statusCode = 400;
+    throw err;
+  }
+  return Number(assignment.deviceId);
 }
 
 /**
@@ -266,12 +289,20 @@ export async function createVehicle({ name, plateNumber, companyId }) {
   });
 }
 
-export async function updateVehicle(id, { name, plateNumber }) {
+export async function updateVehicle(id, { name, plateNumber }, auth = null) {
   const vehicle = await Vehicle.findByPk(id);
   if (!vehicle) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
+  }
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      const err = new Error('Vehicle not found');
+      err.statusCode = 404;
+      throw err;
+    }
   }
   const trimmed = (name || '').trim();
   if (!trimmed) {
@@ -297,7 +328,7 @@ export async function updateVehicle(id, { name, plateNumber }) {
   }
 
   await vehicle.update({ name: trimmed, plateNumber: plate });
-  return getVehicleMerged(id);
+  return getVehicleMerged(id, auth);
 }
 
 export async function patchVehicleFields(id, fields = {}, auth = null) {
@@ -337,13 +368,21 @@ export async function patchVehicleFields(id, fields = {}, auth = null) {
   return getVehicleMerged(id, auth);
 }
 
-export async function deleteVehicle(id) {
+export async function deleteVehicle(id, auth = null) {
   const vid = String(id);
   const vehicle = await Vehicle.findByPk(vid);
   if (!vehicle) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
+  }
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      const err = new Error('Vehicle not found');
+      err.statusCode = 404;
+      throw err;
+    }
   }
 
   const activeAssignment = await DeviceAssignment.findOne({
@@ -553,7 +592,10 @@ export async function getVehicleMerged(id, auth = null) {
 export async function listDeviceAssignments(vehicleId, companyId = null) {
   const vehicle = await Vehicle.findByPk(vehicleId);
   if (!vehicle) return null;
-  if (companyId && vehicle.companyId && vehicle.companyId !== companyId) return null;
+  // vehicle.companyId is NOT NULL as of the 20260908 migration (see
+  // assertVehicleInTenant); companyId itself may still be falsy for
+  // unscoped/platform callers.
+  if (companyId && vehicle.companyId !== companyId) return null;
   const rows = await DeviceAssignment.findAll({
     where: { vehicleId: String(vehicleId) },
     order: [['assignedAt', 'DESC']],
@@ -599,6 +641,24 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
     }
   }
 
+  // Device-hijack guard: a Traccar device id is a small, guessable integer.
+  // Without this check, any manager who can access SOME vehicle in their own
+  // company could reassign a device already claimed by a different company
+  // (Vehicle Visibility Audit, B5 / D4) — ensureDeviceInCompany below would
+  // otherwise silently move it. Platform callers may still move a device
+  // between companies deliberately.
+  const existingDeviceLink = await CompanyDevice.findOne({ where: { traccarDeviceId: did } });
+  if (existingDeviceLink && existingDeviceLink.companyId !== vehicle.companyId) {
+    const isPlatform = auth?.activeContext?.type === 'platform';
+    if (!isPlatform) {
+      const err = new Error(
+        'This device is already assigned to another company. A platform administrator must release it first.',
+      );
+      err.statusCode = 409;
+      throw err;
+    }
+  }
+
   const trDevice = await getTraccarDevice(did);
   if (!trDevice) {
     const err = new Error('Traccar device not found');
@@ -635,6 +695,12 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
   try {
     await syncVehicleDeviceLabels(vehicle, did);
     await ensureDeviceInCompany(vehicle.companyId || DEFAULT_COMPANY_ID, did, vid);
+    // Keep the company's Traccar-side users in sync with its device group
+    // every time its device roster changes — the missing half of
+    // ensureDeviceInCompany, which only ever moved the device itself
+    // (Vehicle Visibility Audit, B3 / D1). Additive/idempotent; failures are
+    // non-fatal, same as the Traccar sync calls above.
+    await reconcileCompanyTraccarUsers(vehicle.companyId || DEFAULT_COMPANY_ID);
     await getVehicleSpec(did);
   } catch (err) {
     console.error('[vehicleFleet] label sync after assign failed:', err?.message || err);
@@ -659,12 +725,20 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
  *   fuelConsumptionLPer100km, vehicleType, lowFuelThresholdPct, updateIntervalSec, geofenceEnabled,
  *   geofenceRadiusM, alerts)
  */
-export async function updateVehicleMergedConfig(vehicleId, body = {}) {
+export async function updateVehicleMergedConfig(vehicleId, body = {}, auth = null) {
   const vehicle = await Vehicle.findByPk(vehicleId);
   if (!vehicle) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
+  }
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      const err = new Error('Vehicle not found');
+      err.statusCode = 404;
+      throw err;
+    }
   }
 
   const assignment = await DeviceAssignment.findOne({
@@ -696,7 +770,7 @@ export async function updateVehicleMergedConfig(vehicleId, body = {}) {
     await updateVehicle(vehicleId, {
       name: body.name !== undefined ? body.name : vehicle.name,
       plateNumber: body.plateNumber !== undefined ? body.plateNumber : vehicle.plateNumber,
-    });
+    }, auth);
   }
 
   if (wantsSpec && assignment) {
@@ -727,18 +801,26 @@ export async function updateVehicleMergedConfig(vehicleId, body = {}) {
     await upsertTraccarDeviceAttribute(deviceId, 'numzFleetConfig', next);
   }
 
-  return getVehicleMerged(vehicleId);
+  return getVehicleMerged(vehicleId, auth);
 }
 
 /**
  * Sync Routine Service Traccar schedule and persist config on device attributes.
  */
-export async function saveRoutineServiceForVehicle(vehicleId, { intervalKm, startingOdometerKm }) {
+export async function saveRoutineServiceForVehicle(vehicleId, { intervalKm, startingOdometerKm }, auth = null) {
   const vehicle = await Vehicle.findByPk(vehicleId);
   if (!vehicle) {
     const err = new Error('Vehicle not found');
     err.statusCode = 404;
     throw err;
+  }
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      const err = new Error('Vehicle not found');
+      err.statusCode = 404;
+      throw err;
+    }
   }
 
   const assignment = await DeviceAssignment.findOne({
@@ -773,7 +855,7 @@ export async function saveRoutineServiceForVehicle(vehicleId, { intervalKm, star
   };
   await upsertTraccarDeviceAttribute(deviceId, 'numzFleetConfig', next);
 
-  return getVehicleMerged(vehicleId);
+  return getVehicleMerged(vehicleId, auth);
 }
 
 /**

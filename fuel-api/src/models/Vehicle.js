@@ -19,7 +19,7 @@ export default (sequelize) => {
       },
       companyId: {
         type: DataTypes.UUID,
-        allowNull: true,
+        allowNull: false,
         field: 'company_id',
         references: { model: 'companies', key: 'id' },
       },

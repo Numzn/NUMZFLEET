@@ -37,6 +37,39 @@ export async function hasPlatformSuperAdminRole(numzUserId) {
 }
 
 /**
+ * Grants the platform_super_admin role to a numz user (companyId IS NULL,
+ * same shape hasPlatformSuperAdminRole reads). Companion writer for the
+ * reader above — nothing wrote this assignment before (see this file's
+ * original docstring). Intended for a deliberate, one-off, human-triggered
+ * decision (e.g. demoting a Traccar `administrator` account to a
+ * company-scoped identity while preserving its platform capability through
+ * this role instead) — not for any automatic provisioning path. Idempotent:
+ * safe to call on an identity that already holds the role.
+ */
+export async function grantPlatformSuperAdmin(numzUserId) {
+  if (!numzUserId) return null;
+  const [role] = await Role.findOrCreate({
+    where: { key: 'platform_super_admin', companyId: null },
+    defaults: { label: 'Platform Super Admin', isSystem: true },
+  });
+  const [userRole] = await UserRole.findOrCreate({
+    where: { numzUserId, roleId: role.id, companyId: null },
+  });
+  clearPermissionsCache(numzUserId);
+  return userRole;
+}
+
+/** Companion to grantPlatformSuperAdmin — same deliberate, one-off intent. */
+export async function revokePlatformSuperAdmin(numzUserId) {
+  if (!numzUserId) return 0;
+  const role = await Role.findOne({ where: { key: 'platform_super_admin', companyId: null } });
+  if (!role) return 0;
+  const removed = await UserRole.destroy({ where: { numzUserId, roleId: role.id, companyId: null } });
+  clearPermissionsCache(numzUserId);
+  return removed;
+}
+
+/**
  * Resolves a numz user's permissions for a given company (or platform-wide,
  * when companyId is null) into a flat array of permission keys — the one
  * function everything downstream should call, rather than each caller

@@ -44,6 +44,18 @@ export async function findRoutineServiceForDevice(deviceId) {
   return schedules.find((s) => s.attributes?.numzServicePackage === true) ?? null;
 }
 
+/**
+ * True if maintenanceId is one of deviceId's own Traccar maintenance
+ * schedules (via tc_device_maintenance). Used to confirm a caller-supplied
+ * maintenanceId actually belongs to the vehicle they claim it does before
+ * resetting it — see maintenanceController.js's resetTraccarMaintenanceHandler
+ * (Vehicle Visibility Audit, D3).
+ */
+export async function deviceOwnsMaintenanceId(deviceId, maintenanceId) {
+  const schedules = await loadMaintenancesForDevice(deviceId);
+  return schedules.some((s) => s.id === Number(maintenanceId));
+}
+
 /** All numzServicePackage-tagged schedules for a device, oldest (lowest id) first. */
 async function findAllRoutineServicesForDevice(deviceId) {
   const schedules = await loadMaintenancesForDevice(deviceId);

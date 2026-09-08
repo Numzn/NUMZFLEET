@@ -111,7 +111,7 @@ export const assignDevice = async (req, res) => {
  */
 export const updateVehicleConfig = async (req, res) => {
   try {
-    const merged = await updateVehicleMergedConfig(req.params.id, req.body || {});
+    const merged = await updateVehicleMergedConfig(req.params.id, req.body || {}, req.auth);
     return res.json(merged);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -129,7 +129,7 @@ export const updateRoutineService = async (req, res) => {
     const merged = await saveRoutineServiceForVehicle(req.params.id, {
       intervalKm,
       startingOdometerKm,
-    });
+    }, req.auth);
     return res.json(merged);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -144,7 +144,7 @@ export const updateRoutineService = async (req, res) => {
 export const updateVehicle = async (req, res) => {
   try {
     const { name, plateNumber } = req.body || {};
-    const merged = await updateVehicleService(req.params.id, { name, plateNumber });
+    const merged = await updateVehicleService(req.params.id, { name, plateNumber }, req.auth);
     return res.json(merged);
   } catch (error) {
     const status = error.statusCode || 500;
@@ -158,7 +158,7 @@ export const updateVehicle = async (req, res) => {
  */
 export const deleteVehicle = async (req, res) => {
   try {
-    await deleteVehicleService(req.params.id);
+    await deleteVehicleService(req.params.id, req.auth);
     return res.status(204).send();
   } catch (error) {
     const status = error.statusCode || 500;
