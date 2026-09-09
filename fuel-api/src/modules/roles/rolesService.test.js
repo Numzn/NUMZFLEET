@@ -19,6 +19,16 @@ import { traccarServiceFetch } from '../../services/traccarServiceClient.js';
 const TEST_SLUG_PREFIX = 'rolesservice-';
 const createdTraccarUserIds = [];
 
+// CI's quality-checks job has no Traccar service/credentials — only the dev
+// stack has a real Traccar reachable (see organizationProvisioningService.test.js
+// for the established pattern this matches). Both cases here create a real
+// Traccar user as fixture setup even though the second's own assertion is
+// Postgres-only, so skip the whole suite together rather than picking apart
+// which half of each case needs it.
+const SKIP_NO_TRACCAR = (process.env.TRACCAR_API_USER && process.env.TRACCAR_API_PASSWORD)
+  ? false
+  : 'requires a live Traccar (TRACCAR_API_USER/TRACCAR_API_PASSWORD not set) — not available in CI yet';
+
 after(async () => {
   const { Company, NumzUser } = await import('../../models/index.js');
   const companies = await Company.findAll({ where: { slug: { [Op.like]: `${TEST_SLUG_PREFIX}%` } } });
@@ -57,7 +67,7 @@ async function makeTraccarUser(label) {
   return user;
 }
 
-describe('assignRoleToUser — a user joining a company gets Traccar group access immediately', () => {
+describe('assignRoleToUser — a user joining a company gets Traccar group access immediately', { skip: SKIP_NO_TRACCAR }, () => {
   it('reconciles the company\'s Traccar group as part of assigning a new team member\'s first role', async () => {
     const company = await makeCompany('Join Test Co');
     const tUser = await makeTraccarUser('Join Test User');

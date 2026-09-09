@@ -19,6 +19,14 @@ import { traccarServiceFetch } from './traccarServiceClient.js';
 const TEST_SLUG_PREFIX = 'companyprovisioning-';
 const createdTraccarUserIds = [];
 
+// CI's quality-checks job has no Traccar service/credentials — only the dev
+// stack has a real Traccar reachable (see organizationProvisioningService.test.js
+// for the established pattern this matches). Every test here is meaningless
+// without it, so skip the whole suite there rather than individual cases.
+const SKIP_NO_TRACCAR = (process.env.TRACCAR_API_USER && process.env.TRACCAR_API_PASSWORD)
+  ? false
+  : 'requires a live Traccar (TRACCAR_API_USER/TRACCAR_API_PASSWORD not set) — not available in CI yet';
+
 after(async () => {
   const { Company, NumzUser } = await import('../models/index.js');
   const companies = await Company.findAll({ where: { slug: { [Op.like]: `${TEST_SLUG_PREFIX}%` } } });
@@ -69,7 +77,7 @@ async function makeNumzUser(companyId, traccarUserId, status = 'active') {
   });
 }
 
-describe('reconcileCompanyTraccarUsers', () => {
+describe('reconcileCompanyTraccarUsers', { skip: SKIP_NO_TRACCAR }, () => {
   it('grants group membership to an active, Traccar-linked user, and is idempotent', async () => {
     const company = await makeCompany('Grant Test Co');
     const tUser = await makeTraccarUser('Grant Test User');
