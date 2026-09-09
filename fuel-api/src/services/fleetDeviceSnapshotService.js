@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { CompanyDevice } from '../models/index.js';
+import { Vehicle, DeviceAssignment } from '../models/index.js';
 import { getTraccarDevicesByIds, getTraccarLatestPositionsByDeviceIds } from '../config/traccar.js';
 import { getAccessibleCompanyIds } from './scopeValidationService.js';
 
@@ -34,39 +34,43 @@ function toPositionDto(row) {
  * Company-scoped device + position snapshot — the fuel-api-mediated
  * equivalent of Traccar's own GET /api/devices + GET /api/positions, so the
  * Dashboard and Live Map can be governed by the same company_id boundary the
- * Vehicles registry already uses (Vehicle Visibility Audit, D2). This does
- * not replace Traccar's own session/WS auth — it adds a company-filtered
- * alternative for the initial/periodic snapshot fetch, backed by the same
- * getAccessibleCompanyIds() the rest of fuel-api's tenancy already uses.
- *
- * Scope note: for a platform-scoped caller (accessibleIds === null) this
- * returns every device present in company_devices across all companies —
- * i.e. every device some company has actually claimed via ensureDeviceInCompany
- * — not literally every device Traccar has ever seen. A device with no
- * company_devices row yet (never assigned to a vehicle) is out of scope for
- * this endpoint either way, matching how an unassigned device has no fleet
- * meaning yet on the Vehicles registry either.
+ * Vehicles registry already uses. This does not replace Traccar's own
+ * session/WS auth — it adds a company-filtered alternative for the
+ * initial/periodic snapshot fetch, backed by the same getAccessibleCompanyIds()
+ * the rest of fuel-api's tenancy already uses.
  */
 /**
  * The security-relevant part of getFleetDeviceSnapshot, isolated so it can
- * be tested against real company_devices rows without needing live Traccar
- * device/position data — see fleetDeviceSnapshotService.test.js. Same
- * getAccessibleCompanyIds() scoping listVehiclesMerged uses (Vehicle
- * Visibility Audit, D2): platform → all companies, partner → own + child
- * customers, customer → own company only.
+ * be tested against real vehicle/assignment rows without needing live
+ * Traccar device/position data — see fleetDeviceSnapshotService.test.js.
+ *
+ * Sources device ids from vehicles.company_id + active device_assignments —
+ * the same join listVehiclesMerged's toMergedDto path relies on, and the
+ * one truly authoritative link, written transactionally inside assignDevice's
+ * own DB transaction. NOT company_devices: that table is written best-effort,
+ * after the transaction, purely as a cache for other consumers (fleet KPIs,
+ * maintenance) — it can drift from the real vehicle/device relationship, and
+ * Live Map visibility must not inherit that drift.
  */
 export async function getAccessibleTraccarDeviceIds(auth) {
   const accessibleIds = getAccessibleCompanyIds(auth);
 
-  const where = { isActive: true };
+  const where = {};
   if (accessibleIds !== null) {
     if (!accessibleIds.length) return [];
     where.companyId = accessibleIds.length === 1 ? accessibleIds[0] : { [Op.in]: accessibleIds };
   }
 
-  const companyDevices = await CompanyDevice.findAll({ where, attributes: ['traccarDeviceId'] });
+  const vehicles = await Vehicle.findAll({ where, attributes: ['id'] });
+  if (!vehicles.length) return [];
+  const vehicleIds = vehicles.map((v) => v.id);
+
+  const assignments = await DeviceAssignment.findAll({
+    where: { vehicleId: { [Op.in]: vehicleIds }, isActive: true },
+    attributes: ['deviceId'],
+  });
   return [...new Set(
-    companyDevices.map((d) => Number(d.traccarDeviceId)).filter((n) => Number.isFinite(n)),
+    assignments.map((a) => Number(a.deviceId)).filter((n) => Number.isFinite(n)),
   )];
 }
 

@@ -419,6 +419,31 @@ export const closeTraccarConnection = async () => {
 };
 
 /**
+ * Run one query against Traccar MySQL on a single-use connection, closed
+ * immediately after — for callers that don't want to keep the shared pool
+ * (getTraccarPool) alive as a side effect. The long-running server process
+ * is fine holding that pool open for its whole lifetime, but any occasional,
+ * low-frequency caller (a one-off script, or code invoked from short-lived
+ * `node --test` child processes) leaves that pool's connections open and
+ * keeps the process's event loop alive indefinitely unless every such
+ * process remembers to call closeTraccarConnection() itself — a real bug
+ * found the hard way (Vehicle Visibility Audit rebuild: an unclosed pool
+ * hung a test file, and later a second, unrelated pre-existing test file
+ * that transitively started exercising the same code path hung the same
+ * way, since it had no reason to know about this pool at all). A one-off
+ * connection per call sidesteps the whole class of bug.
+ */
+export const runTraccarQuery = async (sql, params = []) => {
+  const connection = await mysql.createConnection(traccarConfig);
+  try {
+    const [rows] = await connection.execute(sql, params);
+    return rows;
+  } finally {
+    await connection.end();
+  }
+};
+
+/**
  * Get geofence by ID from Traccar
  */
 export const getTraccarGeofence = async (geofenceId) => {

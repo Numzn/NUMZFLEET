@@ -155,6 +155,23 @@ describe('activeContext always equals the identity\'s home context', () => {
     assert.equal(ctx.activeContext.companyId, null);
   });
 
+  it('a NON-administrator, company-scoped user WITH the platform_super_admin role IS super admin — platform capability no longer requires Traccar administrator=true', async () => {
+    clearCompanyContextCache();
+    const traccarUserId = freshTraccarUserId();
+    const company = await makeCompany({ name: 'Decoupled Platform Co', organizationType: 'customer' });
+    const numzUser = await makeNumzUser(traccarUserId, company.id);
+    await grantPlatformSuperAdminRole(numzUser.id);
+    const nonAdminUser = ordinaryTraccarUser(traccarUserId); // administrator: false
+
+    const ctx = await resolveCompanyContextForTraccarUser(nonAdminUser);
+    assert.equal(ctx.isSuperAdmin, true, 'the role grant alone must be sufficient — no Traccar administrator flag required');
+    assert.equal(ctx.homeCompanyId, company.id);
+    // Still never a second context to operate inside — same invariant as the
+    // dual-capability case above.
+    assert.equal(ctx.activeContext.type, 'customer');
+    assert.equal(ctx.activeContext.companyId, company.id);
+  });
+
   it('a company-scoped admin WITHOUT the platform_super_admin role stays company_admin only (unaffected by the platform-capability branch)', async () => {
     clearCompanyContextCache();
     const traccarUserId = freshTraccarUserId();

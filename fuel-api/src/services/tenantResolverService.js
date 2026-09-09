@@ -85,17 +85,27 @@ async function getHomeContext(traccarUser) {
     }
   }
 
-  // Platform capability — a Traccar admin with no home company (the
-  // original, sole case, unchanged) OR a Traccar admin who ALSO has a home
-  // company but holds an explicit platform_super_admin role assignment
-  // (additive; see rolesService.js's hasPlatformSuperAdminRole). This is a
-  // MANAGEMENT CAPABILITY, not a second organization to operate inside —
-  // it never changes which company this identity's session is scoped to.
+  // Platform capability is granted by the platform_super_admin role,
+  // independent of Traccar's raw administrator flag — see
+  // rolesService.js's hasPlatformSuperAdminRole/grantPlatformSuperAdmin.
+  // This is a MANAGEMENT CAPABILITY, not a second organization to operate
+  // inside — it never changes which company this identity's session is
+  // scoped to (activeContext below), and critically it does NOT grant
+  // Traccar-side Live Map visibility outside the identity's own company —
+  // that's governed entirely by Traccar's own group/permission state (see
+  // companyProvisioningService.reconcileCompanyTraccarUsers). Vehicle
+  // Visibility Audit: administrator=true must never be the mechanism for
+  // customer vehicle visibility, so it must not be a precondition for
+  // platform capability either — a company-scoped identity can hold the
+  // role without ever being a Traccar administrator. The one remaining use
+  // of the raw flag is the original, narrower bootstrap case: an
+  // administrator with literally no home company at all (nothing else could
+  // identify them as platform-capable before any role exists to grant).
   const hasPlatformRole = numzUser?.id
     ? await hasPlatformSuperAdminRole(numzUser.id)
     : false;
-  const isSuperAdmin = traccarUser.administrator === true
-    && (!numzUser?.companyId || hasPlatformRole);
+  const isSuperAdmin = hasPlatformRole
+    || (traccarUser.administrator === true && !numzUser?.companyId);
 
   if (isSuperAdmin) {
     roles.push('super_admin');

@@ -1,4 +1,5 @@
 import { clearPermissionsCache } from '../../services/rolesService.js';
+import { reconcileCompanyTraccarUsers } from '../../services/companyProvisioningService.js';
 import * as repo from './rolesRepository.js';
 
 function requireCompanyContext(req) {
@@ -52,6 +53,20 @@ export async function assignRoleToUser(req) {
 
   await repo.assignRole(numzUser.id, role.id, companyId);
   clearPermissionsCache(numzUser.id);
+
+  // This is the "a user joins a company" moment — the only place today a
+  // numz_user actually attaches to a company via the app (see
+  // rolesRepository.ensureNumzUserForTraccarId, which refuses to silently
+  // reattach a user already provisioned elsewhere). Their Traccar group
+  // membership must follow immediately, not wait for the next unrelated
+  // device assignment. Best-effort: a Traccar hiccup here must not fail the
+  // role assignment, which has already succeeded in Postgres.
+  try {
+    await reconcileCompanyTraccarUsers(companyId);
+  } catch (err) {
+    console.warn('[assignRoleToUser] Traccar group reconciliation failed (non-fatal):', err?.message || err);
+  }
+
   return repo.listRoleAssignmentsForCompany(companyId);
 }
 
