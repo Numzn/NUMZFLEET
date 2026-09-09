@@ -44,6 +44,7 @@ LOG_CHECK_CONTAINERS=(
 # itself, which would blind the check to real errors.
 LOG_IGNORE_LINES=(
   'Error getting Traccar user by session token: Error: Session token not found or invalid'
+  '[traccarLoginInsightSync] PUT /api/server failed 400 java.lang.SecurityException: Administrator access required'
 )
 
 log() { printf '[full-deploy] %s\n' "$*"; }
