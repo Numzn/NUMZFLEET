@@ -97,6 +97,15 @@ describe('manager room resolution', () => {
     assert.deepEqual(roomsForSocket({}), []);
     assert.deepEqual(roomsForSocket({ userId: null, isManager: false }), []);
   });
+
+  it('refuses a manager room to a socket with no identified user', () => {
+    // The shape the dev auth bypass produces when handed a non-numeric user
+    // id: no identity, but a claimed manager flag and a company the resolver
+    // defaulted to. It must get nothing, not a real company's room.
+    assert.deepEqual(roomsForSocket({ userId: null, isManager: true, companyId: COMPANY_B }), []);
+    assert.deepEqual(roomsForSocket({ userId: '', isManager: true, companyId: COMPANY_A }), []);
+    assert.deepEqual(roomsForSocket({ userId: null, isManager: true, isPlatform: true }), []);
+  });
 });
 
 describe('cross-company isolation of manager broadcasts', () => {
@@ -133,6 +142,17 @@ describe('cross-company isolation of manager broadcasts', () => {
 
     assert.equal(managerB.received.length, 1);
     assert.equal(managerA.received.length, 0, 'Company A manager must NOT receive Company B events');
+  });
+
+  it('never delivers to an unidentified socket, even one claiming to be a manager', () => {
+    const { io, connect } = createFakeIo();
+    const managerA = connect('managerA', { userId: 3, isManager: true, companyId: COMPANY_A });
+    const unidentified = connect('unidentified', { userId: null, isManager: true, companyId: COMPANY_A });
+
+    emitVehicleDocumentOcrCompleted(io, { companyId: COMPANY_A, documentId: 'doc-5' });
+
+    assert.equal(managerA.received.length, 1);
+    assert.equal(unidentified.received.length, 0, 'a socket with no identity must receive nothing');
   });
 
   it('drops a broadcast with no company rather than sending it widely', () => {

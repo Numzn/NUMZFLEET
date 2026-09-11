@@ -66,13 +66,21 @@ export const initializeSocket = (io) => {
         // Dev bypass only, and the company is still resolved server-side from
         // the claimed user id — the handshake never supplies a company itself.
         // Same trust boundary DEV_AUTH_BYPASS already grants on the HTTP side.
-        try {
-          const context = await resolveCompanyContextForTraccarUser({ id: socket.data.userId });
-          socket.data.companyId = context?.activeContext?.companyId ?? null;
-          socket.data.isPlatform = context?.activeContext?.type === 'platform';
-        } catch {
-          socket.data.companyId = null;
-          socket.data.isPlatform = false;
+        //
+        // Only resolve for a usable id: resolveCompanyContextForTraccarUser
+        // answers a null id with the DEFAULT_COMPANY_ID fallback, which would
+        // hand an unidentifiable socket a real company.
+        socket.data.companyId = null;
+        socket.data.isPlatform = false;
+        if (Number.isFinite(socket.data.userId)) {
+          try {
+            const context = await resolveCompanyContextForTraccarUser({ id: socket.data.userId });
+            socket.data.companyId = context?.activeContext?.companyId ?? null;
+            socket.data.isPlatform = context?.activeContext?.type === 'platform';
+          } catch {
+            socket.data.companyId = null;
+            socket.data.isPlatform = false;
+          }
         }
       } else {
         socket.data.userId = null;

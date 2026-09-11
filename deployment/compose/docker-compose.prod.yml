@@ -48,7 +48,11 @@ services:
     # §5-§8), so its version must never change as a silent side effect of a
     # deploy that happened to pull a newer `latest`. Upgrades are now a
     # deliberate, reviewable edit to this line.
-    image: traccar/traccar:6.15.3
+    #
+    # Pinned by digest, not just by tag: a tag is mutable and can be re-pushed,
+    # which would reintroduce exactly the silent-change problem this removes.
+    # The tag is kept alongside it purely so the version is readable here.
+    image: traccar/traccar:6.15.3@sha256:35346b4af46d57adaeff69a548a7d2cb189a2487fe9c24c99044ee7aa104b5df
     container_name: numzfleet-prod-traccar
     restart: unless-stopped
     # Renders conf/traccar.xml.template with TELEMETRY_INGEST_SECRET substituted

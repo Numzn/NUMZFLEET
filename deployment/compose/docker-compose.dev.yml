@@ -53,7 +53,8 @@ services:
     # gap visible. Aligning dev to 6.15.3 is a deliberate one-line upgrade,
     # worth doing before relying on dev to validate anything that depends on
     # Traccar's permission behaviour.
-    image: traccar/traccar:6.14.5
+    # Pinned by digest for the same reason as production — see the note there.
+    image: traccar/traccar:6.14.5@sha256:b7a19c3aa641dd775897173ac21ba6ca410a72047736d065fe63ab344f62eaac
     container_name: numzfleet-dev-traccar
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/traccar-entrypoint.sh"]

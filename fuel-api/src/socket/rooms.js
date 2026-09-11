@@ -47,15 +47,24 @@ export function resolveManagerRoom({ isManager = false, isPlatform = false, comp
 export function roomsForSocket({
   userId = null, isManager = false, isPlatform = false, companyId = null,
 } = {}) {
+  // No identified user means no rooms at all — not even a manager room.
+  //
+  // `isManager` and `companyId` are both derived from an authenticated
+  // identity, so their presence without a user id means resolution went wrong
+  // somewhere upstream. Trusting them anyway is how an unidentified socket
+  // would land in a real company's room: the dev auth bypass, handed a
+  // non-numeric user id, produces exactly that shape (null id, claimed manager
+  // flag, and a company the resolver defaulted). Refuse the whole set rather
+  // than reason about which half is trustworthy.
+  if (userId == null || userId === '') return [];
+
   const rooms = [];
 
   const managerRoom = resolveManagerRoom({ isManager, isPlatform, companyId });
   if (managerRoom) rooms.push(managerRoom);
 
-  if (userId != null && userId !== '') {
-    rooms.push(`driver-${userId}`);
-    rooms.push(`user-${userId}`);
-  }
+  rooms.push(`driver-${userId}`);
+  rooms.push(`user-${userId}`);
 
   return rooms;
 }
