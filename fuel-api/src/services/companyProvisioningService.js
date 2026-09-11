@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { Company, CompanyDevice, NumzUser, DEFAULT_COMPANY_ID } from '../models/index.js';
 import { traccarServiceFetch } from './traccarServiceClient.js';
 import { runTraccarQuery } from '../config/traccar.js';
@@ -7,20 +8,91 @@ import {
   markAclSyncFailure,
 } from './traccarAclSyncStatus.js';
 
-export async function ensureCompanyTraccarGroup(companyId = DEFAULT_COMPANY_ID) {
+/**
+ * Does this group still exist in Traccar? Read-only, straight against Traccar's
+ * MySQL — the same pattern currentTraccarGroupMemberIds uses below. Deliberately
+ * not an API call: it needs no Traccar permission, so a stale id is still
+ * detectable even when the service identity has lost access to the group.
+ */
+async function traccarGroupExists(groupId) {
+  const rows = await runTraccarQuery('SELECT id FROM tc_groups WHERE id = ?', [groupId]);
+  return rows.length > 0;
+}
+
+/**
+ * Is this group id already claimed by a different company? One company = one
+ * group and one group = one company (docs/TENANCY_ARCHITECTURE.md §2), so a
+ * contested id means the stored value is wrong, never that the group is shared.
+ */
+async function groupClaimedByAnotherCompany(groupId, companyId) {
+  const other = await Company.findOne({
+    where: { traccarGroupId: groupId, id: { [Op.ne]: companyId } },
+    attributes: ['id'],
+  });
+  return other?.id || null;
+}
+
+/** Creates this company's own Traccar group and returns its id. */
+async function createCompanyTraccarGroup(company) {
+  const group = await traccarServiceFetch('/api/groups', {
+    method: 'POST',
+    body: JSON.stringify({ name: `NumzTrak — ${company.name}` }),
+  });
+  return group.id;
+}
+
+/**
+ * Resolve the company's own Traccar group, creating it if there isn't a usable
+ * one. A stored id is no longer trusted on sight: a group deleted in Traccar
+ * sets tc_devices.groupid to NULL and cascades away every tc_user_group row,
+ * while companies.traccar_group_id keeps pointing at the dead id forever — so
+ * every later grant, revoke and device move silently targets nothing.
+ *
+ * A stored id is used only when it both still exists and is not claimed by
+ * another company. Otherwise a fresh group is created for this company, which
+ * by construction cannot belong to anyone else.
+ *
+ * `deps` exists so the decision can be tested without a live Traccar — see
+ * companyGroupIntegrity.test.js. Production always uses the real implementations.
+ */
+export async function ensureCompanyTraccarGroup(companyId = DEFAULT_COMPANY_ID, deps = {}) {
+  const {
+    groupExists = traccarGroupExists,
+    claimedByAnother = groupClaimedByAnotherCompany,
+    createGroup = createCompanyTraccarGroup,
+  } = deps;
+
   const company = await Company.findByPk(companyId);
   if (!company) {
     const err = new Error('Company not found');
     err.statusCode = 404;
     throw err;
   }
-  if (company.traccarGroupId) return company;
 
-  const group = await traccarServiceFetch('/api/groups', {
-    method: 'POST',
-    body: JSON.stringify({ name: `NumzTrak — ${company.name}` }),
-  });
-  await company.update({ traccarGroupId: group.id });
+  if (company.traccarGroupId) {
+    const stored = company.traccarGroupId;
+
+    const otherCompanyId = await claimedByAnother(stored, company.id);
+    if (otherCompanyId) {
+      console.warn(`[companyProvisioning] company ${company.id} stored Traccar group ${stored}, but it is claimed by company ${otherCompanyId} — creating a dedicated group instead`);
+    } else {
+      let exists;
+      try {
+        exists = await groupExists(stored);
+      } catch (err) {
+        // Traccar unreachable is not evidence the group is gone. Recreating on
+        // a transient failure would spawn a duplicate group on every blip, so
+        // keep the stored id and let the caller's own error handling apply.
+        console.warn('[companyProvisioning] could not verify Traccar group existence (keeping stored id):', err?.message || err);
+        return company;
+      }
+      if (exists) return company;
+      console.warn(`[companyProvisioning] company ${company.id} stored Traccar group ${stored}, which no longer exists — recreating`);
+    }
+  }
+
+  const groupId = await createGroup(company);
+  await company.update({ traccarGroupId: groupId });
   return company;
 }
 

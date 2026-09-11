@@ -55,3 +55,4 @@
 20260906_notification_preferences_company_id.sql
 20260906_delivery_attempt_provider_message_unique.sql
 20260908_vehicles_company_id_not_null.sql
+20260911_company_traccar_group_unique.sql

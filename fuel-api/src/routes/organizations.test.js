@@ -161,10 +161,19 @@ describe('Phase 2B: Partner & Customer Management APIs', () => {
     it('verifies platform overview aggregation logic', async () => {
       const { Company } = await import('../models/index.js');
 
-      // Count current state
-      const initialPartnerCount = await Company.count({ where: { organizationType: 'partner' } });
+      // Scoped to this test's own fixtures. A global count is not safe here:
+      // node --test runs test files concurrently, so any other suite creating
+      // a company mid-test would move an instance-wide total and fail this
+      // assertion for reasons that have nothing to do with the aggregation.
+      const initialPartnerCount = await Company.count({
+        where: { organizationType: 'partner', slug: { [Op.like]: 'overview-partner-%' } },
+      });
       const initialDirectCount = await Company.count({
-        where: { organizationType: 'customer', parentCompanyId: null },
+        where: {
+          organizationType: 'customer',
+          parentCompanyId: null,
+          slug: { [Op.like]: 'overview-direct-%' },
+        },
       });
 
       // Create test data
@@ -193,12 +202,22 @@ describe('Phase 2B: Partner & Customer Management APIs', () => {
       });
 
       // Verify counts increased
-      const newPartnerCount = await Company.count({ where: { organizationType: 'partner' } });
+      const newPartnerCount = await Company.count({
+        where: { organizationType: 'partner', slug: { [Op.like]: 'overview-partner-%' } },
+      });
       const newDirectCount = await Company.count({
-        where: { organizationType: 'customer', parentCompanyId: null },
+        where: {
+          organizationType: 'customer',
+          parentCompanyId: null,
+          slug: { [Op.like]: 'overview-direct-%' },
+        },
       });
       const childCount = await Company.count({
-        where: { organizationType: 'customer', parentCompanyId: { [Op.ne]: null } },
+        where: {
+          organizationType: 'customer',
+          parentCompanyId: { [Op.ne]: null },
+          slug: { [Op.like]: 'overview-child-%' },
+        },
       });
 
       assert.strictEqual(newPartnerCount, initialPartnerCount + 1, 'Partner count should increase by 1');
