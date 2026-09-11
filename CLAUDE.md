@@ -74,6 +74,7 @@ Dev containers use prefix `numzfleet-dev-*`; production containers use prefix `n
 ## Domain docs (read before large changes)
 
 - @docs/DEVELOPMENT.md
+- @docs/TENANCY_ARCHITECTURE.md
 - @docs/PLATFORM_ARCHITECTURE.md
 - @fuel-api/docs/OPERATION_SESSIONS_API.md
 - @fuel-api/docs/ACCOUNTS_AND_TENANCY.md

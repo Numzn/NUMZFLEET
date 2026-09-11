@@ -1,13 +1,15 @@
 # NUMZ Platform Architecture
 
-**Status:** Frozen v2.0  
-**Scope:** Platform identity, tenancy, context, permissions, service boundaries, provisioning, audit, UI modes, auth evolution  
-**Does not cover:** Implementation code, API endpoint specs, database migration SQL  
-**Applies to:** All work touching authentication, tenancy, company provisioning, platform navigation, or cross-tenant data access  
+**Status:** Frozen v2.1  
+**Scope:** Platform identity, context model, service boundaries, provisioning, audit, UI modes, auth evolution  
+**Does not cover:** Implementation code, API endpoint specs, database migration SQL — and, as of v2.1, tenant isolation, company scoping, authorization, customer roles, resource ownership, and Traccar tenancy boundaries, which belong to [TENANCY_ARCHITECTURE.md](TENANCY_ARCHITECTURE.md)  
+**Applies to:** All work touching authentication, company provisioning, platform navigation, or cross-tenant data access  
 
-**Governance:** This document is authoritative. Pull requests that change tenancy, authentication, permissions, provisioning, or platform navigation must be reviewed against this specification. Deviations require a version bump and amendment here — not silent drift in code.
+**Governance:** This document is authoritative for the Scope above. Pull requests that change authentication, provisioning, or platform navigation must be reviewed against this specification. Deviations require a version bump and amendment here — not silent drift in code. **Where this document and [TENANCY_ARCHITECTURE.md](TENANCY_ARCHITECTURE.md) both speak to tenancy or authorization, that document wins.**
 
 **v2.0 amendment (supersedes v1.1's context-switching model):** v1.1 specified a session-level context switch — a platform admin could "enter" a partner's or customer's workspace from inside their own session (`activeContext.type` toggling between `platform`/`company`, an exit banner, audited enter/exit events). That model was built, then deliberately reversed: **there is no cross-company context switching.** Every organization is an independent environment with its own login/session; `activeContext` always equals the identity's own home context (never an override); to operate a different organization's fleet you log out and log in as that organization. This is the permanent model, not an interim state pending a future phase. See [Active Context](#active-context) and [One organization per session (frozen)](#one-organization-per-session-frozen) below — both fully rewritten for v2.0. Sections describing other, still-aspirational target architecture (`ExecutionContext`, Platform/Company Services boundary, Provisioning Engine, Platform Health, platform audit table) are unaffected by this amendment; they remain the same forward-looking target they always were.
+
+**v2.1 amendment (delegates tenancy and authorization):** Following the September 2026 cross-company visibility incident and the architecture review after it, tenancy and authorization are now specified in a dedicated authoritative document: **[TENANCY_ARCHITECTURE.md](TENANCY_ARCHITECTURE.md)**. It governs tenant isolation, company scoping, authorization, customer roles, resource ownership, and Traccar tenancy boundaries — including the rule that Traccar's own ACL and `administrator` flag are never inputs to a NUMZFLEET authorization decision, the company-scoped vs platform-scoped role distinction, the backend integration identities, and the removal of direct browser access to Traccar. Sections below that touch those subjects (Four authorization dimensions, Execution Context, Resource ownership, Data isolation rules) remain accurate in intent but are **subordinate** to that document; where they differ, it wins. This split exists so tenancy has one source of truth, not two.
 
 **Operational supplement:** [fuel-api/docs/ACCOUNTS_AND_TENANCY.md](../fuel-api/docs/ACCOUNTS_AND_TENANCY.md) (request flow, env vars, troubleshooting).
 
@@ -523,6 +525,7 @@ These gaps are **expected** until implementation phases begin. New code must mov
 
 | Document | Role |
 |----------|------|
+| [TENANCY_ARCHITECTURE.md](TENANCY_ARCHITECTURE.md) | **Authoritative** for tenant isolation, company scoping, authorization, customer roles, resource ownership, Traccar tenancy boundaries |
 | [fuel-api/docs/ACCOUNTS_AND_TENANCY.md](../fuel-api/docs/ACCOUNTS_AND_TENANCY.md) | Operational: request flow, troubleshooting |
 | [fuel-api/docs/DATABASE_MIGRATIONS.md](../fuel-api/docs/DATABASE_MIGRATIONS.md) | Migration apply order |
 | [VEHICLE_ODOMETER_STANDARD.md](VEHICLE_ODOMETER_STANDARD.md) | Domain: odometer (company-scoped consumer) |
