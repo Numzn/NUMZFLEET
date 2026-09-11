@@ -15,7 +15,7 @@ const router = express.Router();
 router.use(authenticate);
 router.use(attachTenantContext);
 router.get('/command-center', requireAuth, requireManager, getFleetCommandCenter);
-router.get('/devices', requireAuth, requireManager, getFleetDeviceSnapshotHandler);
+router.get('/devices', requireAuth, getFleetDeviceSnapshotHandler);
 router.get('/maintenance/dashboard', requireAuth, requireManager, getDashboard);
 router.get('/maintenance/budget', requireAuth, requireManager, getBudget);
 router.put('/maintenance/budget', requireAuth, requireManager, putBudget);

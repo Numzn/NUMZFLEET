@@ -29,6 +29,18 @@ const SocketController = () => {
 
   const socketRef = useRef();
   const retryCountRef = useRef(0);
+  // Company-scoped device ids from the last successful fuel-api snapshot.
+  // The raw Traccar WebSocket below is authenticated but not company-scoped
+  // — it pushes whatever Traccar's own (frequently stale) ACLs allow, which
+  // has been observed in production to include other companies' devices via
+  // leftover direct grants/group membership. Every WS-delivered device,
+  // position, and event is filtered against this set before it reaches
+  // Redux, so a stale Traccar ACL can no longer leak cross-company live
+  // data even though fuel-api can't control what Traccar decides to send.
+  // Starts empty (fail closed): nothing from the socket is trusted until
+  // refreshSnapshot has resolved at least once, which useEffectAsync below
+  // guarantees happens before connectSocket() is ever called.
+  const accessibleDeviceIdsRef = useRef(new Set());
 
   const soundEvents = useAttributePreference('soundEvents', '');
   const soundAlarms = useAttributePreference('soundAlarms', 'sos');
@@ -46,17 +58,27 @@ const SocketController = () => {
   // their Traccar-side group/permission grants being correct (D1), not on
   // this snapshot fetch.
   const refreshSnapshot = useCallback(async () => {
-    try {
-      const sessionCheck = await traccarFetch('/api/session');
-      if (sessionCheck.status === 401) {
-        navigate('/login');
-        return;
-      }
+    // Both calls run in parallel (allSettled, not all — a fleet/devices
+    // failure must not suppress the session-liveness check below, and vice
+    // versa; sequential awaits here previously added a full extra
+    // round-trip to every reconnect/tab-focus refresh for no benefit, since
+    // neither call depends on the other's result).
+    const [sessionResult, devicesResult] = await Promise.allSettled([
+      traccarFetch('/api/session'),
+      fetchOrThrow('/api/fleet/devices', { headers: fuelApiAuthHeaders(user) }),
+    ]);
 
-      const response = await fetchOrThrow('/api/fleet/devices', {
-        headers: fuelApiAuthHeaders(user),
-      });
-      const { devices, positions } = await response.json();
+    if (sessionResult.status === 'fulfilled' && sessionResult.value.status === 401) {
+      navigate('/login');
+      return;
+    }
+
+    if (devicesResult.status !== 'fulfilled') {
+      return; // ignore refresh errors; websocket will retry independently
+    }
+    try {
+      const { devices, positions } = await devicesResult.value.json();
+      accessibleDeviceIdsRef.current = new Set(devices.map((d) => d.id));
       dispatch(devicesActions.refresh(devices));
       dispatch(sessionActions.updatePositions(positions));
     } catch {
@@ -118,14 +140,18 @@ const SocketController = () => {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      const accessibleIds = accessibleDeviceIdsRef.current;
       if (data.devices) {
-        dispatch(devicesActions.update(data.devices));
+        const devices = data.devices.filter((d) => accessibleIds.has(d.id));
+        if (devices.length) dispatch(devicesActions.update(devices));
       }
       if (data.positions) {
-        dispatch(sessionActions.updatePositions(data.positions));
+        const positions = data.positions.filter((p) => accessibleIds.has(p.deviceId));
+        if (positions.length) dispatch(sessionActions.updatePositions(positions));
       }
       if (data.events) {
-        handleEvents(data.events);
+        const events = data.events.filter((e) => accessibleIds.has(e.deviceId));
+        if (events.length) handleEvents(events);
       }
       if (data.logs) {
         dispatch(sessionActions.updateLogs(data.logs));
