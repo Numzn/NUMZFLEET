@@ -1,6 +1,11 @@
 import { Company, CompanyDevice, NumzUser, DEFAULT_COMPANY_ID } from '../models/index.js';
 import { traccarServiceFetch } from './traccarServiceClient.js';
 import { runTraccarQuery } from '../config/traccar.js';
+import {
+  markAclSyncAttempt,
+  markAclSyncSuccess,
+  markAclSyncFailure,
+} from './traccarAclSyncStatus.js';
 
 export async function ensureCompanyTraccarGroup(companyId = DEFAULT_COMPANY_ID) {
   const company = await Company.findByPk(companyId);
@@ -58,13 +63,16 @@ export async function ensureDeviceInCompany(companyId, traccarDeviceId, vehicleI
  * ensureDeviceInCompany's own Traccar-sync error handling.
  */
 async function grantUserTraccarGroupAccess(traccarGroupId, traccarUserId) {
+  markAclSyncAttempt();
   try {
     await traccarServiceFetch('/api/permissions', {
       method: 'POST',
       body: JSON.stringify({ userId: traccarUserId, groupId: traccarGroupId }),
     });
+    markAclSyncSuccess();
     return true;
   } catch (err) {
+    markAclSyncFailure(err);
     console.warn('[companyProvisioning] Traccar user-group grant failed (non-fatal):', err?.message || err);
     return false;
   }
@@ -72,13 +80,16 @@ async function grantUserTraccarGroupAccess(traccarGroupId, traccarUserId) {
 
 /** Companion revoke — same best-effort contract as the grant above. */
 async function revokeUserTraccarGroupAccess(traccarGroupId, traccarUserId) {
+  markAclSyncAttempt();
   try {
     await traccarServiceFetch('/api/permissions', {
       method: 'DELETE',
       body: JSON.stringify({ userId: traccarUserId, groupId: traccarGroupId }),
     });
+    markAclSyncSuccess();
     return true;
   } catch (err) {
+    markAclSyncFailure(err);
     console.warn('[companyProvisioning] Traccar user-group revoke failed (non-fatal):', err?.message || err);
     return false;
   }

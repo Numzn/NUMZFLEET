@@ -49,6 +49,7 @@ import { startNotificationDeliveryScheduler } from './jobs/notificationDeliveryS
 import { startSmsDeliveryReconciliationScheduler } from './jobs/smsDeliveryReconciliationScheduler.js';
 import { startNotificationEscalationScheduler } from './jobs/notificationEscalationScheduler.js';
 import { getDeliveryWorkerStatus } from './notifications/delivery/deliveryWorkerStatus.js';
+import { getTraccarAclSyncStatus } from './services/traccarAclSyncStatus.js';
 import {
   reconcileStuckExecuting,
   shouldReconcileOnStartup,
@@ -280,10 +281,15 @@ const healthHandler = (req, res) => {
   // healthy and failing here would break container health and deploys. It is
   // surfaced as `notifications.degraded` so it cannot pass unnoticed either.
   const notifications = getDeliveryWorkerStatus();
+  // Traccar ACL sync is defence in depth, never the tenancy boundary
+  // (docs/TENANCY_ARCHITECTURE.md §8) — a failing sync must be visible without
+  // failing the probe, exactly like a stalled delivery worker above.
+  const traccarAclSync = getTraccarAclSyncStatus();
   res.status(200).json({
     status: 'ok',
     service: 'numztrak-fuel-api',
     notifications,
+    traccarAclSync,
   });
 };
 app.get('/health', healthHandler);
