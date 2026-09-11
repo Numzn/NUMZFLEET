@@ -28,6 +28,16 @@ export default (sequelize) => {
       traccarGroupId: {
         type: DataTypes.INTEGER,
         allowNull: true,
+        // One NUMZFLEET company = exactly one Traccar group, and no group is
+        // shared by two companies (docs/TENANCY_ARCHITECTURE.md §2). Declared
+        // here as well as in 20260911_company_traccar_group_unique.sql: the
+        // migration covers databases that already exist, this covers every
+        // schema built from the models — including CI, which provisions itself
+        // with syncDatabase() and deliberately never replays raw SQL
+        // migrations, so a migration-only constraint would be untestable there.
+        // Postgres treats NULLs as distinct, so unprovisioned companies may all
+        // hold NULL, matching the migration's partial index.
+        unique: true,
         field: 'traccar_group_id',
       },
       settings: {
