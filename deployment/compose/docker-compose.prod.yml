@@ -36,7 +36,19 @@ services:
       retries: 10
 
   traccar:
-    image: traccar/traccar:latest
+    # Pinned, was `latest`. 6.15.3 is exactly what production is already
+    # running — verified by digest, not by assumption: the running container's
+    # RepoDigest and the 6.15.3 tag both resolve to
+    # sha256:35346b4af46d57adaeff69a548a7d2cb189a2487fe9c24c99044ee7aa104b5df.
+    # At the time of pinning `latest` resolved to that same digest, so this
+    # change is byte-identical today and is not an upgrade.
+    #
+    # This matters beyond reproducibility: Traccar's permission model is
+    # load-bearing for device commands and ACL sync (docs/TENANCY_ARCHITECTURE.md
+    # §5-§8), so its version must never change as a silent side effect of a
+    # deploy that happened to pull a newer `latest`. Upgrades are now a
+    # deliberate, reviewable edit to this line.
+    image: traccar/traccar:6.15.3
     container_name: numzfleet-prod-traccar
     restart: unless-stopped
     # Renders conf/traccar.xml.template with TELEMETRY_INGEST_SECRET substituted

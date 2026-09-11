@@ -41,7 +41,19 @@ services:
       retries: 10
 
   traccar:
-    image: traccar/traccar:latest
+    # Pinned, was `latest`. 6.14.5 is exactly what this dev stack is already
+    # running — verified by digest: the running container's RepoDigest and the
+    # 6.14.5 tag both resolve to
+    # sha256:b7a19c3aa641dd775897173ac21ba6ca410a72047736d065fe63ab344f62eaac.
+    #
+    # NOTE: dev (6.14.5) is behind production (6.15.3). That drift already
+    # existed — both stacks tracked `latest` and pulled it at different times,
+    # which is precisely what the floating tag was hiding. Pinning each
+    # environment to what it actually runs changes nothing today and makes the
+    # gap visible. Aligning dev to 6.15.3 is a deliberate one-line upgrade,
+    # worth doing before relying on dev to validate anything that depends on
+    # Traccar's permission behaviour.
+    image: traccar/traccar:6.14.5
     container_name: numzfleet-dev-traccar
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/traccar-entrypoint.sh"]
