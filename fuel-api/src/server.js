@@ -355,11 +355,12 @@ if (process.env.NODE_ENV === 'development') {
       let driverRooms = {};
       
       if (adapter) {
-        const managersRoom = adapter.rooms?.get('managers');
-        managersRoomSize = managersRoom ? managersRoom.size : 0;
-        
-        // Get all driver rooms
+        // Manager rooms are company-scoped (`managers:<companyId>`), so this
+        // is the total across all of them rather than one global room's size.
         adapter.rooms?.forEach((sockets, roomName) => {
+          if (roomName.startsWith('managers:')) {
+            managersRoomSize += sockets.size;
+          }
           if (roomName.startsWith('driver-')) {
             driverRooms[roomName] = sockets.size;
           }

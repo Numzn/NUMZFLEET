@@ -3,6 +3,8 @@
  */
 import { validateSessionToken } from '../services/sessionService.js';
 import { roleFlagsFromTraccar } from '../services/userService.js';
+import { resolveCompanyContextForTraccarUser } from '../services/tenantResolverService.js';
+import { roomsForSocket } from './rooms.js';
 
 const getSessionTokenFromCookieHeader = (cookieHeader) => {
   if (!cookieHeader || typeof cookieHeader !== 'string') {
@@ -39,6 +41,19 @@ export const initializeSocket = (io) => {
         socket.data.userId = user.id || null;
         socket.data.administrator = !!user.administrator;
         socket.data.isManager = roleFlagsFromTraccar(user).isManager;
+        // Company is resolved server-side from the authenticated identity, so
+        // room membership can be company-scoped (rooms.js). Fails closed: a
+        // context that cannot be resolved yields no company and therefore no
+        // manager room, rather than falling back to a shared one.
+        try {
+          const context = await resolveCompanyContextForTraccarUser(user);
+          socket.data.companyId = context?.activeContext?.companyId ?? null;
+          socket.data.isPlatform = context?.activeContext?.type === 'platform';
+        } catch (contextError) {
+          console.error(`❌ [Socket] Could not resolve company for socket ${socket.id}:`, contextError?.message || contextError);
+          socket.data.companyId = null;
+          socket.data.isPlatform = false;
+        }
       } else if (isDev && socket.handshake?.auth?.userId != null) {
         const authUserId = Number(socket.handshake.auth.userId);
         socket.data.userId = Number.isFinite(authUserId) ? authUserId : null;
@@ -48,10 +63,23 @@ export const initializeSocket = (io) => {
           attributes: socket.handshake.auth.attributes,
           isManager: socket.handshake.auth.isManager,
         }).isManager;
+        // Dev bypass only, and the company is still resolved server-side from
+        // the claimed user id — the handshake never supplies a company itself.
+        // Same trust boundary DEV_AUTH_BYPASS already grants on the HTTP side.
+        try {
+          const context = await resolveCompanyContextForTraccarUser({ id: socket.data.userId });
+          socket.data.companyId = context?.activeContext?.companyId ?? null;
+          socket.data.isPlatform = context?.activeContext?.type === 'platform';
+        } catch {
+          socket.data.companyId = null;
+          socket.data.isPlatform = false;
+        }
       } else {
         socket.data.userId = null;
         socket.data.administrator = false;
         socket.data.isManager = false;
+        socket.data.companyId = null;
+        socket.data.isPlatform = false;
       }
 
       if (!user && isDev) {
@@ -68,6 +96,8 @@ export const initializeSocket = (io) => {
       socket.data.userId = null;
       socket.data.administrator = false;
       socket.data.isManager = false;
+      socket.data.companyId = null;
+      socket.data.isPlatform = false;
       next();
     }
   });
@@ -97,23 +127,28 @@ export const initializeSocket = (io) => {
 
       // ========== Auto-join rooms with error handling ==========
       try {
-        if (isManager) {
-          socket.join('managers');
-          if (isDev) {
-            console.log(`✅ [Socket] ${socket.id} joined managers room`);
-          }
+        // Membership is decided entirely by rooms.js from server-resolved
+        // identity — manager rooms are company-scoped, so a manager of one
+        // company can never be in another company's room.
+        const rooms = roomsForSocket({
+          userId,
+          isManager,
+          isPlatform: socket.data?.isPlatform || false,
+          companyId: socket.data?.companyId || null,
+        });
+
+        for (const room of rooms) {
+          socket.join(room);
         }
-        
-        if (userId) {
-          const driverRoom = `driver-${userId}`;
-          const userRoom = `user-${userId}`;
-          socket.join(driverRoom);
-          socket.join(userRoom);
-          if (isDev) {
-            console.log(`✅ [Socket] ${socket.id} joined ${driverRoom} and ${userRoom}`);
+
+        if (isDev) {
+          console.log(`✅ [Socket] ${socket.id} joined ${rooms.length ? rooms.join(', ') : 'no rooms'}`);
+          if (!userId) {
+            console.warn(`⚠️ [Socket] No userId for socket ${socket.id}, skipping personal rooms`);
           }
-        } else if (isDev) {
-          console.warn(`⚠️ [Socket] No userId for socket ${socket.id}, skipping driver room`);
+          if (isManager && !socket.data?.companyId && !socket.data?.isPlatform) {
+            console.warn(`⚠️ [Socket] Manager socket ${socket.id} has no resolvable company — no manager room joined`);
+          }
         }
       } catch (joinError) {
         console.error(`❌ [Socket] Error joining rooms for ${socket.id}:`, joinError);
