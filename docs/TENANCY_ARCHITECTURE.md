@@ -1,6 +1,7 @@
 # NUMZFLEET Tenancy Architecture
 
-**Status:** Authoritative v1.0
+**Status:** Authoritative v1.1
+**Baseline:** `b43301d` — Phases 1 and 2 delivered and verified in production (2026-09-12). Everything described as future work in this document is measured against that commit.
 **Scope:** Tenant isolation, company scoping, authorization, customer roles, resource ownership, Traccar tenancy boundaries
 **Does not cover:** Platform product positioning, UI navigation, provisioning workflow, audit strategy — see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md)
 **Applies to:** All work touching authorization, company scoping, resource ownership, real-time delivery, or any path that reaches Traccar
@@ -207,7 +208,9 @@ Sync failures must be observable rather than silent. Attempts, successes, failur
 
 ## 9. Known gaps
 
-Honest mapping of what does not yet satisfy this document. New code must move toward the target, never extend the legacy pattern.
+What already holds as of `b43301d`, so the gaps below are read against the right baseline: the backend reaches Traccar as a dedicated non-admin identity rather than a person's account; Traccar administrators are zero; `tc_user_device` is empty and no code path can create a row in it; one company maps to exactly one Traccar group, enforced by both a database constraint and the model; a deleted company group is detected and recreated rather than silently pointed at forever; manager real-time rooms are company-scoped; and Traccar ACL sync failures are visible on `/health`.
+
+Everything below is still open. All of it is addressed by [Phase 3](#phase-3--designed-not-started), which has not begun. New code must move toward the target, never extend the legacy pattern.
 
 | Gap | Location |
 |-----|----------|
@@ -226,30 +229,89 @@ Honest mapping of what does not yet satisfy this document. New code must move to
 
 ## 10. Migration
 
-Twelve phases, each independently shippable and reversible. Only Phase 11 removes a capability; everything before it is additive.
+Each phase is independently shippable and reversible. Only the removal of `/traccar/*` takes a capability away; everything else is additive.
 
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
-| 1 | Observability, Traccar version pinning, company-scoped manager rooms | **Done** |
-| 2 | Dedicated runtime + provisioner identities | Pending |
-| 3 | Restore command dispatch through the runtime identity | Pending |
-| 4 | ExecutionContext + policy engine; RBAC becomes the decision source | Pending |
-| 5 | Freeze the direct-Traccar surface (CI guard) | Pending |
-| 6 | Geofences: ownership model + endpoints | Pending |
-| 7 | Reports | Pending |
-| 8 | Replay, history, events, media | Pending |
-| 9 | Remaining Traccar-sensitive surface | Pending |
-| 10 | Server-side WebSocket telemetry | Pending |
-| 11 | Remove browser access to `/traccar/*` | Pending |
-| 12 | Demote Traccar ACL to secondary defence | Pending |
+| 1 | Observability, Traccar version pinning, company-scoped manager rooms | **Delivered** — `2ab6602`…`acb26a1` |
+| 2 | One company = one Traccar group; dedicated non-admin `numzfleet-system` identity; command dispatch restored through it | **Delivered** — `1315136`, `b43301d` |
+| 3 | Policy engine, `AuthorizedDeviceRef`, `/traccar/*` migration, NUMZFLEET-owned resource authorization, cross-company isolation tests | **Not started** — see below |
 
-Phase 11 has a hard prerequisite: the session family (login, token login, OpenID, password reset, TOTP) must be re-homed onto fuel-api first.
+An earlier revision of this document numbered the remaining work as separate phases 3–12. Those are now the delivery steps *inside* Phase 3, so there is one numbering scheme rather than two. The step that restored command dispatch was absorbed into Phase 2, which delivered it.
+
+---
+
+## Phase 3 — designed, not started
+
+> **Phase 3 has not begun.** No code, migration, Traccar change, credential change or deployment has been made for it, and none should be until it is explicitly authorised. This section records intent and scope so the work can be picked up without re-deriving the design; it is not a licence to start.
+>
+> **Do not reopen Phase 2.** The `numzfleet-system` identity, its permissions, the group model and the uniqueness constraint are delivered, verified in production and out of scope here.
+
+Phase 3 is the work that moves NUMZFLEET from *"Postgres is authoritative for the paths we have mediated"* to *"Postgres is authoritative, full stop."* Today the company boundary is correctly enforced everywhere fuel-api mediates, and Traccar's own ACL is still the only thing standing between a company and another company's data on every path fuel-api does not mediate. Phase 3 closes that asymmetry.
+
+### Central authorization Policy Engine
+
+**Purpose.** One place answers *may this identity perform this action on this resource*. Today that decision is spread across `authGates.js` (coarse, and derived from Traccar's own `administrator`/`isManager` flags), ad-hoc `assertVehicleInTenant` calls in individual controllers, and `scopeValidationService`. The RBAC tables (`permissions` → `role_permissions` → `roles` → `user_roles`) exist and are populated, but nothing gates on them — so the roles a customer sees and the access they actually have are answered by two different systems.
+
+**Planned scope.** An `ExecutionContext` built once per request (`req.context`) carrying identity, company, resolved permissions and resource scope, coexisting with `req.auth` during migration. An `authorize(ctx, action, resource)` function that denies by default and requires **two independent checks to both pass**: the resource's company must be within the identity's accessible companies, and the action's permission must be held. Resource resolvers that answer "which company owns this" from Postgres only — never from Traccar, never from the request body. Traccar's `administrator` flag stops being an input to any NUMZFLEET decision, and a `NULL` company on a role assignment becomes the only expression of platform scope.
+
+**Sequencing note.** Enforcement runs in shadow mode first — logging what the new engine *would* decide beside the current decision until divergence is zero on real traffic. Two prerequisites that must be settled before it becomes the boundary: the per-process authorization caches (`rolesService`, `tenantResolverService`) go stale across instances and need a TTL, shared cache or version counter; and the `DEFAULT_COMPANY_ID` runtime fallback must be retired, since an unprovisioned identity currently receives a real tenant silently.
+
+### `AuthorizedDeviceRef`
+
+**Purpose.** Make "authorization already happened" a property the type system enforces rather than a convention reviewers must notice. The risk it addresses is structural: a raw `deviceId` arriving in a request body must never be able to reach Traccar, and today only care and code review prevent that.
+
+**Planned scope.** A branded value object that only `authorize()` can construct. `TraccarGateway` methods that act on a device accept nothing else, so a controller holding an unverified id has nothing the gateway will take. Consolidates the three Traccar clients that exist today (`config/traccar.js`, `traccarServiceClient.js`, `traccarCommandService.js`) behind one module, with a CI rule confining imports of it to `src/traccar/`.
+
+**Why it matters for the backend identity.** `numzfleet-system` deliberately holds device reach across every company's group — that is what lets it dispatch commands at all. The non-inheritance rule is what keeps that from becoming customer-visible reach: a customer request passes NUMZFLEET authorization *first*, and only then may fuel-api use the identity. `AuthorizedDeviceRef` is how that rule stops depending on discipline.
+
+### `/traccar/*` migration
+
+**Purpose.** Remove the browser's direct, unmediated path to Traccar's native API. The inventory taken at `18dd8df` found **52 distinct endpoints across roughly 180 call sites in ~74 frontend files**, including `/api/permissions`, `/api/permissions/bulk`, `/api/users`, `/api/groups` and `/api/server/reboot`. For any account Traccar treats as an administrator these are live and effective, entirely outside NUMZFLEET's authorization.
+
+**Planned scope, in order.** Freeze the surface with a CI guard so it can only shrink. Build company-scoped fuel-api equivalents, smallest first: geofences, then reports (route/stops/events/trips/combined), then replay, history, events and media, then the remainder — devices, drivers, calendars, computed attributes, maintenance, saved commands, and a read-only subset of `/api/server`. Traccar's own user, group and permission administration pages are **removed from the UI rather than migrated**; that capability belongs to `/api/roles` and the organization endpoints. Move live telemetry onto fuel-api's existing Socket.IO with company rooms, fed by Traccar's server-to-server forwarding rather than a browser WebSocket. Finally remove the public `/traccar/*` nginx location.
+
+**Hard prerequisite.** The session family — login, token login, OpenID, password reset, TOTP — must be re-homed onto fuel-api before that last step. This is the only step in the entire programme that removes a fallback rather than adding one, and it is deliberately last.
+
+### NUMZFLEET-owned resource authorization
+
+**Purpose.** Several resources cannot be authorized at all today because nothing in Postgres records who owns them. Geofences, drivers, calendars, computed attributes and saved commands exist only as Traccar rows. Traccar's group inheritance covers **devices only** — geofence and driver access come from their own `tc_user_*` tables and do not inherit from a company group — so the group model, however correct, does not reach them.
+
+**Planned scope.** Ownership tables mirroring the proven `company_devices` shape rather than a new pattern. Backfill is an **operator-reviewed decision per record**: there is no reliable signal to infer ownership from, and guessing would manufacture it. Alongside that, structural tightening: `device_assignments` gains `company_id` with a composite foreign key to `vehicles(id, company_id)` so a cross-company assignment becomes unrepresentable rather than merely checked, and a partial unique index enforces one active assignment per physical device.
+
+**Timing note.** Production currently holds two companies and three vehicles. This backfill will never be cheaper than it is now.
+
+### Cross-company isolation tests
+
+**Purpose.** Prove the invariant outside the browser and independently of Traccar. Frontend filtering is a UX affordance; the tests must demonstrate the boundary holds against a client that skips the app entirely.
+
+**Planned scope.** [§11 Required tests](#11-required-tests) is the specification — the actor fixtures, the per-resource matrix, the four Traccar-divergence scenarios and the outside-the-browser bypass tests. Phase 3 is where that specification stops being aspirational: today only parts of it exist, and the cross-company cases are proven for the paths fuel-api already mediates. The additional assertion Phase 3 introduces is **deny before Traccar is contacted** — verified with a spy on the Traccar client, not merely by observing a 403, so a denied request demonstrably never reaches the backend identity.
+
+**Constraint learned the hard way.** See the CI note in §11: a guarantee enforced only in a raw SQL migration cannot be tested in CI and will fail any test asserting it.
+
+### Delivery steps within Phase 3
+
+Retained from the earlier numbering so the sequence is not lost. Each remains independently shippable and reversible.
+
+| Step | Deliverable |
+|------|-------------|
+| 1 | `ExecutionContext` + policy engine; RBAC becomes the decision source (shadow mode first) |
+| 2 | Freeze the direct-Traccar surface with a CI guard |
+| 3 | Geofences: ownership model + company-scoped endpoints |
+| 4 | Reports |
+| 5 | Replay, history, events, media |
+| 6 | Remaining Traccar-sensitive surface; Traccar admin pages removed from the UI |
+| 7 | Server-side WebSocket telemetry over fuel-api's Socket.IO |
+| 8 | Re-home the session family, then remove browser access to `/traccar/*` |
+| 9 | Demote Traccar ACL to secondary defence |
 
 ---
 
 ## 11. Required tests
 
 Tenancy tests run in CI **without** a live Traccar. That constraint is deliberate: it forces the tenancy decision to be provably independent of Traccar.
+
+A second constraint follows from how CI is built: `quality-checks` provisions its database with `syncDatabase()` and deliberately never replays the raw SQL migrations. **Any guarantee enforced at the database level must therefore also be declared on the Sequelize model**, or it will not exist in CI and any test asserting it will fail there while passing locally. `companies.traccar_group_id` is declared in both places for exactly this reason.
 
 **Core matrix** — for every resource (vehicle, device, position, event, trip, report, replay, geofence, driver, maintenance, fuel operation, operation session, notification, media):
 
