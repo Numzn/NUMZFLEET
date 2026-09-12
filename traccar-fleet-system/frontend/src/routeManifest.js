@@ -188,7 +188,6 @@ export const ROUTES = [
   '/settings/server',
   '/settings/user',
   '/settings/user/:id',
-  '/settings/user/:id/connections',
   '/settings/users',
   '/test/toast-notifications',
 ];

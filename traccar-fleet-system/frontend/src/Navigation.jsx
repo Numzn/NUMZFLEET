@@ -1,6 +1,6 @@
 import {
   Navigate, Route, Routes,
-  useSearchParams,
+  useSearchParams, useParams,
 } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import UnifiedShell from './common/components/UnifiedShell';
@@ -32,7 +32,6 @@ import TripReportPage from './reports/TripReportPage';
 import StopReportPage from './reports/StopReportPage';
 import SummaryReportPage from './reports/SummaryReportPage';
 import ChartReportPage from './reports/ChartReportPage';
-import DriverPage from './settings/DriverPage';
 import CalendarsPage from './settings/CalendarsPage';
 import CalendarPage from './settings/CalendarPage';
 import ComputedAttributesPage from './settings/ComputedAttributesPage';
@@ -60,7 +59,6 @@ import TechnicianRoute from './common/components/TechnicianRoute';
 import ScheduledPage from './reports/ScheduledPage';
 import DeviceConnectionsPage from './settings/DeviceConnectionsPage';
 import GroupConnectionsPage from './settings/GroupConnectionsPage';
-import UserConnectionsPage from './settings/UserConnectionsPage';
 import LogsPage from './reports/LogsPage';
 import SharePage from './settings/SharePage';
 import AnnouncementPage from './settings/AnnouncementPage';
@@ -96,6 +94,15 @@ import DirectCustomersPage from './saas/pages/DirectCustomersPage';
 import PartnerCustomersPage from './saas/pages/PartnerCustomersPage';
 import PartnerOverviewPage from './saas/pages/PartnerOverviewPage';
 import PlatformOverviewPage from './saas/pages/PlatformOverviewPage';
+
+// /settings/driver/:id was the old Traccar-native driver edit form (settings/DriverPage.jsx,
+// now removed) — nothing in the app links here anymore (FleetDriversPage.jsx routes to
+// PersonProfilePage instead), but redirect rather than 404 for a stale bookmark, preserving
+// the Traccar driver id (same id space as settings/center/people/personApi.js's fetchDriver).
+const DriverRedirect = () => {
+  const { id } = useParams();
+  return <Navigate to={`/settings/people/driver/${id}`} replace />;
+};
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -219,8 +226,8 @@ const Navigation = () => {
               data (confirmed in the Settings discovery audit) — redirect rather
               than delete so any existing deep link still lands somewhere real. */}
           <Route path="drivers" element={<Navigate to="/fleet/drivers" replace />} />
-          <Route path="driver/:id" element={<DriverPage />} />
-          <Route path="driver" element={<DriverPage />} />
+          <Route path="driver/:id" element={<DriverRedirect />} />
+          <Route path="driver" element={<Navigate to="/settings/people" replace />} />
           <Route path="geofence/:id" element={<GeofencePage />} />
           <Route path="geofence" element={<GeofencePage />} />
           <Route path="groups" element={<SettingsCenterShell><GroupsPage /></SettingsCenterShell>} />
@@ -243,7 +250,6 @@ const Navigation = () => {
               working, same pattern as /settings/drivers above. */}
           <Route path="users" element={<Navigate to="/settings/people" replace />} />
           <Route path="roles" element={<RolesSection />} />
-          <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
           <Route path="user" element={<UserPage />} />
           </Route>
