@@ -8,7 +8,11 @@ import { createDriver } from '../../settings/center/people/personApi';
  * Adds a driver. A driver does not need a sign-in account, so linking to a
  * person is offered but never required — the common case of someone who only
  * ever drives should not force an account into existence. `people` is
- * already scoped to the caller's own company (useDriverPersonIndex).
+ * already scoped to the caller's own company AND filtered to people who
+ * don't already have a driver profile (useDriverPersonIndex's
+ * unlinkedPeople) — a person can only ever be linked to one driver, so
+ * anyone already linked isn't offered here. The backend enforces this too
+ * (driverService.js) — this filtering is a convenience, not the guarantee.
  */
 export default function AddDriverDialog({
   open, onClose, people = [], onCreated, currentUser,
@@ -93,13 +97,15 @@ export default function AddDriverDialog({
             onChange={(_, value) => setPerson(value)}
             getOptionLabel={(option) => option.name || ''}
             isOptionEqualToValue={(option, value) => option.id === value.id}
-            disabled={busy}
+            disabled={busy || people.length === 0}
             renderInput={(params) => (
               <TextField
                 {...params}
-                label="Same person as"
+                label="Link to existing person (optional)"
                 size="small"
-                helperText="Optional. Link this driver to someone who signs in, so both show as one person."
+                helperText={people.length === 0
+                  ? 'No unlinked people available.'
+                  : 'Only people without a Driver profile are shown.'}
               />
             )}
           />

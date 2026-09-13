@@ -54,6 +54,24 @@ async function resolveOwnedPersonByTraccarId(companyId, personId) {
   return person;
 }
 
+/**
+ * A person may be linked to at most one driver profile. The frontend already
+ * excludes linked people from the picker (useDriverPersonIndex's
+ * unlinkedPeople), but that is a UX convenience, not the guarantee — this is
+ * the actual enforcement point, so a direct API call can't bypass it.
+ * `excludeDriverId` lets an update keep (or re-save) its own existing link
+ * without tripping over itself.
+ */
+async function requireUnclaimedPerson(companyId, person, excludeDriverId = null) {
+  if (!person) return;
+  const existing = await Driver.findOne({ where: { numzUserId: person.id, companyId } });
+  if (existing && existing.id !== excludeDriverId) {
+    const err = new Error('This person already has a driver profile');
+    err.statusCode = 409;
+    throw err;
+  }
+}
+
 /** Shapes a Driver row for the frontend — personId (Traccar id), never the raw numzUserId UUID. */
 function toDriverDto(driver, personTraccarId) {
   return {
@@ -100,8 +118,10 @@ export async function getCompanyDriver(req, driverId) {
  *
  * personId (a Traccar user id, matching /api/people's own key) is optional —
  * a driver profile does not require a NUMZFLEET sign-in account — but when
- * given must already belong to this company. This is the one enforcement
- * point for "Company A cannot link a Company B person to a driver."
+ * given must already belong to this company (resolveOwnedPersonByTraccarId)
+ * and must not already be linked to another driver (requireUnclaimedPerson).
+ * This is the one enforcement point for both rules — a direct API call
+ * cannot bypass either just because the frontend picker already filters.
  */
 export async function createCompanyDriver(req) {
   const companyId = requireCompanyId(req);
@@ -117,6 +137,7 @@ export async function createCompanyDriver(req) {
   uniqueId = uniqueId && String(uniqueId).trim() ? String(uniqueId).trim() : `numz-${uuid().slice(0, 8)}`;
 
   const person = await resolveOwnedPersonByTraccarId(companyId, personId);
+  await requireUnclaimedPerson(companyId, person);
 
   let traccarDriver;
   try {
@@ -179,6 +200,7 @@ export async function updateCompanyDriver(req, driverId) {
   let nextPerson = null;
   if ('personId' in body) {
     nextPerson = await resolveOwnedPersonByTraccarId(companyId, body.personId);
+    await requireUnclaimedPerson(companyId, nextPerson, driver.id);
     personChanged = (nextPerson?.id ?? null) !== driver.numzUserId;
     updates.numzUserId = nextPerson?.id ?? null;
   }

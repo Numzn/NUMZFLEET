@@ -62,7 +62,7 @@ export default function FleetDriversPage() {
   const [removing, setRemoving] = useState(null);
   const [removeError, setRemoveError] = useState(null);
 
-  const { personByDriverId, people } = useDriverPersonIndex({ currentUser });
+  const { personByDriverId, unlinkedPeople } = useDriverPersonIndex({ currentUser });
 
   useEffectAsync(async () => {
     setLoading(true);
@@ -199,7 +199,7 @@ export default function FleetDriversPage() {
 
         <AddDriverDialog
           open={adding}
-          people={people}
+          people={unlinkedPeople}
           currentUser={currentUser}
           onClose={() => setAdding(false)}
           onCreated={() => { setAdding(false); setTimestamp(Date.now()); }}

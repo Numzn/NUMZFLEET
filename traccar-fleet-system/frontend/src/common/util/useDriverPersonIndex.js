@@ -49,7 +49,15 @@ export default function useDriverPersonIndex({ enabled = true, currentUser } = {
     return index;
   }, [people, drivers]);
 
+  /** People with no driver profile yet — the only ones eligible to link when adding a new driver. */
+  const unlinkedPeople = useMemo(() => {
+    const linkedPersonIds = new Set(
+      drivers.map((d) => d.personId).filter((id) => id != null).map(String),
+    );
+    return people.filter((p) => !linkedPersonIds.has(String(p.id)));
+  }, [people, drivers]);
+
   return {
-    personByDriverId, people, drivers, loading,
+    personByDriverId, people, unlinkedPeople, drivers, loading,
   };
 }

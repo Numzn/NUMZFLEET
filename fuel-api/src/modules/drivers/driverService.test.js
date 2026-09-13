@@ -205,6 +205,79 @@ describe('getCompanyDriver / createCompanyDriver / updateCompanyDriver / deleteC
     );
   });
 
+  it('createCompanyDriver rejects linking a person who already has a driver profile', async () => {
+    const company = await makeCompany('Driver Co PersonClaimed');
+    const person = await makeTraccarUser('Already Linked Person');
+    await makeNumzUser(person.id, company.id);
+
+    const first = await trackTraccarDriver(
+      await createCompanyDriver({
+        auth: { companyId: company.id },
+        body: { ...driverPayload('First Linked'), personId: person.id },
+      }),
+    );
+    assert.equal(first.personId, person.id);
+
+    await assert.rejects(
+      () => createCompanyDriver({
+        auth: { companyId: company.id },
+        body: { ...driverPayload('Second Linked'), personId: person.id },
+      }),
+      (err) => err.statusCode === 409,
+      'a person already linked to one driver must not be linkable to a second',
+    );
+  });
+
+  it('updateCompanyDriver rejects re-linking a person already claimed by a different driver', async () => {
+    const company = await makeCompany('Driver Co PersonClaimedUpdate');
+    const person = await makeTraccarUser('Claimed On Update');
+    await makeNumzUser(person.id, company.id);
+
+    const claimedBy = await trackTraccarDriver(
+      await createCompanyDriver({
+        auth: { companyId: company.id },
+        body: { ...driverPayload('Claims It'), personId: person.id },
+      }),
+    );
+    const other = await trackTraccarDriver(
+      await createCompanyDriver({ auth: { companyId: company.id }, body: driverPayload('Wants It Too') }),
+    );
+
+    await assert.rejects(
+      () => updateCompanyDriver(
+        { auth: { companyId: company.id }, body: { personId: person.id } },
+        other.id,
+      ),
+      (err) => err.statusCode === 409,
+      'a second driver must not be able to steal a person already linked to another driver',
+    );
+
+    const stillClaimedBy = await getCompanyDriver({ auth: { companyId: company.id } }, claimedBy.id);
+    assert.equal(stillClaimedBy.personId, person.id, 'the original link must be untouched by the rejected attempt');
+    const stillOther = await getCompanyDriver({ auth: { companyId: company.id } }, other.id);
+    assert.equal(stillOther.personId, null, 'the rejected driver must not have gained the link');
+  });
+
+  it('updateCompanyDriver allows re-saving a driver\'s own existing person link without a false-positive rejection', async () => {
+    const company = await makeCompany('Driver Co PersonReSave');
+    const person = await makeTraccarUser('Re-Save Person');
+    await makeNumzUser(person.id, company.id);
+
+    const driver = await trackTraccarDriver(
+      await createCompanyDriver({
+        auth: { companyId: company.id },
+        body: { ...driverPayload('Re-Save Driver'), personId: person.id },
+      }),
+    );
+
+    const resaved = await updateCompanyDriver(
+      { auth: { companyId: company.id }, body: { personId: person.id, name: 'Re-Save Driver Renamed' } },
+      driver.id,
+    );
+    assert.equal(resaved.personId, person.id, 'saving a driver\'s own already-linked person must not be rejected');
+    assert.equal(resaved.name, 'Re-Save Driver Renamed');
+  });
+
   it('createCompanyDriver leaves no orphaned Traccar driver if the NUMZFLEET write fails', async () => {
     const { Driver } = await import('../../models/index.js');
     const company = await makeCompany('Driver Co Orphan');
