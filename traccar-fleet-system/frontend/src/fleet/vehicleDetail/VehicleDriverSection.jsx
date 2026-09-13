@@ -5,20 +5,30 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import useFeatures from '../../common/util/useFeatures.js';
 import { vehicleModuleSx } from './dashboardCardSx.js';
-import { useLinkedDrivers } from './useVehicleDriver.js';
 import AssignDriverDialog from './AssignDriverDialog';
 
 dayjs.extend(relativeTime);
 
+/**
+ * The assigned driver — NUMZFLEET's own Driver ↔ Vehicle relationship
+ * (fuel-api's getVehicleMerged), not a separate fetch. `linkedDrivers` and
+ * `reloadLinked` come from the parent's already-fetched vehicle (Setup:
+ * useVehicleData; Dashboard/Overview: useVehicleWorkspaceData) — this
+ * component never queries Traccar or fuel-api on its own for the read side.
+ */
 export default function VehicleDriverSection({
   vehicle,
+  vehicleId,
   deviceId,
   telemetry,
+  linkedDrivers,
+  reloadLinked,
+  loading,
   onRefreshVehicle,
+  currentUser,
   embedded = false,
 }) {
   const features = useFeatures();
-  const { linkedDrivers, reloadLinked, loading } = useLinkedDrivers(deviceId);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const linkedName = linkedDrivers?.[0]?.name?.trim();
@@ -63,9 +73,9 @@ export default function VehicleDriverSection({
             Assigned driver
           </Typography>
         )}
-        {deviceId == null ? (
+        {vehicleId == null ? (
           <Typography variant="body2" color="text.secondary">
-            Assign a Traccar device to this fleet vehicle before linking a driver.
+            Vehicle not ready yet.
           </Typography>
         ) : loading && !displayName ? (
           <Typography variant="body2" color="text.secondary">
@@ -99,10 +109,11 @@ export default function VehicleDriverSection({
       <AssignDriverDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        deviceId={deviceId}
+        vehicleId={vehicleId}
         linkedDrivers={linkedDrivers}
         reloadLinked={reloadLinked}
         onSaved={onRefreshVehicle}
+        currentUser={currentUser}
       />
     </>
   );

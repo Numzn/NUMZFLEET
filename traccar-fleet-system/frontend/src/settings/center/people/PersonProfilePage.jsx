@@ -46,7 +46,7 @@ export default function PersonProfilePage() {
     person, driver, loading, error, reload,
   } = usePersonProfile({ personId: userId, driverId, currentUser });
   const vehicles = usePersonVehicles(driver);
-  const { personByDriverId, loading: indexLoading } = useDriverPersonIndex({ enabled: !!driverId });
+  const { personByDriverId, loading: indexLoading } = useDriverPersonIndex({ enabled: !!driverId, currentUser });
 
   const driverAnchored = !!driverId && !userId;
   const linkedPerson = driverAnchored && driver ? personByDriverId[driver.id] : null;
@@ -121,6 +121,7 @@ export default function PersonProfilePage() {
             vehicles={vehicles}
             canManage={manager}
             onChanged={reload}
+            currentUser={currentUser}
           />
         );
       case 'vehicles':

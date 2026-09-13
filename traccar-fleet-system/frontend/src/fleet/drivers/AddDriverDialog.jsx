@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useSelector } from 'react-redux';
 import {
   Alert, Autocomplete, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField,
 } from '@mui/material';
@@ -8,12 +7,12 @@ import { createDriver } from '../../settings/center/people/personApi';
 /**
  * Adds a driver. A driver does not need a sign-in account, so linking to a
  * person is offered but never required — the common case of someone who only
- * ever drives should not force an account into existence.
+ * ever drives should not force an account into existence. `people` is
+ * already scoped to the caller's own company (useDriverPersonIndex).
  */
 export default function AddDriverDialog({
-  open, onClose, people = [], onCreated,
+  open, onClose, people = [], onCreated, currentUser,
 }) {
-  const currentUserId = useSelector((state) => state.session.user?.id);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [tag, setTag] = useState('');
@@ -46,8 +45,7 @@ export default function AddDriverDialog({
         uniqueId: tag.trim() || (person ? `numz-${person.id}` : `numz-${Date.now().toString(36)}`),
         phone: phone.trim(),
         personId: person?.id ?? null,
-        actingUserId: currentUserId,
-      });
+      }, currentUser);
       reset();
       onCreated();
     } catch (e) {

@@ -25,7 +25,7 @@ function EnableDriverProfile({ person, canManage, onEnabled }) {
   const [tag, setTag] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const currentUserId = useSelector((state) => state.session.user?.id);
+  const currentUser = useSelector((state) => state.session.user);
 
   const handleEnable = async () => {
     setBusy(true);
@@ -38,8 +38,7 @@ function EnableDriverProfile({ person, canManage, onEnabled }) {
         uniqueId: tag.trim() || `numz-${person.id}`,
         phone: person.phone || '',
         personId: person.id,
-        actingUserId: currentUserId,
-      });
+      }, currentUser);
       onEnabled();
     } catch (e) {
       setError(e.message || 'Could not enable a driver profile.');
@@ -73,7 +72,7 @@ function EnableDriverProfile({ person, canManage, onEnabled }) {
 }
 
 export default function PersonDriverTab({
-  person, driver, vehicles = [], canManage, onChanged,
+  person, driver, vehicles = [], canManage, onChanged, currentUser,
 }) {
   const [draft, setDraft] = useState({ name: '', phone: '' });
   const [saving, setSaving] = useState(false);
@@ -82,7 +81,7 @@ export default function PersonDriverTab({
   useEffect(() => {
     setDraft({
       name: driver?.name || '',
-      phone: driver?.attributes?.phone || '',
+      phone: driver?.phone || '',
     });
     setError(null);
   }, [driver]);
@@ -93,17 +92,13 @@ export default function PersonDriverTab({
   }
 
   const dirty = draft.name !== (driver.name || '')
-    || draft.phone !== (driver.attributes?.phone || '');
+    || draft.phone !== (driver.phone || '');
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
-      const attributes = { ...(driver.attributes || {}) };
-      if (draft.phone) attributes.phone = draft.phone;
-      else delete attributes.phone;
-
-      await updateDriver({ ...driver, name: draft.name, attributes });
+      await updateDriver({ ...driver, name: draft.name, phone: draft.phone || null }, currentUser);
       onChanged();
     } catch (e) {
       setError(e.message || 'Could not save the driver profile.');

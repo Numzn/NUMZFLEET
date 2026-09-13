@@ -1,18 +1,15 @@
 import fetchOrThrow from '../../../common/util/fetchOrThrow';
-import { traccarPath } from '../../../config/traccarApi.js';
 import { fuelApiAuthHeaders } from '../../../config/fuelApiAuth.js';
-import { invalidatePersonDriverLink } from '../../../common/util/usePersonDriverLinks';
 
 /**
  * Every call the People and Drivers experience makes, in one place, so the
  * screens themselves never build a request path.
  *
- * Tenancy: the person resource itself (list/create/read/update/delete) is now
- * fully fuel-api-backed and company-scoped — see
- * fuel-api/src/modules/people/peopleService.js. Only drivers and the
- * driver↔person link still read and write Traccar globally, not scoped to
- * the caller's company — tracked for later migration the same way, and
- * deliberately unchanged in this pass (driver architecture is out of scope).
+ * Tenancy: both People (fuel-api/src/modules/people/peopleService.js) and
+ * Driver (fuel-api/src/modules/drivers/driverService.js) are now fully
+ * fuel-api-backed and company-scoped. Nothing here calls Traccar directly —
+ * Traccar is reached only from the backend's own integration boundary
+ * (fuel-api/src/modules/drivers/driverTraccarSync.js), never the browser.
  */
 
 /**
@@ -77,80 +74,98 @@ export async function deletePerson(personId, user) {
   });
 }
 
-export async function fetchDriverForPerson(personId) {
-  const response = await fetchOrThrow(traccarPath(`/api/drivers?userId=${personId}`));
-  const rows = await response.json();
-  return Array.isArray(rows) ? rows[0] || null : null;
-}
-
-export async function fetchDriver(driverId) {
-  const response = await fetchOrThrow(traccarPath(`/api/drivers/${driverId}`));
+/**
+ * Company-scoped drivers list (GET /api/drivers). Each row carries `personId`
+ * (a Traccar user id, matching fetchCompanyPeople's own `id` field) when the
+ * driver is linked to a person — resolving that link no longer costs a
+ * separate request per person.
+ */
+export async function fetchCompanyDrivers(user) {
+  const response = await fetchOrThrow('/api/drivers', { headers: fuelApiAuthHeaders(user) });
   return response.json();
 }
 
-export async function updateDriver(driver) {
-  const response = await fetchOrThrow(traccarPath(`/api/drivers/${driver.id}`), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+/** One company-scoped driver (GET /api/drivers/:id) — 404s if owned by a different company. */
+export async function fetchDriver(driverId, user) {
+  const response = await fetchOrThrow(`/api/drivers/${driverId}`, { headers: fuelApiAuthHeaders(user) });
+  return response.json();
+}
+
+/**
+ * A person's driver profile, if any — most people don't have one. There is
+ * no dedicated endpoint for this direction; the company driver list already
+ * carries personId per row (see fetchCompanyDrivers), so this is a client-side
+ * lookup rather than a second request.
+ */
+export async function fetchDriverForPerson(personId, user) {
+  const drivers = await fetchCompanyDrivers(user);
+  return drivers.find((d) => String(d.personId) === String(personId)) ?? null;
+}
+
+/**
+ * Creates a driver profile: a Traccar driver (so telemetry can identify
+ * them) plus the NUMZFLEET record that owns the business relationship,
+ * together — see fuel-api/src/modules/drivers/driverService.js.
+ * `personId` (optional) links this driver to an existing person by their
+ * Traccar id — a driver profile does not require a sign-in account.
+ */
+export async function createDriver({
+  name, uniqueId, phone, personId = null,
+}, user) {
+  const response = await fetchOrThrow('/api/drivers', {
+    method: 'POST',
+    headers: fuelApiAuthHeaders(user),
+    body: JSON.stringify({ name, uniqueId, phone, personId }),
+  });
+  return response.json();
+}
+
+/**
+ * Updates are whole-object replacements as far as the caller is concerned —
+ * pass the record you loaded with your edits merged in. The backend (PATCH
+ * /api/drivers/:id) only applies its own whitelisted subset of fields and
+ * verifies company ownership first.
+ */
+export async function updateDriver(driver, user) {
+  const response = await fetchOrThrow(`/api/drivers/${driver.id}`, {
+    method: 'PATCH',
+    headers: fuelApiAuthHeaders(user),
     body: JSON.stringify(driver),
   });
   return response.json();
 }
 
 /**
- * Removing a driver profile also drops its vehicle association — that happens
- * automatically and leaves no record, so anything asking the user to confirm
- * should say so.
+ * Deletes a company-owned driver (DELETE /api/drivers/:id) — refused (409)
+ * if currently assigned to a vehicle; unassign first.
  */
-export async function deleteDriver(driverId) {
-  await fetchOrThrow(traccarPath(`/api/drivers/${driverId}`), { method: 'DELETE' });
-}
-
-async function setDriverPersonLink(personId, driverId, linked) {
-  await fetchOrThrow(traccarPath('/api/permissions'), {
-    method: linked ? 'POST' : 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: Number(personId), driverId: Number(driverId) }),
+export async function deleteDriver(driverId, user) {
+  await fetchOrThrow(`/api/drivers/${driverId}`, {
+    method: 'DELETE',
+    headers: fuelApiAuthHeaders(user),
   });
-  invalidatePersonDriverLink(personId);
 }
-
-export { setDriverPersonLink };
 
 /**
- * Creates a driver profile, optionally attached to the person it describes.
- *
- * Creating a record also attaches it to whoever created it. Left alone, every
- * driver a manager sets up would accumulate on that manager's own identity and
- * surface as their driver profile, so the creator is always detached — a driver
- * profile belongs to the person it describes, not to whoever entered it.
+ * Assigns an existing NUMZFLEET driver to a vehicle (POST
+ * /api/vehicles/:vehicleId/driver) — the authoritative Driver ↔ Vehicle
+ * relationship. Refused (409) if the driver and vehicle belong to different
+ * companies, even if both ids are otherwise valid.
  */
-export async function createDriver({
-  name, uniqueId, phone, personId = null, actingUserId = null,
-}) {
-  const createResponse = await fetchOrThrow(traccarPath('/api/drivers'), {
+export async function assignVehicleDriver(vehicleId, driverId, user) {
+  const response = await fetchOrThrow(`/api/vehicles/${vehicleId}/driver`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name,
-      uniqueId,
-      attributes: phone ? { phone } : {},
-    }),
+    headers: fuelApiAuthHeaders(user),
+    body: JSON.stringify({ driverId }),
   });
-  const driver = await createResponse.json();
+  return response.json();
+}
 
-  if (personId != null) {
-    await setDriverPersonLink(personId, driver.id, true);
-  }
-
-  if (actingUserId != null && Number(actingUserId) !== Number(personId)) {
-    try {
-      await setDriverPersonLink(actingUserId, driver.id, false);
-    } catch {
-      // The profile is created and correctly attached; a leftover link on the
-      // creator is not worth failing the action for.
-    }
-  }
-
-  return driver;
+/** Removes a vehicle's active driver assignment, if any (DELETE /api/vehicles/:vehicleId/driver). */
+export async function unassignVehicleDriver(vehicleId, user) {
+  const response = await fetchOrThrow(`/api/vehicles/${vehicleId}/driver`, {
+    method: 'DELETE',
+    headers: fuelApiAuthHeaders(user),
+  });
+  return response.json();
 }

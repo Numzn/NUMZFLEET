@@ -26,13 +26,13 @@ export default function usePersonProfile({ personId, driverId, currentUser }) {
         // A missing driver profile is a normal state, not a failure — most
         // people do not have one.
         try {
-          setDriver(await fetchDriverForPerson(personId));
+          setDriver(await fetchDriverForPerson(personId, currentUser));
         } catch {
           setDriver(null);
         }
       } else {
         setPerson(null);
-        setDriver(await fetchDriver(driverId));
+        setDriver(await fetchDriver(driverId, currentUser));
       }
     } catch (e) {
       setError(e.message || 'This record could not be loaded.');

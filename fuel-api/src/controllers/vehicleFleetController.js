@@ -8,6 +8,8 @@ import {
   updateVehicleMergedConfig,
   deleteVehicle as deleteVehicleService,
   saveRoutineServiceForVehicle,
+  assignDriverToVehicle,
+  unassignDriverFromVehicle,
 } from '../services/vehicleFleetService.js';
 import {
   listServiceRecordsForVehicle,
@@ -103,6 +105,41 @@ export const assignDevice = async (req, res) => {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Assign device error:', error);
     return res.status(status).json({ error: dbErrorMessage(error, 'Failed to assign device') });
+  }
+};
+
+/**
+ * POST /api/vehicles/:vehicleId/driver — assign a NUMZFLEET driver to this vehicle.
+ * Body: { driverId: string }
+ */
+export const assignDriver = async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { driverId } = req.body || {};
+    if (!driverId) {
+      return res.status(400).json({ error: 'driverId is required' });
+    }
+    const result = await assignDriverToVehicle(vehicleId, driverId, { auth: req.auth });
+    return res.json(result);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Assign driver error:', error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to assign driver') });
+  }
+};
+
+/**
+ * DELETE /api/vehicles/:vehicleId/driver — remove this vehicle's active driver assignment.
+ */
+export const unassignDriver = async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const result = await unassignDriverFromVehicle(vehicleId, { auth: req.auth });
+    return res.json(result);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Unassign driver error:', error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to unassign driver') });
   }
 };
 

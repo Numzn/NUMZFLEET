@@ -49,15 +49,10 @@ const DeviceConnectionsPage = () => {
               label={t('sharedNotifications')}
             />
             {!features.disableDrivers && (
-              <LinkField
-                endpointAll={traccarPath('/api/drivers?all=true')}
-                endpointLinked={`${traccarPath('/api/drivers')}?deviceId=${id}`}
-                baseId={id}
-                keyBase="deviceId"
-                keyLink="driverId"
-                titleGetter={(it) => `${it.name} (${it.uniqueId})`}
-                label={t('sharedDrivers')}
-              />
+              <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                {t('sharedDrivers')}: driver assignment is managed from a vehicle's
+                Setup page now, not here — open the vehicle and use Setup → Driver Assignment.
+              </Typography>
             )}
             {!features.disableComputedAttributes && (
               <LinkField

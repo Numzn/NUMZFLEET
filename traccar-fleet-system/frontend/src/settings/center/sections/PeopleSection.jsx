@@ -85,7 +85,7 @@ export default function PeopleSection() {
   }, [timestamp]);
 
   const visible = items.filter((u) => temporary || !u.temporary).filter(filterByKeyword(searchKeyword));
-  const { driverByPerson } = usePersonDriverLinks(visible.map((item) => item.id));
+  const { driverByPerson } = usePersonDriverLinks(visible.map((item) => item.id), { currentUser });
 
   return (
     <SettingsCenterShell>

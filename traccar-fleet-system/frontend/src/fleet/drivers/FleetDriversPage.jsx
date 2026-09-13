@@ -31,12 +31,10 @@ import PersonStatusChip from '../../common/components/PersonStatusChip';
 import { derivePersonStatus } from '../../common/util/personRoles';
 import useDriverPersonIndex from '../../common/util/useDriverPersonIndex';
 import { useManager } from '../../common/util/permissions';
-import { traccarPath } from '../../config/traccarApi.js';
-import fetchOrThrow from '../../common/util/fetchOrThrow';
 import { useEffectAsync } from '../../reactHelper';
 import { filterByKeyword } from '../../settings/components/SearchHeader';
 import TableShimmer from '../../common/components/TableShimmer';
-import { deleteDriver } from '../../settings/center/people/personApi';
+import { deleteDriver, fetchCompanyDrivers } from '../../settings/center/people/personApi';
 import AddDriverDialog from './AddDriverDialog.jsx';
 
 /**
@@ -45,13 +43,14 @@ import AddDriverDialog from './AddDriverDialog.jsx';
  * profile, so a row leads to that person's profile rather than to a separate
  * driver record.
  *
- * Tenancy: driver and person data is read globally, not scoped to the caller's
- * company. Pre-existing, and tracked for the later migration behind NUMZFLEET
- * APIs.
+ * Tenancy: driver and person data is fully fuel-api-backed and company-scoped
+ * now (GET/DELETE /api/drivers — see fuel-api/src/modules/drivers/driverService.js).
+ * Creation happens through the same NUMZFLEET driver domain as People.
  */
 export default function FleetDriversPage() {
   const navigate = useNavigate();
   const manager = useManager();
+  const currentUser = useSelector((state) => state.session.user);
   const devices = useSelector((state) => state.devices.items);
   const positions = useSelector((state) => state.session.positions);
 
@@ -63,13 +62,12 @@ export default function FleetDriversPage() {
   const [removing, setRemoving] = useState(null);
   const [removeError, setRemoveError] = useState(null);
 
-  const { personByDriverId, people } = useDriverPersonIndex();
+  const { personByDriverId, people } = useDriverPersonIndex({ currentUser });
 
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      const response = await fetchOrThrow(traccarPath('/api/drivers'));
-      setItems(await response.json());
+      setItems(await fetchCompanyDrivers(currentUser));
     } finally {
       setLoading(false);
     }
@@ -98,7 +96,7 @@ export default function FleetDriversPage() {
 
   const handleRemove = async () => {
     try {
-      await deleteDriver(removing.id);
+      await deleteDriver(removing.id, currentUser);
       setRemoving(null);
       setRemoveError(null);
       setTimestamp(Date.now());
@@ -159,7 +157,7 @@ export default function FleetDriversPage() {
                       {person ? person.name : 'No sign-in account'}
                     </Typography>
                   </TableCell>
-                  <TableCell>{item.attributes?.phone || '—'}</TableCell>
+                  <TableCell>{item.phone || '—'}</TableCell>
                   <TableCell>
                     {person ? <PersonStatusChip status={derivePersonStatus(person)} /> : '—'}
                   </TableCell>
@@ -202,6 +200,7 @@ export default function FleetDriversPage() {
         <AddDriverDialog
           open={adding}
           people={people}
+          currentUser={currentUser}
           onClose={() => setAdding(false)}
           onCreated={() => { setAdding(false); setTimestamp(Date.now()); }}
         />

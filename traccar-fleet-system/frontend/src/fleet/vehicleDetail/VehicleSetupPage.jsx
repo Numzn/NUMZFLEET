@@ -15,7 +15,6 @@ import FleetWorkspaceShell from '../../common/components/FleetWorkspaceShell';
 import { useManager } from '../../common/util/permissions';
 import useFeatures from '../../common/util/useFeatures.js';
 import useVehicleData from './useVehicleData';
-import { useLinkedDrivers } from './useVehicleDriver.js';
 import { useLinkedGeofences } from './useLinkedGeofences.js';
 import { vehicleWorkspacePath } from '../vehicleRegistry/vehicleRegistryUtils.js';
 import { patchVehicleFields, saveRoutineService } from '../vehiclesApi.js';
@@ -68,9 +67,14 @@ function renderModuleContent(moduleId, props) {
       return (
         <DriverSetupModule
           vehicle={props.vehicle}
+          vehicleId={props.vehicleId}
           deviceId={props.deviceId}
           telemetry={props.telemetry}
+          linkedDrivers={props.linkedDrivers}
+          reloadLinked={props.reloadLinkedDrivers}
+          linkedDriversLoading={props.linkedDriversLoading}
           onRefreshVehicle={props.onRefreshVehicle}
+          currentUser={props.currentUser}
         />
       );
     case 'fuel':
@@ -135,7 +139,12 @@ export default function VehicleSetupPage() {
     deviceId,
   } = useVehicleData(vehicleId);
 
-  const { linkedDrivers, reloadLinked } = useLinkedDrivers(deviceId);
+  // The Driver ↔ Vehicle relationship is authoritative NUMZFLEET state now
+  // (fuel-api's getVehicleMerged) — it arrives with the vehicle itself, not
+  // a second fetch. Array-wrapped (0 or 1) to match VehicleDriverSection's
+  // existing linkedDrivers?.[0] contract.
+  const linkedDrivers = vehicle?.driver ? [vehicle.driver] : [];
+  const linkedDriversLoading = loading;
   const {
     linkedGeofences,
     reloadLinked: reloadLinkedGeofences,
@@ -187,9 +196,11 @@ export default function VehicleSetupPage() {
   }, [vehicleId, user, deviceId]);
 
   const handleRefreshVehicle = useCallback(async () => {
+    // refresh() alone repopulates linkedDrivers too — it's derived from
+    // vehicle.driver, not a separate fetch.
     await refresh();
-    await Promise.all([reloadLinked(), reloadLinkedGeofences()]);
-  }, [refresh, reloadLinked, reloadLinkedGeofences]);
+    await reloadLinkedGeofences();
+  }, [refresh, reloadLinkedGeofences]);
 
   useEffect(() => {
     if (!deviceId) return undefined;
@@ -243,7 +254,7 @@ export default function VehicleSetupPage() {
         await saveRoutineService(user, vehicleId, { intervalKm, startingOdometerKm });
       }
       setReviewOpen(false);
-      await Promise.all([reloadLinked(), reloadLinkedGeofences(), refresh()]);
+      await Promise.all([reloadLinkedGeofences(), refresh()]);
       const notifyOn = merged?.fleetConfig?.alerts?.geofence !== false;
       showToast(
         `Setup saved. Geofence notifications ${notifyOn ? 'enabled' : 'disabled'}.`,
@@ -257,7 +268,6 @@ export default function VehicleSetupPage() {
   }, [
     save,
     saveConfig,
-    reloadLinked,
     reloadLinkedGeofences,
     refresh,
     showToast,
@@ -297,6 +307,9 @@ export default function VehicleSetupPage() {
     capabilities,
     capabilitiesLoading,
     onRefreshVehicle: handleRefreshVehicle,
+    linkedDrivers,
+    linkedDriversLoading,
+    currentUser: user,
     linkedGeofences,
     linkedGeofencesLoading,
     linkedGeofencesError,

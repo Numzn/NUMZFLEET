@@ -33,6 +33,8 @@ import RoleModel from './Role.js';
 import PermissionModel from './Permission.js';
 import RolePermissionModel from './RolePermission.js';
 import UserRoleModel from './UserRole.js';
+import DriverModel from './Driver.js';
+import DriverAssignmentModel from './DriverAssignment.js';
 
 const FuelRequest = FuelRequestModel(sequelize);
 const VehicleSpec = VehicleSpecModel(sequelize);
@@ -68,6 +70,8 @@ const Role = RoleModel(sequelize);
 const Permission = PermissionModel(sequelize);
 const RolePermission = RolePermissionModel(sequelize);
 const UserRole = UserRoleModel(sequelize);
+const Driver = DriverModel(sequelize);
+const DriverAssignment = DriverAssignmentModel(sequelize);
 
 Company.hasMany(Vehicle, { foreignKey: 'companyId' });
 Vehicle.belongsTo(Company, { foreignKey: 'companyId' });
@@ -106,6 +110,18 @@ UserRole.belongsTo(Company, { foreignKey: 'companyId' });
 
 Vehicle.hasMany(DeviceAssignment, { foreignKey: 'vehicleId' });
 DeviceAssignment.belongsTo(Vehicle, { foreignKey: 'vehicleId' });
+
+// Driver domain (additive — see 20260913_driver_domain.sql). A driver
+// profile does not require a NUMZFLEET sign-in account (numzUserId
+// nullable), mirroring how a Traccar driver never required a Traccar user.
+Company.hasMany(Driver, { foreignKey: 'companyId' });
+Driver.belongsTo(Company, { foreignKey: 'companyId' });
+NumzUser.hasOne(Driver, { foreignKey: 'numzUserId', as: 'driverProfile' });
+Driver.belongsTo(NumzUser, { foreignKey: 'numzUserId', as: 'person' });
+Vehicle.hasMany(DriverAssignment, { foreignKey: 'vehicleId' });
+DriverAssignment.belongsTo(Vehicle, { foreignKey: 'vehicleId' });
+Driver.hasMany(DriverAssignment, { foreignKey: 'driverId' });
+DriverAssignment.belongsTo(Driver, { foreignKey: 'driverId' });
 Vehicle.hasMany(VehicleImmobilizationIntent, { foreignKey: 'vehicleId', as: 'immobilizationIntents' });
 VehicleImmobilizationIntent.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
 Vehicle.hasMany(ServiceRecord, { foreignKey: 'fleetVehicleId', as: 'serviceRecords' });
@@ -300,6 +316,8 @@ export {
   Permission,
   RolePermission,
   UserRole,
+  Driver,
+  DriverAssignment,
   DEFAULT_COMPANY_ID,
 };
 export default sequelize;

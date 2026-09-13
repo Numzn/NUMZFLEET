@@ -1,6 +1,5 @@
 import useVehicleData from '../useVehicleData.js';
 import { useLinkedGeofences } from '../useLinkedGeofences.js';
-import { useLinkedDrivers } from '../useVehicleDriver.js';
 import useVehicleEngine from './useVehicleEngine.js';
 import useVehicleServiceHistory from './useVehicleServiceHistory.js';
 import useLastRefill from './useLastRefill.js';
@@ -22,7 +21,6 @@ export default function useVehicleWorkspaceData(vehicleId) {
     livePosition: core.livePosition,
   });
   const linkedGeofences = useLinkedGeofences(deviceId);
-  const linkedDrivers = useLinkedDrivers(deviceId);
   const lastRefill = useLastRefill(deviceId);
   const todayRefuel = useTodayOperationRefuel(deviceId);
   const fuelRequests = useVehicleFuelRequests(deviceId);
@@ -49,9 +47,13 @@ export default function useVehicleWorkspaceData(vehicleId) {
     linkedGeofences: linkedGeofences.linkedGeofences,
     linkedZonesLoading: linkedGeofences.loading,
     linkedZoneCount: linkedGeofences.linkedGeofences?.length ?? 0,
-    linkedDrivers: linkedDrivers.linkedDrivers,
-    linkedDriversLoading: linkedDrivers.loading,
-    reloadLinkedDrivers: linkedDrivers.reloadLinked,
+    // The Driver ↔ Vehicle relationship is authoritative NUMZFLEET state now
+    // (see fuel-api's getVehicleMerged) — it arrives with the vehicle itself,
+    // not a second fetch. Array-wrapped (0 or 1) to keep every existing
+    // linkedDrivers?.[0] consumer unchanged.
+    linkedDrivers: vehicle?.driver ? [vehicle.driver] : [],
+    linkedDriversLoading: core.loading,
+    reloadLinkedDrivers: core.refresh,
     lastRefill: lastRefill.lastRefill,
     lastRefillLoading: lastRefill.loading,
     todayRefuel,

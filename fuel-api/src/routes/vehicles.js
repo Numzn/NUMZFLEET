@@ -13,6 +13,8 @@ import {
   getVehicle,
   getVehicleAssignments,
   assignDevice,
+  assignDriver,
+  unassignDriver,
   updateVehicleConfig,
   updateRoutineService,
   updateVehicle,
@@ -73,8 +75,10 @@ router.get('/fuel-intelligence/summary', requireAuth, requireManager, getFleetFu
 // Mutations and fleet reads: managers only (v1)
 router.post('/', requireAuth, requireManager, createVehicle);
 router.get('/', requireAuth, requireManager, listVehicles);
-// assign-device before :id so "assign-device" is never captured as id
+// assign-device/driver before :id so neither is ever captured as id
 router.post('/:vehicleId/assign-device', requireAuth, requireManager, assignDevice);
+router.post('/:vehicleId/driver', requireAuth, requireManager, assignDriver);
+router.delete('/:vehicleId/driver', requireAuth, requireManager, unassignDriver);
 
 // Immobilization intents (vehicle-centric operational control)
 router.get('/:vehicleId/immobilization/capabilities', requireAuth, requireManager, getCapabilities);

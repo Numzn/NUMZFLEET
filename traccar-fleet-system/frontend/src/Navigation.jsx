@@ -97,8 +97,10 @@ import PlatformOverviewPage from './saas/pages/PlatformOverviewPage';
 
 // /settings/driver/:id was the old Traccar-native driver edit form (settings/DriverPage.jsx,
 // now removed) — nothing in the app links here anymore (FleetDriversPage.jsx routes to
-// PersonProfilePage instead), but redirect rather than 404 for a stale bookmark, preserving
-// the Traccar driver id (same id space as settings/center/people/personApi.js's fetchDriver).
+// PersonProfilePage instead), but redirect rather than 404 for a stale bookmark. The :id
+// this carries forward was a Traccar driver id under the old form; driver identity is now a
+// NUMZFLEET id (see fuel-api/src/modules/drivers/driverService.js), so a genuinely old
+// bookmark's id will no longer resolve — an acceptable gap for a route nothing still links to.
 const DriverRedirect = () => {
   const { id } = useParams();
   return <Navigate to={`/settings/people/driver/${id}`} replace />;

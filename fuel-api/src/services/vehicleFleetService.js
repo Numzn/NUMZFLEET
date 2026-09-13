@@ -544,6 +544,15 @@ export async function getVehicleMerged(id, auth = null) {
   const effectiveCompanyId = vehicle.companyId || DEFAULT_COMPANY_ID;
   merged.serviceSummary = await summarizeForVehicle(id, effectiveCompanyId);
 
+  // NUMZFLEET's own Driver ↔ Vehicle assignment (authoritative) — not a
+  // Traccar device ↔ driver read. Dashboard/Overview/Setup all consume this
+  // single field instead of independently querying Traccar.
+  try {
+    merged.driver = await getVehicleDriverDto(id);
+  } catch {
+    merged.driver = null;
+  }
+
   // Authoritative routine-service signal (actual Traccar schedule, tagged
   // numzServicePackage) — not the cached numzFleetConfig.routineService
   // pointer. Device-scoped lookup, no full-fleet scan (matches the batched
@@ -716,6 +725,150 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
   });
 
   return getVehicleMerged(vid);
+}
+
+function driverToDto(driver) {
+  if (!driver) return null;
+  return {
+    id: driver.id,
+    name: driver.name,
+    phone: driver.phone ?? null,
+    uniqueId: driver.uniqueId,
+    status: driver.status,
+  };
+}
+
+/** The driver currently assigned to a vehicle, or null — used to enrich getVehicleMerged's DTO. */
+export async function getVehicleDriverDto(vehicleId) {
+  const { Driver, DriverAssignment } = await import('../models/index.js');
+  const assignment = await DriverAssignment.findOne({ where: { vehicleId, isActive: true } });
+  if (!assignment) return null;
+  const driver = await Driver.findByPk(assignment.driverId);
+  return driverToDto(driver);
+}
+
+/**
+ * NUMZFLEET Driver ↔ Vehicle assignment — the authoritative relationship
+ * (see docs on the driver domain). Mirrors assignDevice's own security
+ * shape exactly: the vehicle must belong to the caller's company, AND the
+ * selected resource (here, the driver) must too — this is the enforcement
+ * point that closes "Company A driver → Company B vehicle" and its mirror,
+ * which no check anywhere previously covered (Driver ↔ Person/User ↔
+ * Vehicle tenancy audit, Scenario C/D).
+ *
+ * Traccar's device ↔ driver link is synced best-effort afterward, using
+ * whatever device this vehicle currently has assigned — a projection, never
+ * the source of truth.
+ */
+export async function assignDriverToVehicle(vehicleId, driverId, options = {}) {
+  const { Driver, DriverAssignment } = await import('../models/index.js');
+  const auth = options.auth || null;
+  const vid = String(vehicleId);
+
+  const vehicle = await Vehicle.findByPk(vid);
+  if (!vehicle) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const driver = await Driver.findByPk(driverId);
+  if (!driver) {
+    const err = new Error('Driver not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      const err = new Error('Access denied - You do not have permission to access this vehicle');
+      err.statusCode = 403;
+      throw err;
+    }
+    if (!canAccessCompany(auth, driver.companyId)) {
+      const err = new Error('Access denied - You do not have permission to access this driver');
+      err.statusCode = 403;
+      throw err;
+    }
+  }
+
+  // The hard invariant, independent of who is asking: a driver can only ever
+  // be assigned to a vehicle in its own company. canAccessCompany alone
+  // isn't enough — a platform identity can legitimately access both a
+  // Company A vehicle and a Company B driver individually, which must still
+  // not be allowed to pair them together.
+  if (driver.companyId !== vehicle.companyId) {
+    const err = new Error('Driver and vehicle belong to different companies');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const assignedAt = new Date();
+  await sequelize.transaction(async (t) => {
+    await DriverAssignment.update(
+      { isActive: false, unassignedAt: assignedAt },
+      { where: { vehicleId: vid, isActive: true }, transaction: t },
+    );
+    await DriverAssignment.create(
+      { vehicleId: vid, driverId: driver.id, isActive: true, assignedAt },
+      { transaction: t },
+    );
+  });
+
+  try {
+    const activeDevice = await DeviceAssignment.findOne({ where: { vehicleId: vid, isActive: true } });
+    if (activeDevice && driver.traccarDriverId != null) {
+      const { syncDeviceDriverLink } = await import('../modules/drivers/driverTraccarSync.js');
+      await syncDeviceDriverLink(Number(activeDevice.deviceId), driver.traccarDriverId, true);
+    }
+  } catch (err) {
+    console.warn('[vehicleFleet] driver-device Traccar sync after assign failed (non-fatal):', err?.message || err);
+  }
+
+  return { vehicleId: vid, driver: driverToDto(driver), assignedAt: assignedAt.toISOString() };
+}
+
+/** Removes the vehicle's active driver assignment, if any. Idempotent. */
+export async function unassignDriverFromVehicle(vehicleId, options = {}) {
+  const { Driver, DriverAssignment } = await import('../models/index.js');
+  const auth = options.auth || null;
+  const vid = String(vehicleId);
+
+  const vehicle = await Vehicle.findByPk(vid);
+  if (!vehicle) {
+    const err = new Error('Vehicle not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    if (!canAccessCompany(auth, vehicle.companyId)) {
+      const err = new Error('Access denied - You do not have permission to access this vehicle');
+      err.statusCode = 403;
+      throw err;
+    }
+  }
+
+  const active = await DriverAssignment.findOne({ where: { vehicleId: vid, isActive: true } });
+  if (!active) {
+    return { vehicleId: vid, driver: null };
+  }
+
+  const driver = await Driver.findByPk(active.driverId);
+  await active.update({ isActive: false, unassignedAt: new Date() });
+
+  try {
+    const activeDevice = await DeviceAssignment.findOne({ where: { vehicleId: vid, isActive: true } });
+    if (activeDevice && driver?.traccarDriverId != null) {
+      const { syncDeviceDriverLink } = await import('../modules/drivers/driverTraccarSync.js');
+      await syncDeviceDriverLink(Number(activeDevice.deviceId), driver.traccarDriverId, false);
+    }
+  } catch (err) {
+    console.warn('[vehicleFleet] driver-device Traccar sync after unassign failed (non-fatal):', err?.message || err);
+  }
+
+  return { vehicleId: vid, driver: null };
 }
 
 /**
