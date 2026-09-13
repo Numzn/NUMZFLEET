@@ -12,6 +12,7 @@ router.use(attachTenantContext);
 router.get('/', requireAuth, requireManager, ctrl.listDrivers);
 router.post('/', requireAuth, requireManager, ctrl.createDriver);
 router.get('/:driverId', requireAuth, requireManager, ctrl.getDriver);
+router.get('/:driverId/vehicles', requireAuth, requireManager, ctrl.getDriverVehicles);
 router.patch('/:driverId', requireAuth, requireManager, ctrl.updateDriver);
 router.delete('/:driverId', requireAuth, requireManager, ctrl.deleteDriver);
 

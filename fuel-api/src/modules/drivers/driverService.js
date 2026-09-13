@@ -93,6 +93,15 @@ async function attachPersonTraccarId(driver) {
   return toDriverDto(driver, person?.traccarUserId ?? null);
 }
 
+/**
+ * assignedVehicle is batched here (not on toDriverDto/getCompanyDriver) since
+ * this is the one path the Fleet > Drivers list actually needs it on — a
+ * single findAll for every driver's active assignment, not one query per
+ * row. Same authoritative source (driver_assignments) as Vehicle Setup's own
+ * "Driver Assignment" module and People's usePersonVehicles.js — Fleet >
+ * Drivers must agree with both rather than reading live device telemetry,
+ * which is a different, device-reported signal, not the NUMZFLEET assignment.
+ */
 export async function listCompanyDrivers(req) {
   const companyId = requireCompanyId(req);
   const drivers = await Driver.findAll({ where: { companyId }, order: [['name', 'ASC']] });
@@ -101,13 +110,54 @@ export async function listCompanyDrivers(req) {
     ? await NumzUser.findAll({ where: { id: numzUserIds } })
     : [];
   const traccarIdByNumzUserId = new Map(people.map((p) => [p.id, p.traccarUserId]));
-  return drivers.map((driver) => toDriverDto(driver, traccarIdByNumzUserId.get(driver.numzUserId) ?? null));
+
+  const driverIds = drivers.map((d) => d.id);
+  const { Vehicle } = await import('../../models/index.js');
+  const assignments = driverIds.length
+    ? await DriverAssignment.findAll({ where: { driverId: driverIds, isActive: true } })
+    : [];
+  const vehicleIds = [...new Set(assignments.map((a) => a.vehicleId))];
+  const vehicles = vehicleIds.length ? await Vehicle.findAll({ where: { id: vehicleIds, companyId } }) : [];
+  const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
+  const vehicleByDriverId = new Map();
+  for (const a of assignments) {
+    const v = vehicleById.get(a.vehicleId);
+    if (v) vehicleByDriverId.set(a.driverId, v);
+  }
+
+  return drivers.map((driver) => {
+    const dto = toDriverDto(driver, traccarIdByNumzUserId.get(driver.numzUserId) ?? null);
+    const vehicle = vehicleByDriverId.get(driver.id);
+    dto.assignedVehicle = vehicle ? { id: vehicle.id, name: vehicle.name } : null;
+    return dto;
+  });
 }
 
 export async function getCompanyDriver(req, driverId) {
   const companyId = requireCompanyId(req);
   const driver = await requireOwnedDriver(companyId, driverId);
   return attachPersonTraccarId(driver);
+}
+
+/**
+ * The vehicle(s) this driver is currently assigned to, per the authoritative
+ * driver_assignments table — the same relationship Vehicle Setup's "Driver
+ * Assignment" module writes to (vehicleFleetService.js's
+ * assignDriverToVehicle). This is deliberately NOT derived from live Traccar
+ * telemetry: a driver's People profile ("Current vehicle") must agree with
+ * what Setup just saved immediately, not wait for the physical device to
+ * next report a matching driverUniqueId.
+ */
+export async function listCompanyDriverVehicles(req, driverId) {
+  const companyId = requireCompanyId(req);
+  await requireOwnedDriver(companyId, driverId);
+  const { Vehicle } = await import('../../models/index.js');
+  const assignments = await DriverAssignment.findAll({ where: { driverId, isActive: true } });
+  if (!assignments.length) return [];
+  const vehicles = await Vehicle.findAll({
+    where: { id: assignments.map((a) => a.vehicleId), companyId },
+  });
+  return vehicles.map((v) => ({ id: v.id, name: v.name, plateNumber: v.plateNumber ?? null }));
 }
 
 /**

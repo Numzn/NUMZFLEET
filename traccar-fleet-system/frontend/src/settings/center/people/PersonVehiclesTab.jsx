@@ -18,10 +18,9 @@ export default function PersonVehiclesTab({ person, driver, vehicles = [] }) {
   if (!vehicles.length) {
     return (
       <Stack spacing={1}>
-        <Typography variant="body2">No vehicle is currently reporting this driver.</Typography>
+        <Typography variant="body2">This driver is not assigned to a vehicle.</Typography>
         <Typography variant="caption" sx={{ color: 'var(--color-text-secondary)' }}>
-          A vehicle appears here once it reports with this driver aboard. To put this driver on a
-          vehicle, open the vehicle and change its driver.
+          To assign this driver, open the vehicle&apos;s Setup and change its driver.
         </Typography>
       </Stack>
     );
@@ -30,7 +29,7 @@ export default function PersonVehiclesTab({ person, driver, vehicles = [] }) {
   return (
     <Stack spacing={1.5}>
       {vehicles.map((vehicle) => (
-        <SettingsCard key={vehicle.deviceId} sx={{ p: 1.5 }}>
+        <SettingsCard key={vehicle.id} sx={{ p: 1.5 }}>
           <Stack
             direction="row"
             alignItems="center"
@@ -40,7 +39,7 @@ export default function PersonVehiclesTab({ person, driver, vehicles = [] }) {
             <Stack sx={{ minWidth: 0 }}>
               <Typography fontWeight={600} noWrap>{vehicle.name}</Typography>
               <Typography variant="caption" sx={{ color: 'var(--color-text-secondary)' }}>
-                Currently reporting this driver
+                Currently assigned
               </Typography>
             </Stack>
             {vehicle.fleetVehicleId && (

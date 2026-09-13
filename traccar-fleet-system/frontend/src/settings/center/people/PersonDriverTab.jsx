@@ -141,7 +141,7 @@ export default function PersonDriverTab({
       >
         <Fact
           label="Current vehicle"
-          value={vehicles.length ? vehicles.map((v) => v.name).join(', ') : 'None reported'}
+          value={vehicles.length ? vehicles.map((v) => v.name).join(', ') : 'None assigned'}
         />
         <Fact
           label="Account status"

@@ -92,6 +92,16 @@ export async function fetchDriver(driverId, user) {
 }
 
 /**
+ * The vehicle(s) this driver is currently assigned to, per the authoritative
+ * driver_assignments table (the same relationship Vehicle Setup's Driver
+ * Assignment module writes to) — not derived from live Traccar telemetry.
+ */
+export async function fetchDriverVehicles(driverId, user) {
+  const response = await fetchOrThrow(`/api/drivers/${driverId}/vehicles`, { headers: fuelApiAuthHeaders(user) });
+  return response.json();
+}
+
+/**
  * A person's driver profile, if any — most people don't have one. There is
  * no dedicated endpoint for this direction; the company driver list already
  * carries personId per row (see fetchCompanyDrivers), so this is a client-side

@@ -16,6 +16,14 @@ export async function getDriver(req, res) {
   }
 }
 
+export async function getDriverVehicles(req, res) {
+  try {
+    res.json(await service.listCompanyDriverVehicles(req, req.params.driverId));
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message || 'Failed to load assigned vehicles' });
+  }
+}
+
 export async function createDriver(req, res) {
   try {
     res.status(201).json(await service.createCompanyDriver(req));

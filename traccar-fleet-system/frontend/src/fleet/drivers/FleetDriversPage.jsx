@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
@@ -51,8 +51,6 @@ export default function FleetDriversPage() {
   const navigate = useNavigate();
   const manager = useManager();
   const currentUser = useSelector((state) => state.session.user);
-  const devices = useSelector((state) => state.devices.items);
-  const positions = useSelector((state) => state.session.positions);
 
   const [items, setItems] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -73,19 +71,6 @@ export default function FleetDriversPage() {
     }
     return null;
   }, [timestamp]);
-
-  // A vehicle reports which driver is aboard, which is the only signal for
-  // "current vehicle" — there is no stored assignment to read.
-  const vehicleByDriverKey = useMemo(() => {
-    const map = {};
-    Object.values(positions || {}).forEach((position) => {
-      const driverKey = position?.attributes?.driverUniqueId;
-      if (driverKey == null) return;
-      const device = devices?.[position.deviceId];
-      if (device) map[String(driverKey)] = device.name || `#${device.id}`;
-    });
-    return map;
-  }, [devices, positions]);
 
   const openDriver = (driver) => {
     const person = personByDriverId[driver.id];
@@ -161,7 +146,7 @@ export default function FleetDriversPage() {
                   <TableCell>
                     {person ? <PersonStatusChip status={derivePersonStatus(person)} /> : '—'}
                   </TableCell>
-                  <TableCell>{vehicleByDriverKey[String(item.uniqueId)] || '—'}</TableCell>
+                  <TableCell>{item.assignedVehicle?.name || '—'}</TableCell>
                   <TableCell align="right">
                     <Tooltip title="Edit">
                       <IconButton size="small" onClick={() => openDriver(item)}>

@@ -45,7 +45,7 @@ export default function PersonProfilePage() {
   const {
     person, driver, loading, error, reload,
   } = usePersonProfile({ personId: userId, driverId, currentUser });
-  const vehicles = usePersonVehicles(driver);
+  const vehicles = usePersonVehicles(driver, currentUser);
   const { personByDriverId, loading: indexLoading } = useDriverPersonIndex({ enabled: !!driverId, currentUser });
 
   const driverAnchored = !!driverId && !userId;

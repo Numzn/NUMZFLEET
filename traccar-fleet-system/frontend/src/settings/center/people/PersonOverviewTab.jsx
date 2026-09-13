@@ -41,7 +41,7 @@ export default function PersonOverviewTab({ person, driver, vehicles = [] }) {
         <Fact label="Driver profile" value={driver ? driver.name : 'None'} />
         <Fact
           label="Current vehicle"
-          value={vehicles.length ? vehicles.map((v) => v.name).join(', ') : 'None reported'}
+          value={vehicles.length ? vehicles.map((v) => v.name).join(', ') : 'None assigned'}
         />
       </Box>
     </Stack>

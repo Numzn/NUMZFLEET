@@ -5,6 +5,7 @@ import { Op } from 'sequelize';
 
 import {
   listCompanyDrivers, getCompanyDriver, createCompanyDriver, updateCompanyDriver, deleteCompanyDriver,
+  listCompanyDriverVehicles,
 } from './driverService.js';
 import { requireAuth, requireManager } from '../../middleware/authGates.js';
 import { traccarServiceFetch } from '../../services/traccarServiceClient.js';
@@ -135,6 +136,32 @@ describe('listCompanyDrivers — tenant boundary (real Postgres + real Traccar)'
     const empty = await makeCompany('Driver Co Empty');
     const result = await listCompanyDrivers({ auth: { companyId: empty.id } });
     assert.deepEqual(result, []);
+  });
+
+  it('listCompanyDrivers reports assignedVehicle from driver_assignments, not live telemetry — the Fleet > Drivers list regression', async () => {
+    const { Vehicle } = await import('../../models/index.js');
+    const { assignDriverToVehicle, unassignDriverFromVehicle } = await import('../../services/vehicleFleetService.js');
+    const company = await makeCompany('Driver Co ListAssignedVehicle');
+    const vehicle = await Vehicle.create({ id: uuid(), name: 'List Assigned Vehicle', companyId: company.id });
+    const driver = await trackTraccarDriver(
+      await createCompanyDriver({ auth: { companyId: company.id }, body: driverPayload('List Assigned Driver') }),
+    );
+    const auth = { auth: { companyId: company.id, activeContext: { type: 'customer', companyId: company.id } } };
+
+    let list = await listCompanyDrivers({ auth: { companyId: company.id } });
+    let row = list.find((d) => d.id === driver.id);
+    assert.equal(row.assignedVehicle, null, 'not yet assigned');
+
+    await assignDriverToVehicle(vehicle.id, driver.id, auth);
+    list = await listCompanyDrivers({ auth: { companyId: company.id } });
+    row = list.find((d) => d.id === driver.id);
+    assert.equal(row.assignedVehicle.id, vehicle.id);
+    assert.equal(row.assignedVehicle.name, 'List Assigned Vehicle');
+
+    await unassignDriverFromVehicle(vehicle.id, auth);
+    list = await listCompanyDrivers({ auth: { companyId: company.id } });
+    row = list.find((d) => d.id === driver.id);
+    assert.equal(row.assignedVehicle, null, 'unassignment must also reflect immediately');
   });
 });
 
@@ -426,5 +453,58 @@ describe('getCompanyDriver / createCompanyDriver / updateCompanyDriver / deleteC
     await deleteCompanyDriver(auth, created.id);
     list = await listCompanyDrivers(auth);
     assert.ok(!list.some((d) => d.id === created.id));
+  });
+});
+
+describe('listCompanyDriverVehicles — the driver-side view of the Setup-side assignment', { skip: SKIP_NO_TRACCAR }, () => {
+  it('a driver with no active assignment has no vehicles', async () => {
+    const company = await makeCompany('Driver Co VehiclesEmpty');
+    const driver = await trackTraccarDriver(
+      await createCompanyDriver({ auth: { companyId: company.id }, body: driverPayload('No Vehicle') }),
+    );
+    const vehicles = await listCompanyDriverVehicles({ auth: { companyId: company.id } }, driver.id);
+    assert.deepEqual(vehicles, []);
+  });
+
+  it('reflects a Vehicle Setup assignment immediately — the regression this endpoint exists to fix', async () => {
+    // Before this endpoint, a driver's People profile ("Current vehicle") was
+    // derived from live Traccar telemetry (driverUniqueId on a position), a
+    // completely different source from what Vehicle Setup's Driver Assignment
+    // module actually writes (driver_assignments). Assigning a driver in
+    // Setup updated Setup immediately but never reached the driver's own
+    // profile — this test proves the two now read the same source.
+    const { Vehicle } = await import('../../models/index.js');
+    const { assignDriverToVehicle, unassignDriverFromVehicle } = await import('../../services/vehicleFleetService.js');
+    const company = await makeCompany('Driver Co VehiclesReflect');
+    const vehicle = await Vehicle.create({ id: uuid(), name: 'Setup Assigned Vehicle', companyId: company.id });
+    const driver = await trackTraccarDriver(
+      await createCompanyDriver({ auth: { companyId: company.id }, body: driverPayload('Setup Linked') }),
+    );
+    const auth = { auth: { companyId: company.id, activeContext: { type: 'customer', companyId: company.id } } };
+
+    let vehicles = await listCompanyDriverVehicles({ auth: { companyId: company.id } }, driver.id);
+    assert.deepEqual(vehicles, [], 'not yet assigned');
+
+    await assignDriverToVehicle(vehicle.id, driver.id, auth);
+    vehicles = await listCompanyDriverVehicles({ auth: { companyId: company.id } }, driver.id);
+    assert.equal(vehicles.length, 1);
+    assert.equal(vehicles[0].id, vehicle.id);
+    assert.equal(vehicles[0].name, 'Setup Assigned Vehicle');
+
+    await unassignDriverFromVehicle(vehicle.id, auth);
+    vehicles = await listCompanyDriverVehicles({ auth: { companyId: company.id } }, driver.id);
+    assert.deepEqual(vehicles, [], 'unassignment must also reflect immediately');
+  });
+
+  it('404s for a driver owned by a different company', async () => {
+    const companyA = await makeCompany('Driver Co VehiclesA');
+    const companyB = await makeCompany('Driver Co VehiclesB');
+    const driverB = await trackTraccarDriver(
+      await createCompanyDriver({ auth: { companyId: companyB.id }, body: driverPayload('Not Yours') }),
+    );
+    await assert.rejects(
+      () => listCompanyDriverVehicles({ auth: { companyId: companyA.id } }, driverB.id),
+      (err) => err.statusCode === 404,
+    );
   });
 });
