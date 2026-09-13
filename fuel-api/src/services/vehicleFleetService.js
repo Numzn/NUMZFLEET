@@ -748,6 +748,26 @@ export async function getVehicleDriverDto(vehicleId) {
 }
 
 /**
+ * The phone of the driver currently assigned to whatever vehicle a device
+ * belongs to — the mobile "Call Driver" action only has a Traccar deviceId
+ * to start from. Company-scoped like assertDeviceInTenant: an unowned or
+ * unassigned device resolves to null rather than leaking another company's
+ * driver data, so a not-found and a cross-company lookup look identical to
+ * the caller.
+ */
+export async function getDriverPhoneByDeviceId(deviceId, auth = null) {
+  const assignment = await DeviceAssignment.findOne({ where: { deviceId, isActive: true } });
+  if (!assignment) return null;
+  if (auth) {
+    const { canAccessCompany } = await import('./scopeValidationService.js');
+    const vehicle = await Vehicle.findByPk(assignment.vehicleId);
+    if (!vehicle || !canAccessCompany(auth, vehicle.companyId)) return null;
+  }
+  const driver = await getVehicleDriverDto(assignment.vehicleId);
+  return driver?.phone ?? null;
+}
+
+/**
  * NUMZFLEET Driver ↔ Vehicle assignment — the authoritative relationship
  * (see docs on the driver domain). Mirrors assignDevice's own security
  * shape exactly: the vehicle must belong to the caller's company, AND the

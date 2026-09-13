@@ -10,6 +10,7 @@ import {
   saveRoutineServiceForVehicle,
   assignDriverToVehicle,
   unassignDriverFromVehicle,
+  getDriverPhoneByDeviceId,
 } from '../services/vehicleFleetService.js';
 import {
   listServiceRecordsForVehicle,
@@ -140,6 +141,23 @@ export const unassignDriver = async (req, res) => {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Unassign driver error:', error);
     return res.status(status).json({ error: dbErrorMessage(error, 'Failed to unassign driver') });
+  }
+};
+
+/**
+ * GET /api/vehicles/device/:deviceId/driver-phone — the phone of whichever
+ * driver is currently assigned to this device's vehicle, for the mobile
+ * "Call Driver" action. Always 200 with `{ phone: string|null }` — an
+ * unassigned or cross-company device resolves to null, same as "no driver".
+ */
+export const getDriverPhoneByDevice = async (req, res) => {
+  try {
+    const phone = await getDriverPhoneByDeviceId(req.params.deviceId, req.auth);
+    return res.json({ phone });
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Get driver phone by device error:', error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to load driver phone') });
   }
 };
 

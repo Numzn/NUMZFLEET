@@ -105,9 +105,8 @@ const CommandPalette = () => {
           icon: <PersonIcon />,
           title: driver.name,
           subtitle: driver.uniqueId || 'Driver',
-          // The fleet-scoped drivers screen — not /settings/drivers, a legacy
-          // duplicate over the same Traccar /api/drivers data (see the
-          // Settings discovery audit; sidebar and search must agree here).
+          // The fleet-scoped drivers screen — not /settings/drivers, which no
+          // longer exists now that NUMZFLEET owns the Driver domain.
           action: () => navigate('/fleet/drivers'),
         });
       }

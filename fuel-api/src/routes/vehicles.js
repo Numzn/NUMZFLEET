@@ -15,6 +15,7 @@ import {
   assignDevice,
   assignDriver,
   unassignDriver,
+  getDriverPhoneByDevice,
   updateVehicleConfig,
   updateRoutineService,
   updateVehicle,
@@ -79,6 +80,7 @@ router.get('/', requireAuth, requireManager, listVehicles);
 router.post('/:vehicleId/assign-device', requireAuth, requireManager, assignDevice);
 router.post('/:vehicleId/driver', requireAuth, requireManager, assignDriver);
 router.delete('/:vehicleId/driver', requireAuth, requireManager, unassignDriver);
+router.get('/device/:deviceId/driver-phone', requireAuth, requireManager, getDriverPhoneByDevice);
 
 // Immobilization intents (vehicle-centric operational control)
 router.get('/:vehicleId/immobilization/capabilities', requireAuth, requireManager, getCapabilities);

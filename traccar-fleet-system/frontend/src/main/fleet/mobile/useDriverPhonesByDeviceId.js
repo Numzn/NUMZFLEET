@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import fetchOrThrow from '../../../common/util/fetchOrThrow';
-import { traccarPath } from '../../../config/traccarApi.js';
+import { fuelApiAuthHeaders } from '../../../config/fuelApiAuth.js';
 
 /** Session cache: deviceId -> phone string (or null when looked up but absent). */
 const phoneCache = new Map();
 
-async function fetchDriverPhone(deviceId) {
+/**
+ * fuel-api's own company-scoped resolver (device -> vehicle -> assigned
+ * NUMZFLEET driver -> phone), not Traccar's native /api/drivers?deviceId=
+ * list — that endpoint has no company column, so any signed-in user could
+ * previously resolve any other company's driver phone by device id.
+ */
+async function fetchDriverPhone(deviceId, user) {
   try {
-    const res = await fetchOrThrow(traccarPath(`/api/drivers?deviceId=${deviceId}`));
-    const rows = await res.json();
-    const phone = Array.isArray(rows)
-      ? rows.map((d) => d?.attributes?.phone).find(Boolean) || null
-      : null;
-    phoneCache.set(deviceId, phone);
-    return phone;
+    const res = await fetchOrThrow(`/api/vehicles/device/${deviceId}/driver-phone`, {
+      headers: fuelApiAuthHeaders(user),
+    });
+    const { phone } = await res.json();
+    phoneCache.set(deviceId, phone ?? null);
+    return phone ?? null;
   } catch {
     phoneCache.set(deviceId, null);
     return null;
@@ -28,6 +34,7 @@ async function fetchDriverPhone(deviceId) {
  * @returns {{ phoneByDeviceId: Record<string|number, string|null>, loading: boolean }}
  */
 export default function useDriverPhonesByDeviceId(devices = []) {
+  const user = useSelector((state) => state.session.user);
   const [phoneByDeviceId, setPhoneByDeviceId] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -47,10 +54,10 @@ export default function useDriverPhonesByDeviceId(devices = []) {
       return next;
     });
 
-    if (missing.length === 0) return undefined;
+    if (missing.length === 0 || !user) return undefined;
 
     setLoading(true);
-    Promise.all(missing.map((id) => fetchDriverPhone(id).then((phone) => [id, phone])))
+    Promise.all(missing.map((id) => fetchDriverPhone(id, user).then((phone) => [id, phone])))
       .then((entries) => {
         if (cancelled) return;
         setPhoneByDeviceId((prev) => {
@@ -64,7 +71,7 @@ export default function useDriverPhonesByDeviceId(devices = []) {
       });
 
     return () => { cancelled = true; };
-  }, [idsKey]);
+  }, [idsKey, user]);
 
   return { phoneByDeviceId, loading };
 }

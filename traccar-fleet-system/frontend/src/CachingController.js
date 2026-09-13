@@ -3,6 +3,7 @@ import { useDispatch, useSelector, connect } from 'react-redux';
 import { traccarPath } from './config/traccarApi.js';
 import { fuelApiAuthHeaders } from './config/fuelApiAuth.js';
 import { fetchTraccarMaintenances } from './fleet/vehiclesApi.js';
+import { fetchCompanyDrivers } from './settings/center/people/personApi.js';
 import {
   geofencesActions, groupsActions, driversActions, maintenancesActions, calendarsActions, fuelRequestsActions,
 } from './store';
@@ -32,11 +33,14 @@ const CachingController = () => {
   }, [authenticated]);
 
   useEffectAsync(async () => {
-    if (authenticated) {
-      const response = await fetchOrThrow(traccarPath('/api/drivers'));
-      dispatch(driversActions.refresh(await response.json()));
+    // fuel-api's own company-scoped /api/drivers, not Traccar's native list —
+    // Traccar's has no company column, so polling it directly here would leak
+    // every company's drivers into every session's driver-name lookups
+    // (DriverValue.js, CommandPalette.jsx search) regardless of tenancy.
+    if (authenticated && user) {
+      dispatch(driversActions.refresh(await fetchCompanyDrivers(user)));
     }
-  }, [authenticated]);
+  }, [authenticated, user]);
 
   useEffectAsync(async () => {
     if (authenticated && user) {
