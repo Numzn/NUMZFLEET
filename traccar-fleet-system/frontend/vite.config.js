@@ -392,6 +392,26 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      // Same pattern as /api/roles above — must be explicit or this falls
+      // through to the catch-all /api → Traccar rule and 404s there (see the
+      // /api/push-subscriptions comment below for the exact class of bug this
+      // avoids).
+      '/api/people': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
       '/api/platform': {
         target: fuelApiUrl,
         changeOrigin: true,

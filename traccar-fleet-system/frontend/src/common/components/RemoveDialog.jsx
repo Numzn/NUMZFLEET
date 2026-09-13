@@ -21,13 +21,21 @@ const useStyles = makeStyles()((theme) => ({
 }));
 
 const RemoveDialog = ({
-  open, endpoint, itemId, onResult,
+  open, endpoint, itemId, onResult, onRemove,
 }) => {
   const { classes } = useStyles();
   const t = useTranslation();
 
+  // onRemove lets a caller (e.g. PeopleSection) route the delete through its own
+  // company-scoped fuel-api call instead of this component's default
+  // Traccar-direct one — additive; every existing caller keeps the endpoint
+  // behavior unchanged by simply not passing it.
   const handleRemove = useCatch(async () => {
-    await fetchOrThrow(traccarPath(`/api/${endpoint}/${itemId}`), { method: 'DELETE' });
+    if (onRemove) {
+      await onRemove(itemId);
+    } else {
+      await fetchOrThrow(traccarPath(`/api/${endpoint}/${itemId}`), { method: 'DELETE' });
+    }
     onResult(true);
   });
 

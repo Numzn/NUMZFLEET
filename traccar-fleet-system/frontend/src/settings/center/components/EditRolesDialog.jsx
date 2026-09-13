@@ -54,9 +54,9 @@ export default function EditRolesDialog({
       </DialogTitle>
       <DialogContent>
         <Alert severity="info" sx={{ mb: 2 }}>
-          Roles here are for visibility and planning only — they don&apos;t yet change
-          what this person can actually do. Actual access is still controlled by their
-          Traccar admin/manager settings.
+          These are NUMZFLEET&apos;s own roles — the source of record for this person&apos;s
+          role assignment going forward, tracked separately from the Traccar settings
+          above.
         </Alert>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <FormGroup>

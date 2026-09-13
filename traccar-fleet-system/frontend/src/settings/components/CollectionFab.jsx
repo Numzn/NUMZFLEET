@@ -15,7 +15,10 @@ const useStyles = makeStyles()((theme) => ({
   },
 }));
 
-const CollectionFab = ({ editPath, disabled }) => {
+// onClick lets a caller (e.g. PeopleSection) open its own dialog instead of
+// navigating to editPath — additive; every existing caller keeps the
+// navigate(editPath) behavior unchanged by simply not passing it.
+const CollectionFab = ({ editPath, onClick, disabled }) => {
   const { classes } = useStyles();
   const navigate = useNavigate();
 
@@ -24,7 +27,7 @@ const CollectionFab = ({ editPath, disabled }) => {
   if (!readonly && !disabled) {
     return (
       <div className={classes.fab}>
-        <Fab size="medium" color="primary" onClick={() => navigate(editPath)}>
+        <Fab size="medium" color="primary" onClick={onClick || (() => navigate(editPath))}>
           <AddIcon />
         </Fab>
       </div>

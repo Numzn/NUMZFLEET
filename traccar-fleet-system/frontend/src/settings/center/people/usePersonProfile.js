@@ -7,7 +7,7 @@ import { fetchPerson, fetchDriverForPerson, fetchDriver } from './personApi';
  * arrived by — their account (People) or their driver profile (Drivers) — so
  * both entry points feed the same screen instead of each fetching its own copy.
  */
-export default function usePersonProfile({ personId, driverId }) {
+export default function usePersonProfile({ personId, driverId, currentUser }) {
   const [person, setPerson] = useState(null);
   const [driver, setDriver] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,7 +22,7 @@ export default function usePersonProfile({ personId, driverId }) {
     setError(null);
     try {
       if (personId) {
-        setPerson(await fetchPerson(personId));
+        setPerson(await fetchPerson(personId, currentUser));
         // A missing driver profile is a normal state, not a failure — most
         // people do not have one.
         try {

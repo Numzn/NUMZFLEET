@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   Box, Typography, Switch, FormControlLabel, TextField, CircularProgress, Stack,
 } from '@mui/material';
@@ -18,32 +19,45 @@ import { useSetTopBarTitle } from '../../../common/components/TopBarTitleContext
 import SettingsCenterShell from '../SettingsCenterShell.jsx';
 import SettingsSectionPanel from '../components/SettingsSectionPanel.jsx';
 import SettingsCard from '../components/SettingsCard.jsx';
+import AddPersonDialog from '../components/AddPersonDialog.jsx';
 import CollectionActions from '../../components/CollectionActions';
 import CollectionFab from '../../components/CollectionFab';
 import { filterByKeyword } from '../../components/SearchHeader';
+import { fetchCompanyPeople, deletePerson } from '../people/personApi';
 
 /**
- * The people directory. Roles and status shown here are derived from the fields
- * that actually gate access (see common/util/personRoles.js), not from the
- * roles/permissions tables, whose assignments do not yet change what anyone can
- * do — showing both at once would present two contradictory answers to "what is
- * this person allowed to do?".
+ * NUMZFLEET People — the one people directory (not a "Team" system alongside
+ * a separate "People" system; this section *is* what settingsSectionRegistry
+ * already labels "People", now also true of the component's own name).
+ * Roles and status shown here are derived from the fields that actually gate
+ * access today (see common/util/personRoles.js), not from the roles/
+ * permissions tables — resolvePermissionsForNumzUser() isn't the decision
+ * source for any route yet, so showing both at once would present two
+ * contradictory answers to "what can this person actually do?". The NUMZFLEET
+ * roles a person holds are shown on their own profile's Access tab instead
+ * (PersonAccessTab.jsx), where that distinction has room to be explained.
  *
- * Tenancy: /api/users and /api/drivers are read straight from Traccar and are
- * not scoped to the caller's company. Pre-existing, and tracked for the later
- * migration behind NUMZFLEET APIs.
+ * Tenancy: list, add, and remove are all fuel-api-backed and company-scoped
+ * now (GET/POST/DELETE /api/people, deriving the tenant from the caller's own
+ * session server-side — see fuel-api/src/modules/people/peopleService.js).
+ * The row click-through (to PersonProfilePage) and the login row action are
+ * the two things here still reaching Traccar directly and unscoped — login
+ * is a Traccar session by definition, and the profile page's own read is
+ * company-scoped independently (personApi.js's fetchPerson).
  */
-export default function TeamSection() {
+export default function PeopleSection() {
   useSetTopBarTitle('Settings');
   const navigate = useNavigate();
   const t = useTranslation();
   const manager = useManager();
+  const currentUser = useSelector((state) => state.session.user);
 
   const [timestamp, setTimestamp] = useState(Date.now());
   const [items, setItems] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [temporary, setTemporary] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const handleLogin = useCatch(async (userId) => {
     await fetchOrThrow(traccarPath(`/api/session/${userId}`));
@@ -57,13 +71,14 @@ export default function TeamSection() {
     handler: handleLogin,
   };
 
+  const handleRemovePerson = async (personId) => {
+    await deletePerson(personId, currentUser);
+  };
+
   useEffectAsync(async () => {
     setLoading(true);
     try {
-      // Attributes carry the role signals (isManager, numzRole), so unlike the
-      // previous version this cannot request excludeAttributes.
-      const response = await fetchOrThrow(traccarPath('/api/users'));
-      setItems(await response.json());
+      setItems(await fetchCompanyPeople(currentUser));
     } finally {
       setLoading(false);
     }
@@ -122,7 +137,7 @@ export default function TeamSection() {
                     <CollectionActions
                       itemId={item.id}
                       editPath="/settings/people/user"
-                      endpoint="users"
+                      onRemove={handleRemovePerson}
                       setTimestamp={setTimestamp}
                       customActions={manager ? [actionLogin] : []}
                     />
@@ -147,7 +162,13 @@ export default function TeamSection() {
           label={t('userTemporary')}
         />
       </SettingsSectionPanel>
-      <CollectionFab editPath="/settings/user" />
+      <CollectionFab onClick={() => setAddOpen(true)} />
+      <AddPersonDialog
+        open={addOpen}
+        currentUser={currentUser}
+        onClose={() => setAddOpen(false)}
+        onCreated={() => { setAddOpen(false); setTimestamp(Date.now()); }}
+      />
     </SettingsCenterShell>
   );
 }

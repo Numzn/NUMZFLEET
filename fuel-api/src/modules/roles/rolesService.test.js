@@ -1,7 +1,8 @@
 /**
  * "A user joins a company" is not a standalone feature in NUMZFLEET today —
- * it happens as a side effect of Team Management assigning that person a
- * role for the first time (see rolesRepository.ensureNumzUserForTraccarId,
+ * it happens as a side effect of the People/Access flow (a person's profile →
+ * Access tab → EditRolesDialog) assigning that person a role for the first
+ * time (see rolesRepository.ensureNumzUserForTraccarId,
  * which refuses to silently reattach a user already provisioned into a
  * different company). This verifies that moment also grants Traccar group
  * access immediately, rather than waiting for an unrelated device
@@ -13,8 +14,9 @@ import assert from 'node:assert/strict';
 import { v4 as uuid } from 'uuid';
 import { Op } from 'sequelize';
 
-import { assignRoleToUser } from './rolesService.js';
+import { assignRoleToUser, removeRoleFromUser, listAssignments } from './rolesService.js';
 import { traccarServiceFetch } from '../../services/traccarServiceClient.js';
+import { requireManager } from '../../middleware/authGates.js';
 
 const TEST_SLUG_PREFIX = 'rolesservice-';
 const createdTraccarUserIds = [];
@@ -92,5 +94,144 @@ describe('assignRoleToUser — a user joining a company gets Traccar group acces
       () => assignRoleToUser({ auth: { companyId: companyB.id }, body: { traccarUserId: tUser.id, roleKey: 'driver' } }),
       (err) => err.statusCode === 409,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Postgres-level correctness for the Person Access → EditRolesDialog wiring.
+// No live Traccar required: nothing below exercises the Traccar group
+// reconcile (that's the suite above) — these prove the RBAC read/write/guard
+// behavior itself, so they run in CI too, unlike the Traccar-gated suite above.
+// Fake Traccar ids are large, run-unique integers (same convention as
+// tenantResolverService.test.js) — findRoleByKey/ensureNumzUserForTraccarId
+// never verify the id against a real Traccar account, so none is needed here.
+// ---------------------------------------------------------------------------
+
+let nextFakeTraccarUserId = 800_000_000 + (Date.now() % 90_000_000);
+const freshFakeTraccarUserId = () => nextFakeTraccarUserId++;
+const createdNumzUserIds = [];
+
+after(async () => {
+  if (!createdNumzUserIds.length) return;
+  const { NumzUser } = await import('../../models/index.js');
+  await NumzUser.destroy({ where: { id: { [Op.in]: createdNumzUserIds } } });
+});
+
+/** Same shape seedRolesAndPermissions.js uses — findOrCreate so this suite never depends on that script having run against whatever DB it executes against (see tenantResolverService.test.js's identical rationale). */
+async function ensureRole(key, label) {
+  const { Role } = await import('../../models/index.js');
+  const [role] = await Role.findOrCreate({
+    where: { key, companyId: null },
+    defaults: { label, isSystem: true },
+  });
+  return role;
+}
+
+async function trackNumzUserFor(traccarUserId) {
+  const { NumzUser } = await import('../../models/index.js');
+  const row = await NumzUser.findOne({ where: { traccarUserId } });
+  if (row) createdNumzUserIds.push(row.id);
+  return row;
+}
+
+describe('assignRoleToUser / removeRoleFromUser — Postgres-level correctness (no Traccar required)', () => {
+  it('assigning a role creates a UserRole scoped to the caller\'s own company', async () => {
+    const company = await makeCompany('PG Assign Co');
+    await ensureRole('driver', 'Driver');
+    const traccarUserId = freshFakeTraccarUserId();
+
+    const result = await assignRoleToUser({ auth: { companyId: company.id }, body: { traccarUserId, roleKey: 'driver' } });
+    const created = result.find((a) => a.traccarUserId === traccarUserId);
+    assert.ok(created, 'assignment should appear in the returned company assignment list');
+    assert.equal(created.roleKey, 'driver');
+
+    const numzUser = await trackNumzUserFor(traccarUserId);
+    assert.equal(numzUser.companyId, company.id, 'the auto-provisioned numz_users row must belong to the caller\'s own company');
+  });
+
+  it('listAssignments only returns the caller company\'s own assignments — never another company\'s', async () => {
+    const companyA = await makeCompany('PG List Co A');
+    const companyB = await makeCompany('PG List Co B');
+    await ensureRole('driver', 'Driver');
+    const idA = freshFakeTraccarUserId();
+    const idB = freshFakeTraccarUserId();
+
+    await assignRoleToUser({ auth: { companyId: companyA.id }, body: { traccarUserId: idA, roleKey: 'driver' } });
+    await assignRoleToUser({ auth: { companyId: companyB.id }, body: { traccarUserId: idB, roleKey: 'driver' } });
+    await trackNumzUserFor(idA);
+    await trackNumzUserFor(idB);
+
+    const listA = await listAssignments({ auth: { companyId: companyA.id } });
+    assert.ok(listA.some((a) => a.traccarUserId === idA), 'company A must see its own assignment');
+    assert.ok(!listA.some((a) => a.traccarUserId === idB), 'company A must never see company B\'s assignment');
+  });
+
+  it('removing an assignment removes exactly that one, scoped to the caller company', async () => {
+    const company = await makeCompany('PG Remove Co');
+    await ensureRole('technician', 'Technician');
+    const traccarUserId = freshFakeTraccarUserId();
+
+    const afterAssign = await assignRoleToUser({ auth: { companyId: company.id }, body: { traccarUserId, roleKey: 'technician' } });
+    const target = afterAssign.find((a) => a.traccarUserId === traccarUserId);
+    await trackNumzUserFor(traccarUserId);
+
+    const afterRemove = await removeRoleFromUser({ auth: { companyId: company.id }, params: { userRoleId: target.userRoleId } });
+    assert.ok(!afterRemove.some((a) => a.userRoleId === target.userRoleId), 'the removed assignment must be gone');
+  });
+
+  it('a company cannot remove another company\'s assignment (not found, not silently allowed)', async () => {
+    const companyA = await makeCompany('PG CrossRemove Co A');
+    const companyB = await makeCompany('PG CrossRemove Co B');
+    await ensureRole('driver', 'Driver');
+    const traccarUserId = freshFakeTraccarUserId();
+
+    const assigned = await assignRoleToUser({ auth: { companyId: companyA.id }, body: { traccarUserId, roleKey: 'driver' } });
+    const target = assigned.find((a) => a.traccarUserId === traccarUserId);
+    await trackNumzUserFor(traccarUserId);
+
+    await assert.rejects(
+      () => removeRoleFromUser({ auth: { companyId: companyB.id }, params: { userRoleId: target.userRoleId } }),
+      (err) => err.statusCode === 404,
+    );
+  });
+
+  it('refuses to remove a company\'s last company_admin', async () => {
+    const company = await makeCompany('PG LastAdmin Co');
+    await ensureRole('company_admin', 'Company Admin');
+    const traccarUserId = freshFakeTraccarUserId();
+
+    const assigned = await assignRoleToUser({ auth: { companyId: company.id }, body: { traccarUserId, roleKey: 'company_admin' } });
+    const target = assigned.find((a) => a.traccarUserId === traccarUserId && a.roleKey === 'company_admin');
+    await trackNumzUserFor(traccarUserId);
+
+    await assert.rejects(
+      () => removeRoleFromUser({ auth: { companyId: company.id }, params: { userRoleId: target.userRoleId } }),
+      (err) => err.statusCode === 409,
+    );
+  });
+});
+
+describe('requireManager — role assignment endpoints reject non-managers', () => {
+  it('blocks a user who is neither Traccar isManager nor administrator', () => {
+    const req = { user: { id: 1, isManager: false, administrator: false } };
+    let statusCode = null;
+    let body = null;
+    const res = {
+      status(code) { statusCode = code; return this; },
+      json(payload) { body = payload; return this; },
+    };
+    let nextCalled = false;
+    requireManager(req, res, () => { nextCalled = true; });
+
+    assert.equal(nextCalled, false, 'next() must not be called for a non-manager');
+    assert.equal(statusCode, 403);
+    assert.ok(body?.error);
+  });
+
+  it('allows a Traccar manager through', () => {
+    const req = { user: { id: 2, isManager: true, administrator: false } };
+    let nextCalled = false;
+    requireManager(req, {}, () => { nextCalled = true; });
+    assert.equal(nextCalled, true);
   });
 });

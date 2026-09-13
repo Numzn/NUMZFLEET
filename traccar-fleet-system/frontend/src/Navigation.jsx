@@ -15,7 +15,7 @@ import SettingsCenterShell from './settings/center/SettingsCenterShell.jsx';
 import OverviewSection from './settings/center/sections/OverviewSection.jsx';
 import ProfileSection from './settings/center/sections/ProfileSection';
 import SecuritySection from './settings/center/sections/SecuritySection';
-import TeamSection from './settings/center/sections/TeamSection';
+import PeopleSection from './settings/center/sections/PeopleSection';
 import PersonProfilePage from './settings/center/people/PersonProfilePage.jsx';
 import RolesSection from './settings/center/sections/RolesSection';
 import DevicesSection from './settings/center/sections/DevicesSection';
@@ -243,7 +243,7 @@ const Navigation = () => {
           <Route path="notification" element={<SettingsCenterShell><NotificationPage /></SettingsCenterShell>} />
           <Route path="preferences" element={<PreferencesSection />} />
           <Route path="server" element={<SettingsCenterShell><ServerPage /></SettingsCenterShell>} />
-          <Route path="people" element={<TeamSection />} />
+          <Route path="people" element={<PeopleSection />} />
           <Route path="people/user/:userId" element={<PersonProfilePage />} />
           <Route path="people/driver/:driverId" element={<PersonProfilePage />} />
           {/* Renamed to People. Redirect keeps existing links and bookmarks

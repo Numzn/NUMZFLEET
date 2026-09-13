@@ -18,7 +18,7 @@ const useStyles = makeStyles()(() => ({
 }));
 
 const CollectionActions = ({
-  itemId, editPath, endpoint, setTimestamp, customActions, readonly,
+  itemId, editPath, endpoint, setTimestamp, customActions, readonly, onRemove,
 }) => {
   const theme = useTheme();
   const { classes } = useStyles();
@@ -98,7 +98,7 @@ const CollectionActions = ({
           )}
         </div>
       )}
-      <RemoveDialog style={{ transform: 'none' }} open={removing} endpoint={endpoint} itemId={itemId} onResult={handleRemoveResult} />
+      <RemoveDialog style={{ transform: 'none' }} open={removing} endpoint={endpoint} onRemove={onRemove} itemId={itemId} onResult={handleRemoveResult} />
     </>
   );
 };

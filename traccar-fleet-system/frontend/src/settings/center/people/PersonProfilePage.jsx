@@ -1,6 +1,7 @@
 import {
   Navigate, useNavigate, useParams, useSearchParams,
 } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   Alert, Box, Button, CircularProgress, Stack, Tab, Tabs,
 } from '@mui/material';
@@ -38,11 +39,12 @@ export default function PersonProfilePage() {
   const manager = useManager();
   const { disableDrivers } = useFeatures();
   const [searchParams, setSearchParams] = useSearchParams();
+  const currentUser = useSelector((state) => state.session.user);
   useSetTopBarTitle('Settings');
 
   const {
     person, driver, loading, error, reload,
-  } = usePersonProfile({ personId: userId, driverId });
+  } = usePersonProfile({ personId: userId, driverId, currentUser });
   const vehicles = usePersonVehicles(driver);
   const { personByDriverId, loading: indexLoading } = useDriverPersonIndex({ enabled: !!driverId });
 
@@ -110,7 +112,7 @@ export default function PersonProfilePage() {
   const renderTab = () => {
     switch (activeTab) {
       case 'profile':
-        return <PersonProfileTab person={person} canManage={manager} onSaved={reload} />;
+        return <PersonProfileTab person={person} canManage={manager} currentUser={currentUser} onSaved={reload} />;
       case 'driver':
         return (
           <PersonDriverTab
@@ -124,7 +126,7 @@ export default function PersonProfilePage() {
       case 'vehicles':
         return <PersonVehiclesTab person={person} driver={driver} vehicles={vehicles} />;
       case 'access':
-        return <PersonAccessTab person={person} canManage={manager} onSaved={reload} />;
+        return <PersonAccessTab person={person} canManage={manager} currentUser={currentUser} onSaved={reload} />;
       default:
         return <PersonOverviewTab person={person} driver={driver} vehicles={vehicles} />;
     }

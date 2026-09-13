@@ -3,7 +3,9 @@ import { Box, Stack, TextField } from '@mui/material';
 import SettingsSaveBar from '../components/SettingsSaveBar.jsx';
 import { updatePerson } from './personApi';
 
-export default function PersonProfileTab({ person, canManage, onSaved }) {
+export default function PersonProfileTab({
+  person, canManage, currentUser, onSaved,
+}) {
   const [draft, setDraft] = useState({ name: '', phone: '', email: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -32,7 +34,7 @@ export default function PersonProfileTab({ person, canManage, onSaved }) {
         name: draft.name,
         phone: draft.phone || null,
         email: draft.email,
-      });
+      }, currentUser);
       onSaved();
     } catch (e) {
       setError(e.message || 'Could not save these changes.');
