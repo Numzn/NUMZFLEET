@@ -229,6 +229,36 @@ describe('getCompanyDriver / createCompanyDriver / updateCompanyDriver / deleteC
     assert.equal(createdTraccarDriverIds.length, before, 'no Traccar driver should have been created before validation ran');
   });
 
+  it('a driver created and then updated with a phone reaches Traccar correctly — phone in attributes, never a top-level field', async () => {
+    // Regression for the live bug report: "Unrecognized field \"phone\"
+    // (class org.traccar.model.Driver)". Verifies the *actual* Traccar
+    // projection, not just that our own call succeeded.
+    const company = await makeCompany('Driver Co PhoneProjection');
+    const created = await trackTraccarDriver(
+      await createCompanyDriver({
+        auth: { companyId: company.id },
+        body: { ...driverPayload('Phone Create'), phone: '+260971111111' },
+      }),
+    );
+    assert.equal(created.phone, '+260971111111', 'create must succeed and return the phone NUMZFLEET stored');
+
+    const rawAfterCreate = await traccarServiceFetch(`/api/drivers/${created.traccarDriverId}`);
+    assert.equal(rawAfterCreate.phone, undefined, 'Traccar\'s own driver object must never carry a top-level phone field');
+    assert.equal(rawAfterCreate.attributes.phone, '+260971111111', 'the phone must land in attributes on the real Traccar projection');
+    assert.equal(rawAfterCreate.name, 'Phone Create', 'name must still reach Traccar correctly');
+    assert.equal(rawAfterCreate.uniqueId, created.uniqueId, 'uniqueId must still reach Traccar correctly (driverUniqueId telemetry matching depends on this)');
+
+    const updated = await updateCompanyDriver(
+      { auth: { companyId: company.id }, body: { phone: '+260972222222' } },
+      created.id,
+    );
+    assert.equal(updated.phone, '+260972222222', 'update must succeed and return the new phone');
+
+    const rawAfterUpdate = await traccarServiceFetch(`/api/drivers/${created.traccarDriverId}`);
+    assert.equal(rawAfterUpdate.phone, undefined, 'Traccar\'s own driver object must still never carry a top-level phone field after update');
+    assert.equal(rawAfterUpdate.attributes.phone, '+260972222222', 'the updated phone must land in attributes on the real Traccar projection');
+  });
+
   it('updateCompanyDriver edits a driver and whitelist-ignores unknown fields', async () => {
     const company = await makeCompany('Driver Co Update');
     const created = await trackTraccarDriver(

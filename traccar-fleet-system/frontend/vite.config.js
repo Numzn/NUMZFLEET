@@ -412,6 +412,29 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      // Same pattern as /api/people above. Missing this specific entry was
+      // the actual cause of a live bug report: without it, /api/drivers
+      // fell through to Traccar's OWN native /api/drivers endpoint (which,
+      // unlike /people or /roles, really exists on Traccar) — so requests
+      // didn't 404, they silently landed on Traccar and got rejected with
+      // "Unrecognized field \"phone\"" because Traccar's Driver model has no
+      // such field. fuel-api's own /api/drivers was never actually reached.
+      '/api/drivers': {
+        target: fuelApiUrl,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.cookie) {
+              proxyReq.setHeader('Cookie', req.headers.cookie);
+            }
+            if (req.headers['x-user-id']) {
+              proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+            }
+          });
+        },
+      },
       '/api/platform': {
         target: fuelApiUrl,
         changeOrigin: true,

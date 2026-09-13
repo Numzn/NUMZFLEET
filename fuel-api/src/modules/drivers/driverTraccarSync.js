@@ -16,26 +16,37 @@ import { traccarServiceFetch } from '../../services/traccarServiceClient.js';
  * companyProvisioningService.js's reconcileCompanyTraccarUsers.
  */
 
+/**
+ * org.traccar.model.Driver (Traccar's own model — not ours to change) has
+ * exactly four fields: id, name, uniqueId, attributes. Confirmed against the
+ * live tc_drivers schema this session (id, name, uniqueid, attributes — no
+ * phone column). `attributes` is Traccar's own open Map<String,Object>,
+ * which is where NUMZFLEET's Driver-only fields (currently just `phone`)
+ * belong — the exact same place `attributes.isManager`/`attributes.phone`
+ * already land for Traccar *users* elsewhere in this codebase. This
+ * function builds its Traccar-bound body from that explicit allowlist only
+ * — a caller passing any other field (phone included) can never leak it to
+ * a top-level key, because nothing here ever spreads the input object.
+ */
+export function toTraccarDriverBody({ name, uniqueId, phone }) {
+  return {
+    name,
+    uniqueId,
+    attributes: phone ? { phone } : {},
+  };
+}
+
 export async function createTraccarDriver({ name, uniqueId, phone }) {
   return traccarServiceFetch('/api/drivers', {
     method: 'POST',
-    body: JSON.stringify({
-      name,
-      uniqueId,
-      attributes: phone ? { phone } : {},
-    }),
+    body: JSON.stringify(toTraccarDriverBody({ name, uniqueId, phone })),
   });
 }
 
 export async function updateTraccarDriver(traccarDriverId, { name, uniqueId, phone }) {
   return traccarServiceFetch(`/api/drivers/${traccarDriverId}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      id: traccarDriverId,
-      name,
-      uniqueId,
-      attributes: phone ? { phone } : {},
-    }),
+    body: JSON.stringify({ id: traccarDriverId, ...toTraccarDriverBody({ name, uniqueId, phone }) }),
   });
 }
 
