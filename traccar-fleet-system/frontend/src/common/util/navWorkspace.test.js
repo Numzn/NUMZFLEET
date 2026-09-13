@@ -31,7 +31,7 @@ test('a path merely prefixed with "settings" is not the settings workspace', () 
   assert.equal(isSettingsWorkspace('/settings-export'), false);
   assert.equal(isSettingsWorkspace('/settingsomething'), false);
   assert.equal(isSettingsWorkspace('/settings'), true);
-  assert.equal(isSettingsWorkspace('/settings/team'), true);
+  assert.equal(isSettingsWorkspace('/settings/people'), true);
 });
 
 test('exiting returns to the page the user came from', () => {
@@ -45,7 +45,7 @@ test('exiting falls back to the dashboard when there is nowhere to return to', (
   assert.equal(resolveExitTarget(undefined), OPERATIONAL_HOME);
   assert.equal(resolveExitTarget(''), OPERATIONAL_HOME);
   // Never bounce back into Settings.
-  assert.equal(resolveExitTarget('/settings/team'), OPERATIONAL_HOME);
+  assert.equal(resolveExitTarget('/settings/people'), OPERATIONAL_HOME);
 });
 
 test('every /saas/platform route is the platform area, and nothing else is', () => {

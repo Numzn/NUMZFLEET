@@ -49,7 +49,7 @@ export const PERMISSIONS = [
   { key: 'reports.analytics.read', category: 'reporting', description: 'View analytics.' },
   { key: 'reports.traccar.read', category: 'reporting', description: 'View raw Traccar reports.' },
 
-  // Organization — Team, Company info (Settings Hub > Organization)
+  // Organization — People, Company info (Settings Hub > Organization)
   { key: 'organization.settings.manage', category: 'organization', description: 'Edit company name and settings.' },
   { key: 'organization.members.manage', category: 'organization', description: 'Invite, edit, and remove team members.' },
   { key: 'organization.roles.manage', category: 'organization', description: 'Assign roles to team members.' },

@@ -37,7 +37,7 @@ export async function assignRoleToUser(req) {
     throw err;
   }
   if (role.key === 'platform_super_admin') {
-    const err = new Error('Platform Super Admin cannot be assigned from Team Management');
+    const err = new Error('Platform Super Admin cannot be assigned from People');
     err.statusCode = 403;
     throw err;
   }
@@ -83,8 +83,8 @@ export async function removeRoleFromUser(req) {
   }
 
   // Invariant: a company must always retain at least one Company Admin, or
-  // it locks itself out of Team Management entirely — see the RBAC design
-  // discussion's CompanyMembership aggregate invariant.
+  // it locks itself out of its own People/Access role management entirely —
+  // see the RBAC design discussion's CompanyMembership aggregate invariant.
   if (target.roleKey === 'company_admin') {
     const adminCount = assignments.filter((a) => a.roleKey === 'company_admin').length;
     if (adminCount <= 1) {

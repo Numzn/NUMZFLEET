@@ -300,13 +300,16 @@ describe('Phase 2 Consolidation Stage 2: organizationService optional admin prov
       const { Vehicle } = await import('../models/index.js');
       await Vehicle.create({ name: 'Overview Delta Vehicle', companyId: customer.id });
 
-      // >= rather than strict +1 — node:test runs files in parallel, and other
-      // files may concurrently insert their own vehicles between the two
-      // reads (same pre-existing flakiness class as organizations.test.js's
-      // aggregation test). Still fails hard against a hardcoded 0.
+      // >= rather than strict +1 for both counts — node:test runs files in
+      // parallel, and other files may concurrently insert their own vehicles
+      // or direct customers between the two reads (same pre-existing
+      // flakiness class as organizations.test.js's aggregation test; observed
+      // directCustomerCount actually collide with peopleService.test.js's
+      // company creation under a full-suite run). Still fails hard against a
+      // hardcoded 0.
       const overviewAfter = await getOrganizationOverview();
       assert.ok(overviewAfter.vehicleCount >= overview.vehicleCount + 1, `vehicleCount must be a real Vehicle.count(), not a hardcoded 0 (before=${overview.vehicleCount}, after=${overviewAfter.vehicleCount})`);
-      assert.equal(overviewAfter.directCustomerCount, overview.directCustomerCount + 1);
+      assert.ok(overviewAfter.directCustomerCount >= overview.directCustomerCount + 1, `directCustomerCount must be a real count, not a hardcoded 0 (before=${overview.directCustomerCount}, after=${overviewAfter.directCustomerCount})`);
     });
   });
 });

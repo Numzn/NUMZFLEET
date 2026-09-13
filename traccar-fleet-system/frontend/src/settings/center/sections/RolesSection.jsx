@@ -106,7 +106,8 @@ function RoleCard({ role, allPermissions }) {
  * Read-only explainer for the system roles NUMZFLEET's new roles/permissions
  * foundation understands (see fuel-api/src/permissions/permissionCatalog.js).
  * Deliberately not a role x permission matrix — see the RBAC execution phase
- * instructions this was built against. To change who has a role, use Team.
+ * instructions this was built against. To change who has a role, use People
+ * (a person's profile → Access tab).
  */
 export default function RolesSection() {
   useSetTopBarTitle('Settings');
@@ -134,7 +135,7 @@ export default function RolesSection() {
     <SettingsCenterShell>
       <SettingsSectionPanel
         title="Roles"
-        description="What each role can and cannot do. To change who has a role, use Team."
+        description="What each role can and cannot do. To change who has a role, use People."
       >
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
