@@ -28,8 +28,8 @@ async function getEventOutcome(eventId) {
  */
 async function recordOutcome(eventId, fields) {
   await sequelize.query(
-    `INSERT INTO telemetry_processed_events (event_id, "deviceId", "eventType", "vehicleId", outcome)
-     VALUES (:eventId, :deviceId, :eventType, :vehicleId, :outcome)
+    `INSERT INTO telemetry_processed_events (event_id, "deviceId", "eventType", "vehicleId", outcome, "processedAt")
+     VALUES (:eventId, :deviceId, :eventType, :vehicleId, :outcome, now())
      ON CONFLICT (event_id) DO UPDATE SET
        "deviceId" = EXCLUDED."deviceId",
        "eventType" = EXCLUDED."eventType",
