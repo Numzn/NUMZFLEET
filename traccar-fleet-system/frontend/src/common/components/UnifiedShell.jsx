@@ -11,7 +11,8 @@ import { useTheme } from '@mui/material/styles';
 import { useDispatch, useSelector } from 'react-redux';
 import MenuIcon from '@mui/icons-material/Menu';
 import UnifiedSidebar, { SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED } from './UnifiedSidebar';
-import OrganizationBadge from '../../saas/components/OrganizationBadge';
+import NotificationCenter from '../../notifications/NotificationCenter';
+import UserMenuDropdown from './UserMenuDropdown';
 import { TopBarTitleProvider, useTopBarTitle } from './TopBarTitleContext';
 import LiveMapTopBar from '../../main/components/LiveMapTopBar';
 import FleetSidebar from '../../main/fleet/FleetSidebar';
@@ -275,12 +276,20 @@ function UnifiedShellContent() {
                   <MenuIcon />
                 </IconButton>
               )}
-              <OrganizationBadge />
-              {topBarTitle && (
+              {topBarTitle ? (
                 <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ flex: 1 }}>
                   {topBarTitle}
                 </Typography>
+              ) : (
+                <Box sx={{ flex: 1 }} />
               )}
+              {/* Global account chrome — the one place it lives now, instead of
+                  repeated at the foot of every sidebar variant (desktop rail,
+                  mobile drawer). */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                <NotificationCenter />
+                <UserMenuDropdown />
+              </Box>
             </Box>
           )}
 

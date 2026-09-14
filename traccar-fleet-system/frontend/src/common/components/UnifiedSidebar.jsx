@@ -33,9 +33,6 @@ import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
-import NotificationCenter from '../../notifications/NotificationCenter';
-import UserMenuDropdown from './UserMenuDropdown';
-import OrganizationBadge from '../../saas/components/OrganizationBadge';
 import usePersistedState from '../util/usePersistedState';
 import { useAdministrator, useManager, useRestriction } from '../util/permissions';
 import useFeatures from '../util/useFeatures';
@@ -159,12 +156,6 @@ const useStyles = makeStyles()((theme) => ({
     padding: theme.spacing(1, 1.25, 1.25, 1.25),
     borderTop: `1px solid ${theme.palette.divider}`,
     backgroundColor: 'var(--surface-card)',
-  },
-  footerRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing(1),
   },
 }));
 
@@ -469,11 +460,6 @@ const UnifiedSidebar = ({
               flexShrink: 0,
             }}
           />
-          {/* Same spine, every workspace — this is the one place organization
-              identity is now guaranteed to render regardless of where the
-              user is in the app (previously only the default workspace's
-              topbar showed it at all). */}
-          <OrganizationBadge compact={collapsed} />
         </Box>
       )}
 
@@ -481,12 +467,9 @@ const UnifiedSidebar = ({
         {!showHeaderLogo && (
           <Box sx={{ px: collapsed ? 1.25 : 1.5, py: 1.5 }}>
             {!collapsed && (
-              <>
-                <Typography variant="subtitle2" fontWeight={800} letterSpacing="0.14em" color="primary.main" sx={{ mb: 0.5 }}>
-                  NUMZFLEET
-                </Typography>
-                <OrganizationBadge />
-              </>
+              <Typography variant="subtitle2" fontWeight={800} letterSpacing="0.14em" color="primary.main" sx={{ mb: 0.5 }}>
+                NUMZFLEET
+              </Typography>
             )}
           </Box>
         )}
@@ -509,18 +492,13 @@ const UnifiedSidebar = ({
         ))}
       </List>
 
-      {/* Forced-collapsed workspaces (live map) already surface notifications
-          and account in their own operational topbar (LiveMapTopBar) — showing
-          them again here would put two bells and two account menus on screen
-          at once. The collapse toggle is meaningless there too, since collapse
-          isn't optional. */}
+      {/* Notifications and account now live in the shared topbar (UnifiedShell)
+          instead of here — one place for global account chrome instead of a
+          copy at the foot of every sidebar variant. Forced-collapsed
+          workspaces (live map) have no collapse toggle either, since collapse
+          isn't optional there. */}
       {!forceExpanded && !forceCollapsed && (
         <Box className={classes.footer}>
-          <Box className={classes.footerRow} sx={{ mb: 0.75 }}>
-            <NotificationCenter />
-            <UserMenuDropdown />
-          </Box>
-          <Divider sx={{ opacity: 0.35, mb: 1 }} />
           <Tooltip title={collapsed ? 'Expand' : 'Collapse'} placement="right" disableHoverListener={!collapsed}>
             <Box>
               <ListItemButton
