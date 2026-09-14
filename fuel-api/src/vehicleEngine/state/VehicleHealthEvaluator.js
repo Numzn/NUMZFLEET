@@ -81,6 +81,20 @@ export function evaluateVehicleHealth({
     issues.push('excessive_reconstructed_duration');
   }
 
+  // A stateEnteredAt in the future can only be corruption (clock skew, a bad
+  // reconstruction, a manual data fix gone wrong) — never a legitimate
+  // reading, regardless of confidence. Left undetected, DurationCalculator's
+  // negative-duration clamp (see calculateDuration()) hides it silently
+  // forever, since "unchanged" evaluations reuse the persisted value
+  // byte-for-byte with nothing to ever re-check it. Flagging it here is what
+  // lets evaluateAndHeal() force a rebuild instead.
+  if (enteredAt != null) {
+    const enteredAtMs = new Date(enteredAt).getTime();
+    if (Number.isFinite(enteredAtMs) && enteredAtMs > now) {
+      issues.push('future_state_entered_at');
+    }
+  }
+
   return {
     status: issues.length === 0 ? 'ok' : 'warning',
     issues,

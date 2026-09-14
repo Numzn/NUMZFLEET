@@ -1,4 +1,3 @@
-import sequelize from '../config/database.js';
 import {
   Vehicle, DeviceAssignment, VehicleActivityState,
 } from '../models/index.js';
@@ -14,6 +13,7 @@ import {
 } from '../notifications/vehicleStateNotificationService.js';
 import { runIntervalJob } from './schedulerRuntime.js';
 import { LOCK_KEYS } from './lockKeys.js';
+import { withAdvisoryLock } from '../utils/advisoryLock.js';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -76,15 +76,6 @@ function logTick(fields) {
   console.log(JSON.stringify({ event: 'vehicle-state.reconciliation.tick', ...fields, ts: new Date().toISOString() }));
 }
 
-async function withVehicleLock(vehicleId, fn) {
-  await sequelize.query('SELECT pg_advisory_lock(hashtext(:key)::bigint)', { replacements: { key: vehicleId } });
-  try {
-    return await fn();
-  } finally {
-    await sequelize.query('SELECT pg_advisory_unlock(hashtext(:key)::bigint)', { replacements: { key: vehicleId } });
-  }
-}
-
 /**
  * Genuinely iterates every vehicle with an active device assignment —
  * unlike telemetryReconciliationScheduler.js (which only re-scans tc_events
@@ -106,16 +97,46 @@ export async function runOnce({ source = 'reconciliation' } = {}) {
   const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
   const alertsOn = alertsEnabled();
 
+  // Deterministic tie-break: same known gap as telemetryIngestion.js (see its
+  // comment) — nothing in the schema yet prevents two active assignments for
+  // one vehicle or one device. assignedAt DESC + a duplicate warning keeps
+  // this read deterministic without depending on Postgres row order.
   const assignments = await DeviceAssignment.findAll({
     where: { vehicleId: vehicleIds, isActive: true },
+    order: [['assignedAt', 'DESC']],
   });
-  const deviceIdByVehicleId = new Map(assignments.map((a) => [a.vehicleId, Number(a.deviceId)]));
+  const deviceIdByVehicleId = new Map();
+  const duplicateAssignmentVehicleIds = [];
+  for (const a of assignments) {
+    if (deviceIdByVehicleId.has(a.vehicleId)) {
+      duplicateAssignmentVehicleIds.push(a.vehicleId);
+      continue; // first row wins (assignedAt DESC = most recent)
+    }
+    deviceIdByVehicleId.set(a.vehicleId, Number(a.deviceId));
+  }
+  if (duplicateAssignmentVehicleIds.length) {
+    console.warn('[vehicle-state-reconciliation] duplicate active assignments (using most recent)', duplicateAssignmentVehicleIds);
+  }
   const deviceIds = [...new Set(assignments.map((a) => Number(a.deviceId)))];
 
-  const [devices, positions] = await Promise.all([
-    deviceIds.length ? getTraccarDevicesByIds(deviceIds) : [],
-    deviceIds.length ? getTraccarLatestPositionsByDeviceIds(deviceIds) : [],
-  ]);
+  let devices = [];
+  let positions = [];
+  try {
+    [devices, positions] = await Promise.all([
+      deviceIds.length ? getTraccarDevicesByIds(deviceIds) : [],
+      deviceIds.length ? getTraccarLatestPositionsByDeviceIds(deviceIds) : [],
+    ]);
+  } catch (err) {
+    // Isolated from the per-vehicle loop's own try/catch below on purpose:
+    // without any device/position data at all there is nothing to evaluate
+    // this tick, but that must be visible as "Traccar was unreachable this
+    // tick" rather than indistinguishable from any other error, and rather
+    // than the whole tick throwing out through runIntervalJob's generic
+    // catch with no vehicle-state-specific context.
+    console.error('[vehicle-state-reconciliation] Traccar fetch failed; skipping this tick', err?.message || err);
+    logTick({ scanned: 0, repaired: 0, source, total: vehicleIds.length, traccarUnavailable: true });
+    return;
+  }
   const deviceMap = new Map(devices.map((d) => [Number(d.id), d]));
   const positionMap = new Map(positions.filter((p) => p.deviceId != null).map((p) => [Number(p.deviceId), p]));
 
@@ -131,7 +152,7 @@ export async function runOnce({ source = 'reconciliation' } = {}) {
     if (deviceId == null) continue; // no active device assignment — nothing to evaluate
     scanned += 1;
 
-    await withVehicleLock(vehicleId, async () => {
+    await withAdvisoryLock(vehicleId, async () => {
       try {
         const device = deviceMap.get(deviceId);
         const position = positionMap.get(deviceId);
@@ -143,6 +164,7 @@ export async function runOnce({ source = 'reconciliation' } = {}) {
           deviceStatus: device?.status ?? null,
           deviceLastUpdate: device?.lastupdate ?? null,
           positionSpeed: position?.speed != null ? Number(position.speed) : null,
+          positionFixTime: position?.fixtime ?? null,
           existing,
           now,
         }, { source });
@@ -204,7 +226,14 @@ export async function runOnce({ source = 'reconciliation' } = {}) {
     });
   }
 
-  logTick({ scanned, repaired, source });
+  // total vs scanned makes assignment-coverage gaps visible without a
+  // separate query: a vehicle with no active device assignment is silently
+  // excluded from every reconciliation pass (nothing to evaluate it
+  // against), and a stale "scanned < total" gap is otherwise indistinguishable
+  // from "everything's fine" in this log line alone.
+  logTick({
+    total: vehicleIds.length, scanned, repaired, source, skippedNoAssignment: vehicleIds.length - scanned,
+  });
 }
 
 /** One-shot eager pass on server boot — mirrors runImmobilizationStartupReconcile(). */

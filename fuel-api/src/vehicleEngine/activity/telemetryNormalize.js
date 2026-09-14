@@ -37,6 +37,7 @@ export function normalizeTraccarEvent(raw) {
   }
 
   const deviceLastUpdate = device?.lastUpdate ?? position?.fixTime ?? eventObj.eventTime;
+  const positionFixTime = position?.fixTime ?? null;
 
   let positionSpeed = position?.speed != null ? Number(position.speed) : null;
   if (positionSpeed == null || !Number.isFinite(positionSpeed)) {
@@ -55,5 +56,6 @@ export function normalizeTraccarEvent(raw) {
     deviceStatus,
     deviceLastUpdate,
     positionSpeed,
+    positionFixTime,
   };
 }

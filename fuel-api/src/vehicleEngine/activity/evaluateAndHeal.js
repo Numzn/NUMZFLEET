@@ -1,6 +1,6 @@
 import { evaluateStateTransition } from './vehicleStateEngine.js';
 
-// Only these two issues are actual evidence that the *persisted timestamp*
+// Only these issues are actual evidence that the *persisted timestamp*
 // itself is wrong, so only these trigger a forced repair attempt.
 // stale_telemetry/telemetry_conflict are informational context about current
 // telemetry quality — e.g. a vehicle that dropped offline mid-drive will
@@ -8,9 +8,14 @@ import { evaluateStateTransition } from './vehicleStateEngine.js';
 // after, even though offline/stateEnteredAt are both completely correct.
 // Force-rebuilding on those would just re-stamp the same value repeatedly,
 // producing no-op "corrections" that pollute the audit trail with noise.
+// future_state_entered_at is unconditional evidence of corruption (a
+// stateEnteredAt can never legitimately be later than now) regardless of
+// confidence, unlike excessive_reconstructed_duration which only applies to
+// 'reconstructed' confidence.
 const REPAIR_TRIGGERING_ISSUES = new Set([
   'state_contradicted_by_recent_telemetry',
   'excessive_reconstructed_duration',
+  'future_state_entered_at',
 ]);
 
 /**

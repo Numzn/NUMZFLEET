@@ -492,6 +492,7 @@ export async function listVehiclesMerged(auth) {
           deviceStatus: device?.status ?? null,
           deviceLastUpdate: device?.lastupdate ?? null,
           positionSpeed: position?.speed != null ? Number(position.speed) : null,
+          positionFixTime: position?.fixtime ?? null,
         };
       });
     activityByVehicle = await evaluateAndPersistActivityStates(activityRows);
@@ -577,6 +578,7 @@ export async function getVehicleMerged(id, auth = null) {
         deviceStatus: device?.status ?? null,
         deviceLastUpdate: device?.lastupdate ?? null,
         positionSpeed: position?.speed != null ? Number(position.speed) : null,
+        positionFixTime: position?.fixtime ?? null,
       }]);
       merged.activityState = activity.get(String(id)) ?? null;
     } catch {

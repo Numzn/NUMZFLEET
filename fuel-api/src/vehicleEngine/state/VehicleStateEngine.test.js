@@ -282,3 +282,94 @@ test('evaluateVehicleHealth: no fixTime provided -> no stale_telemetry false pos
   const result = evaluateVehicleHealth({ state: 'moving', telemetry: {}, now: NOW });
   assert.deepEqual(result, { status: 'ok', issues: [] });
 });
+
+// --- future_state_entered_at ---
+
+test('buildVehicleState: future stateEnteredAt -> warning + future_state_entered_at, regardless of confidence', () => {
+  const futureEnteredAt = new Date(NOW + 3600_000).toISOString(); // 1h in the future
+  const snapshot = buildVehicleState(
+    { deviceStatus: 'online', deviceLastUpdate: NOW, positionSpeed: 0, now: NOW },
+    { state: 'idle', stateEnteredAt: futureEnteredAt, stateSource: 'observed' },
+  );
+  assert.equal(snapshot.health, 'warning');
+  assert.ok(snapshot.issues.includes('future_state_entered_at'));
+});
+
+test('buildVehicleState: stateEnteredAt exactly "now" is not flagged as future (boundary)', () => {
+  const snapshot = buildVehicleState(
+    { deviceStatus: 'online', deviceLastUpdate: NOW, positionSpeed: 0, now: NOW },
+    { state: 'idle', stateEnteredAt: new Date(NOW).toISOString(), stateSource: 'observed' },
+  );
+  assert.ok(!snapshot.issues.includes('future_state_entered_at'));
+});
+
+test('buildVehicleState: past stateEnteredAt never flagged as future', () => {
+  const snapshot = buildVehicleState(
+    { deviceStatus: 'online', deviceLastUpdate: NOW, positionSpeed: 0, now: NOW },
+    { state: 'idle', stateEnteredAt: new Date(NOW - 60_000).toISOString(), stateSource: 'observed' },
+  );
+  assert.ok(!snapshot.issues.includes('future_state_entered_at'));
+});
+
+// --- out-of-order / delayed evidence guard ---
+
+test('evaluateStateTransition: delayed event predating the current persisted transition is rejected, not applied', async () => {
+  // 10:00 moving -> 10:05 stopped -> 10:10 moving (already persisted) ->
+  // 10:12 a delayed 'devicestopped' event for 10:05 finally arrives, its own
+  // evidence time (now) still 10:05.
+  const t1005 = Date.parse('2026-09-06T10:05:00.000Z');
+  const t1010 = Date.parse('2026-09-06T10:10:00.000Z');
+
+  const currentlyPersisted = persisted('moving', t1010); // recorded from the 10:10 transition
+
+  const result = await evaluateStateTransition(
+    { deviceStatus: 'online', deviceLastUpdate: t1005, positionSpeed: 0, now: t1005 }, // the delayed 10:05 stop
+    currentlyPersisted,
+  );
+
+  assert.equal(result.transition, null, 'must not be applied as a genuine transition');
+  assert.equal(result.metadata.staleEvidence, true);
+  // Must echo the CURRENT state back, never re-derive from the stale telemetry
+  // (which would say 'idle') — persistActivityState writes whatever this
+  // resolves to unconditionally, so this is the actual regression guard.
+  assert.equal(result.snapshot.state, 'moving');
+  assert.equal(result.snapshot.enteredAt, currentlyPersisted.stateEnteredAt);
+  assert.ok(result.snapshot.issues.includes('stale_evidence_ignored'));
+});
+
+test('evaluateStateTransition: an event at or after the persisted stateEnteredAt is never treated as stale evidence', async () => {
+  const previousState = persisted('idle', NOW - 60_000);
+  const result = await evaluateStateTransition(
+    { deviceStatus: 'online', deviceLastUpdate: NOW, positionSpeed: 20, now: NOW },
+    previousState,
+  );
+  assert.notEqual(result.metadata.staleEvidence, true);
+  assert.equal(result.transition.currentState, 'moving');
+});
+
+test('evaluateStateTransition: a future stateEnteredAt with an agreeing live state is NOT swallowed as "stale evidence" (must stay reachable for self-healing)', async () => {
+  // now < previousEnteredAtMs here too, but for the opposite reason: the
+  // PERSISTED value is corrupt (future), not the incoming telemetry. If the
+  // stale-evidence guard fired on this, buildVehicleState()'s health check
+  // (the only thing that can ever flag future_state_entered_at) would never
+  // run, and evaluateAndHeal's forced-repair path would never see the issue —
+  // this vehicle would be stuck reporting "stale evidence ignored" forever,
+  // since real time can never catch up to an arbitrarily-future timestamp.
+  const previousState = persisted('idle', NOW + 3600_000); // 1h in the future
+  const result = await evaluateStateTransition(
+    { deviceStatus: 'online', deviceLastUpdate: NOW, positionSpeed: 0, now: NOW },
+    previousState,
+  );
+  assert.notEqual(result.metadata.staleEvidence, true);
+  assert.equal(result.transition, null, 'states agree -> unchanged, not a transition');
+  assert.ok(result.snapshot.issues.includes('future_state_entered_at'), 'must still reach the health check');
+});
+
+test('evaluateStateTransition: stale evidence guard does not apply to first observation', async () => {
+  const result = await evaluateStateTransition(
+    { deviceStatus: 'online', deviceLastUpdate: NOW - 3600_000, positionSpeed: 0, now: NOW - 3600_000 },
+    null,
+  );
+  assert.equal(result.metadata.initialObservation, true);
+  assert.notEqual(result.metadata.staleEvidence, true);
+});

@@ -5,6 +5,7 @@ import { normalizeTraccarEvent } from './telemetryNormalize.js';
 import { evaluateAndHeal } from './evaluateAndHeal.js';
 import { persistActivityState } from './activityStateService.js';
 import { recordVehicleStateCorrection } from './vehicleStateAuditService.js';
+import { withAdvisoryLock } from '../../utils/advisoryLock.js';
 
 function logTelemetry(event, fields = {}) {
   console.log(JSON.stringify({ event, ...fields, ts: new Date().toISOString() }));
@@ -48,22 +49,6 @@ async function recordOutcome(eventId, fields) {
   );
 }
 
-async function withVehicleLock(vehicleId, fn) {
-  const lockKey = { key: vehicleId };
-  await sequelize.query('SELECT pg_advisory_lock(hashtext(:key)::bigint)', {
-    replacements: lockKey,
-    type: QueryTypes.SELECT,
-  });
-  try {
-    return await fn();
-  } finally {
-    await sequelize.query('SELECT pg_advisory_unlock(hashtext(:key)::bigint)', {
-      replacements: lockKey,
-      type: QueryTypes.SELECT,
-    });
-  }
-}
-
 /**
  * Orchestrates one Traccar event end-to-end: normalize -> dedupe -> resolve
  * vehicle -> lock -> VehicleStateEngine -> persist -> log -> emit. No
@@ -79,10 +64,29 @@ export async function processTelemetryEvent(rawEvent) {
     return;
   }
 
-  const { eventId, deviceId, eventType, eventTime, deviceStatus, deviceLastUpdate, positionSpeed } = normalized;
+  const {
+    eventId, deviceId, eventType, eventTime, deviceStatus, deviceLastUpdate, positionSpeed, positionFixTime,
+  } = normalized;
 
   try {
-    const assignment = await DeviceAssignment.findOne({ where: { deviceId, isActive: true } });
+    // Deterministic tie-break + visibility for a known, tracked data-integrity
+    // gap: nothing in the schema today prevents two active assignments for the
+    // same physical device (see docs/TENANCY_ARCHITECTURE.md §9 — a partial
+    // unique index is planned Phase 3 work, not yet authorized). Without an
+    // explicit order, findOne() would return whichever row Postgres happens to
+    // pick, which could nondeterministically flip which vehicle "owns" this
+    // device's events across calls. Most-recently-assigned wins, deterministically,
+    // and a duplicate is logged rather than silently tolerated.
+    const activeAssignments = await DeviceAssignment.findAll({
+      where: { deviceId, isActive: true },
+      order: [['assignedAt', 'DESC']],
+    });
+    if (activeAssignments.length > 1) {
+      logTelemetry('telemetry.ingest.duplicate_active_assignment', {
+        deviceId, count: activeAssignments.length, chosenVehicleId: activeAssignments[0].vehicleId,
+      });
+    }
+    const assignment = activeAssignments[0] ?? null;
     const vehicleId = assignment?.vehicleId ?? null;
 
     if (!vehicleId) {
@@ -90,7 +94,7 @@ export async function processTelemetryEvent(rawEvent) {
       return;
     }
 
-    await withVehicleLock(vehicleId, async () => {
+    await withAdvisoryLock(vehicleId, async () => {
       // Only a prior *successful* attempt is a true duplicate. Anything else
       // (never attempted, or a prior attempt that errored) is retried here —
       // this is what lets the hourly reconciliation job actually recover a
@@ -110,6 +114,7 @@ export async function processTelemetryEvent(rawEvent) {
           deviceStatus,
           deviceLastUpdate,
           positionSpeed,
+          positionFixTime,
           existing,
           now: eventTime.getTime(),
         }, { source: 'webhook' });
@@ -141,16 +146,25 @@ export async function processTelemetryEvent(rawEvent) {
 
       await recordOutcome(eventId, { deviceId, eventType, vehicleId, outcome: 'processed' });
 
-      logTelemetry('telemetry.ingest.processed', {
-        eventId,
-        deviceId,
-        vehicleId,
-        eventType,
-        state: transition.state,
-        stateSource: transition.stateSource,
-        changed: transition.changed,
-      });
-
+      if (transition.issues?.includes('stale_evidence_ignored')) {
+        // Distinct from the routine line below on purpose — this is the one
+        // log line that proves a delayed/out-of-order event was correctly
+        // rejected instead of silently blending into "just another processed
+        // event" or, worse, into a silent state regression.
+        logTelemetry('telemetry.ingest.stale_evidence_ignored', {
+          eventId, deviceId, vehicleId, eventType, persistedState: transition.state,
+        });
+      } else {
+        logTelemetry('telemetry.ingest.processed', {
+          eventId,
+          deviceId,
+          vehicleId,
+          eventType,
+          state: transition.state,
+          stateSource: transition.stateSource,
+          changed: transition.changed,
+        });
+      }
     });
   } catch (err) {
     logTelemetry('telemetry.ingest.error', {

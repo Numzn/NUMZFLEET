@@ -144,6 +144,66 @@ export async function evaluateStateTransition(telemetry = {}, previousState = nu
   });
 
   const initialObservation = !previousState;
+
+  // Out-of-order / delayed evidence guard: this telemetry's own evidence
+  // time predates when the currently-recorded state began, so it describes
+  // a moment the system has already moved past — e.g. a `devicestopped`
+  // event timestamped 10:05, delivered late at 10:12, arriving after a
+  // 10:10 `devicemoving` transition has already been persisted. Applying it
+  // would regress a correct, more-current state using stale evidence.
+  // Reject exactly like "nothing changed": echo the existing record
+  // verbatim rather than re-deriving `state` from this telemetry (which
+  // would disagree with previousState.state by construction — that's why
+  // it's being rejected — and every caller persists whatever this function
+  // returns unconditionally, changed or not).
+  //
+  // Doesn't affect on-demand/reconciliation evaluations: their `now` is
+  // always wall-clock "right now", which cannot legitimately predate a
+  // correctly-persisted stateEnteredAt. It only ever fires for telemetry
+  // carrying its own, earlier timestamp — i.e. a specific webhook event.
+  //
+  // Requires currentState !== previousState.state on purpose: this guard
+  // exists only to stop stale evidence from being misread as a transition.
+  // If the two already agree, there is nothing to misapply — falling through
+  // to the ordinary "unchanged" branch below still runs buildVehicleState()
+  // and its health checks, which is exactly what lets a corrupted *future*
+  // stateEnteredAt (now < previousEnteredAtMs, but for the opposite reason —
+  // the persisted value is wrong, not the incoming evidence) get caught by
+  // future_state_entered_at and self-heal via evaluateAndHeal's forced
+  // rebuild. Without this extra condition, that health check would never
+  // run at all: this guard would swallow every evaluation of a vehicle stuck
+  // with a bogus future timestamp, forever, since "now" can never exceed it.
+  const previousEnteredAtMs = previousState?.stateEnteredAt
+    ? new Date(previousState.stateEnteredAt).getTime()
+    : NaN;
+  const isStaleEvidence = !initialObservation
+    && previousState.state !== currentState
+    && Number.isFinite(previousEnteredAtMs)
+    && now < previousEnteredAtMs;
+
+  if (isStaleEvidence) {
+    const { enteredAt, durationSeconds, agrees } = calculateDuration({
+      liveState: previousState.state, persistedState: previousState, now,
+    });
+    const snapshot = buildVehicleStateSnapshot({
+      vehicleId: telemetry.vehicleId ?? null,
+      deviceId: telemetry.deviceId ?? null,
+      state: previousState.state,
+      enteredAt,
+      durationSeconds,
+      confidence: agrees ? (previousState.stateSource ?? 'observed') : 'unknown',
+      health: 'warning',
+      issues: ['stale_evidence_ignored'],
+      telemetry: {
+        deviceStatus: telemetry.deviceStatus ?? null,
+        deviceLastUpdate: telemetry.deviceLastUpdate ?? null,
+        positionSpeed: telemetry.positionSpeed ?? null,
+        positionFixTime: telemetry.positionFixTime ?? null,
+      },
+    });
+    return { snapshot, transition: null, metadata: { initialObservation: false, staleEvidence: true } };
+  }
+
   const stateChanged = !initialObservation && previousState.state !== currentState;
 
   // Nothing new to report: reuse the existing record verbatim.

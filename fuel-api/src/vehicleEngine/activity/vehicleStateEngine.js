@@ -64,6 +64,7 @@ async function resolveStateEnteredAt({ deviceId, state, deviceLastUpdate, now })
  *
  * @param {{ vehicleId: string, deviceId: number|null, deviceStatus: string|null,
  *   deviceLastUpdate: string|Date|null, positionSpeed: number|null,
+ *   positionFixTime?: string|Date|null,
  *   existing: { state: string, stateEnteredAt: Date, stateSource: string }|null,
  *   now?: number, forceRebuild?: boolean }} input
  * @returns {Promise<{ state: string, stateEnteredAt: Date, stateSource: string, changed: boolean }>}
@@ -74,12 +75,13 @@ export async function evaluateStateTransition({
   deviceStatus,
   deviceLastUpdate,
   positionSpeed,
+  positionFixTime = null,
   existing,
   now = Date.now(),
   forceRebuild = false,
 }) {
   const telemetry = {
-    vehicleId, deviceId, deviceStatus, deviceLastUpdate, positionSpeed, now,
+    vehicleId, deviceId, deviceStatus, deviceLastUpdate, positionSpeed, positionFixTime, now,
   };
   // forceRebuild bypasses the "unchanged, reuse existing" short-circuit by
   // presenting this evaluation as if there were no previous record at all —

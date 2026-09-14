@@ -24,6 +24,7 @@ import VehicleFuelIntervalModel from './VehicleFuelInterval.js';
 import VehicleDailyMileageModel from './VehicleDailyMileage.js';
 import VehicleActivityStateModel from './VehicleActivityState.js';
 import VehicleStateAuditEventModel from './VehicleStateAuditEvent.js';
+import TelemetryProcessedEventModel from './TelemetryProcessedEvent.js';
 import LoginAuditEventModel from './LoginAuditEvent.js';
 import NotificationPreferenceModel from './NotificationPreference.js';
 import PushSubscriptionModel from './PushSubscription.js';
@@ -61,6 +62,7 @@ const VehicleFuelInterval = VehicleFuelIntervalModel(sequelize);
 const VehicleDailyMileage = VehicleDailyMileageModel(sequelize);
 const VehicleActivityState = VehicleActivityStateModel(sequelize);
 const VehicleStateAuditEvent = VehicleStateAuditEventModel(sequelize);
+const TelemetryProcessedEvent = TelemetryProcessedEventModel(sequelize);
 const LoginAuditEvent = LoginAuditEventModel(sequelize);
 const NotificationPreference = NotificationPreferenceModel(sequelize);
 const PushSubscription = PushSubscriptionModel(sequelize);
@@ -307,6 +309,7 @@ export {
   VehicleDailyMileage,
   VehicleActivityState,
   VehicleStateAuditEvent,
+  TelemetryProcessedEvent,
   LoginAuditEvent,
   NotificationPreference,
   PushSubscription,

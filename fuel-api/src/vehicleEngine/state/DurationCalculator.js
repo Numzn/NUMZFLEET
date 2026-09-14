@@ -32,6 +32,11 @@ export function calculateDuration({ liveState, persistedState, now = Date.now() 
 
   return {
     enteredAt: new Date(enteredAtMs).toISOString(),
+    // Clamped to 0 so a corrupted future enteredAt never surfaces as a
+    // negative duration — but this is a display-safety clamp only, not the
+    // fix: it does not repair or even flag the corruption. That's
+    // VehicleHealthEvaluator's 'future_state_entered_at' check, which feeds
+    // evaluateAndHeal()'s forced-repair path — see VehicleHealthEvaluator.js.
     durationSeconds: Math.max(0, Math.round((now - enteredAtMs) / 1000)),
     agrees: true,
   };

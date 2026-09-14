@@ -643,9 +643,14 @@ const startServer = async () => {
       stopNotificationDeliveryScheduler = startNotificationDeliveryScheduler();
       stopSmsDeliveryReconciliationScheduler = startSmsDeliveryReconciliationScheduler();
       stopNotificationEscalationScheduler = startNotificationEscalationScheduler();
-      void runVehicleStateStartupReconcile().finally(() => {
-        stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
-      });
+      // Registered independently of the startup reconcile promise settling
+      // (not chained via .finally()) — the scheduler's own startupDelayMs
+      // (default 60s) already spaces its first tick out from this pass, and
+      // a hang (not just an error — runVehicleStateStartupReconcile() already
+      // catches errors internally) in the one-shot pass must never prevent
+      // the recurring 15-minute timer from ever being created.
+      stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
+      void runVehicleStateStartupReconcile();
     });
 
     return; // Exit early (sync already attempted if Postgres was reachable)
@@ -686,9 +691,11 @@ const startServer = async () => {
     stopNotificationDeliveryScheduler = startNotificationDeliveryScheduler();
     stopSmsDeliveryReconciliationScheduler = startSmsDeliveryReconciliationScheduler();
     stopNotificationEscalationScheduler = startNotificationEscalationScheduler();
-    void runVehicleStateStartupReconcile().finally(() => {
-      stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
-    });
+    // See the matching comment in the degraded-mode branch above: registered
+    // independently of the startup reconcile promise so a hang there can
+    // never suppress the recurring scheduler.
+    stopVehicleStateReconciliationScheduler = startVehicleStateReconciliationScheduler();
+    void runVehicleStateStartupReconcile();
     reconcileDeviceAssignmentLabels()
       .then((stats) => {
         if (process.env.NODE_ENV === 'development') {

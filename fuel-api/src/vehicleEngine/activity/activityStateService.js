@@ -13,7 +13,7 @@ import { recordVehicleStateCorrection } from './vehicleStateAuditService.js';
  * Classification/transition decisions live in vehicleStateEngine.js; this
  * function only orchestrates the batch read + upsert around it.
  *
- * @param {Array<{ vehicleId: string, deviceId: number|null, deviceStatus: string|null, deviceLastUpdate: string|Date|null, positionSpeed: number|null }>} rows
+ * @param {Array<{ vehicleId: string, deviceId: number|null, deviceStatus: string|null, deviceLastUpdate: string|Date|null, positionSpeed: number|null, positionFixTime?: string|Date|null }>} rows
  * @returns {Promise<Map<string, { state: string, stateEnteredAt: Date, stateSource: string }>>}
  */
 export async function evaluateAndPersistActivityStates(rows) {
@@ -36,6 +36,7 @@ export async function evaluateAndPersistActivityStates(rows) {
       deviceStatus: row.deviceStatus,
       deviceLastUpdate: row.deviceLastUpdate,
       positionSpeed: row.positionSpeed,
+      positionFixTime: row.positionFixTime ?? null,
       existing,
       now,
     }, { source: 'on_demand' });

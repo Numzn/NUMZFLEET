@@ -2,6 +2,17 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { determineVehicleStateAlerts } from './vehicleStateReconciliationScheduler.js';
 
+// runOnce() itself is deliberately not covered here with a dedicated
+// integration test: it scans every vehicle in the database with no company
+// filter (by design — see its own doc comment), which makes it a poor fit
+// for an isolated test against a shared dev database that may hold an
+// unpredictable number of real vehicles with their own real Traccar-side
+// state. Its behavior is still exercised indirectly: it's a thin per-vehicle
+// loop around evaluateAndHeal() (covered by evaluateAndHeal.test.js) and
+// withAdvisoryLock() (covered by telemetryIngestion.test.js's concurrency
+// test), and the coverage-logging/batch-fetch-isolation changes were
+// verified by direct code reading and a manual dev run, not a committed test.
+
 const NOW = Date.parse('2026-09-06T12:00:00.000Z');
 const EXTENDED_OFFLINE_MS = 2 * 60 * 60 * 1000;
 const EXCESSIVE_IDLE_MS = 45 * 60 * 1000;
@@ -131,3 +142,4 @@ describe('determineVehicleStateAlerts — extended offline / excessive idle (sus
     assert.equal(result.excessiveIdle, false);
   });
 });
+
