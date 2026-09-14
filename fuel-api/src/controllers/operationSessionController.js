@@ -75,7 +75,7 @@ export const planSession = async (req, res) => {
 
 export const getSessionDetails = async (req, res) => {
   try {
-    const session = await getOperationSessionDetails(req.user, req.params.id, req.auth);
+    const session = await getOperationSessionDetails(req.user, req.params.id, req.auth?.companyId);
     return res.json(session);
   } catch (error) {
     return handleError(res, error, 'Get operation session details error', 'Failed to fetch operation session details');
@@ -84,7 +84,7 @@ export const getSessionDetails = async (req, res) => {
 
 export const patchSession = async (req, res) => {
   try {
-    const session = await updateOperationDetails(req.user, req.params.id, req.body || {}, req.auth);
+    const session = await updateOperationDetails(req.user, req.params.id, req.body || {}, req.auth?.companyId);
     return res.json(session);
   } catch (error) {
     return handleError(res, error, 'Patch operation session error', 'Failed to update operation session');
@@ -93,7 +93,7 @@ export const patchSession = async (req, res) => {
 
 export const closeSession = async (req, res) => {
   try {
-    const session = await closeOperationSession(req.user, req.params.id, req.auth);
+    const session = await closeOperationSession(req.user, req.params.id, req.auth?.companyId);
     return res.json(session);
   } catch (error) {
     return handleError(res, error, 'Close operation session error', 'Failed to close operation session');
@@ -102,7 +102,7 @@ export const closeSession = async (req, res) => {
 
 export const addRefuels = async (req, res) => {
   try {
-    const result = await createSessionRefuels(req.user, req.params.id, req.body || {}, req.auth);
+    const result = await createSessionRefuels(req.user, req.params.id, req.body || {}, req.auth?.companyId);
     return res.status(201).json(result);
   } catch (error) {
     return handleError(res, error, 'Add operation session refuels error', 'Failed to add operation session refuels');
@@ -120,7 +120,7 @@ export const recordRefuel = async (req, res) => {
 
 export const markArrived = async (req, res) => {
   try {
-    const result = await markRefuelArrived(req.user, req.params.id, req.body || {}, req.auth);
+    const result = await markRefuelArrived(req.user, req.params.id, req.body || {}, req.auth?.companyId);
     return res.status(200).json(result);
   } catch (error) {
     return handleError(res, error, 'Mark arrived error', 'Failed to mark vehicle arrived');
@@ -129,7 +129,7 @@ export const markArrived = async (req, res) => {
 
 export const skipVehicle = async (req, res) => {
   try {
-    const result = await skipRefuel(req.user, req.params.id, req.body || {}, req.auth);
+    const result = await skipRefuel(req.user, req.params.id, req.body || {}, req.auth?.companyId);
     return res.status(200).json(result);
   } catch (error) {
     return handleError(res, error, 'Skip vehicle error', 'Failed to skip vehicle');
@@ -138,7 +138,7 @@ export const skipVehicle = async (req, res) => {
 
 export const unskipVehicle = async (req, res) => {
   try {
-    const result = await unskipRefuel(req.user, req.params.id, req.body || {}, req.auth);
+    const result = await unskipRefuel(req.user, req.params.id, req.body || {}, req.auth?.companyId);
     return res.status(200).json(result);
   } catch (error) {
     return handleError(res, error, 'Unskip vehicle error', 'Failed to unskip vehicle');
@@ -174,7 +174,7 @@ export const approveSession = async (req, res) => {
 
 export const createAdjustment = async (req, res) => {
   try {
-    const adjustment = await createOperationAdjustment(req.user, req.params.id, req.body || {}, req.auth);
+    const adjustment = await createOperationAdjustment(req.user, req.params.id, req.body || {}, req.auth?.companyId);
     return res.status(201).json(adjustment);
   } catch (error) {
     return handleError(res, error, 'Create adjustment error', 'Failed to create adjustment');
@@ -183,7 +183,7 @@ export const createAdjustment = async (req, res) => {
 
 export const unlockSession = async (req, res) => {
   try {
-    const result = await unlockOperation(req.user, req.params.id, req.body || {}, req.auth);
+    const result = await unlockOperation(req.user, req.params.id, req.body || {}, req.auth?.companyId);
     return res.json(result);
   } catch (error) {
     return handleError(res, error, 'Unlock operation error', 'Failed to unlock operation');
@@ -192,7 +192,7 @@ export const unlockSession = async (req, res) => {
 
 export const getInvoice = async (req, res) => {
   try {
-    const invoice = await getOperationInvoice(req.user, req.params.id, req.auth);
+    const invoice = await getOperationInvoice(req.user, req.params.id, req.auth?.companyId);
     return res.json(invoice);
   } catch (error) {
     return handleError(res, error, 'Get operation invoice error', 'Failed to get invoice');
