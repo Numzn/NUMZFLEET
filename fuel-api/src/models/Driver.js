@@ -59,8 +59,8 @@ export default (sequelize) => {
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       indexes: [
-        { fields: ['companyId'] },
-        { fields: ['numzUserId'] },
+        { name: 'idx_drivers_company_id', fields: ['company_id'] },
+        { name: 'idx_drivers_numz_user_id', fields: ['numz_user_id'] },
       ],
     },
   );
