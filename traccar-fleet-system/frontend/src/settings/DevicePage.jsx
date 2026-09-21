@@ -63,6 +63,7 @@ const DevicePage = () => {
   return (
     <EditItemView
       endpoint="devices"
+      createEndpoint="/api/fleet/devices"
       item={item}
       setItem={setItem}
       validate={validate}

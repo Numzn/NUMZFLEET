@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   Container, Button, Accordion, AccordionDetails, AccordionSummary, Skeleton, Typography, TextField,
 } from '@mui/material';
@@ -7,14 +8,16 @@ import { useTranslation } from '../../common/components/LocalizationProvider';
 import useSettingsStyles from '../common/useSettingsStyles';
 import fetchOrThrow from '../../common/util/fetchOrThrow';
 import { traccarPath } from '../../config/traccarApi.js';
+import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 import { settingsListParent } from '../../common/util/navigationParents';
 
 const EditItemView = ({
-  children, endpoint, item, setItem, defaultItem, validate, onItemSaved,
+  children, endpoint, item, setItem, defaultItem, validate, onItemSaved, createEndpoint,
 }) => {
   const navigate = useNavigate();
   const { classes } = useSettingsStyles();
   const t = useTranslation();
+  const user = useSelector((state) => state.session.user);
 
   const { id } = useParams();
 
@@ -30,6 +33,24 @@ const EditItemView = ({
   }, [id, item, defaultItem]);
 
   const handleSave = useCatch(async () => {
+    // Creation only: route through fuel-api instead of Traccar directly, so
+    // company ownership can be established at the moment the device is
+    // created (see deviceProvisioningService.js on the backend). Editing an
+    // existing item (id present) is unaffected and still goes straight to
+    // Traccar, same as every other entity this shared view handles.
+    if (!id && createEndpoint) {
+      const response = await fetchOrThrow(createEndpoint, {
+        method: 'POST',
+        headers: fuelApiAuthHeaders(user),
+        body: JSON.stringify(item),
+      });
+      if (onItemSaved) {
+        onItemSaved(await response.json());
+      }
+      navigate(settingsListParent(endpoint));
+      return;
+    }
+
     let path = `/api/${endpoint}`;
     if (id) {
       path += `/${id}`;

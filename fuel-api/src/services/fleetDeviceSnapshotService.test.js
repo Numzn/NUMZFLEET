@@ -206,3 +206,64 @@ describe('Vehicle Visibility Audit — company-scoped device snapshot, sourced f
     assert.deepEqual(ids, []);
   });
 });
+
+describe('Device onboarding — unassigned company-owned devices are accessible before any vehicle assignment', () => {
+  const createdCompanyDeviceIds = [];
+
+  after(async () => {
+    const { CompanyDevice } = await import('../models/index.js');
+    if (createdCompanyDeviceIds.length) {
+      await CompanyDevice.destroy({ where: { id: { [Op.in]: createdCompanyDeviceIds } } });
+    }
+  });
+
+  async function makeUnassignedCompanyDevice(companyId, traccarDeviceId) {
+    const { CompanyDevice } = await import('../models/index.js');
+    const row = await CompanyDevice.create({
+      id: uuid(), companyId, traccarDeviceId, vehicleId: null, isActive: true,
+    });
+    createdCompanyDeviceIds.push(row.id);
+    return row;
+  }
+
+  it('a freshly created, unassigned device owned by the company is accessible to it', async () => {
+    const company = await makeCompany('Onboarding Owner (test)');
+    const device = freshDeviceId();
+    await makeUnassignedCompanyDevice(company.id, device);
+
+    const ids = await getAccessibleTraccarDeviceIds(customerAuth(company.id));
+    assert.ok(ids.includes(device), 'unassigned company-owned device must be accessible to its own company');
+  });
+
+  it('an unassigned device owned by a different company is never accessible', async () => {
+    const owner = await makeCompany('Onboarding Owner B (test)');
+    const stranger = await makeCompany('Onboarding Stranger (test)');
+    const device = freshDeviceId();
+    await makeUnassignedCompanyDevice(owner.id, device);
+
+    const ids = await getAccessibleTraccarDeviceIds(customerAuth(stranger.id));
+    assert.ok(!ids.includes(device), 'unassigned device must not leak to a different company');
+  });
+
+  it('an unassigned device and an assigned device from the same company are both accessible, with no duplicate ids', async () => {
+    const company = await makeCompany('Onboarding Mixed (test)');
+    const unassignedDevice = freshDeviceId();
+    const assignedDevice = freshDeviceId();
+    await makeUnassignedCompanyDevice(company.id, unassignedDevice);
+    await makeAssignedVehicle(company.id, 'Assigned Vehicle', assignedDevice);
+
+    const ids = await getAccessibleTraccarDeviceIds(customerAuth(company.id));
+    assert.ok(ids.includes(unassignedDevice));
+    assert.ok(ids.includes(assignedDevice));
+    assert.equal(ids.length, new Set(ids).size, 'no duplicate ids from the two merged sources');
+  });
+
+  it('a platform caller sees unassigned company-owned devices across every company', async () => {
+    const company = await makeCompany('Onboarding Platform Visible (test)');
+    const device = freshDeviceId();
+    await makeUnassignedCompanyDevice(company.id, device);
+
+    const ids = await getAccessibleTraccarDeviceIds(platformAuth());
+    assert.ok(ids.includes(device));
+  });
+});

@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Vehicle, DeviceAssignment } from '../models/index.js';
+import { Vehicle, DeviceAssignment, CompanyDevice } from '../models/index.js';
 import { getTraccarDevicesByIds, getTraccarLatestPositionsByDeviceIds } from '../config/traccar.js';
 import { getAccessibleCompanyIds } from './scopeValidationService.js';
 
@@ -44,34 +44,67 @@ function toPositionDto(row) {
  * be tested against real vehicle/assignment rows without needing live
  * Traccar device/position data — see fleetDeviceSnapshotService.test.js.
  *
- * Sources device ids from vehicles.company_id + active device_assignments —
- * the same join listVehiclesMerged's toMergedDto path relies on, and the
- * one truly authoritative link, written transactionally inside assignDevice's
- * own DB transaction. NOT company_devices: that table is written best-effort,
- * after the transaction, purely as a cache for other consumers (fleet KPIs,
- * maintenance) — it can drift from the real vehicle/device relationship, and
- * Live Map visibility must not inherit that drift.
+ * Two independent sources, merged:
+ *
+ * - Assigned devices come from vehicles.company_id + active
+ *   device_assignments — the same join listVehiclesMerged's toMergedDto path
+ *   relies on, and the one truly authoritative link for an assigned device,
+ *   written transactionally inside assignDevice's own DB transaction.
+ *   company_devices is NOT used for this half: its own vehicle_id column is
+ *   written best-effort, after that transaction, purely as a cache for other
+ *   consumers (fleet KPIs, maintenance) — it can drift from the real
+ *   vehicle/device relationship, and Live Map visibility must not inherit
+ *   that drift.
+ *
+ * - Unassigned-but-company-owned devices come from company_devices WHERE
+ *   vehicle_id IS NULL. For this half company_devices IS authoritative: a
+ *   vehicle_id: null row is written exactly once, synchronously, by
+ *   deviceProvisioningService.createCompanyDevice() at device-creation time
+ *   (via ensureDeviceInCompany), and nothing else can produce one. This is
+ *   what lets a brand-new device appear in the assign-device workflow before
+ *   any vehicle exists for it — company ownership is established at
+ *   onboarding, not inferred later from an assignment.
+ *
+ * The two sets are unioned via a Set rather than a SQL UNION so each keeps
+ * its own company filter and neither can leak a cross-company id into the
+ * other's result.
  */
 export async function getAccessibleTraccarDeviceIds(auth) {
   const accessibleIds = getAccessibleCompanyIds(auth);
 
   const where = {};
+  const companyDeviceWhere = { vehicleId: null, isActive: true };
   if (accessibleIds !== null) {
     if (!accessibleIds.length) return [];
-    where.companyId = accessibleIds.length === 1 ? accessibleIds[0] : { [Op.in]: accessibleIds };
+    const companyFilter = accessibleIds.length === 1 ? accessibleIds[0] : { [Op.in]: accessibleIds };
+    where.companyId = companyFilter;
+    companyDeviceWhere.companyId = companyFilter;
   }
 
-  const vehicles = await Vehicle.findAll({ where, attributes: ['id'] });
-  if (!vehicles.length) return [];
-  const vehicleIds = vehicles.map((v) => v.id);
+  const [vehicles, unassignedCompanyDevices] = await Promise.all([
+    Vehicle.findAll({ where, attributes: ['id'] }),
+    CompanyDevice.findAll({ where: companyDeviceWhere, attributes: ['traccarDeviceId'] }),
+  ]);
 
-  const assignments = await DeviceAssignment.findAll({
-    where: { vehicleId: { [Op.in]: vehicleIds }, isActive: true },
-    attributes: ['deviceId'],
-  });
-  return [...new Set(
-    assignments.map((a) => Number(a.deviceId)).filter((n) => Number.isFinite(n)),
-  )];
+  const ids = new Set(
+    unassignedCompanyDevices
+      .map((d) => Number(d.traccarDeviceId))
+      .filter((n) => Number.isFinite(n)),
+  );
+
+  if (vehicles.length) {
+    const vehicleIds = vehicles.map((v) => v.id);
+    const assignments = await DeviceAssignment.findAll({
+      where: { vehicleId: { [Op.in]: vehicleIds }, isActive: true },
+      attributes: ['deviceId'],
+    });
+    for (const a of assignments) {
+      const n = Number(a.deviceId);
+      if (Number.isFinite(n)) ids.add(n);
+    }
+  }
+
+  return [...ids];
 }
 
 export async function getFleetDeviceSnapshot(auth) {
