@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useDispatch } from 'react-redux';
 import { traccarPath } from '../config/traccarApi.js';
+import { devicesActions } from '../store';
 
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -30,6 +32,7 @@ import fetchOrThrow from '../common/util/fetchOrThrow';
 const DevicePage = () => {
   const { classes } = useSettingsStyles();
   const t = useTranslation();
+  const dispatch = useDispatch();
 
   const admin = useAdministrator();
 
@@ -60,6 +63,16 @@ const DevicePage = () => {
 
   const validate = () => item && item.name && item.uniqueId;
 
+  // The assign-device dropdown (VehiclesPage) and the Live Map both read
+  // from the devices Redux slice, which SocketController only refreshes on
+  // login/reconnect/tab-focus — never on a plain settings save. Without
+  // this, a device created (or renamed) here is correctly assignable
+  // server-side immediately, but invisible in those screens until the next
+  // refresh/reconnect happens to occur.
+  const handleDeviceSaved = (device) => {
+    dispatch(devicesActions.update([device]));
+  };
+
   return (
     <EditItemView
       endpoint="devices"
@@ -67,6 +80,7 @@ const DevicePage = () => {
       item={item}
       setItem={setItem}
       validate={validate}
+      onItemSaved={handleDeviceSaved}
     >
       {item && (
         <>

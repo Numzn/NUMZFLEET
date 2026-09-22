@@ -196,6 +196,7 @@ const VehiclesPage = () => {
         onClose={() => setAssignOpen(false)}
         maxWidth="sm"
         fullWidth
+        fullScreen={isMobile}
         PaperProps={operationalDialogPaperProps}
       >
         <DialogTitle sx={operationalDialogTitleSx}>Assign Traccar device</DialogTitle>

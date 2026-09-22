@@ -18,6 +18,18 @@ import { requestNotificationSync } from './notifications/NotificationSyncControl
 
 const logoutCode = 4000;
 
+// Safety-net reconciliation for a session that's been sitting open: login,
+// WS reconnect, and tab focus/online already cover the common cases, but
+// none of them fire when a device's company ownership changes in another
+// session while this one stays open, visible, and connected the whole time
+// (Device Onboarding investigation, 2026-09-22). A plain timer against the
+// same company-scoped refreshSnapshot() is deliberately preferred over
+// inferring staleness from the raw Traccar WebSocket payload below — that
+// feed is explicitly documented (accessibleDeviceIdsRef, above) as an
+// unreliable company-scope signal, so it's the wrong thing to trigger a
+// resync from.
+const DEVICE_RECONCILE_INTERVAL_MS = 3 * 60 * 1000;
+
 const SocketController = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -29,6 +41,11 @@ const SocketController = () => {
 
   const socketRef = useRef();
   const retryCountRef = useRef(0);
+  // Reconnect, visibility/online, and the periodic reconciliation timer
+  // below can all ask for a refresh close together; this makes concurrent
+  // calls a no-op rather than letting an older in-flight response land
+  // after (and overwrite) a newer one.
+  const refreshInFlightRef = useRef(false);
   // Company-scoped device ids from the last successful fuel-api snapshot.
   // The raw Traccar WebSocket below is authenticated but not company-scoped
   // — it pushes whatever Traccar's own (frequently stale) ACLs allow, which
@@ -58,31 +75,37 @@ const SocketController = () => {
   // their Traccar-side group/permission grants being correct (D1), not on
   // this snapshot fetch.
   const refreshSnapshot = useCallback(async () => {
-    // Both calls run in parallel (allSettled, not all — a fleet/devices
-    // failure must not suppress the session-liveness check below, and vice
-    // versa; sequential awaits here previously added a full extra
-    // round-trip to every reconnect/tab-focus refresh for no benefit, since
-    // neither call depends on the other's result).
-    const [sessionResult, devicesResult] = await Promise.allSettled([
-      traccarFetch('/api/session'),
-      fetchOrThrow('/api/fleet/devices', { headers: fuelApiAuthHeaders(user) }),
-    ]);
-
-    if (sessionResult.status === 'fulfilled' && sessionResult.value.status === 401) {
-      navigate('/login');
-      return;
-    }
-
-    if (devicesResult.status !== 'fulfilled') {
-      return; // ignore refresh errors; websocket will retry independently
-    }
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     try {
-      const { devices, positions } = await devicesResult.value.json();
-      accessibleDeviceIdsRef.current = new Set(devices.map((d) => d.id));
-      dispatch(devicesActions.refresh(devices));
-      dispatch(sessionActions.updatePositions(positions));
-    } catch {
-      // ignore refresh errors; websocket will retry independently
+      // Both calls run in parallel (allSettled, not all — a fleet/devices
+      // failure must not suppress the session-liveness check below, and vice
+      // versa; sequential awaits here previously added a full extra
+      // round-trip to every reconnect/tab-focus refresh for no benefit, since
+      // neither call depends on the other's result).
+      const [sessionResult, devicesResult] = await Promise.allSettled([
+        traccarFetch('/api/session'),
+        fetchOrThrow('/api/fleet/devices', { headers: fuelApiAuthHeaders(user) }),
+      ]);
+
+      if (sessionResult.status === 'fulfilled' && sessionResult.value.status === 401) {
+        navigate('/login');
+        return;
+      }
+
+      if (devicesResult.status !== 'fulfilled') {
+        return; // ignore refresh errors; websocket will retry independently
+      }
+      try {
+        const { devices, positions } = await devicesResult.value.json();
+        accessibleDeviceIdsRef.current = new Set(devices.map((d) => d.id));
+        dispatch(devicesActions.refresh(devices));
+        dispatch(sessionActions.updatePositions(positions));
+      } catch {
+        // ignore refresh errors; websocket will retry independently
+      }
+    } finally {
+      refreshInFlightRef.current = false;
     }
   }, [dispatch, navigate, user]);
 
@@ -212,9 +235,18 @@ const SocketController = () => {
     };
     window.addEventListener('online', reconnectIfNeeded);
     document.addEventListener('visibilitychange', onVisibility);
+
+    // Periodic safety net (see DEVICE_RECONCILE_INTERVAL_MS above). Skipped
+    // while the tab is hidden — visibilitychange already refreshes on
+    // return, so a background tab has no need to poll at all.
+    const reconcileTimer = setInterval(() => {
+      if (!document.hidden) void refreshSnapshot();
+    }, DEVICE_RECONCILE_INTERVAL_MS);
+
     return () => {
       window.removeEventListener('online', reconnectIfNeeded);
       document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(reconcileTimer);
     };
   }, [authenticated, refreshSnapshot]);
 
