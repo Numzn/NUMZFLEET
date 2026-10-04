@@ -286,4 +286,8 @@ main() {
   exit 1
 }
 
-main "$@"
+# Run only when executed, not when sourced (lets a wrapper source this file and reuse
+# post_deploy_verify without triggering a deploy).
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
