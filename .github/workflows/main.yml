@@ -1,6 +1,10 @@
 name: Production deploy
 
-# Only path to OCI: push to main builds images, pushes Docker Hub, deploys production.
+# push to main (or a manual dispatch) -> tests -> SHA-tagged images on Docker Hub -> NUMZ-PRODUCTION (RocketVPS)
+# deploys them through the forced-command wrapper `numzfleet-deploy`, which is installed on the server from a
+# reviewed commit. This is the only deploy path. CI holds a restricted key that can ONLY run
+# `deploy <sha>` / `check <sha>`, and sends a DATA-ONLY payload (migrations + compose file): no script that
+# runs on the server comes from CI.
 
 on:
   push:
@@ -14,15 +18,17 @@ on:
   workflow_dispatch:
     inputs:
       git_sha:
-        description: "Optional SHA to deploy (break-glass). Defaults to current ref."
+        description: "Full 40-hex SHA to deploy (break-glass). Defaults to the current ref."
         required: false
         type: string
+      dry_run:
+        description: "Run the read-only `check` on the server instead of deploying."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-
-env:
-  OCI_REPO_PATH: /home/ubuntu/NUMZFLEET
 
 jobs:
   quality-checks:
@@ -51,13 +57,13 @@ jobs:
     steps:
       - name: Resolve target SHA
         id: target
+        env:
+          SHA_INPUT: ${{ github.event.inputs.git_sha }}
         run: |
-          SHA_INPUT="${{ github.event.inputs.git_sha }}"
-          if [ -n "$SHA_INPUT" ]; then
-            echo "sha=$SHA_INPUT" >> "$GITHUB_OUTPUT"
-          else
-            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          fi
+          set -euo pipefail
+          SHA="${SHA_INPUT:-$GITHUB_SHA}"
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "target SHA must be 40 lowercase hex characters" >&2; exit 1; }
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,7 +94,7 @@ jobs:
           # idempotency quirks (case-folded constraint names, etc.) that have
           # never mattered in the real deploy sequence and aren't this job's
           # concern. Real production migrations still run for real at deploy
-          # time in deploy-oci, against the actual long-lived prod DB.
+          # time on the server (numzfleet-deploy), against the actual long-lived prod DB.
           node -e "import('./src/models/index.js').then(m => m.syncDatabase()).then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); })"
           npm test
 
@@ -126,16 +132,37 @@ jobs:
         with:
           ref: ${{ needs.quality-checks.outputs.sha }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Image tags are immutable: a SHA that is already published is never rebuilt or overwritten. Re-running or
+      # re-dispatching a SHA that is already live therefore deploys exactly the images that are running.
+      - name: Check whether this SHA is already published
+        id: published
+        env:
+          SHA: ${{ needs.quality-checks.outputs.sha }}
+          NS: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          all=true
+          for img in numzfleet-frontend numzfleet-backend numzfleet-erb; do
+            if docker manifest inspect "$NS/$img:$SHA" >/dev/null 2>&1; then
+              echo "already published: $img:${SHA:0:12}"
+            else
+              echo "not published yet: $img:${SHA:0:12}"
+              all=false
+            fi
+          done
+          echo "all=$all" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: steps.published.outputs.all != 'true'
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push frontend
+        if: steps.published.outputs.all != 'true'
         uses: docker/build-push-action@v6
         with:
           context: traccar-fleet-system/frontend
@@ -151,6 +178,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push backend
+        if: steps.published.outputs.all != 'true'
         uses: docker/build-push-action@v6
         with:
           context: fuel-api
@@ -161,6 +189,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push ERB
+        if: steps.published.outputs.all != 'true'
         uses: docker/build-push-action@v6
         with:
           context: erb-fuel-monitor
@@ -170,41 +199,60 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-oci:
+  deploy-production:
     needs: build-and-push
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 30
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    env:
+      TARGET_SHA: ${{ needs.build-and-push.outputs.sha }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           ref: ${{ needs.build-and-push.outputs.sha }}
 
       - name: Verify image manifests exist
         run: |
           chmod +x deployment/verify/verify-docker-manifests.sh
-          deployment/verify/verify-docker-manifests.sh "${{ needs.build-and-push.outputs.sha }}" "${{ secrets.DOCKERHUB_USERNAME }}"
+          deployment/verify/verify-docker-manifests.sh "$TARGET_SHA" "${{ secrets.DOCKERHUB_USERNAME }}"
 
-      - name: Setup SSH key
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.OCI_SSH_KEY }}" > ~/.ssh/id_oci
-          chmod 600 ~/.ssh/id_oci
-          ssh-keyscan -H "${{ secrets.OCI_SSH_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Deploy to OCI
+      - name: Set up SSH (restricted deploy key, pinned host key)
         env:
-          DEPLOY_SHA: ${{ needs.build-and-push.outputs.sha }}
+          DEPLOY_KEY: ${{ secrets.ROCKETVPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.ROCKETVPS_SSH_KNOWN_HOSTS }}
         run: |
-          ssh -i ~/.ssh/id_oci "${{ secrets.OCI_SSH_USER }}@${{ secrets.OCI_SSH_HOST }}" \
-            "set -euo pipefail; \
-             cd '${OCI_REPO_PATH}'; \
-             git fetch origin --tags; \
-             git checkout '${DEPLOY_SHA}'; \
-             bash deployment/deploy/promote-to-production.sh '${DEPLOY_SHA}' deployment/.env"
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts_vps
+          chmod 644 ~/.ssh/known_hosts_vps
+
+      - name: Deploy on NUMZ-PRODUCTION (or read-only check when dry_run)
+        env:
+          SSH_HOST: ${{ vars.ROCKETVPS_SSH_HOST }}
+          SSH_USER: ${{ vars.ROCKETVPS_SSH_USER }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "refusing: target SHA is not 40 lowercase hex" >&2; exit 1; }
+          VERB=deploy
+          if [[ "$DRY_RUN" == "true" ]]; then VERB=check; fi
+          echo "target ${TARGET_SHA} verb ${VERB}"
+          # Data-only payload: migrations + compose file. The server validates it against an allow-list.
+          git archive --format=tar "$TARGET_SHA" fuel-api/migrations deployment/compose/docker-compose.prod.yml \
+            | ssh -i ~/.ssh/id_deploy \
+                -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+                -o UserKnownHostsFile="$HOME/.ssh/known_hosts_vps" \
+                -o ConnectTimeout=20 -o ServerAliveInterval=30 \
+                "$SSH_USER@$SSH_HOST" "$VERB $TARGET_SHA"
 
       - name: Verify production health
+        if: env.DRY_RUN != 'true'
         run: |
           curl -fsS --max-time 30 "https://numz.site/health"
           curl -fsS --max-time 30 "https://numz.site/api/health"
