@@ -5,27 +5,37 @@ export function withActionableFlags(computed) {
   const isActionable = !computed.unknown
     && computed.remaining != null
     && (computed.dueSoon || computed.remaining <= 0);
+  // Overdue means strictly PAST the due point. Sitting exactly on it is "due now":
+  // actionable but not yet overdue, which keeps the Service Due state reachable.
   const isOverdue = !computed.unknown
     && computed.remaining != null
-    && computed.remaining <= 0;
+    && computed.remaining < 0;
   return { ...computed, isActionable, isOverdue };
 }
 
 /**
- * Next-due math for a Traccar maintenance schedule (ported from frontend useVehicleMaintenance).
+ * Next-due math for a maintenance schedule.
+ *
+ * `start` is the cycle's origin: the odometer (or time) at which the last service
+ * was done, or at which the schedule was first configured. The next service is due
+ * one `period` later — nextDue = start + period.
+ *
+ * ONLY completing a service moves `start` (see resetMaintenanceScheduleAfterCompletion
+ * in routineServiceTraccarService.js). Passing the due point must never roll the
+ * schedule forward to the next multiple: a missed service stays due, and
+ * `remaining` goes negative (overdue) until the service is actually completed.
+ *
+ *   start 5,000 km, period 5,000 km, odometer 10,500 km
+ *     -> nextDue 10,000 km, remaining -500 km (overdue)   [not 15,000 / +4,500]
  */
 export function computeDue(m, position, odometerFallbackMeters = null) {
   const isTime = typeof m.type === 'string' && m.type.endsWith('Time');
   const start = Number(m.start) || 0;
   const period = Number(m.period) || 0;
+  const nextDue = start + period;
 
   if (isTime) {
     const now = Date.now();
-    let nextDue = start;
-    if (period > 0 && now > start) {
-      const cycles = Math.floor((now - start) / period) + 1;
-      nextDue = start + cycles * period;
-    }
     const remaining = nextDue - now;
     return withActionableFlags({
       ...m,
@@ -59,13 +69,6 @@ export function computeDue(m, position, odometerFallbackMeters = null) {
     });
   }
 
-  let nextDue;
-  if (current < start) {
-    nextDue = start;
-  } else {
-    const cycles = Math.floor((current - start) / period) + 1;
-    nextDue = start + cycles * period;
-  }
   const remaining = nextDue - current;
   return withActionableFlags({
     ...m,
@@ -96,6 +99,9 @@ export function classifyDueBucket(computed, now = Date.now()) {
 export function formatRemainingLabel(computed) {
   if (computed.unknown || computed.remaining == null) {
     return 'Awaiting telemetry';
+  }
+  if (computed.remaining === 0) {
+    return 'Due now';
   }
   if (computed.isOverdue) {
     if (computed.isTime) {

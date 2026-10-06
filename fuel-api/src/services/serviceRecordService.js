@@ -43,6 +43,18 @@ export function normalizeStatusForDto(status) {
   return status;
 }
 
+/**
+ * The maintenance cycle advances only when a service is actually completed:
+ * on the transition INTO 'completed' for a record linked to a schedule. Any other
+ * update (scheduling, in-progress, edits to an already-completed record) must leave
+ * the schedule's start untouched. Kept pure so that rule is directly testable.
+ */
+export function shouldRebaseScheduleOnCompletion({
+  nextStatus, wasCompleted, maintenanceId, deviceId,
+}) {
+  return nextStatus === 'completed' && !wasCompleted && maintenanceId != null && Boolean(deviceId);
+}
+
 export function toServiceRecordDto(record) {
   if (!record) return null;
   const plain = record.toJSON ? record.toJSON() : record;
@@ -243,7 +255,9 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
   // not a second client-initiated call — so a lost connection between steps
   // can no longer leave the system silently inconsistent. Outcome is
   // persisted (scheduleResetStatus/scheduleResetError), not just thrown.
-  if (patch.status === 'completed' && !wasCompleted && record.maintenanceId != null && deviceId) {
+  if (shouldRebaseScheduleOnCompletion({
+    nextStatus: patch.status, wasCompleted, maintenanceId: record.maintenanceId, deviceId,
+  })) {
     try {
       await resetMaintenanceScheduleAfterCompletion({
         deviceId,

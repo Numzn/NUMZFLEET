@@ -30,6 +30,20 @@ export function deriveRoutineServiceStatus(remainingKm) {
   return { status, statusLabel: STATUS_LABELS[status] };
 }
 
+/**
+ * Whole kilometres left before the Routine Service is due (negative once it is
+ * past due), taken from a due-engine item. Every consumer — the dashboard, the
+ * per-vehicle summary behind notifications — converts through this one function,
+ * so they cannot drift apart on the same schedule.
+ * @param {{ type?: string, remaining?: number|null }|null|undefined} item
+ * @returns {number|null}
+ */
+export function routineRemainingKm(item) {
+  if (item?.type !== 'totalDistance' || item.remaining == null) return null;
+  const km = Math.round(Number(item.remaining) / 1000);
+  return Number.isFinite(km) ? km : null;
+}
+
 export function isRoutineServiceSchedule(schedule) {
   return schedule?.attributes?.numzServicePackage === true;
 }

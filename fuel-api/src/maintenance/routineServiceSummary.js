@@ -1,6 +1,7 @@
 import {
   deriveRoutineServiceStatus,
   isRoutineServiceSchedule,
+  routineRemainingKm,
   ROUTINE_SERVICE_LABEL,
 } from './routineServiceStatus.js';
 
@@ -13,10 +14,7 @@ export function buildRoutineServiceSummaryByVehicle(dueState) {
   const map = new Map();
   for (const item of dueState?.items ?? []) {
     if (!item.fleetVehicleId || !isRoutineServiceSchedule(item)) continue;
-    let remainingKm = null;
-    if (item.type === 'totalDistance' && item.remaining != null) {
-      remainingKm = Math.round(Number(item.remaining) / 1000);
-    }
+    const remainingKm = routineRemainingKm(item);
     const { status, statusLabel } = deriveRoutineServiceStatus(remainingKm);
     map.set(String(item.fleetVehicleId), {
       label: ROUTINE_SERVICE_LABEL,

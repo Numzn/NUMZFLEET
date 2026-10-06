@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveRoutineServiceStatus } from './routineServiceStatus.js';
+import { deriveRoutineServiceStatus, routineRemainingKm } from './routineServiceStatus.js';
 
 test('deriveRoutineServiceStatus boundary values', () => {
   assert.deepEqual(deriveRoutineServiceStatus(1001), { status: 'on_track', statusLabel: 'On Track' });
@@ -13,4 +13,18 @@ test('deriveRoutineServiceStatus boundary values', () => {
   assert.deepEqual(deriveRoutineServiceStatus(0), { status: 'due_now', statusLabel: 'Service Due' });
   assert.deepEqual(deriveRoutineServiceStatus(-1), { status: 'overdue', statusLabel: 'Overdue' });
   assert.deepEqual(deriveRoutineServiceStatus(null), { status: null, statusLabel: null });
+});
+
+test('routineRemainingKm converts a due item to whole km, negative once past due', () => {
+  assert.equal(routineRemainingKm({ type: 'totalDistance', remaining: 400000 }), 400);
+  assert.equal(routineRemainingKm({ type: 'totalDistance', remaining: 0 }), 0);
+  assert.equal(routineRemainingKm({ type: 'totalDistance', remaining: -500000 }), -500);
+  assert.equal(routineRemainingKm({ type: 'totalDistance', remaining: -1000 }), -1);
+});
+
+test('routineRemainingKm is null when there is nothing to measure', () => {
+  assert.equal(routineRemainingKm({ type: 'totalDistance', remaining: null }), null);
+  assert.equal(routineRemainingKm({ type: 'totalDistance' }), null);
+  assert.equal(routineRemainingKm({ type: 'hours', remaining: 3600000 }), null);
+  assert.equal(routineRemainingKm(null), null);
 });

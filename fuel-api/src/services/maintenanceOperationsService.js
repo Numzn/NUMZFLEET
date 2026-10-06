@@ -6,6 +6,7 @@ import {
 import {
   deriveRoutineServiceStatus,
   isRoutineServiceSchedule,
+  routineRemainingKm,
   ROUTINE_SERVICE_LABEL,
 } from '../maintenance/routineServiceStatus.js';
 import { aggregateMaintenanceCosts } from '../maintenance/maintenanceCostService.js';
@@ -16,15 +17,14 @@ import {
 import { countCompletedToday } from '../repositories/serviceRecordRepository.js';
 import { Vehicle } from '../models/index.js';
 
-function buildImmediateAttention(dueState, openWorkOrdersByVehicle, limit = 10) {
+// Exported for tests: the dashboard's attention list must classify a schedule the
+// same way the per-vehicle summary and the vehicle engine do.
+export function buildImmediateAttention(dueState, openWorkOrdersByVehicle, limit = 10) {
   const byVehicle = new Map();
 
   for (const item of dueState.items) {
     if (!item.fleetVehicleId || !isRoutineServiceSchedule(item)) continue;
-    let remainingKm = null;
-    if (item.type === 'totalDistance' && item.remaining != null) {
-      remainingKm = Math.round(Number(item.remaining) / 1000);
-    }
+    const remainingKm = routineRemainingKm(item);
     const { status, statusLabel } = deriveRoutineServiceStatus(remainingKm);
     if (status === 'on_track') continue;
 

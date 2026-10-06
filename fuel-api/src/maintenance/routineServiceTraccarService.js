@@ -186,6 +186,26 @@ function isTimeMaintenanceType(type) {
 }
 
 /**
+ * Where the NEXT service cycle starts once a service is completed: the odometer
+ * the service was actually done at (or "now" for a time-based schedule) — not the
+ * old due point and not whatever the odometer reads later. The next due point is
+ * then start + period (see computeDue), so completing an overdue service at
+ * 10,500 km with a 5,000 km interval puts the next one at 15,500 km.
+ * Pure, so it can be tested without Traccar.
+ * @param {{ type: string, completionOdometerKm: number|null|undefined, now?: number }} params
+ * @returns {number} the new `start`, in the schedule's own unit (metres or ms)
+ */
+export function computeRebasedStart({ type, completionOdometerKm, now = Date.now() }) {
+  if (isTimeMaintenanceType(type)) return now;
+  if (completionOdometerKm == null || !Number.isFinite(Number(completionOdometerKm))) {
+    const err = new Error('completionOdometerKm is required to reset a distance-based schedule');
+    err.statusCode = 400;
+    throw err;
+  }
+  return Math.round(Number(completionOdometerKm) * 1000);
+}
+
+/**
  * Rebase a Traccar maintenance schedule's `start` to the trusted completion
  * mileage (or now, for time-based schedules) — server-side equivalent of the
  * frontend's completeMaintenanceService.js reset step, so the whole
@@ -209,17 +229,7 @@ export async function resetMaintenanceScheduleAfterCompletion({ deviceId, mainte
     throw err;
   }
 
-  let newStart;
-  if (isTimeMaintenanceType(item.type)) {
-    newStart = Date.now();
-  } else {
-    if (completionOdometerKm == null || !Number.isFinite(Number(completionOdometerKm))) {
-      const err = new Error('completionOdometerKm is required to reset a distance-based schedule');
-      err.statusCode = 400;
-      throw err;
-    }
-    newStart = Math.round(Number(completionOdometerKm) * 1000);
-  }
+  const newStart = computeRebasedStart({ type: item.type, completionOdometerKm });
 
   const response = await traccarFetch(`/api/maintenance/${item.id}`, {
     method: 'PUT',
