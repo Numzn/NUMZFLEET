@@ -2,10 +2,9 @@ import { useEffect } from 'react';
 import { useDispatch, useSelector, connect } from 'react-redux';
 import { traccarPath } from './config/traccarApi.js';
 import { fuelApiAuthHeaders } from './config/fuelApiAuth.js';
-import { fetchTraccarMaintenances } from './fleet/vehiclesApi.js';
 import { fetchCompanyDrivers } from './settings/center/people/personApi.js';
 import {
-  geofencesActions, groupsActions, driversActions, maintenancesActions, calendarsActions, fuelRequestsActions,
+  geofencesActions, driversActions, calendarsActions, fuelRequestsActions,
 } from './store';
 import { useEffectAsync } from './reactHelper';
 import fetchOrThrow from './common/util/fetchOrThrow';
@@ -26,26 +25,12 @@ const CachingController = () => {
   }, [authenticated]);
 
   useEffectAsync(async () => {
-    if (authenticated) {
-      const response = await fetchOrThrow(traccarPath('/api/groups'));
-      dispatch(groupsActions.refresh(await response.json()));
-    }
-  }, [authenticated]);
-
-  useEffectAsync(async () => {
     // fuel-api's own company-scoped /api/drivers, not Traccar's native list —
     // Traccar's has no company column, so polling it directly here would leak
     // every company's drivers into every session's driver-name lookups
     // (DriverValue.js, CommandPalette.jsx search) regardless of tenancy.
     if (authenticated && user) {
       dispatch(driversActions.refresh(await fetchCompanyDrivers(user)));
-    }
-  }, [authenticated, user]);
-
-  useEffectAsync(async () => {
-    if (authenticated && user) {
-      const rows = await fetchTraccarMaintenances(user);
-      dispatch(maintenancesActions.refresh(rows));
     }
   }, [authenticated, user]);
 

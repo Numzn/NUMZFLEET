@@ -74,7 +74,6 @@ export default function useVehicleData(vehicleId) {
   const positions = useSelector((s) => s.session.positions);
   const events = useSelector((s) => s.events.items);
   const devicesById = useSelector((s) => s.devices.items);
-  const groupsById = useSelector((s) => s.groups.items);
   const motionNow = useMotionDurationTick();
 
   const [erbState, setErbState] = useState({
@@ -283,14 +282,6 @@ export default function useVehicleData(vehicleId) {
     };
   }, [events, historicalEvents, deviceId, showGeofenceAlerts]);
 
-  const groupName = useMemo(() => {
-    if (deviceId == null) return null;
-    const d = devicesById[deviceId];
-    const gid = d?.groupId;
-    if (gid == null) return null;
-    return groupsById[gid]?.name ?? null;
-  }, [devicesById, groupsById, deviceId]);
-
   // Live state is the current-state authority (see resolveLiveActivityState.js
   // for why the persisted activityState record can drift arbitrarily far from
   // reality) — computed from the same Redux devices/positions every other
@@ -361,7 +352,6 @@ export default function useVehicleData(vehicleId) {
     saveConfig,
     livePosition,
     deviceId,
-    groupName,
     motionLabel,
     motionDurationLabel,
     ignitionPhrase,

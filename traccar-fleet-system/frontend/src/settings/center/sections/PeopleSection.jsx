@@ -2,19 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
-  Box, Typography, Switch, FormControlLabel, TextField, CircularProgress, Stack,
+  Box, Typography, TextField, CircularProgress, Stack,
 } from '@mui/material';
-import LoginIcon from '@mui/icons-material/Login';
-import { traccarPath } from '../../../config/traccarApi.js';
-import { useCatch, useEffectAsync } from '../../../reactHelper';
+import { useEffectAsync } from '../../../reactHelper';
 import { useTranslation } from '../../../common/components/LocalizationProvider';
-import { useManager } from '../../../common/util/permissions';
 import { derivePersonRoles, derivePersonStatus } from '../../../common/util/personRoles';
 import usePersonDriverLinks from '../../../common/util/usePersonDriverLinks';
 import PersonRoleChips from '../../../common/components/PersonRoleChips';
 import PersonStatusChip from '../../../common/components/PersonStatusChip';
 import { formatTime } from '../../../common/util/formatter';
-import fetchOrThrow from '../../../common/util/fetchOrThrow';
 import { useSetTopBarTitle } from '../../../common/components/TopBarTitleContext';
 import SettingsCenterShell from '../SettingsCenterShell.jsx';
 import SettingsSectionPanel from '../components/SettingsSectionPanel.jsx';
@@ -40,36 +36,22 @@ import { fetchCompanyPeople, deletePerson } from '../people/personApi';
  * Tenancy: list, add, and remove are all fuel-api-backed and company-scoped
  * now (GET/POST/DELETE /api/people, deriving the tenant from the caller's own
  * session server-side — see fuel-api/src/modules/people/peopleService.js).
- * The row click-through (to PersonProfilePage) and the login row action are
- * the two things here still reaching Traccar directly and unscoped — login
- * is a Traccar session by definition, and the profile page's own read is
- * company-scoped independently (personApi.js's fetchPerson).
+ * There is deliberately no "log in as this person" action: each organization
+ * is its own login, and nothing in NUMZFLEET lets one identity act as another.
+ * Traccar's temporary (expiring-share) accounts are internal artifacts, not
+ * people, so they are not listed.
  */
 export default function PeopleSection() {
   useSetTopBarTitle('Settings');
   const navigate = useNavigate();
   const t = useTranslation();
-  const manager = useManager();
   const currentUser = useSelector((state) => state.session.user);
 
   const [timestamp, setTimestamp] = useState(Date.now());
   const [items, setItems] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [temporary, setTemporary] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-
-  const handleLogin = useCatch(async (userId) => {
-    await fetchOrThrow(traccarPath(`/api/session/${userId}`));
-    window.location.replace('/');
-  });
-
-  const actionLogin = {
-    key: 'login',
-    title: t('loginLogin'),
-    icon: <LoginIcon fontSize="small" />,
-    handler: handleLogin,
-  };
 
   const handleRemovePerson = async (personId) => {
     await deletePerson(personId, currentUser);
@@ -84,7 +66,7 @@ export default function PeopleSection() {
     }
   }, [timestamp]);
 
-  const visible = items.filter((u) => temporary || !u.temporary).filter(filterByKeyword(searchKeyword));
+  const visible = items.filter((u) => !u.temporary).filter(filterByKeyword(searchKeyword));
   const { driverByPerson } = usePersonDriverLinks(visible.map((item) => item.id), { currentUser });
 
   return (
@@ -139,7 +121,6 @@ export default function PeopleSection() {
                       editPath="/settings/people/user"
                       onRemove={handleRemovePerson}
                       setTimestamp={setTimestamp}
-                      customActions={manager ? [actionLogin] : []}
                     />
                   </Box>
                 </Box>
@@ -150,17 +131,6 @@ export default function PeopleSection() {
             )}
           </Stack>
         )}
-        <FormControlLabel
-          sx={{ mt: 2 }}
-          control={(
-            <Switch
-              checked={temporary}
-              onChange={(e) => setTemporary(e.target.checked)}
-              size="small"
-            />
-          )}
-          label={t('userTemporary')}
-        />
       </SettingsSectionPanel>
       <CollectionFab onClick={() => setAddOpen(true)} />
       <AddPersonDialog

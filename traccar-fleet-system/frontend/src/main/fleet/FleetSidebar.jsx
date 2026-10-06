@@ -21,7 +21,6 @@ const FleetSidebar = ({
   collapsed,
   filteredDevices,
   positions,
-  groups,
   filters,
   onFilterChange,
   deviceFleetVehicleIdByDeviceId,
@@ -78,7 +77,6 @@ const FleetSidebar = ({
         <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 0.35, minWidth: 0 }}>
           <FleetSearch compact />
           <FleetFilters
-            groups={groups}
             filters={filters}
             devices={filteredDevices}
             onFilterChange={onFilterChange}

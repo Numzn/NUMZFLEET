@@ -6,6 +6,8 @@ import {
   getFleetCommandCenter,
   getFleetDeviceSnapshotHandler,
   createFleetDeviceHandler,
+  updateFleetDeviceHandler,
+  deleteFleetDeviceHandler,
 } from '../controllers/fleetCommandController.js';
 import {
   getDashboard,
@@ -21,6 +23,8 @@ router.use(attachTenantContext);
 router.get('/command-center', requireAuth, requireManager, getFleetCommandCenter);
 router.get('/devices', requireAuth, getFleetDeviceSnapshotHandler);
 router.post('/devices', requireAuth, requireManager, createFleetDeviceHandler);
+router.patch('/devices/:id', requireAuth, requireManager, updateFleetDeviceHandler);
+router.delete('/devices/:id', requireAuth, requireManager, deleteFleetDeviceHandler);
 router.get('/maintenance/dashboard', requireAuth, requireManager, getDashboard);
 router.get('/maintenance/budget', requireAuth, requireManager, getBudget);
 router.put('/maintenance/budget', requireAuth, requireManager, putBudget);

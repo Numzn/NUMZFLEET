@@ -24,7 +24,7 @@ import {
 import { makeStyles } from 'tss-react/mui';
 import CloseIcon from '@mui/icons-material/Close';
 import RouteIcon from '@mui/icons-material/Route';
-import SendIcon from '@mui/icons-material/Send';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PendingIcon from '@mui/icons-material/Pending';
@@ -35,6 +35,10 @@ import PositionValue from './PositionValue';
 import { useDeviceReadonly, useRestriction } from '../util/permissions';
 import usePositionAttributes from '../attributes/usePositionAttributes';
 import { devicesActions } from '../../store';
+import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
+import { resolveKnownFleetVehicleId } from '../../fleet/display/resolveVehicleDisplay';
+import { vehicleImmobilizerPath } from '../../fleet/vehicleRegistry/vehicleRegistryUtils';
+import { deleteFleetDevice } from '../../fleet/fleetDevicesApi';
 import { useCatch, useCatchCallback } from '../../reactHelper';
 import { useAttributePreference } from '../util/preferences';
 import fetchOrThrow from '../util/fetchOrThrow';
@@ -127,7 +131,6 @@ const StatusCard = ({ deviceId, position, onClose, disableActions, desktopPaddin
   const readonly = useRestriction('readonly');
   const deviceReadonly = useDeviceReadonly();
 
-  const shareDisabled = useSelector((state) => state.session.server.attributes.disableShare);
   const user = useSelector((state) => state.session.user);
   const device = useSelector((state) => state.devices.items[deviceId]);
 
@@ -145,11 +148,15 @@ const StatusCard = ({ deviceId, position, onClose, disableActions, desktopPaddin
 
   const handleRemove = useCatch(async (removed) => {
     if (removed) {
-      const response = await fetchOrThrow(traccarPath('/api/devices'));
-      dispatch(devicesActions.refresh(await response.json()));
+      dispatch(devicesActions.remove(deviceId));
     }
     setRemoving(false);
   });
+
+  // The curated NUMZFLEET vehicle action in place of a raw command console: the
+  // Immobilizer flow runs through fuel-api's authorization and audit trail.
+  const { byDeviceId, byFleetVehicleId } = useVehicleDisplayContext();
+  const fleetVehicleId = resolveKnownFleetVehicleId({ byDeviceId, byFleetVehicleId }, deviceId, null);
 
   const handleGeofence = useCatchCallback(async () => {
     const newItem = {
@@ -257,13 +264,15 @@ const StatusCard = ({ deviceId, position, onClose, disableActions, desktopPaddin
                     <RouteIcon />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title={t('commandTitle')}>
-                  <IconButton
-                    onClick={() => navigate(`/settings/device/${deviceId}/command`)}
-                    disabled={disableActions}
-                  >
-                    <SendIcon />
-                  </IconButton>
+                <Tooltip title={fleetVehicleId ? 'Immobilizer' : 'Vehicle not registered in fleet manager'}>
+                  <span>
+                    <IconButton
+                      onClick={() => navigate(vehicleImmobilizerPath(fleetVehicleId))}
+                      disabled={disableActions || !fleetVehicleId}
+                    >
+                      <LockOutlinedIcon />
+                    </IconButton>
+                  </span>
                 </Tooltip>
                 <Tooltip title={t('sharedEdit')}>
                   <IconButton
@@ -294,15 +303,13 @@ const StatusCard = ({ deviceId, position, onClose, disableActions, desktopPaddin
           <MenuItem component="a" target="_blank" href={`http://maps.apple.com/?ll=${position.latitude},${position.longitude}`}>{t('linkAppleMaps')}</MenuItem>
           <MenuItem component="a" target="_blank" href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${position.latitude}%2C${position.longitude}&heading=${position.course}`}>{t('linkStreetView')}</MenuItem>
           {navigationAppTitle && <MenuItem component="a" target="_blank" href={navigationAppLink.replace('{latitude}', position.latitude).replace('{longitude}', position.longitude)}>{navigationAppTitle}</MenuItem>}
-          {!shareDisabled && !user.temporary && (
-            <MenuItem onClick={() => navigate(`/settings/device/${deviceId}/share`)}><Typography color="secondary">{t('deviceShare')}</Typography></MenuItem>
-          )}
         </Menu>
       )}
       <RemoveDialog
         open={removing}
         endpoint="devices"
         itemId={deviceId}
+        onRemove={(id) => deleteFleetDevice(user, id)}
         onResult={(removed) => handleRemove(removed)}
       />
     </>

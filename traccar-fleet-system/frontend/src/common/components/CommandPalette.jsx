@@ -23,16 +23,12 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import PersonIcon from '@mui/icons-material/Person';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
-import {
-  useAdministrator, useManager, useTechnician, useSuperAdmin,
-} from '../util/permissions';
-import useFeatures from '../util/useFeatures';
+import useSettingsGates from '../../settings/center/useSettingsGates.js';
 import { SETTINGS_SECTIONS, isSettingsSectionVisible } from '../../settings/center/settingsSectionRegistry.js';
 
 const MAX_RESULTS = 12;
@@ -49,13 +45,8 @@ const CommandPalette = () => {
 
   const devices = useSelector((state) => state.devices.items);
   const drivers = useSelector((state) => state.drivers.items);
-  const groups = useSelector((state) => state.groups.items);
-  const manager = useManager();
-  const admin = useAdministrator();
-  const technician = useTechnician();
-  const platformOwner = useSuperAdmin();
-  const features = useFeatures();
-  const currentContext = useSelector((state) => state.organizations?.currentContext);
+  // Same gate inputs the sidebar and the /settings route guard use.
+  const settingsGates = useSettingsGates();
 
   useEffect(() => {
     const onKey = (e) => {
@@ -112,23 +103,9 @@ const CommandPalette = () => {
       }
     });
 
-    Object.values(groups).forEach((group) => {
-      if (group.name?.toLowerCase().includes(q)) {
-        out.push({
-          key: `group-${group.id}`,
-          icon: <LocationOnIcon />,
-          title: group.name,
-          subtitle: 'Device group',
-          action: () => navigate('/settings/groups'),
-        });
-      }
-    });
-
     SETTINGS_SECTIONS.forEach((section) => {
       if (!section.live) return;
-      if (!isSettingsSectionVisible(section, {
-        manager, admin, technician, platformOwner, features, currentContextType: currentContext?.type,
-      })) return;
+      if (!isSettingsSectionVisible(section, settingsGates)) return;
       const haystack = [section.label, section.description, ...(section.keywords || [])]
         .join(' ')
         .toLowerCase();
@@ -144,7 +121,7 @@ const CommandPalette = () => {
     });
 
     return out.slice(0, MAX_RESULTS);
-  }, [admin, currentContext?.type, devices, drivers, features, getDisplayForDevice, groups, manager, navigate, platformOwner, query, technician]);
+  }, [devices, drivers, getDisplayForDevice, navigate, query, settingsGates]);
 
   const handlePick = useCallback((item) => {
     item.action();

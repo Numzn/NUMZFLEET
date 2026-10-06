@@ -62,7 +62,7 @@ const AnnouncementPage = () => {
               endpoint={traccarPath('/api/notifications/notificators?announcement=true')}
               keyGetter={(it) => it.type}
               titleGetter={(it) => t(prefixString('notificator', it.type))}
-              label={t('notificationNotificators')}
+              label="Send via"
             />
             <TextField
               value={message.subject}

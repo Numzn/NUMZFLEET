@@ -80,4 +80,150 @@ export async function createCompanyDevice(companyId, payload = {}) {
   return device;
 }
 
-export default { createCompanyDevice };
+// ---------------------------------------------------------------------------
+// Edit and remove — company-scoped, through fuel-api
+//
+// The browser used to PUT / DELETE /api/devices/:id straight at Traccar, so it
+// could rewrite a tracker's identity (uniqueId), move it between Traccar groups,
+// and delete it while leaving NUMZFLEET's ownership and assignment rows behind.
+// These two functions are the only supported way to change a tracker now:
+// the caller's company is checked first, only fields a fleet manager legitimately
+// owns can change, and removal cleans up NUMZFLEET's own records too.
+// ---------------------------------------------------------------------------
+
+const TEXT_FIELD_MAX = 128;
+const CATEGORY_PATTERN = /^[a-z]{1,32}$/;
+
+/** What a fleet manager may change. Identity (uniqueId), group, disabled/expiry, attributes are platform-managed. */
+export const EDITABLE_DEVICE_FIELDS = ['name', 'phone', 'model', 'category'];
+
+function httpError(statusCode, message) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
+
+function cleanText(value, field, { required = false } = {}) {
+  if (value == null) {
+    if (required) throw httpError(400, `${field} is required`);
+    return null;
+  }
+  if (typeof value !== 'string') throw httpError(400, `${field} must be text`);
+  const text = value.trim();
+  if (!text) {
+    if (required) throw httpError(400, `${field} cannot be empty`);
+    return null;
+  }
+  if (text.length > TEXT_FIELD_MAX) throw httpError(400, `${field} is too long`);
+  return text;
+}
+
+/**
+ * Validates an edit request. Rejects (rather than silently ignores) any field outside
+ * the editable set, so a request that tries to change identity or group fails loudly.
+ */
+export function sanitizeDevicePatch(body = {}) {
+  const input = body && typeof body === 'object' ? body : {};
+  const forbidden = Object.keys(input).filter((key) => !EDITABLE_DEVICE_FIELDS.includes(key));
+  if (forbidden.length) {
+    throw httpError(400, `These fields cannot be changed here: ${forbidden.join(', ')}`);
+  }
+
+  const patch = {};
+  if ('name' in input) patch.name = cleanText(input.name, 'name', { required: true });
+  if ('phone' in input) patch.phone = cleanText(input.phone, 'phone');
+  if ('model' in input) patch.model = cleanText(input.model, 'model');
+  if ('category' in input) {
+    const category = cleanText(input.category, 'category');
+    if (category != null && !CATEGORY_PATTERN.test(category)) throw httpError(400, 'category is not valid');
+    patch.category = category;
+  }
+  if (!Object.keys(patch).length) throw httpError(400, 'Nothing to update');
+  return patch;
+}
+
+function parseDeviceId(value) {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) throw httpError(400, 'A valid device id is required');
+  return id;
+}
+
+/**
+ * The device must already belong to the caller's company (owned, or assigned to one
+ * of its vehicles). Anything else — missing, another company's, unowned — is the
+ * same 404, so the response never reveals whether a device id exists elsewhere.
+ */
+async function assertDeviceInCompany(auth, deviceId, deps) {
+  const accessible = await deps.getAccessibleIds(auth);
+  if (!accessible.map(Number).includes(deviceId)) throw httpError(404, 'Device not found');
+}
+
+async function defaultReleaseOwnership(deviceId) {
+  const { sequelize, DeviceAssignment, CompanyDevice } = await import('../models/index.js');
+  await sequelize.transaction(async (transaction) => {
+    await DeviceAssignment.update(
+      { isActive: false, unassignedAt: new Date() },
+      { where: { deviceId, isActive: true }, transaction },
+    );
+    await CompanyDevice.destroy({ where: { traccarDeviceId: deviceId }, transaction });
+  });
+}
+
+async function resolveDeps(injected) {
+  // Tests inject every dependency, which also means the database layer is never loaded.
+  if (injected.getAccessibleIds && injected.traccarFetch && injected.releaseOwnership) return injected;
+  const { getAccessibleTraccarDeviceIds } = await import('./fleetDeviceSnapshotService.js');
+  return {
+    getAccessibleIds: getAccessibleTraccarDeviceIds,
+    traccarFetch: traccarServiceFetch,
+    releaseOwnership: defaultReleaseOwnership,
+    ...injected,
+  };
+}
+
+/**
+ * Edit a tracker the caller's company owns. Reads the current Traccar record and
+ * writes it back with only the whitelisted fields changed, so identity, group,
+ * attributes and every other field are carried over untouched.
+ */
+export async function updateCompanyDevice(auth, deviceIdInput, body, injected = {}) {
+  const deps = await resolveDeps(injected);
+  const deviceId = parseDeviceId(deviceIdInput);
+  const patch = sanitizeDevicePatch(body);
+  await assertDeviceInCompany(auth, deviceId, deps);
+
+  const current = await deps.traccarFetch(`/api/devices/${deviceId}`);
+  if (!current) throw httpError(404, 'Device not found');
+
+  return deps.traccarFetch(`/api/devices/${deviceId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...current, ...patch, id: deviceId }),
+  });
+}
+
+/**
+ * Remove a tracker the caller's company owns. Traccar goes first: if it refuses,
+ * nothing else has changed. Then NUMZFLEET's own records are cleaned up — the
+ * active vehicle assignment ends and the ownership row goes — so no vehicle is
+ * left pointing at a tracker that no longer exists.
+ */
+export async function removeCompanyDevice(auth, deviceIdInput, injected = {}) {
+  const deps = await resolveDeps(injected);
+  const deviceId = parseDeviceId(deviceIdInput);
+  await assertDeviceInCompany(auth, deviceId, deps);
+
+  await deps.traccarFetch(`/api/devices/${deviceId}`, { method: 'DELETE' });
+
+  try {
+    await deps.releaseOwnership(deviceId);
+  } catch (cleanupErr) {
+    // The tracker is already gone from Traccar and the snapshot only ever lists
+    // devices Traccar still has, so stale rows are inert — but say so loudly.
+    console.error(
+      `[deviceProvisioning] device ${deviceId} was removed from Traccar but its NUMZFLEET ownership/assignment cleanup failed and needs manual reconciliation:`,
+      cleanupErr?.message || cleanupErr,
+    );
+  }
+}
+
+export default { createCompanyDevice, updateCompanyDevice, removeCompanyDevice };

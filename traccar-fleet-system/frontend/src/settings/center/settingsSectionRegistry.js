@@ -7,12 +7,8 @@ import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
 import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
-import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
-import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
 import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined';
 import CalculateOutlinedIcon from '@mui/icons-material/CalculateOutlined';
-import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
-import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
@@ -29,13 +25,19 @@ import { isPartnerAdminArea, isPlatformArea } from '../../common/util/navWorkspa
  * "Soon" chip until their phase in .claude/plans/this-is-a-very-deep-stallman.md
  * ships, rather than 404ing or being silently invented ahead of schedule.
  *
- * `category` is the frozen Configuration Hub information architecture
- * (Overview/Personal/Organization/Fleet/Automation/Integrations/System) —
- * see the Settings discovery-audit artifact for the evidence behind it.
+ * `category` is the Configuration Hub information architecture
+ * (Overview/Personal/Organization/Integrations/System, plus Platform and
+ * Business for those capabilities). Every section here is a NUMZFLEET concept:
+ * generic Traccar administration (maintenance schedules, alert rules, groups,
+ * saved commands) was removed from the product surface — Traccar is an internal
+ * integration, not something a fleet manager configures. What remains under
+ * System for the platform owner (calendars, computed attributes, server) is
+ * engineering tooling and is gated to that role, here and at the route.
  * `description`/`keywords` exist so settings content can be searched (e.g.
  * from CommandPalette) without a separate, hand-maintained search index.
  *
- * `requiresRole` filters coarsely ('manager' | 'admin' | 'technician'); note
+ * `requiresRole` filters coarsely ('manager' | 'admin' | 'technician' |
+ * 'platformOwner'); note
  * useManager() already returns true for admins (admin implies manager in
  * this app's permission model — see permissions.js), so 'admin' only needs
  * to be used where a check is genuinely stricter than 'manager'.
@@ -46,8 +48,6 @@ import { isPartnerAdminArea, isPlatformArea } from '../../common/util/navWorkspa
 export const SETTINGS_CATEGORIES = {
   personal: 'Personal',
   organization: 'Organization',
-  fleet: 'Fleet',
-  automation: 'Automation',
   integrations: 'Integrations',
   system: 'System',
   platform: 'Platform',
@@ -65,12 +65,8 @@ export const SETTINGS_SECTION_IDS = {
   devices: 'devices',
   preferences: 'preferences',
   notifications: 'notifications',
-  alertRules: 'alertRules',
-  groups: 'groups',
   calendars: 'calendars',
   computedAttributes: 'computedAttributes',
-  maintenanceSchedules: 'maintenanceSchedules',
-  savedCommands: 'savedCommands',
   announcement: 'announcement',
   server: 'server',
 };
@@ -196,11 +192,9 @@ export const SETTINGS_SECTIONS = [
     id: SETTINGS_SECTION_IDS.notifications,
     label: 'Notifications',
     icon: NotificationsOutlinedIcon,
-    // Deliberately NOT /settings/notifications — that's Traccar's existing
-    // "Alert rules" list (settings/NotificationsPage.jsx), a different
-    // concept (event->notificator rule config vs. personal channel prefs).
-    // Reusing that path would recreate the exact class of naming collision
-    // the app-wide UI/UX audit found elsewhere (Drivers, Maintenance).
+    // NUMZFLEET's business notification preferences. The path keeps its
+    // historical name: Traccar's own event-to-notificator "alert rules" page is no
+    // longer part of the product, and /settings/notifications is not a route.
     path: '/settings/notification-preferences',
     match: (pathname) => pathname.startsWith('/settings/notification-preferences'),
     live: true,
@@ -209,43 +203,18 @@ export const SETTINGS_SECTIONS = [
     keywords: ['notifications', 'alerts', 'sms', 'email', 'push', 'channels'],
   },
   {
-    id: SETTINGS_SECTION_IDS.alertRules,
-    label: 'Alert Rules',
-    icon: NotificationsActiveOutlinedIcon,
-    path: '/settings/notifications',
-    // Exact/subsegment match only — must NOT swallow /settings/notification-preferences
-    // (see the Notifications section above and the discovery audit's note on
-    // this exact class of naming collision).
-    match: (pathname) => pathname === '/settings/notifications'
-      || pathname === '/settings/notification'
-      || pathname.startsWith('/settings/notification/'),
-    live: true,
-    category: 'automation',
-    description: 'Which Traccar events trigger which notificators.',
-    keywords: ['alert rules', 'notificators', 'events', 'automation'],
-  },
-  {
-    id: SETTINGS_SECTION_IDS.groups,
-    label: 'Groups',
-    icon: FolderOutlinedIcon,
-    path: '/settings/groups',
-    match: (pathname) => pathname.startsWith('/settings/group'),
-    live: true,
-    requiresFeature: 'disableGroups',
-    category: 'integrations',
-    description: 'Device grouping for permission inheritance.',
-    keywords: ['groups', 'device groups', 'connectivity'],
-  },
-  {
     id: SETTINGS_SECTION_IDS.calendars,
     label: 'Calendars',
     icon: TodayOutlinedIcon,
     path: '/settings/calendars',
     match: (pathname) => pathname.startsWith('/settings/calendar'),
     live: true,
-    requiresFeature: 'disableCalendars',
-    category: 'automation',
-    description: 'Time windows feeding rules and reports.',
+    // Engineering tool, not a fleet-management feature. It stays (platform owner
+    // only) because scheduled reports still require a calendar to be selected;
+    // no NUMZFLEET business feature configures calendars.
+    requiresRole: 'platformOwner',
+    category: 'system',
+    description: 'Time windows used by scheduled reports (platform owner).',
     keywords: ['calendars', 'schedule', 'time window'],
   },
   {
@@ -255,39 +224,12 @@ export const SETTINGS_SECTIONS = [
     path: '/settings/attributes',
     match: (pathname) => pathname.startsWith('/settings/attribute'),
     live: true,
-    // Note: UnifiedSidebar's legacy guard checked `features.disableComputedAttributes`,
-    // a key useFeatures() never actually returns (it exposes `disableAttributes`) —
-    // that guard was already inert before this migration. Preserving the real
-    // current behavior (always visible to managers) rather than silently
-    // starting to enforce a gate nobody has been able to trip until now.
-    category: 'automation',
-    description: 'Derived values feeding automation rules.',
-    keywords: ['computed attributes', 'derived values', 'automation'],
-  },
-  {
-    id: SETTINGS_SECTION_IDS.maintenanceSchedules,
-    label: 'Maintenance Schedules',
-    icon: ScheduleOutlinedIcon,
-    path: '/settings/maintenances',
-    match: (pathname) => pathname.startsWith('/settings/maintenance'),
-    live: true,
-    requiresRole: 'admin',
-    requiresFeature: 'disableMaintenance',
-    category: 'fleet',
-    description: 'Traccar-native maintenance rule templates (advanced).',
-    keywords: ['maintenance schedules', 'traccar schedules', 'service intervals'],
-  },
-  {
-    id: SETTINGS_SECTION_IDS.savedCommands,
-    label: 'Saved Commands',
-    icon: SendOutlinedIcon,
-    path: '/settings/commands',
-    match: (pathname) => pathname.startsWith('/settings/command'),
-    live: true,
-    requiresFeature: 'disableSavedCommands',
-    category: 'automation',
-    description: 'Reusable device command presets.',
-    keywords: ['saved commands', 'device commands'],
+    // Per-position scripting engine with no NUMZFLEET dependency. Kept as an
+    // engineering capability for the platform owner only.
+    requiresRole: 'platformOwner',
+    category: 'system',
+    description: 'Derived tracker values (platform owner).',
+    keywords: ['computed attributes', 'derived values', 'engineering'],
   },
   {
     id: SETTINGS_SECTION_IDS.announcement,
@@ -308,10 +250,12 @@ export const SETTINGS_SECTIONS = [
     path: '/settings/server',
     match: (pathname) => pathname.startsWith('/settings/server'),
     live: true,
-    requiresRole: 'admin',
+    // Shared by every company, so it is a platform-owner decision — never a
+    // per-company admin's.
+    requiresRole: 'platformOwner',
     category: 'system',
-    description: 'Raw Traccar server configuration.',
-    keywords: ['server', 'traccar server', 'defaults'],
+    description: 'Platform-wide server configuration (platform owner).',
+    keywords: ['server', 'defaults', 'platform'],
   },
 ];
 

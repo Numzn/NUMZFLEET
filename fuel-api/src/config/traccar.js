@@ -316,7 +316,7 @@ export const getTraccarDevicesByIds = async (ids) => {
   const pool = getTraccarPool();
   const placeholders = unique.map(() => '?').join(',');
   const [rows] = await pool.execute(
-    `SELECT id, name, uniqueid, status, lastupdate, positionid, attributes FROM tc_devices WHERE id IN (${placeholders})`,
+    `SELECT id, name, uniqueid, status, lastupdate, positionid, model, phone, category, attributes FROM tc_devices WHERE id IN (${placeholders})`,
     unique,
   );
   rows.forEach((row) => parseDeviceRowAttributes(row));

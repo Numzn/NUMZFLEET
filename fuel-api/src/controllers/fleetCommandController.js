@@ -1,6 +1,10 @@
 import { getFleetCommandCenterKpis } from '../services/fleetCommandCenterService.js';
 import { getFleetDeviceSnapshot } from '../services/fleetDeviceSnapshotService.js';
-import { createCompanyDevice } from '../services/deviceProvisioningService.js';
+import {
+  createCompanyDevice,
+  updateCompanyDevice,
+  removeCompanyDevice,
+} from '../services/deviceProvisioningService.js';
 import { dbErrorMessage } from '../utils/dbErrorMessage.js';
 
 export async function getFleetCommandCenter(req, res) {
@@ -43,5 +47,35 @@ export async function createFleetDeviceHandler(req, res) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('[fleet-devices] create failed:', error?.message || error);
     return res.status(status).json({ error: dbErrorMessage(error, 'Failed to create device') });
+  }
+}
+
+/**
+ * PATCH /api/fleet/devices/:id — edit a tracker the caller's company owns. Only
+ * name, phone, model and category can change; identity and group are not editable.
+ */
+export async function updateFleetDeviceHandler(req, res) {
+  try {
+    const device = await updateCompanyDevice(req.auth, req.params.id, req.body || {});
+    return res.json(device);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('[fleet-devices] update failed:', error?.message || error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to update device') });
+  }
+}
+
+/**
+ * DELETE /api/fleet/devices/:id — remove a tracker the caller's company owns,
+ * ending its vehicle assignment and ownership record along with it.
+ */
+export async function deleteFleetDeviceHandler(req, res) {
+  try {
+    await removeCompanyDevice(req.auth, req.params.id);
+    return res.status(204).end();
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('[fleet-devices] delete failed:', error?.message || error);
+    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to remove device') });
   }
 }

@@ -33,7 +33,6 @@ const ReportFilter = ({
   const readonly = useRestriction('readonly');
 
   const devices = useSelector((state) => state.devices.items);
-  const groups = useSelector((state) => state.groups.items);
 
   const deviceIds = useMemo(() => searchParams.getAll('deviceId').map(Number), [searchParams]);
   const groupIds = useMemo(() => searchParams.getAll('groupId').map(Number), [searchParams]);
@@ -163,21 +162,6 @@ const ReportFilter = ({
               updateReportParams(searchParams, setSearchParams, 'deviceId', values);
             }}
             multiple={deviceType === 'multiple'}
-            fullWidth
-          />
-        </div>
-      )}
-      {deviceType === 'multiple' && (
-        <div className={classes.filterItem}>
-          <SelectField
-            label={t('settingsGroups')}
-            data={Object.values(groups).sort((a, b) => a.name.localeCompare(b.name))}
-            value={groupIds}
-            onChange={(e) => {
-              const values = e.target.value;
-              updateReportParams(searchParams, setSearchParams, 'groupId', values);
-            }}
-            multiple
             fullWidth
           />
         </div>

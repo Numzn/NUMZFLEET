@@ -29,7 +29,6 @@ export default function VehicleWorkspaceTabs(props) {
     livePosition,
     deviceId,
     linkedDrivers,
-    groupName,
     fleetVehicleId,
     onRefreshVehicle,
     maintenance,
@@ -154,7 +153,6 @@ export default function VehicleWorkspaceTabs(props) {
       livePosition={livePosition}
       deviceId={deviceId}
       linkedDrivers={linkedDrivers}
-      groupName={groupName}
       maintenanceItems={maintenance.items}
       vehicleEngine={vehicleEngine}
       onRefreshVehicle={onRefreshVehicle}

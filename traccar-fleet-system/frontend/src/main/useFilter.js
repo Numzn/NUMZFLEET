@@ -25,7 +25,6 @@ export default (
   fleetTab = 'all',
   alertDeviceIds,
 ) => {
-  const groups = useSelector((state) => state.groups.items);
   const devices = useSelector((state) => state.devices.items);
 
   const safeKeyword = String(keyword ?? '').toLowerCase();
@@ -34,16 +33,6 @@ export default (
   const positionArray = useMemo(() => Object.values(safePositions), [safePositions]);
 
   useEffect(() => {
-    const deviceGroups = (device) => {
-      const groupIds = [];
-      let { groupId } = device;
-      while (groupId) {
-        groupIds.push(groupId);
-        groupId = groups[groupId]?.groupId || 0;
-      }
-      return groupIds;
-    };
-
     // Same live authority as the rest of the fleet UI (see
     // resolveLiveActivityState.js) — one evaluation timestamp per filter
     // pass so every device in this pass is judged consistently.
@@ -80,7 +69,6 @@ export default (
 
     const filtered = Object.values(devices)
       .filter((device) => !filter.statuses.length || filter.statuses.includes(device.status))
-      .filter((device) => !filter.groups.length || deviceGroups(device).some((id) => filter.groups.includes(id)))
       .filter(fleetTabFilters)
       .filter((device) => {
         if (!safeKeyword) return true;
@@ -113,7 +101,6 @@ export default (
     filterMap,
     fleetTab,
     alertDeviceIds,
-    groups,
     devices,
     safePositions,
     positionArray,

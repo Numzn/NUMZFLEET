@@ -67,8 +67,8 @@ export async function completeMaintenanceService(user, fleetVehicleId, maintenan
   if (completed.scheduleResetStatus === 'failed') {
     const wrapped = new Error(
       completed.scheduleResetError
-        ? `Service was recorded but the maintenance schedule could not be reset: ${completed.scheduleResetError}`
-        : 'Service was recorded but the maintenance schedule could not be reset.',
+        ? `Service was recorded but the next service cycle could not be restarted: ${completed.scheduleResetError}`
+        : 'Service was recorded but the next service cycle could not be restarted.',
     );
     wrapped.serviceRecordId = completed.id;
     wrapped.partialSuccess = true;

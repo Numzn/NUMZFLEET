@@ -55,14 +55,6 @@ export default function DeviceTelemetryModule({
           >
             Device settings
           </Button>
-          <Button
-            size="small"
-            variant="text"
-            sx={{ textTransform: 'none' }}
-            onClick={() => navigate(deviceId ? `/settings/maintenances?deviceId=${deviceId}` : '/settings/maintenances')}
-          >
-            Advanced schedules (Settings)
-          </Button>
         </Box>
       )}
       {!canSaveSpecs && (

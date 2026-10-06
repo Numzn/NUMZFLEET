@@ -11,6 +11,9 @@ function toDeviceDto(row) {
     status: row.status,
     lastUpdate: row.lastupdate ? new Date(row.lastupdate).toISOString() : null,
     positionId: row.positionid ?? null,
+    model: row.model ?? null,
+    phone: row.phone ?? null,
+    category: row.category ?? null,
     attributes: row.attributes && typeof row.attributes === 'object' ? row.attributes : {},
   };
 }

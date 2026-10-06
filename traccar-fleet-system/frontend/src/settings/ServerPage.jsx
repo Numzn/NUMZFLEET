@@ -238,10 +238,9 @@ const ServerPage = () => {
               </AccordionSummary>
               <AccordionDetails className={classes.details}>
                 <FormGroup>
-                  <FormControlLabel
-                    control={<Checkbox checked={item.registration} onChange={(event) => setItem({ ...item, registration: event.target.checked })} />}
-                    label={t('serverRegistration')}
-                  />
+                  {/* Traccar's own self-registration switch is deliberately not offered:
+                      who may create an account is a NUMZFLEET signup/tenancy decision,
+                      never a server-config checkbox. The stored value is left as it is. */}
                   <FormControlLabel
                     control={<Checkbox checked={item.readonly} onChange={(event) => setItem({ ...item, readonly: event.target.checked })} />}
                     label={t('serverReadonly')}

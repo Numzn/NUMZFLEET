@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { traccarPath } from '../config/traccarApi.js';
 
 import { useDispatch } from 'react-redux';
 import {
@@ -16,7 +15,6 @@ import EditItemView from './components/EditItemView';
 import EditAttributesAccordion from './components/EditAttributesAccordion';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import useGeofenceAttributes from '../common/attributes/useGeofenceAttributes';
-import SelectField from '../common/components/SelectField';
 import { geofencesActions } from '../store';
 import useSettingsStyles from './common/useSettingsStyles';
 
@@ -70,12 +68,6 @@ const GeofencePage = () => {
                 value={item.description || ''}
                 onChange={(event) => setItem({ ...item, description: event.target.value })}
                 label={t('sharedDescription')}
-              />
-              <SelectField
-                value={item.calendarId}
-                onChange={(event) => setItem({ ...item, calendarId: Number(event.target.value) })}
-                endpoint={traccarPath('/api/calendars')}
-                label={t('sharedCalendar')}
               />
               <FormControlLabel
                 control={<Checkbox checked={item.attributes.hide} onChange={(e) => setItem({ ...item, attributes: { ...item.attributes, hide: e.target.checked } })} />}

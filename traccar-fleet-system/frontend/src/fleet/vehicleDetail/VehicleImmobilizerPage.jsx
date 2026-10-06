@@ -383,15 +383,6 @@ export default function VehicleImmobilizerPage() {
               <Button
                 variant="text"
                 size="small"
-                onClick={() => navigate(`/settings/device/${deviceId}/command`)}
-              >
-                Advanced commands
-              </Button>
-            )}
-            {deviceId != null && (
-              <Button
-                variant="text"
-                size="small"
                 onClick={() => navigate(`/reports/events?deviceId=${deviceId}`)}
               >
                 Command events

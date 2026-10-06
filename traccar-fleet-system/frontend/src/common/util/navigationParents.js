@@ -5,14 +5,12 @@
 // already did this for the vehicle workspace family; this covers the rest of the app).
 
 const SETTINGS_LIST_OVERRIDES = {
-  maintenance: '/settings/maintenances',
   'attributes/computed': '/settings/attributes',
   geofences: '/geofences',
 };
 
 export const settingsListParent = (endpoint) => SETTINGS_LIST_OVERRIDES[endpoint] || `/settings/${endpoint}`;
 export const settingsDeviceParent = (deviceId) => `/settings/device/${deviceId}`;
-export const settingsGroupParent = (groupId) => `/settings/group/${groupId}`;
 
 export const SETTINGS_HOME = '/settings/preferences';
 export const DASHBOARD = '/';

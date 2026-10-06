@@ -5,7 +5,6 @@ import FiltersFlyout from '../components/FiltersFlyout';
  * Compact filter control — pair with FleetSearch in one row.
  */
 const FleetFilters = ({
-  groups = [],
   filters,
   devices,
   onFilterChange,
@@ -16,7 +15,6 @@ const FleetFilters = ({
       onFilterChange={onFilterChange}
       compact
       sidebarRail
-      groups={groups}
       filters={filters}
       devices={devices}
     />

@@ -29,7 +29,6 @@ const LiveMapPage = () => {
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
   const positions = useSelector((state) => state.session.positions);
   const devices = useSelector((state) => state.devices.items);
-  const groups = useSelector((state) => state.groups.items || {});
   const fleetTab = useSelector((state) => state.fleetInteraction.fleetTab);
   const fleetWorkspaceMode = useSelector((state) => state.fleetInteraction.fleetWorkspaceMode);
   const searchQuery = useSelector((state) => state.fleetInteraction.searchQuery);
@@ -52,7 +51,6 @@ const LiveMapPage = () => {
 
   const [filter, setFilter] = usePersistedState('filter', {
     statuses: [],
-    groups: [],
   });
   const [filterSort, setFilterSort] = usePersistedState('filterSort', '');
   const [filterMap, setFilterMap] = usePersistedState('filterMap', false);
@@ -156,7 +154,6 @@ const LiveMapPage = () => {
 
     setFilter({
       statuses: nextFilter.statuses || [],
-      groups: nextFilter.groups || [],
     });
     setFilterSort(nextFilter.sortBy || '');
     setFilterMap(Boolean(nextFilter.mapOnly));
@@ -165,10 +162,8 @@ const LiveMapPage = () => {
   const sidebarFleetProps = useMemo(() => ({
     filteredDevices,
     positions,
-    groups: Object.values(groups),
     filters: {
       statuses: filter.statuses,
-      groups: filter.groups,
       sortBy: filterSort,
       mapOnly: filterMap,
     },
@@ -179,9 +174,7 @@ const LiveMapPage = () => {
   }), [
     filteredDevices,
     positions,
-    groups,
     filter.statuses,
-    filter.groups,
     filterSort,
     filterMap,
     operationalPresence,

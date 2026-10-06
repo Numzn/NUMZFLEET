@@ -190,7 +190,6 @@ const FiltersFlyout = ({
   /** Minimal visual weight for fleet sidebar search row (do not change top bar behavior). */
   sidebarRail = false,
   filters = {},
-  groups = [],
   devices = [],
 }) => {
   const { classes } = useStyles();
@@ -201,7 +200,6 @@ const FiltersFlyout = ({
   const [open, setOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState({
     statuses: filters.statuses || [],
-    groups: filters.groups || [],
     sortBy: filters.sortBy || '',
     mapOnly: filters.mapOnly || false,
     cluster: filters.cluster || false,
@@ -236,7 +234,6 @@ const FiltersFlyout = ({
   const handleClearFilters = useCallback(() => {
     const clearedFilters = {
       statuses: [],
-      groups: [],
       sortBy: '',
       mapOnly: false,
       cluster: false,
@@ -257,10 +254,6 @@ const FiltersFlyout = ({
   // Get active filters for display
   const activeFilters = [
     ...localFilters.statuses.map(status => ({ type: 'status', value: status, label: status })),
-    ...localFilters.groups.map(groupId => {
-      const group = groups.find(g => g.id === groupId);
-      return { type: 'group', value: groupId, label: group?.name || 'Unknown Group' };
-    }),
     ...(localFilters.sortBy ? [{ type: 'sort', value: localFilters.sortBy, label: `Sort: ${localFilters.sortBy}` }] : []),
     ...(localFilters.mapOnly ? [{ type: 'map', value: 'mapOnly', label: 'Map Only' }] : []),
     ...(localFilters.cluster ? [{ type: 'cluster', value: 'cluster', label: 'Clustered' }] : []),
@@ -372,30 +365,6 @@ const FiltersFlyout = ({
                     primary={`Unknown (${deviceStatusCount('unknown')})`} 
                   />
                 </MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-
-          {/* Groups Filter */}
-          <Box className={classes.section}>
-            <Typography className={classes.sectionTitle}>
-              Groups
-            </Typography>
-            <FormControl fullWidth className={classes.formControl}>
-              <InputLabel>Device Groups</InputLabel>
-              <Select
-                multiple
-                value={localFilters.groups}
-                onChange={(e) => handleFilterChange('groups', e.target.value)}
-                renderValue={(selected) => selected.length > 0 ? `${selected.length} selected` : 'All groups'}
-                className={classes.select}
-              >
-                {Object.values(groups).sort((a, b) => a.name.localeCompare(b.name)).map((group) => (
-                  <MenuItem key={group.id} value={group.id}>
-                    <Checkbox checked={localFilters.groups.indexOf(group.id) > -1} />
-                    <ListItemText primary={group.name} />
-                  </MenuItem>
-                ))}
               </Select>
             </FormControl>
           </Box>

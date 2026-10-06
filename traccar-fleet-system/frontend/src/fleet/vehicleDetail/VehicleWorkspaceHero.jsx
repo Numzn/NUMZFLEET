@@ -167,7 +167,6 @@ export default function VehicleWorkspaceHero({
   livePosition,
   deviceId,
   linkedDrivers,
-  groupName,
   onQuickAction,
   onPhotoUpdated,
   nextService,

@@ -14,7 +14,6 @@ export default function VehicleWorkspaceLayout({
   livePosition,
   deviceId,
   linkedDrivers,
-  groupName,
   maintenanceItems,
   vehicleEngine,
   children,
@@ -55,7 +54,6 @@ export default function VehicleWorkspaceLayout({
           livePosition={livePosition}
           deviceId={deviceId}
           linkedDrivers={linkedDrivers}
-          groupName={groupName}
           nextService={vehicleEngine?.engine?.maintenance?.nextService ?? null}
           nextServiceLoading={Boolean(vehicleEngine?.loading)}
           onPhotoUpdated={onRefreshVehicle}

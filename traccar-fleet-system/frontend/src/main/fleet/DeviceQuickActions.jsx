@@ -106,7 +106,7 @@ const DeviceQuickActions = ({
 
   const handleAlerts = () => {
     setAnchorEl(null);
-    navigate('/settings/notifications');
+    navigate('/settings/notification-preferences');
   };
 
   const handleContactDriver = () => {

@@ -135,7 +135,7 @@ export default function RolesSection() {
     <SettingsCenterShell>
       <SettingsSectionPanel
         title="Roles"
-        description="What each role can and cannot do. To change who has a role, use People."
+        description="The roles NUMZFLEET defines and what each is designed to allow. Roles are not yet what decides access — that is still based on manager and administrator status. To change who holds a role, use People."
       >
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>

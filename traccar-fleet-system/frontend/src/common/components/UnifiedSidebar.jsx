@@ -42,7 +42,7 @@ import { useTranslation } from './LocalizationProvider';
 import { fuelApiAuthHeaders } from '../../config/fuelApiAuth.js';
 import { isSettingsWorkspace, isPartnerAdminArea, isPlatformArea, resolveExitTarget } from '../util/navWorkspace.js';
 import { buildSettingsNavGroups } from '../../settings/center/settingsSectionRegistry.js';
-import { useSuperAdmin, useTechnician } from '../util/permissions';
+import useSettingsGates from '../../settings/center/useSettingsGates.js';
 import { resolveNavigation } from '../util/navigationResolver';
 
 const useStyles = makeStyles()((theme) => ({
@@ -226,8 +226,8 @@ const UnifiedSidebar = ({
   const collapsed = forceExpanded ? false : (forceCollapsed ? true : (collapsedProp ?? collapsedState));
   const setCollapsed = setCollapsedProp ?? setCollapsedState;
 
-  const technician = useTechnician();
-  const platformOwner = useSuperAdmin();
+  // The Settings nav and the /settings route guard share one gate computation.
+  const settingsGates = useSettingsGates();
   const inSettings = isSettingsWorkspace(location.pathname);
   const inPartnerAdmin = isPartnerAdminArea(location.pathname);
   const inPlatformArea = isPlatformArea(location.pathname);
@@ -248,9 +248,7 @@ const UnifiedSidebar = ({
    */
   const settingsNavGroups = useMemo(() => {
     if (!inSettings) return [];
-    const groups = buildSettingsNavGroups({
-      manager, admin, technician, platformOwner, features, currentContextType: currentContext?.type,
-    });
+    const groups = buildSettingsNavGroups(settingsGates);
     return [
       {
         key: 'exit',
@@ -273,7 +271,7 @@ const UnifiedSidebar = ({
         })),
       })),
     ];
-  }, [admin, features, inSettings, manager, platformOwner, technician, currentContext?.type]);
+  }, [inSettings, settingsGates]);
 
   // External system items (billing/support links) are added to all contexts
   const externalSystemItems = useMemo(() => {

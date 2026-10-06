@@ -11,6 +11,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import LinkField from '../../../../common/components/LinkField';
+import { traccarPath } from '../../../../config/traccarApi.js';
 
 function linkedZoneNames(linkedGeofences) {
   return (linkedGeofences || [])
@@ -29,6 +31,7 @@ export default function ZoneMonitoringModule({
 }) {
   const navigate = useNavigate();
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const names = linkedZoneNames(linkedGeofences);
   const linkedCount = names.length;
   const zoneProtectionActive = linkedCount > 0;
@@ -124,11 +127,26 @@ export default function ZoneMonitoringModule({
           size="small"
           variant="outlined"
           sx={{ textTransform: 'none' }}
-          onClick={() => navigate(`/settings/device/${deviceId}/connections`)}
+          onClick={() => setAssignOpen((open) => !open)}
         >
-          Manage assignments
+          {assignOpen ? 'Hide assignments' : 'Manage assignments'}
         </Button>
       </Box>
+
+      {/* Zone assignment lives here, in the vehicle's own setup, rather than on a
+          separate generic "connections" screen. */}
+      <Collapse in={assignOpen} unmountOnExit>
+        <Box sx={{ mb: 2 }}>
+          <LinkField
+            endpointAll={traccarPath('/api/geofences?all=true')}
+            endpointLinked={`${traccarPath('/api/geofences')}?deviceId=${deviceId}`}
+            baseId={deviceId}
+            keyBase="deviceId"
+            keyLink="geofenceId"
+            label="Zones assigned to this vehicle"
+          />
+        </Box>
+      </Collapse>
 
       <Button
         size="small"

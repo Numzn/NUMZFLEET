@@ -10,8 +10,8 @@ import CombinedReportPage from './reports/CombinedReportPage';
 import PositionsReportPage from './reports/PositionsReportPage';
 import ServerPage from './settings/ServerPage';
 import DevicePage from './settings/DevicePage';
-import UserPage from './settings/UserPage';
 import SettingsCenterShell from './settings/center/SettingsCenterShell.jsx';
+import SettingsRouteGuard from './settings/center/SettingsRouteGuard.jsx';
 import OverviewSection from './settings/center/sections/OverviewSection.jsx';
 import ProfileSection from './settings/center/sections/ProfileSection';
 import SecuritySection from './settings/center/sections/SecuritySection';
@@ -20,10 +20,6 @@ import PersonProfilePage from './settings/center/people/PersonProfilePage.jsx';
 import RolesSection from './settings/center/sections/RolesSection';
 import DevicesSection from './settings/center/sections/DevicesSection';
 import NotificationsSection from './settings/center/sections/NotificationsSection';
-import NotificationsPage from './settings/NotificationsPage';
-import NotificationPage from './settings/NotificationPage';
-import GroupsPage from './settings/GroupsPage';
-import GroupPage from './settings/GroupPage';
 import PositionPage from './other/PositionPage';
 import NetworkPage from './other/NetworkPage';
 import EventReportPage from './reports/EventReportPage';
@@ -36,10 +32,6 @@ import CalendarsPage from './settings/CalendarsPage';
 import CalendarPage from './settings/CalendarPage';
 import ComputedAttributesPage from './settings/ComputedAttributesPage';
 import ComputedAttributePage from './settings/ComputedAttributePage';
-import MaintenancesPage from './settings/MaintenancesPage';
-import MaintenancePage from './settings/MaintenancePage';
-import CommandsPage from './settings/CommandsPage';
-import CommandPage from './settings/CommandPage';
 import StatisticsPage from './reports/StatisticsPage';
 import LoginPage from './login/LoginPage';
 import RegisterPage from './login/RegisterPage';
@@ -50,17 +42,12 @@ import { useEffectAsync } from './reactHelper';
 import { devicesActions } from './store';
 import EventPage from './other/EventPage';
 import PreferencesSection from './settings/center/sections/PreferencesSection';
-import AccumulatorsPage from './settings/AccumulatorsPage';
 import CommandDevicePage from './settings/CommandDevicePage';
-import CommandGroupPage from './settings/CommandGroupPage';
 import App from './App';
 import ChangeServerPage from './login/ChangeServerPage';
 import TechnicianRoute from './common/components/TechnicianRoute';
 import ScheduledPage from './reports/ScheduledPage';
-import DeviceConnectionsPage from './settings/DeviceConnectionsPage';
-import GroupConnectionsPage from './settings/GroupConnectionsPage';
 import LogsPage from './reports/LogsPage';
-import SharePage from './settings/SharePage';
 import AnnouncementPage from './settings/AnnouncementPage';
 import EmulatorPage from './other/EmulatorPage';
 import Loader from './common/components/Loader';
@@ -202,26 +189,20 @@ const Navigation = () => {
           <Route path="emulator" element={<EmulatorPage />} />
           <Route path="test/toast-notifications" element={<ToastNotificationTest />} />
 
-          <Route path="settings">
+          <Route path="settings" element={<SettingsRouteGuard />}>
           <Route index element={<OverviewSection />} />
           <Route path="profile" element={<ProfileSection />} />
           <Route path="security" element={<SecuritySection />} />
           <Route path="notification-preferences" element={<NotificationsSection />} />
-          <Route path="accumulators/:deviceId" element={<AccumulatorsPage />} />
           <Route path="announcement" element={<SettingsCenterShell><AnnouncementPage /></SettingsCenterShell>} />
           <Route path="calendars" element={<SettingsCenterShell><CalendarsPage /></SettingsCenterShell>} />
           <Route path="calendar/:id" element={<SettingsCenterShell><CalendarPage /></SettingsCenterShell>} />
           <Route path="calendar" element={<SettingsCenterShell><CalendarPage /></SettingsCenterShell>} />
-          <Route path="commands" element={<SettingsCenterShell><CommandsPage /></SettingsCenterShell>} />
-          <Route path="command/:id" element={<SettingsCenterShell><CommandPage /></SettingsCenterShell>} />
-          <Route path="command" element={<SettingsCenterShell><CommandPage /></SettingsCenterShell>} />
           <Route path="attributes" element={<SettingsCenterShell><ComputedAttributesPage /></SettingsCenterShell>} />
           <Route path="attribute/:id" element={<SettingsCenterShell><ComputedAttributePage /></SettingsCenterShell>} />
           <Route path="attribute" element={<SettingsCenterShell><ComputedAttributePage /></SettingsCenterShell>} />
           <Route path="devices" element={<TechnicianRoute><DevicesSection /></TechnicianRoute>} />
-          <Route path="device/:id/connections" element={<TechnicianRoute><DeviceConnectionsPage /></TechnicianRoute>} />
           <Route path="device/:id/command" element={<TechnicianRoute><CommandDevicePage /></TechnicianRoute>} />
-          <Route path="device/:id/share" element={<TechnicianRoute><SharePage /></TechnicianRoute>} />
           <Route path="device/:id" element={<TechnicianRoute><DevicePage /></TechnicianRoute>} />
           <Route path="device" element={<TechnicianRoute><DevicePage /></TechnicianRoute>} />
           {/* Legacy duplicate of /fleet/drivers over the same Traccar /api/drivers
@@ -232,17 +213,6 @@ const Navigation = () => {
           <Route path="driver" element={<Navigate to="/settings/people" replace />} />
           <Route path="geofence/:id" element={<GeofencePage />} />
           <Route path="geofence" element={<GeofencePage />} />
-          <Route path="groups" element={<SettingsCenterShell><GroupsPage /></SettingsCenterShell>} />
-          <Route path="group/:id/connections" element={<SettingsCenterShell><GroupConnectionsPage /></SettingsCenterShell>} />
-          <Route path="group/:id/command" element={<SettingsCenterShell><CommandGroupPage /></SettingsCenterShell>} />
-          <Route path="group/:id" element={<SettingsCenterShell><GroupPage /></SettingsCenterShell>} />
-          <Route path="group" element={<SettingsCenterShell><GroupPage /></SettingsCenterShell>} />
-          <Route path="maintenances" element={<SettingsCenterShell><MaintenancesPage /></SettingsCenterShell>} />
-          <Route path="maintenance/:id" element={<SettingsCenterShell><MaintenancePage /></SettingsCenterShell>} />
-          <Route path="maintenance" element={<SettingsCenterShell><MaintenancePage /></SettingsCenterShell>} />
-          <Route path="notifications" element={<SettingsCenterShell><NotificationsPage /></SettingsCenterShell>} />
-          <Route path="notification/:id" element={<SettingsCenterShell><NotificationPage /></SettingsCenterShell>} />
-          <Route path="notification" element={<SettingsCenterShell><NotificationPage /></SettingsCenterShell>} />
           <Route path="preferences" element={<PreferencesSection />} />
           <Route path="server" element={<SettingsCenterShell><ServerPage /></SettingsCenterShell>} />
           <Route path="people" element={<PeopleSection />} />
@@ -252,8 +222,9 @@ const Navigation = () => {
               working, same pattern as /settings/drivers above. */}
           <Route path="users" element={<Navigate to="/settings/people" replace />} />
           <Route path="roles" element={<RolesSection />} />
-          <Route path="user/:id" element={<UserPage />} />
-          <Route path="user" element={<UserPage />} />
+          {/* Anything else under /settings — a removed page's bookmark, a typo — lands
+              on the overview instead of a blank screen. */}
+          <Route path="*" element={<Navigate to="/settings" replace />} />
           </Route>
 
           <Route path="reports">

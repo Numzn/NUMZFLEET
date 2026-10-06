@@ -139,28 +139,6 @@ export async function saveRoutineService(user, vehicleId, { intervalKm, starting
   return res.json();
 }
 
-export async function fetchTraccarMaintenances(user) {
-  const res = await fetchOrThrow('/api/fleet/traccar-maintenances', {
-    headers: fuelApiAuthHeaders(user),
-  });
-  return res.json();
-}
-
-export async function resetTraccarMaintenanceSchedule(user, fleetVehicleId, maintenanceId, body) {
-  const res = await fetchOrThrow(
-    `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/traccar-maintenance/${encodeURIComponent(maintenanceId)}/reset`,
-    {
-      method: 'PUT',
-      headers: {
-        ...fuelApiAuthHeaders(user),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    },
-  );
-  return res.json();
-}
-
 export async function fetchVehicleServiceRecords(user, fleetVehicleId) {
   const res = await fetchOrThrow(
     `/api/vehicles/${encodeURIComponent(fleetVehicleId)}/service-records`,

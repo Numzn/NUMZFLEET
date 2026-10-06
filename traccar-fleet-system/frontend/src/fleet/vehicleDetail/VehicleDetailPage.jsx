@@ -95,7 +95,6 @@ export default function VehicleDetailPage() {
             livePosition={ws.livePosition}
             deviceId={ws.deviceId}
             linkedDrivers={ws.linkedDrivers}
-            groupName={ws.groupName}
             fleetVehicleId={ws.fleetVehicleId}
             onRefreshVehicle={ws.refresh}
             maintenance={ws.maintenance}

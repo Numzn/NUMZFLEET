@@ -131,7 +131,7 @@ export function getCustomerNavigation({
           path: '/map',
           icon: MapOutlinedIcon,
           badge: alertsBadgeCount,
-          badgeHint: 'Live activity — recent Traccar events in this session (not notification unread)',
+          badgeHint: 'Live activity — recent tracker events in this session (not notification unread)',
         },
       ],
     },

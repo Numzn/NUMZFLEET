@@ -199,7 +199,7 @@ const VehiclesPage = () => {
         fullScreen={isMobile}
         PaperProps={operationalDialogPaperProps}
       >
-        <DialogTitle sx={operationalDialogTitleSx}>Assign Traccar device</DialogTitle>
+        <DialogTitle sx={operationalDialogTitleSx}>Assign tracker</DialogTitle>
         <DialogContent sx={operationalDialogContentSx}>
           <FormControl fullWidth size="medium">
             <InputLabel
@@ -225,7 +225,7 @@ const VehiclesPage = () => {
           </FormControl>
           {deviceList.length === 0 && (
             <Alert severity="warning">
-              No devices loaded. Open the live map or devices list first so Traccar devices sync into the app.
+              No trackers loaded yet. Open the live map or the Devices list first so your trackers appear here.
             </Alert>
           )}
         </DialogContent>
@@ -350,7 +350,7 @@ const VehiclesPage = () => {
                   }}
                 >
                   <Typography variant="body2" sx={{ color: 'var(--color-text-secondary)' }}>
-                    No vehicles yet. Add one or assign a Traccar device.
+                    No vehicles yet. Add one or assign a tracker.
                   </Typography>
                 </Box>
               ) : (
