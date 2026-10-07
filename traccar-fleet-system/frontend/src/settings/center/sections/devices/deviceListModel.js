@@ -13,26 +13,22 @@
 export const DEVICE_STATES = {
   ONLINE: 'online',
   OFFLINE: 'offline',
-  NEVER: 'never',
 };
 
-export const DEVICE_TABS = ['all', 'online', 'offline', 'never', 'unassigned'];
+export const DEVICE_TABS = ['all', 'online', 'offline', 'unassigned'];
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 /**
- * Traccar reports `status: 'offline'` both for a tracker that went quiet and for
- * one that has never connected at all. Those need different action from the
- * owner (check the vehicle vs. check power / SIM / server settings), so they are
- * separated here: "never" means no signal has ever been recorded.
+ * Traccar reports `status: 'offline'` for trackers that are not currently
+ * reporting, including trackers with no prior signal. The product presents
+ * both cases consistently as Offline; connection history remains available in
+ * the edit/details workflow.
  */
 export const classifyDevice = (device) => {
   if (device?.status === 'online') return DEVICE_STATES.ONLINE;
-  // Traccar's Device.positionId is a primitive long, so "no position yet" arrives
-  // over the REST API as 0, not null — treat every falsy value as "none".
-  const neverReported = !device?.lastUpdate && !device?.positionId;
-  return neverReported ? DEVICE_STATES.NEVER : DEVICE_STATES.OFFLINE;
+  return DEVICE_STATES.OFFLINE;
 };
 
 /**
@@ -72,7 +68,6 @@ export const countTabs = (rows, vehiclesKnown) => ({
   all: rows.length,
   online: rows.filter((row) => row.state === DEVICE_STATES.ONLINE).length,
   offline: rows.filter((row) => row.state === DEVICE_STATES.OFFLINE).length,
-  never: rows.filter((row) => row.state === DEVICE_STATES.NEVER).length,
   unassigned: vehiclesKnown ? rows.filter((row) => !row.vehicle).length : null,
 });
 
@@ -80,7 +75,6 @@ const matchesTab = (row, tab) => {
   switch (tab) {
     case DEVICE_STATES.ONLINE:
     case DEVICE_STATES.OFFLINE:
-    case DEVICE_STATES.NEVER:
       return row.state === tab;
     case 'unassigned':
       return !row.vehicle;

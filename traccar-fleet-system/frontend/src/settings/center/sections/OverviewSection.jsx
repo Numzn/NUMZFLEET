@@ -4,12 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box, Grid, Typography, ButtonBase,
 } from '@mui/material';
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
-import LocalGasStationOutlinedIcon from '@mui/icons-material/LocalGasStationOutlined';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import SettingsCenterShell from '../SettingsCenterShell.jsx';
 import SettingsCard from '../components/SettingsCard.jsx';
-import ModernKPICard from '../../../dashboard/components/ModernKPICard';
-import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, isSettingsSectionVisible } from '../settingsSectionRegistry.js';
+import { SETTINGS_SECTIONS, isSettingsSectionVisible } from '../settingsSectionRegistry.js';
 import { getRecentSettingsVisits } from '../recentSettingsVisits.js';
 import {
   useAdministrator, useManager, useTechnician, useSuperAdmin,
@@ -36,18 +34,6 @@ export default function OverviewSection() {
   const features = useFeatures();
   const currentContext = useSelector((state) => state.organizations?.currentContext);
 
-  const devices = useSelector((state) => state.devices.items);
-  const offlineCount = useMemo(
-    () => Object.values(devices || {}).filter((d) => d.status !== 'online').length,
-    [devices],
-  );
-
-  const fuelRequests = useSelector((state) => state.fuelRequests?.items || {});
-  const pendingFuelCount = useMemo(() => Object.values(fuelRequests).filter((request) => {
-    const status = request.status?.toLowerCase?.() || '';
-    return status === 'pending' || status === 'submitted' || status === 'awaiting_approval';
-  }).length, [fuelRequests]);
-
   const visibleSections = useMemo(
     () => SETTINGS_SECTIONS.filter((section) => (
       section.category
@@ -60,17 +46,21 @@ export default function OverviewSection() {
   );
 
   const quickAccess = useMemo(() => {
-    const seen = new Set();
-    const out = [];
-    Object.keys(SETTINGS_CATEGORIES).forEach((key) => {
-      const first = visibleSections.find((s) => s.category === key && !seen.has(s.id));
-      if (first) {
-        seen.add(first.id);
-        out.push(first);
-      }
-    });
-    return out;
+    const preferred = ['profile', 'people', 'devices', 'platformAccess', 'businessAccess'];
+    const byId = new Map(visibleSections.map((section) => [section.id, section]));
+    return preferred.map((id) => byId.get(id)).filter(Boolean);
   }, [visibleSections]);
+
+  const relativeTime = (timestamp) => {
+    const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days === 1 ? '' : 's'} ago`;
+  };
 
   const recent = useMemo(() => {
     const byId = new Map(visibleSections.map((s) => [s.id, s]));
@@ -83,30 +73,11 @@ export default function OverviewSection() {
     <SettingsCenterShell>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Overview</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Quick access</Typography>
           <Typography variant="body2" color="text.secondary">
-            Configuration health and quick access. Press ⌘K / Ctrl+K to search any setting.
+            Common settings and configuration options.
           </Typography>
         </Box>
-
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={4}>
-            <ModernKPICard
-              value={offlineCount}
-              label="GPS devices offline"
-              icon={<WarningAmberOutlinedIcon />}
-              color={offlineCount > 0 ? 'warning' : 'success'}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <ModernKPICard
-              value={pendingFuelCount}
-              label="Pending fuel requests"
-              icon={<LocalGasStationOutlinedIcon />}
-              color={pendingFuelCount > 0 ? 'warning' : 'success'}
-            />
-          </Grid>
-        </Grid>
 
         <SettingsCard>
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>Quick access</Typography>
@@ -114,24 +85,27 @@ export default function OverviewSection() {
             {quickAccess.map((section) => {
               const Icon = section.icon;
               return (
-                <Grid item xs={6} sm={4} md={3} key={section.id}>
+                <Grid item xs={12} sm={6} key={section.id}>
                   <ButtonBase
                     onClick={() => navigate(section.path)}
                     sx={{
                       width: '100%',
                       display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      gap: 0.5,
-                      p: 1.5,
+                      alignItems: 'center',
+                      gap: 1.5,
+                      p: 1.75,
                       borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--color-border)',
                       textAlign: 'left',
                       '&:hover': { borderColor: 'var(--color-border-hover)' },
                     }}
                   >
-                    <Icon fontSize="small" />
-                    <Typography variant="body2" fontWeight={600}>{section.label}</Typography>
+                    <Box sx={{ color: 'var(--color-primary)', display: 'grid', placeItems: 'center' }}><Icon /></Box>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography variant="body2" fontWeight={600}>{section.label}</Typography>
+                      <Typography variant="caption" color="text.secondary">{section.description}</Typography>
+                    </Box>
+                    <ArrowForwardIosIcon sx={{ fontSize: 14, color: 'var(--color-text-secondary)' }} />
                   </ButtonBase>
                 </Grid>
               );
@@ -143,7 +117,7 @@ export default function OverviewSection() {
           <SettingsCard>
             <Typography variant="subtitle2" sx={{ mb: 1.5 }}>Recently visited</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              {recent.map(({ section }) => {
+              {recent.map(({ section, at }) => {
                 const Icon = section.icon;
                 return (
                   <ButtonBase
@@ -152,14 +126,18 @@ export default function OverviewSection() {
                     sx={{
                       justifyContent: 'flex-start',
                       gap: 1,
-                      py: 0.75,
+                      py: 1,
                       px: 1,
                       borderRadius: 'var(--radius-md)',
                       '&:hover': { backgroundColor: 'var(--color-surface-alt)' },
                     }}
                   >
                     <Icon fontSize="small" />
-                    <Typography variant="body2">{section.label}</Typography>
+                    <Box sx={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <Typography variant="body2" fontWeight={600}>{section.label}</Typography>
+                      <Typography variant="caption" color="text.secondary">{relativeTime(at)}</Typography>
+                    </Box>
+                    <ArrowForwardIosIcon sx={{ fontSize: 14, color: 'var(--color-text-secondary)' }} />
                   </ButtonBase>
                 );
               })}

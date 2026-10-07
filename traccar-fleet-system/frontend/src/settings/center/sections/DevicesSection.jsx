@@ -5,17 +5,16 @@ import dayjs from 'dayjs';
 import { useTheme } from '@mui/material/styles';
 import {
   Alert, Box, Button, Checkbox, CircularProgress, IconButton, InputAdornment,
-  Menu, MenuItem, Pagination, Select, Stack, Tab, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Tabs, TextField, Tooltip, Typography, useMediaQuery,
+  Menu, MenuItem, Pagination, Select, Stack, TextField, Tooltip, Typography, useMediaQuery,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import TuneIcon from '@mui/icons-material/Tune';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
@@ -26,7 +25,6 @@ import { useDeviceReadonly, useManager, useRestriction } from '../../../common/u
 import { formatTime } from '../../../common/util/formatter';
 import usePersistedState from '../../../common/util/usePersistedState';
 import exportExcel from '../../../common/util/exportExcel';
-import AddressValue from '../../../common/components/AddressValue';
 import RemoveDialog from '../../../common/components/RemoveDialog';
 import { useSetTopBarTitle } from '../../../common/components/TopBarTitleContext';
 import { fetchVehicles } from '../../../fleet/vehiclesApi.js';
@@ -48,40 +46,18 @@ import {
 const STATE_META = {
   online: { label: 'Online', color: 'var(--color-success)', background: 'var(--color-success-light)' },
   offline: { label: 'Offline', color: 'var(--color-critical)', background: 'var(--color-critical-light)' },
-  never: { label: 'Never connected', color: 'var(--color-warning)', background: 'var(--color-warning-light)' },
 };
-
-const NEVER_HINT = 'No signal has ever been received from this tracker. Check that it is powered, has an active SIM and is pointed at the NUMZFLEET server.';
 
 const TABS = [
   { value: 'all', label: 'All Devices' },
   { value: 'online', label: 'Online', dot: 'var(--color-success)' },
   { value: 'offline', label: 'Offline', dot: 'var(--color-critical)' },
-  { value: 'never', label: 'Never connected', dot: 'var(--color-warning)' },
   { value: 'unassigned', label: 'Unassigned', dot: 'var(--color-text-disabled)' },
 ];
 
-// Device, selection and actions are always shown; everything else is optional.
-const COLUMNS = [
-  { key: 'imei', label: 'Identifier (IMEI)', defaultVisible: true },
-  { key: 'status', label: 'Status', defaultVisible: true },
-  { key: 'vehicle', label: 'Vehicle', defaultVisible: true },
-  { key: 'lastSeen', label: 'Last seen', defaultVisible: true },
-  { key: 'location', label: 'Location', defaultVisible: false },
-];
+const FILTER_OPTIONS = TABS.filter((item) => item.value !== 'all');
 
 const muted = { color: 'var(--color-text-secondary)' };
-
-const headCellSx = {
-  color: 'var(--color-text-secondary)',
-  fontWeight: 600,
-  fontSize: 13,
-  whiteSpace: 'nowrap',
-  backgroundColor: 'var(--color-surface-alt)',
-  borderBottom: '1px solid var(--color-border)',
-};
-
-const bodyCellSx = { borderBottom: '1px solid var(--color-border)', py: 1.25 };
 
 // The default Paper surface is translucent in dark mode, so anything that floats
 // over the table needs the opaque elevated surface to stay legible.
@@ -92,6 +68,9 @@ const iconButtonSx = {
   backgroundColor: 'var(--color-surface-alt)',
   '&:hover': { backgroundColor: 'var(--color-border-light)' },
 };
+
+const rowGridTemplate = '32px minmax(0, 1fr) minmax(120px, 0.22fr) minmax(140px, 0.3fr) minmax(110px, 0.2fr) 132px';
+const compactRowGridTemplate = '32px minmax(0, 1fr) minmax(110px, 0.25fr) minmax(130px, 0.3fr) 132px';
 
 function StatusChip({ state }) {
   const meta = STATE_META[state];
@@ -117,64 +96,51 @@ function StatusChip({ state }) {
       {meta.label}
     </Box>
   );
-  return state === 'never' ? <Tooltip title={NEVER_HINT}>{chip}</Tooltip> : chip;
-}
-
-// "Offline" alone hides the case that matters most while onboarding: a tracker
-// that was put on a vehicle but has never reported. Say so next to the chip.
-const statusNote = (row, vehiclesStatus) => {
-  if (row.state !== 'never') return null;
-  if (row.vehicle?.assignedAt) {
-    return `Assigned ${dayjs(row.vehicle.assignedAt).fromNow()}, no signal yet`;
-  }
-  return vehiclesStatus === 'ok' ? 'Not on a vehicle yet' : null;
-};
-
-function StatusNote({ row, vehiclesStatus }) {
-  const note = statusNote(row, vehiclesStatus);
-  if (!note) return null;
-  return (
-    <Typography
-      variant="caption"
-      component="div"
-      sx={{ color: row.vehicle ? 'var(--color-warning)' : 'var(--color-text-secondary)' }}
-    >
-      {note}
-    </Typography>
-  );
+  return chip;
 }
 
 function StatusCell({ row, vehiclesStatus }) {
   return (
     <Box>
       <StatusChip state={row.state} />
-      <Box sx={{ mt: 0.5 }}><StatusNote row={row} vehiclesStatus={vehiclesStatus} /></Box>
     </Box>
   );
 }
 
+const initialsFor = (value) => String(value || 'GPS')
+  .split(/\s+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0])
+  .join('')
+  .toUpperCase();
+
 function DeviceCell({ row }) {
+  const vehicleName = row.vehicle?.name;
+  const primaryLabel = row.vehicle?.plateNumber || vehicleName || row.name || 'Unassigned tracker';
+  const secondaryLabel = 'GPS tracker';
   return (
     <Box sx={{
       display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0,
     }}
     >
       <Box sx={{
-        width: 40,
-        height: 40,
+        width: 48,
+        height: 48,
         flexShrink: 0,
         borderRadius: '10px',
         display: 'grid',
         placeItems: 'center',
-        backgroundColor: 'var(--color-surface-alt)',
-        ...muted,
+        backgroundColor: row.vehicle ? 'var(--color-primary-light)' : 'var(--color-surface-alt)',
+        color: row.vehicle ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+        fontWeight: 700,
       }}
       >
-        <GpsFixedIcon fontSize="small" />
+        {initialsFor(vehicleName || row.name)}
       </Box>
       <Box sx={{ minWidth: 0 }}>
-        <Typography fontWeight={700} noWrap>{row.name}</Typography>
-        <Typography variant="body2" noWrap sx={muted}>{row.model || 'GPS tracker'}</Typography>
+        <Typography fontWeight={700} noWrap>{primaryLabel}</Typography>
+        <Typography variant="body2" noWrap sx={muted}>{secondaryLabel}</Typography>
       </Box>
     </Box>
   );
@@ -224,12 +190,13 @@ function RowActions({
   row, canEdit, onView, onEdit, onRemove,
 }) {
   const t = useTranslation();
+  const [menuAnchor, setMenuAnchor] = useState(null);
   return (
     <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end' }}>
-      <Tooltip title={row.vehicle ? 'Open vehicle' : 'Not assigned to a vehicle'}>
+      <Tooltip title={row.vehicle ? 'Open vehicle workspace' : 'Not assigned to a vehicle'}>
         <span>
-          <IconButton size="small" aria-label="Open vehicle" disabled={!row.vehicle} onClick={() => onView(row)} sx={iconButtonSx}>
-            <VisibilityIcon fontSize="small" />
+          <IconButton size="small" aria-label="Open vehicle workspace" disabled={!row.vehicle} onClick={() => onView(row)} sx={iconButtonSx}>
+            <DirectionsCarIcon fontSize="small" />
           </IconButton>
         </span>
       </Tooltip>
@@ -240,43 +207,25 @@ function RowActions({
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title={t('sharedRemove')}>
-            <IconButton
-              size="small"
-              aria-label={t('sharedRemove')}
-              onClick={() => onRemove(row)}
-              sx={{ ...iconButtonSx, color: 'var(--color-critical)', backgroundColor: 'var(--color-critical-light)' }}
-            >
-              <DeleteIcon fontSize="small" />
+          <Tooltip title="More device actions">
+            <IconButton size="small" aria-label="More device actions" onClick={(event) => setMenuAnchor(event.currentTarget)} sx={iconButtonSx}>
+              <MoreVertIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={() => setMenuAnchor(null)}
+            slotProps={popoverSlotProps}
+          >
+            <MenuItem onClick={() => { setMenuAnchor(null); onEdit(row); }}>Tracker information</MenuItem>
+            <MenuItem onClick={() => { setMenuAnchor(null); onEdit(row); }}>Reassign tracker</MenuItem>
+            <MenuItem onClick={() => { setMenuAnchor(null); onRemove(row); }} sx={{ color: 'var(--color-critical)' }}>
+              <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+              {t('sharedRemove')}
+            </MenuItem>
+          </Menu>
         </>
-      )}
-    </Box>
-  );
-}
-
-function TabLabel({ tab, count }) {
-  return (
-    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-      {tab.dot && <FiberManualRecordIcon sx={{ fontSize: 10, color: tab.dot }} />}
-      <span>{tab.label}</span>
-      {count != null && (
-        <Box
-          component="span"
-          sx={{
-            minWidth: 22,
-            px: 0.75,
-            borderRadius: '6px',
-            fontSize: 12,
-            lineHeight: '20px',
-            textAlign: 'center',
-            backgroundColor: 'var(--color-surface-alt)',
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          {count}
-        </Box>
       )}
     </Box>
   );
@@ -312,11 +261,10 @@ const downloadCsv = (records, filename) => {
  * that has never reported, how long it has been waiting.
  */
 export default function DevicesSection() {
-  useSetTopBarTitle('Settings');
+  useSetTopBarTitle('Devices');
   const theme = useTheme();
   const navigate = useNavigate();
   const t = useTranslation();
-  const compact = useMediaQuery(theme.breakpoints.down('md'));
 
   const dispatch = useDispatch();
   const user = useSelector((state) => state.session.user);
@@ -337,11 +285,10 @@ export default function DevicesSection() {
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = usePersistedState('devicesTablePageSize', DEFAULT_PAGE_SIZE);
-  const [columnPrefs, setColumnPrefs] = usePersistedState('devicesTableColumns', {});
   const [selected, setSelected] = useState(() => new Set());
   const [removeId, setRemoveId] = useState(null);
   const [exportAnchor, setExportAnchor] = useState(null);
-  const [columnsAnchor, setColumnsAnchor] = useState(null);
+  const [filterAnchor, setFilterAnchor] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -408,10 +355,6 @@ export default function DevicesSection() {
   );
   const paged = paginate(filtered, page, pageSize);
 
-  const visible = Object.fromEntries(COLUMNS.map((column) => [
-    column.key, columnPrefs[column.key] ?? column.defaultVisible,
-  ]));
-
   const canEdit = !deviceReadonly;
   const canAdd = !readonlyRestriction;
 
@@ -470,14 +413,14 @@ export default function DevicesSection() {
   );
 
   const headerActions = (
-    <Stack direction="row" spacing={1.5} alignItems="center">
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ width: { xs: '100%', sm: 'auto' } }}>
       <TextField
         size="small"
-        placeholder="Search devices..."
+        placeholder="Search by number plate or initials..."
         value={keyword}
         onChange={(event) => changeKeyword(event.target.value)}
-        inputProps={{ 'aria-label': 'Search devices' }}
-        sx={{ width: { xs: 150, sm: 280 } }}
+        inputProps={{ 'aria-label': 'Search by number plate or initials' }}
+        sx={{ width: { xs: '100%', sm: 280 } }}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start"><SearchIcon fontSize="small" sx={muted} /></InputAdornment>
@@ -487,31 +430,6 @@ export default function DevicesSection() {
       {addButton}
     </Stack>
   );
-
-  const renderCell = (row, key) => {
-    switch (key) {
-      case 'imei':
-        return <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{row.uniqueId}</Typography>;
-      case 'status':
-        return <StatusCell row={row} vehiclesStatus={vehiclesStatus} />;
-      case 'vehicle':
-        return <VehicleCell row={row} vehiclesStatus={vehiclesStatus} />;
-      case 'lastSeen':
-        return <LastSeenCell row={row} />;
-      case 'location':
-        return positions[row.id] ? (
-          <Typography variant="caption" component="div" sx={muted}>
-            <AddressValue
-              latitude={positions[row.id].latitude}
-              longitude={positions[row.id].longitude}
-              originalAddress={positions[row.id]?.address}
-            />
-          </Typography>
-        ) : <Typography variant="body2" sx={muted}>—</Typography>;
-      default:
-        return null;
-    }
-  };
 
   const actionsFor = (row) => (
     <RowActions
@@ -523,51 +441,82 @@ export default function DevicesSection() {
     />
   );
 
-  const renderTable = () => (
-    <TableContainer>
-      <Table size="medium" sx={{ minWidth: 760 }}>
-        <TableHead>
-          <TableRow>
-            <TableCell padding="checkbox" sx={headCellSx}>
-              <Checkbox
-                size="small"
-                checked={allOnPage}
-                indeterminate={!allOnPage && someOnPage}
-                onChange={toggleAllOnPage}
-                inputProps={{ 'aria-label': 'Select all devices on this page' }}
-              />
-            </TableCell>
-            <TableCell sx={headCellSx}>Device</TableCell>
-            {COLUMNS.filter((column) => visible[column.key]).map((column) => (
-              <TableCell key={column.key} sx={headCellSx}>{column.label}</TableCell>
-            ))}
-            <TableCell align="right" sx={headCellSx}>Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {paged.items.map((row) => (
-            <TableRow key={row.id} hover selected={selected.has(row.id)}>
-              <TableCell padding="checkbox" sx={bodyCellSx}>
-                <Checkbox
-                  size="small"
-                  checked={selected.has(row.id)}
-                  onChange={() => toggleOne(row.id)}
-                  inputProps={{ 'aria-label': `Select ${row.name}` }}
-                />
-              </TableCell>
-              <TableCell sx={bodyCellSx}><DeviceCell row={row} /></TableCell>
-              {COLUMNS.filter((column) => visible[column.key]).map((column) => (
-                <TableCell key={column.key} sx={bodyCellSx}>{renderCell(row, column.key)}</TableCell>
-              ))}
-              <TableCell align="right" sx={bodyCellSx}>{actionsFor(row)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+  const selectionControl = (row, label = `Select ${row.name}`) => (
+    <Checkbox
+      size="small"
+      checked={selected.has(row.id)}
+      onChange={() => toggleOne(row.id)}
+      inputProps={{ 'aria-label': label }}
+    />
   );
 
-  const renderCards = () => (
+  const renderDesktopRows = () => (
+    <Box sx={{ minWidth: 0 }}>
+      <Box
+        sx={{
+          display: 'grid', gridTemplateColumns: rowGridTemplate, gap: 1.5, alignItems: 'center',
+          px: 1.5, py: 1, color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 600,
+          borderBottom: '1px solid var(--color-border)',
+        }}
+      >
+        <Checkbox
+          size="small"
+          checked={allOnPage}
+          indeterminate={!allOnPage && someOnPage}
+          onChange={toggleAllOnPage}
+          inputProps={{ 'aria-label': 'Select all devices on this page' }}
+        />
+        <span>Tracker</span>
+        <span>Status</span>
+        <span>Vehicle</span>
+        <span>Last seen</span>
+        <span>Actions</span>
+      </Box>
+      <Stack spacing={1} sx={{ pt: 1 }}>
+        {paged.items.map((row) => (
+          <Box
+            key={row.id}
+            sx={{
+              display: 'grid', gridTemplateColumns: rowGridTemplate, gap: 1.5, alignItems: 'center',
+              minWidth: 0, px: 1.5, py: 1.25, border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)', backgroundColor: selected.has(row.id) ? 'var(--color-surface-alt)' : 'transparent',
+              '&:hover': { backgroundColor: 'var(--color-surface-alt)' },
+            }}
+          >
+            {selectionControl(row)}
+            <Box sx={{ minWidth: 0 }}><DeviceCell row={row} /></Box>
+            <Box sx={{ minWidth: 0 }}><StatusCell row={row} vehiclesStatus={vehiclesStatus} /></Box>
+            <Box sx={{ minWidth: 0 }}><VehicleCell row={row} vehiclesStatus={vehiclesStatus} /></Box>
+            <Box sx={{ minWidth: 0 }}><LastSeenCell row={row} /></Box>
+            <Box sx={{ minWidth: 0 }}>{actionsFor(row)}</Box>
+          </Box>
+        ))}
+      </Stack>
+    </Box>
+  );
+
+  const renderTabletRows = () => (
+    <Stack spacing={1}>
+      {paged.items.map((row) => (
+        <Box
+          key={row.id}
+          sx={{
+            display: 'grid', gridTemplateColumns: compactRowGridTemplate, gap: 1.25, alignItems: 'center',
+            minWidth: 0, px: 1.25, py: 1.25, border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)', backgroundColor: selected.has(row.id) ? 'var(--color-surface-alt)' : 'transparent',
+          }}
+        >
+          {selectionControl(row)}
+          <Box sx={{ minWidth: 0 }}><DeviceCell row={row} /></Box>
+          <Box sx={{ minWidth: 0 }}><StatusCell row={row} vehiclesStatus={vehiclesStatus} /></Box>
+          <Box sx={{ minWidth: 0 }}><VehicleCell row={row} vehiclesStatus={vehiclesStatus} /></Box>
+          <Box sx={{ minWidth: 0 }}>{actionsFor(row)}</Box>
+        </Box>
+      ))}
+    </Stack>
+  );
+
+  const renderMobileCards = () => (
     <Stack spacing={1.5}>
       {paged.items.map((row) => (
         <Box
@@ -579,47 +528,22 @@ export default function DevicesSection() {
             backgroundColor: selected.has(row.id) ? 'var(--color-surface-alt)' : 'transparent',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
-              <Checkbox
-                size="small"
-                checked={selected.has(row.id)}
-                onChange={() => toggleOne(row.id)}
-                inputProps={{ 'aria-label': `Select ${row.name}` }}
-                sx={{ ml: -1 }}
-              />
+              <Box sx={{ ml: -1 }}>{selectionControl(row)}</Box>
               <DeviceCell row={row} />
             </Box>
-            <StatusChip state={row.state} />
+            <Box sx={{ flexShrink: 0 }}><StatusChip state={row.state} /></Box>
           </Box>
-          <Stack spacing={1} sx={{ mt: 1.5 }}>
-            {visible.imei && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-                <Typography variant="body2" sx={muted}>IMEI</Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{row.uniqueId}</Typography>
-              </Box>
-            )}
-            {visible.vehicle && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-                <Typography variant="body2" sx={muted}>Vehicle</Typography>
-                <VehicleCell row={row} vehiclesStatus={vehiclesStatus} />
-              </Box>
-            )}
-            {visible.lastSeen && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-                <Typography variant="body2" sx={muted}>Last seen</Typography>
-                <LastSeenCell row={row} />
-              </Box>
-            )}
-            <StatusNote row={row} vehiclesStatus={vehiclesStatus} />
-          </Stack>
-          <Box sx={{ mt: 1.5 }}>{actionsFor(row)}</Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>{actionsFor(row)}</Box>
         </Box>
       ))}
     </Stack>
   );
 
-  const list = compact ? renderCards() : renderTable();
+  const mobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const tablet = useMediaQuery(theme.breakpoints.between('sm', 'lg'));
+  const list = mobile ? renderMobileCards() : tablet ? renderTabletRows() : renderDesktopRows();
 
   const showingText = paged.total <= paged.items.length
     ? `Showing ${paged.total} of ${paged.total} device${paged.total === 1 ? '' : 's'}`
@@ -654,42 +578,17 @@ export default function DevicesSection() {
     }
     return (
       <Stack spacing={2}>
-        <Box sx={{
-          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5,
-        }}
-        >
-          <Tabs
-            value={activeTab}
-            onChange={(_, value) => changeTab(value)}
-            variant="scrollable"
-            scrollButtons={false}
-            TabIndicatorProps={{ sx: { display: 'none' } }}
-            sx={{ minHeight: 0, maxWidth: '100%', '& .MuiTabs-flexContainer': { gap: 1 } }}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={<TuneIcon />}
+            endIcon={<KeyboardArrowDownIcon />}
+            onClick={(event) => setFilterAnchor(event.currentTarget)}
           >
-            {TABS.map((item) => (
-              <Tab
-                key={item.value}
-                value={item.value}
-                disableRipple
-                disabled={item.value === 'unassigned' && !vehiclesKnown}
-                label={<TabLabel tab={item} count={counts[item.value]} />}
-                sx={{
-                  minHeight: 40,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-secondary)',
-                  '&.Mui-selected': {
-                    color: 'var(--color-primary)',
-                    backgroundColor: 'var(--color-primary-light)',
-                    borderColor: 'var(--color-primary)',
-                  },
-                }}
-              />
-            ))}
-          </Tabs>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+            {`Filter: ${FILTER_OPTIONS.find((item) => item.value === activeTab)?.label || 'All devices'}`}
+          </Button>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ display: { xs: 'none', sm: 'flex' } }}>
             <Button
               variant="outlined"
               color="inherit"
@@ -699,15 +598,6 @@ export default function DevicesSection() {
               disabled={!exportScope.length}
             >
               Export
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              startIcon={<TuneIcon />}
-              endIcon={<KeyboardArrowDownIcon />}
-              onClick={(event) => setColumnsAnchor(event.currentTarget)}
-            >
-              Columns
             </Button>
           </Stack>
         </Box>
@@ -765,12 +655,30 @@ export default function DevicesSection() {
   return (
     <SettingsCenterShell>
       <SettingsSectionPanel
-        title="Devices"
-        description="GPS trackers linked to your fleet."
+        title=""
+        description=""
         actions={headerActions}
       >
         {renderBody()}
       </SettingsSectionPanel>
+
+      <Menu
+        anchorEl={filterAnchor}
+        open={Boolean(filterAnchor)}
+        onClose={() => setFilterAnchor(null)}
+        slotProps={popoverSlotProps}
+      >
+        {FILTER_OPTIONS.map((item) => (
+          <MenuItem
+            key={item.value}
+            selected={item.value === activeTab}
+            disabled={item.value === 'unassigned' && !vehiclesKnown}
+            onClick={() => { setFilterAnchor(null); changeTab(item.value); }}
+          >
+            {item.label}{counts[item.value] != null ? ` (${counts[item.value]})` : ''}
+          </MenuItem>
+        ))}
+      </Menu>
 
       <Menu
         anchorEl={exportAnchor}
@@ -783,24 +691,6 @@ export default function DevicesSection() {
         </MenuItem>
         <MenuItem onClick={() => handleExport('xlsx')}>Excel (.xlsx)</MenuItem>
         <MenuItem onClick={() => handleExport('csv')}>CSV (.csv)</MenuItem>
-      </Menu>
-
-      <Menu
-        anchorEl={columnsAnchor}
-        open={Boolean(columnsAnchor)}
-        onClose={() => setColumnsAnchor(null)}
-        slotProps={popoverSlotProps}
-      >
-        {COLUMNS.map((column) => (
-          <MenuItem
-            key={column.key}
-            dense
-            onClick={() => setColumnPrefs({ ...columnPrefs, [column.key]: !visible[column.key] })}
-          >
-            <Checkbox size="small" checked={visible[column.key]} tabIndex={-1} disableRipple sx={{ mr: 1, p: 0.5 }} />
-            {column.label}
-          </MenuItem>
-        ))}
       </Menu>
 
       <RemoveDialog

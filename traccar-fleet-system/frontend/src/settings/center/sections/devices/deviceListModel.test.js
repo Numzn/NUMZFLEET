@@ -14,8 +14,7 @@ import {
 } from './deviceListModel.js';
 
 // positionId is 0 (not null) for a tracker with no position: Traccar's Device.positionId
-// is a primitive long. The first version of classifyDevice only handled null and showed
-// a never-connected tracker as plain "Offline" in the real UI.
+// is a primitive long. Trackers with no signal are presented as Offline.
 const TRACCAR_NEVER = {
   id: 62, name: 'ALLION', uniqueId: '111111111111111', status: 'offline', lastUpdate: null, positionId: 0,
 };
@@ -35,26 +34,22 @@ const VEHICLES = [
   { id: 'v-free', name: 'Parked truck', plateNumber: 'ABC 999', assignment: null },
 ];
 
-test('classifyDevice separates never-connected from offline and online', () => {
+test('classifyDevice maps never-reported trackers to offline', () => {
   assert.equal(classifyDevice(TRACCAR_LIVE), DEVICE_STATES.ONLINE);
   assert.equal(classifyDevice(TRACCAR_QUIET), DEVICE_STATES.OFFLINE);
-  assert.equal(classifyDevice(TRACCAR_NEVER), DEVICE_STATES.NEVER);
+  assert.equal(classifyDevice(TRACCAR_NEVER), DEVICE_STATES.OFFLINE);
   // status "unknown" with a recorded history is just a quiet tracker, not a new one
   assert.equal(classifyDevice(TRACCAR_UNKNOWN_BUT_SEEN), DEVICE_STATES.OFFLINE);
 });
 
-test('classifyDevice: a recorded position or lastUpdate alone is enough to count as having reported', () => {
+test('classifyDevice treats every non-online tracker as offline', () => {
   assert.equal(classifyDevice({ status: 'offline', lastUpdate: null, positionId: 3 }), DEVICE_STATES.OFFLINE);
   assert.equal(classifyDevice({ status: 'offline', lastUpdate: '2026-10-01T00:00:00Z', positionId: null }), DEVICE_STATES.OFFLINE);
-  assert.equal(classifyDevice({ status: 'offline' }), DEVICE_STATES.NEVER);
-  assert.equal(classifyDevice(undefined), DEVICE_STATES.NEVER);
+  assert.equal(classifyDevice({ status: 'offline' }), DEVICE_STATES.OFFLINE);
+  assert.equal(classifyDevice(undefined), DEVICE_STATES.OFFLINE);
   // every "no position" encoding Traccar / our own DTOs can produce
   [0, null, undefined].forEach((positionId) => {
-    assert.equal(
-      classifyDevice({ status: 'offline', lastUpdate: null, positionId }),
-      DEVICE_STATES.NEVER,
-      `positionId=${positionId}`,
-    );
+    assert.equal(classifyDevice({ status: 'offline', lastUpdate: null, positionId }), DEVICE_STATES.OFFLINE, `positionId=${positionId}`);
   });
 });
 
@@ -70,13 +65,13 @@ test('buildAssignmentIndex maps deviceId (number or numeric string) to its vehic
   assert.equal(buildAssignmentIndex([{ id: 'x', assignment: {} }]).size, 0);
 });
 
-test('the screenshot case: an assigned device that never reported is "never" + assigned, not "unassigned"', () => {
+test('an assigned device with no signal remains offline and assigned', () => {
   const rows = decorateDevices([TRACCAR_NEVER], buildAssignmentIndex(VEHICLES));
-  assert.equal(rows[0].state, DEVICE_STATES.NEVER);
+  assert.equal(rows[0].state, DEVICE_STATES.OFFLINE);
   assert.equal(rows[0].vehicle.name, 'ALLION');
   const counts = countTabs(rows, true);
   assert.deepEqual(counts, {
-    all: 1, online: 0, offline: 0, never: 1, unassigned: 0,
+    all: 1, online: 0, offline: 1, unassigned: 0,
   });
 });
 
@@ -95,8 +90,7 @@ const ALL = decorateDevices(
 test('filterRows by tab', () => {
   assert.deepEqual(filterRows(ALL, { tab: 'all' }).map((r) => r.id), [62, 7, 8, 9]);
   assert.deepEqual(filterRows(ALL, { tab: 'online' }).map((r) => r.id), [8]);
-  assert.deepEqual(filterRows(ALL, { tab: 'offline' }).map((r) => r.id), [7, 9]);
-  assert.deepEqual(filterRows(ALL, { tab: 'never' }).map((r) => r.id), [62]);
+  assert.deepEqual(filterRows(ALL, { tab: 'offline' }).map((r) => r.id), [62, 7, 9]);
   assert.deepEqual(filterRows(ALL, { tab: 'unassigned' }).map((r) => r.id), [8, 9]);
 });
 

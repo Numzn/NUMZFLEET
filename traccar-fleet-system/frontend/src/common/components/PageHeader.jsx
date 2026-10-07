@@ -29,7 +29,11 @@ export default function PageHeader({
 
   return (
     <Box sx={{
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2,
+      display: 'flex',
+      flexWrap: { xs: 'wrap', sm: 'nowrap' },
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 2,
     }}
     >
       <Box sx={{ minWidth: 0 }}>
@@ -46,7 +50,12 @@ export default function PageHeader({
         )}
       </Box>
       {actions && (
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          alignItems={{ xs: 'stretch', sm: 'center' }}
+          sx={{ flexShrink: 0, width: { xs: '100%', sm: 'auto' } }}
+        >
           {actions}
         </Stack>
       )}
