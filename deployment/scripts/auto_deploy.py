@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-NUMZFLEET workstation deploy driver — one command from laptop to production.
+NUMZFLEET workstation release driver — one command from laptop to production.
 
 Flow (see deployment/REGISTRY_DEPLOY.md, section **auto_deploy.py (workstation → server)**):
   1. Optional: git add / commit (auto message from paths unless -m / --prompt-message)
   2. git push origin HEAD:<branch> (updates remote branch from current commit; not only local <branch>)
-  3. SSH: one session runs server git sync then migrate+deploy or registry deploy (optional SSH master during CI wait)
-  4. Optional: wait then HTTP GET /health and /api/health from this machine (cache-bypass) — post-deploy verification
+    3. GitHub Actions builds immutable images and deploys through the RocketVPS forced-command wrapper
+    4. Legacy direct SSH remains available only with --direct-production
 
 Config: optional deployment/scripts/auto_deploy.env (gitignored; copy auto_deploy.env.example).
 Windows: use deployment/scripts/... paths; see deployment/OCI_SSH.md for keys.
@@ -838,7 +838,7 @@ All NUMZFLEET_* variables, flags, and operator flow: deployment/REGISTRY_DEPLOY.
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Commit/push locally, then deploy SHA on server via SSH.",
+        description="Commit/push locally and trigger the GitHub Actions production deployment.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=_HELP_EPILOG,
     )
@@ -929,7 +929,7 @@ def main() -> int:
     parser.add_argument(
         "--direct-production",
         action="store_true",
-        help="Skip the promote wrapper; SSH run-migrate-and-deploy directly (default when --promoted-sha omitted).",
+        help="Legacy only: bypass GitHub Actions and use the retired direct SSH deployment path.",
     )
     args = parser.parse_args()
 
@@ -964,8 +964,9 @@ def main() -> int:
     wait_sec = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_SECONDS", 210)
     # Migrations + fresh images: backend build often exceeds a short buffer; floor unless user set higher.
     wait_min_migrations = _env_int("NUMZFLEET_IMAGE_BUILD_WAIT_MIN_WITH_MIGRATIONS", 180)
+    legacy_direct = args.direct_production or _env_bool("NUMZFLEET_DIRECT_PRODUCTION", False)
 
-    if not args.skip_deploy and not host:
+    if not args.skip_deploy and legacy_direct and not host:
         hint = ""
         if user_env_path and not os.environ.get("NUMZFLEET_SSH_HOST", "").strip():
             hint = f"(Loaded {user_env_path}: NUMZFLEET_SSH_HOST empty; remove line or set host.)\n"
@@ -976,9 +977,8 @@ def main() -> int:
         )
         return 2
 
-    promoted_sha_preview = (args.promoted_sha or "").strip()
-    direct_preview = args.direct_production or _env_bool("NUMZFLEET_DIRECT_PRODUCTION", False) or not promoted_sha_preview
-    prod_mode = " DIRECT" if direct_preview else " PROMOTE"
+    direct_preview = legacy_direct
+    prod_mode = " DIRECT" if direct_preview else (" PROMOTE" if (args.promoted_sha or "").strip() else " CI")
 
     print("\n==============================")
     print(f"NUMZFLEET AUTO DEPLOY ({target.upper()}{prod_mode})")
@@ -1046,11 +1046,7 @@ def main() -> int:
     image_tag_source = (args.deploy_image_tag or os.environ.get("NUMZFLEET_DEPLOY_IMAGE_TAG") or "").strip()
     deploy_sha = sha
     promoted_sha = (args.promoted_sha or "").strip()
-    direct_production = (
-        args.direct_production
-        or _env_bool("NUMZFLEET_DIRECT_PRODUCTION", False)
-        or not promoted_sha
-    )
+    direct_production = legacy_direct
     if promoted_sha:
         if len(promoted_sha) != 40:
             print("[auto_deploy] --promoted-sha must be a full 40-char SHA.", file=sys.stderr)
@@ -1086,6 +1082,19 @@ def main() -> int:
     if args.skip_deploy:
         print("==============================")
         print("DONE (--skip-deploy)")
+        print("==============================\n")
+        return 0
+
+    ci_deploy = not legacy_direct and not (args.promoted_sha or "").strip()
+    if ci_deploy:
+        print(
+            "[auto_deploy] GitHub Actions is now responsible for quality checks, "
+            "immutable image publication, RocketVPS deployment, and health checks.\n"
+            f"[auto_deploy] Monitor: https://github.com/Numzn/NUMZFLEET/actions/workflows/main.yml\n"
+            f"[auto_deploy] Target SHA: {sha}\n"
+        )
+        print("==============================")
+        print("DONE (CI deployment triggered)")
         print("==============================\n")
         return 0
 
