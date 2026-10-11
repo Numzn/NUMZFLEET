@@ -1,4 +1,4 @@
-import { useId, useCallback, useEffect, useRef } from 'react';
+import { useId, useCallback, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -10,8 +10,8 @@ import { useCatchCallback } from '../../reactHelper';
 import { findFonts } from '../core/mapUtil';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 import { resolveLiveActivityState } from '../../fleet/vehicleDetail/resolveLiveActivityState.js';
+import { buildMarkerFeatures } from './markerFeatures.js';
 
-const LERP_DURATION = 1450;
 const STYLE_TRANSITION_MS = 480;
 const MOVE_PULSE = '#34d399';
 const IDLE_PULSE = '#fcd34d';
@@ -507,6 +507,8 @@ const EnhancedMarkers = ({
       }
     };
   }, [
+    // Anything listed here recreates the sources empty — the marker data effect
+    // further down must list every one of these too (guarded by a test).
     mapCluster,
     clusters,
     hovered,
@@ -670,92 +672,50 @@ const EnhancedMarkers = ({
     }
   }, [selectedDeviceId, id, selected, clusters, iconScale]);
 
-  const prevCoordsRef = useRef({});
-  const animFrameRef = useRef(null);
-
-  const buildFeatures = useCallback((source, coords) => {
-    return safePositions
-      .filter((it) => devices.hasOwnProperty(it.deviceId))
-      .filter((it) => (source === id ? it.deviceId !== selectedDeviceId : it.deviceId === selectedDeviceId))
-      .map((position) => {
-        const c = coords[position.deviceId];
-        return {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: c ? [c.lng, c.lat] : [position.longitude, position.latitude],
-          },
-          properties: createFeature(devices, position, selectedPosition && selectedPosition.id),
-        };
-      });
-  }, [safePositions, devices, selectedDeviceId, selectedPosition, id, directionType]);
-
+  /**
+   * Push the latest fixes straight into both GeoJSON sources. No interpolation:
+   * a marker is drawn at the reported longitude/latitude as soon as the
+   * position reaches Redux, so any remaining lag is the tracker's report
+   * interval plus network latency, not the UI.
+   */
   useEffect(() => {
-    const prev = prevCoordsRef.current;
-    const targets = {};
-    let needsAnimation = false;
-
-    safePositions.forEach((pos) => {
-      const old = prev[pos.deviceId];
-      if (old && (old.lng !== pos.longitude || old.lat !== pos.latitude)) {
-        targets[pos.deviceId] = {
-          fromLng: old.lng, fromLat: old.lat,
-          toLng: pos.longitude, toLat: pos.latitude,
-        };
-        needsAnimation = true;
-      }
-      prev[pos.deviceId] = { lng: pos.longitude, lat: pos.latitude };
+    const selectedPositionId = selectedPosition && selectedPosition.id;
+    [id, selected].forEach((source) => {
+      map.getSource(source)?.setData({
+        type: 'FeatureCollection',
+        features: buildMarkerFeatures({
+          positions: safePositions,
+          devices,
+          selectedDeviceId,
+          selectedSource: source === selected,
+          createProperties: (position) => createFeature(devices, position, selectedPositionId),
+        }),
+      });
     });
-
-    if (!needsAnimation) {
-      [id, selected].forEach((source) => {
-        const features = buildFeatures(source, prev);
-        map.getSource(source)?.setData({ type: 'FeatureCollection', features });
-      });
-      return;
-    }
-
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-
-    const startTime = performance.now();
-
-    const animate = (now) => {
-      const elapsed = now - startTime;
-      const rawT = Math.min(elapsed / LERP_DURATION, 1);
-      const t = easeOutCubic(rawT);
-
-      const interpolated = { ...prev };
-      Object.entries(targets).forEach(([deviceId, tgt]) => {
-        interpolated[deviceId] = {
-          lng: lerp(tgt.fromLng, tgt.toLng, t),
-          lat: lerp(tgt.fromLat, tgt.toLat, t),
-        };
-      });
-
-      [id, selected].forEach((source) => {
-        const features = buildFeatures(source, interpolated);
-        map.getSource(source)?.setData({ type: 'FeatureCollection', features });
-      });
-
-      if (rawT < 1) {
-        animFrameRef.current = requestAnimationFrame(animate);
-      } else {
-        Object.entries(targets).forEach(([deviceId, tgt]) => {
-          prev[deviceId] = { lng: tgt.toLng, lat: tgt.toLat };
-        });
-        animFrameRef.current = null;
-      }
-    };
-
-    animFrameRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-    };
-  }, [safePositions, devices, selectedDeviceId, selectedPosition, id, selected, buildFeatures]);
+  }, [
+    safePositions,
+    devices,
+    selectedDeviceId,
+    selectedPosition,
+    directionType,
+    // The effect that creates the sources tears them down and re-adds them
+    // (empty) whenever any of its own inputs change — e.g. a breakpoint change
+    // flipping iconScale. Re-running on exactly those inputs repopulates the
+    // fresh sources in the same commit instead of leaving them blank until the
+    // next position arrives. Keep in step with that effect's dependency list.
+    mapCluster,
+    clusters,
+    hovered,
+    id,
+    iconScale,
+    selected,
+    titleField,
+    onMarkerClickCallback,
+    onClusterClick,
+    onMouseEnter,
+    onMouseLeave,
+    onMapClickCallback,
+  ]);
 
   return null;
 };
