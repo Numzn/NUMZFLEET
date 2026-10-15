@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { isOlderFix } from './positionOrdering.js';
 
 const { reducer, actions } = createSlice({
   name: 'session',
@@ -39,6 +40,8 @@ const { reducer, actions } = createSlice({
       const liveRoutes = state.user.attributes.mapLiveRoutes || state.server.attributes.mapLiveRoutes || 'none';
       const liveRoutesLimit = state.user.attributes['web.liveRouteLength'] || state.server.attributes['web.liveRouteLength'] || 10;
       action.payload.forEach((position) => {
+        // A late frame older than what we already hold must not move the marker back.
+        if (isOlderFix(state.positions[position.deviceId], position)) return;
         state.positions[position.deviceId] = position;
         if (liveRoutes !== 'none') {
           const route = state.history[position.deviceId] || [];
