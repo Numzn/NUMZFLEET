@@ -1,0 +1,35 @@
+--- a/src/main/java/org/traccar/session/ConnectionManager.java
++++ b/src/main/java/org/traccar/session/ConnectionManager.java
+@@ -153,15 +153,13 @@
+             unknownByEndpoint.remove(connectionKey);
+             device.checkDisabled();
+ 
+-            DeviceSession oldSession = sessionsByDeviceId.remove(device.getId());
+-            if (oldSession != null) {
+-                Map<String, DeviceSession> oldEndpointSessions = sessionsByEndpoint.get(oldSession.getConnectionKey());
+-                if (oldEndpointSessions != null && oldEndpointSessions.size() > 1) {
+-                    oldEndpointSessions.remove(device.getUniqueId());
+-                } else {
+-                    sessionsByEndpoint.remove(oldSession.getConnectionKey());
+-                }
+-            }
++            // The newest login becomes the device's current session (commands, status).
++            // A superseded connection deliberately KEEPS its own endpoint mapping and
++            // cache reference until it closes. Dropping them here meant that a login
++            // replayed late from an abandoned socket evicted the live socket's mapping,
++            // and once that stale socket closed the live one was left with no session:
++            // every frame it sent was discarded without a trace.
++            sessionsByDeviceId.remove(device.getId());
+ 
+             DeviceSession deviceSession = new DeviceSession(
+                     device.getId(), device.getUniqueId(), device.getModel(), protocol, channel, remoteAddress);
+@@ -171,9 +169,6 @@
+             sessionsByDeviceId.put(device.getId(), deviceSession);
+ 
+             cacheManager.addDevice(device.getId(), connectionKey);
+-            if (oldSession != null) {
+-                cacheManager.removeDevice(device.getId(), oldSession.getConnectionKey());
+-            }
+ 
+             return deviceSession;
+         } else {
