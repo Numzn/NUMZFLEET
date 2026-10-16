@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { buildMarkerFeatures, moveFeatures } from './markerFeatures.js';
+import {
+  buildMarkerFeatures, isTopDownCategory, moveFeatures,
+} from './markerFeatures.js';
 
 const devices = { 1: { id: 1 }, 2: { id: 2 }, 3: { id: 3 } };
 
@@ -226,4 +228,24 @@ test('moveFeatures: nothing moved and nothing turned keeps the very same feature
   }];
   const [after] = moveFeatures(before, () => [10, 20], () => 10);
   assert.equal(after, before[0]);
+});
+
+
+test('top-down car: cars and devices with no category set are drawn as the car', () => {
+  assert.equal(isTopDownCategory('car'), true);
+  // mapIconKey() normalises a missing, empty or unknown category to "default".
+  assert.equal(isTopDownCategory('default'), true);
+});
+
+test('top-down car: a category chosen on purpose keeps its own marker', () => {
+  ['truck', 'bus', 'van', 'motorcycle', 'bicycle', 'scooter', 'tractor', 'trailer', 'person', 'animal', 'boat', 'ship',
+    'plane', 'helicopter', 'train', 'tram', 'camper', 'crane'].forEach((category) => {
+    assert.equal(isTopDownCategory(category), false, category);
+  });
+});
+
+test('EnhancedMarkers wiring: the marker kind comes from isTopDownCategory, not a hard-coded category', () => {
+  const source = readComponentSource();
+  assert.ok(source.includes('isTopDownCategory(category)'));
+  assert.ok(!/const topDown = category === 'car'/.test(source), 'a bare category === car check must not return');
 });

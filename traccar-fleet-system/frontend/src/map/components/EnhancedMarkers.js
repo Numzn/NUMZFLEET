@@ -10,7 +10,7 @@ import { useCatchCallback } from '../../reactHelper';
 import { findFonts } from '../core/mapUtil';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 import { resolveLiveActivityState } from '../../fleet/vehicleDetail/resolveLiveActivityState.js';
-import { buildMarkerFeatures, moveFeatures } from './markerFeatures.js';
+import { buildMarkerFeatures, isTopDownCategory, moveFeatures } from './markerFeatures.js';
 import { iconSizeExpression, vehicleLayerSpecs } from './markerLayers.js';
 import {
   frameLoop, markerMotion, motionClock, prefersReducedMotion,
@@ -93,7 +93,7 @@ const EnhancedMarkers = ({
     }
 
     const category = mapIconKey(device?.category);
-    const topDown = category === 'car';
+    const topDown = isTopDownCategory(category);
     const pulseState = !isOnline ? 'offline' : (isMoving ? 'moving' : 'idle');
 
     return {
@@ -102,7 +102,8 @@ const EnhancedMarkers = ({
       name: displayName,
       fixTime: formatTime(position.fixTime, 'seconds'),
       category,
-      // Cars are drawn as a rotating top-down sprite, other kinds as a round puck.
+      // Cars (and devices with no category set) are drawn as a rotating top-down
+      // sprite; deliberately chosen other kinds keep the round puck.
       markerIconKey: topDown ? 'car-top-live' : `${category}-live`,
       topDown: topDown ? 1 : 0,
       rotation: course,

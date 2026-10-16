@@ -62,4 +62,15 @@ export const moveFeatures = (features, drawnAt, headingAt = () => null) => featu
   };
 });
 
+/**
+ * Which vehicles are drawn as the rotating top-down car (everything else keeps the
+ * round puck). `category` is the already-normalised icon category: a device with
+ * no category set, or the generic "default" one, normalises to "default". This is
+ * a road-vehicle fleet app and the category is optional when a device is created,
+ * so an unspecified device is treated as a car. A category chosen on purpose
+ * (truck, bus, motorcycle, person, boat, ...) keeps its own marker.
+ */
+export const TOP_DOWN_CATEGORIES = new Set(['car', 'default']);
+export const isTopDownCategory = (category) => TOP_DOWN_CATEGORIES.has(category);
+
 export default buildMarkerFeatures;
