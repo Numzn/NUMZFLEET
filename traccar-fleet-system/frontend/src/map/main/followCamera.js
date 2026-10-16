@@ -11,6 +11,13 @@ export const DEFAULT_TRACKING_ZOOM = 16;
 /** Following resumes this long after the last manual map interaction. */
 export const RESUME_AFTER_MS = 5000;
 
+/**
+ * A pressed pointer blocks camera moves (MapLibre resets gesture handlers on
+ * every camera call, which would kill a drag before it starts). If the matching
+ * release is never seen the press is ignored after this long.
+ */
+export const PRESS_STALE_MS = 15_000;
+
 /** Camera moves are coalesced to at most one per this interval (latest wins). */
 export const MIN_MOVE_INTERVAL_MS = 120;
 

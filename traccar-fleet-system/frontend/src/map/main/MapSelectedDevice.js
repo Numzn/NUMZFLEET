@@ -11,7 +11,15 @@ import {
   SHEET_LEVEL,
 } from '../../main/fleet/fleetSheetConstants';
 import FollowCameraController from './FollowCameraController';
+import { frameLoop, markerMotion, motionClock } from '../components/motionRuntime';
 import { DEFAULT_TRACKING_ZOOM, computeSafeArea } from './followCamera';
+
+/** The marker motion tracker as the controller sees it (shared clock). */
+const motion = {
+  isEnabled: () => markerMotion.isEnabled(),
+  positionAt: (deviceId) => markerMotion.positionAt(deviceId, motionClock()),
+  targetOf: (deviceId) => markerMotion.targetOf(deviceId),
+};
 
 /** MapLibre control stacks the followed vehicle must not hide behind. */
 const CONTROL_STACKS = [
@@ -86,10 +94,15 @@ const MapSelectedDevice = ({ mapReady }) => {
     const controller = new FollowCameraController({
       map,
       getSafeArea: () => readSafeArea(extraBottomRef.current),
+      motion,
     });
     controller.attach();
     controllerRef.current = controller;
+    // Same frame loop that advances the marker glide: the camera locks onto the
+    // drawn icon, so the two can never drift apart on screen.
+    const unsubscribe = frameLoop.subscribe(() => controller.frame());
     return () => {
+      unsubscribe();
       controller.detach();
       controllerRef.current = null;
     };

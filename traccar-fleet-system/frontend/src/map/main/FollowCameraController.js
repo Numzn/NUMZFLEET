@@ -5,6 +5,7 @@ import {
   MIN_MOVE_INTERVAL_MS,
   MIN_MOVE_PX,
   MIN_PAN_DURATION_MS,
+  PRESS_STALE_MS,
   RESUME_AFTER_MS,
   SELECT_DURATION_MS,
   createFixFilter,
@@ -12,6 +13,9 @@ import {
 } from './followCamera.js';
 
 const easeOutQuad = (t) => t * (2 - t);
+
+/** While locked on a gliding vehicle, corrections smaller than this are ignored. */
+const FRAME_LOCK_MIN_PX = 0.5;
 
 /** Camera events a person causes (they carry `originalEvent`); our own moves do not. */
 const INTERACTION_START = ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart'];
@@ -28,8 +32,13 @@ const sameFix = (a, b) => Boolean(a && b)
  * (EnhancedMarkers), so a slow or interrupted camera animation can never delay
  * where a marker is drawn.
  *
- * `map` is duck-typed (on/off/easeTo/project/getZoom) so the controller can be
- * tested with a fake; `getSafeArea()` returns a computeSafeArea() result.
+ * `map` is duck-typed (on/off/easeTo/project/getZoom/isEasing) so the controller
+ * can be tested with a fake; `getSafeArea()` returns a computeSafeArea() result.
+ *
+ * Optional `motion` ({ isEnabled, positionAt(id), targetOf(id) }) is the marker
+ * motion tracker. When it is enabled the vehicle icon glides between fixes, so
+ * the camera must follow the *drawn* position every frame (`frame()`): easing the
+ * camera towards each fix separately would make the icon wobble on screen.
  */
 export default class FollowCameraController {
   constructor({
@@ -40,6 +49,7 @@ export default class FollowCameraController {
     clearTimer = (handle) => clearTimeout(handle),
     trackingZoom = DEFAULT_TRACKING_ZOOM,
     followEnabled = true,
+    motion = null,
   }) {
     this.map = map;
     this.getSafeArea = getSafeArea;
@@ -48,6 +58,7 @@ export default class FollowCameraController {
     this.clearTimer = clearTimer;
     this.trackingZoom = trackingZoom;
     this.followEnabled = followEnabled;
+    this.motion = motion;
 
     this.selectedId = null;
     this.latest = null; // newest valid position of the selected vehicle
@@ -55,12 +66,18 @@ export default class FollowCameraController {
     this.needsFocus = false; // selected, but no usable position seen yet
 
     this.interacting = false;
+    this.pressed = false; // a pointer is down on the map (drag may be about to start)
+    this.pressedAt = 0;
+    this.gesture = false; // a drag/zoom/rotate/pitch happened during this press
     this.lastInteractionAt = null;
     this.resumeTimer = null;
 
     this.lastMoveAt = 0;
     this.lastMovedFix = null;
     this.moveTimer = null;
+    this.settleTimer = null;
+
+    this.framing = false;
 
     this.listeners = [];
   }
@@ -69,9 +86,9 @@ export default class FollowCameraController {
 
   attach() {
     const onUser = (handler) => (event) => {
-      if (event && event.originalEvent) handler();
+      if (event && event.originalEvent) handler(event);
     };
-    const start = onUser(() => { this.interacting = true; this.touch(); });
+    const start = onUser(() => { this.interacting = true; this.gesture = true; this.touch(); });
     const keep = onUser(() => this.touch());
     const end = onUser(() => { this.interacting = false; this.touch(); });
     const zoomed = onUser(() => {
@@ -81,11 +98,35 @@ export default class FollowCameraController {
       this.touch();
     });
 
+    // Pointer down/up. MapLibre's easeTo/jumpTo reset every gesture handler, so any
+    // camera call between a press and the first drag movement kills the drag.
+    // Hold off from the moment of the press; a click that never becomes a gesture
+    // releases at once instead of costing a five-second pause.
+    const press = onUser(() => {
+      this.pressed = true;
+      this.pressedAt = this.now();
+      this.gesture = false;
+    });
+    const release = onUser((event) => {
+      const touches = event.originalEvent.touches;
+      if (touches && touches.length > 0) return; // another finger is still down
+      this.pressed = false;
+      if (this.gesture) this.touch();
+    });
+    ['mousedown', 'touchstart'].forEach((type) => this.listen(type, press));
+    ['mouseup', 'touchend', 'touchcancel'].forEach((type) => this.listen(type, release));
+    // Wheel zoom has no press; pause before its first frame is processed.
+    this.listen('wheel', keep);
+
     INTERACTION_START.forEach((type) => this.listen(type, start));
     INTERACTION_CONTINUE.forEach((type) => this.listen(type, keep));
     INTERACTION_END.forEach((type) => this.listen(type, type === 'zoomend' ? zoomed : end));
     // Inertia after a drag finishes with a moveend that still carries the user event.
     this.listen('moveend', keep);
+    // When one of our own eases ends the vehicle has kept gliding: re-centre it.
+    this.listen('moveend', (event) => {
+      if (!event || !event.originalEvent) this.frame();
+    });
   }
 
   detach() {
@@ -102,8 +143,10 @@ export default class FollowCameraController {
   clearTimers() {
     if (this.resumeTimer != null) this.clearTimer(this.resumeTimer);
     if (this.moveTimer != null) this.clearTimer(this.moveTimer);
+    if (this.settleTimer != null) this.clearTimer(this.settleTimer);
     this.resumeTimer = null;
     this.moveTimer = null;
+    this.settleTimer = null;
   }
 
   // --------------------------------------------------------------- settings
@@ -122,6 +165,8 @@ export default class FollowCameraController {
   select(deviceId, position, { focus = true } = {}) {
     this.clearTimers();
     this.interacting = false;
+    this.pressed = false;
+    this.gesture = false;
     this.lastInteractionAt = null;
     this.filter.reset();
     this.lastMovedFix = null;
@@ -161,11 +206,76 @@ export default class FollowCameraController {
 
     this.latest = position;
     if (this.isPaused()) return;
+    // Gliding vehicles are followed frame by frame (see frame()); only the
+    // initial focus needs an explicit move.
+    if (this.smoothFor(this.selectedId) && !this.needsFocus) {
+      this.scheduleSettle();
+      return;
+    }
     this.scheduleMove();
+  }
+
+  /**
+   * A fix the marker shows instantly (after a long silence, or a confirmed
+   * relocation) starts no glide, so the frame loop never runs for it. Re-centre
+   * once, after the marker has been drawn for this fix. A normal glide starts
+   * from where the icon already is, so this is then a no-op.
+   */
+  scheduleSettle() {
+    if (this.settleTimer != null) return;
+    this.settleTimer = this.setTimer(() => {
+      this.settleTimer = null;
+      this.frame();
+    }, 0);
+  }
+
+  /** True when the icon for `deviceId` is drawn by the motion tracker. */
+  smoothFor(deviceId) {
+    return Boolean(this.motion && this.motion.isEnabled() && this.motion.targetOf(deviceId));
+  }
+
+  /** Where the vehicle is drawn right now (its glide position), as [lng, lat]. */
+  drawnCoordinates(position) {
+    if (this.smoothFor(position.deviceId ?? this.selectedId)) {
+      const drawn = this.motion.positionAt(position.deviceId ?? this.selectedId);
+      if (drawn) return drawn;
+    }
+    return [position.longitude, position.latitude];
+  }
+
+  /**
+   * Keep the drawn vehicle at the centre of the safe area. Called every
+   * animation frame while a glide is running, and once when an ease ends.
+   */
+  frame() {
+    if (this.framing || this.selectedId == null || !this.latest) return;
+    if (!this.followEnabled || this.needsFocus || this.isPaused()) return;
+    if (!this.smoothFor(this.selectedId)) return;
+    if (typeof this.map.isEasing === 'function' && this.map.isEasing()) return;
+
+    // A held outlier is drawn by the marker but must not drag the camera.
+    const target = this.motion.targetOf(this.selectedId);
+    if (target[0] !== this.latest.longitude || target[1] !== this.latest.latitude) return;
+
+    const drawn = this.motion.positionAt(this.selectedId);
+    if (!drawn) return;
+
+    const safe = this.getSafeArea();
+    const point = this.map.project(drawn);
+    if (Math.hypot(point.x - safe.center.x, point.y - safe.center.y) < FRAME_LOCK_MIN_PX) return;
+
+    this.framing = true;
+    try {
+      this.map.easeTo({ center: drawn, offset: [safe.offset.x, safe.offset.y], duration: 0 });
+    } finally {
+      this.framing = false;
+    }
+    this.lastMovedFix = this.latest;
   }
 
   isPaused() {
     if (this.interacting) return true;
+    if (this.pressed && this.now() - this.pressedAt < PRESS_STALE_MS) return true;
     return this.lastInteractionAt != null
       && this.now() - this.lastInteractionAt < RESUME_AFTER_MS;
   }
@@ -224,7 +334,7 @@ export default class FollowCameraController {
     if (reason !== 'resume' && sameFix(position, this.lastMovedFix) && !this.needsFocus) return;
 
     const safe = this.getSafeArea();
-    const target = [position.longitude, position.latitude];
+    const target = this.drawnCoordinates(position);
     const point = this.map.project(target);
     const dx = point.x - safe.center.x;
     const dy = point.y - safe.center.y;
