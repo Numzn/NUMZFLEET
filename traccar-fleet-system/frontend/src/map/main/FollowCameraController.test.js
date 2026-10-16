@@ -4,11 +4,12 @@ import assert from 'node:assert/strict';
 import FollowCameraController from './FollowCameraController.js';
 import {
   DEFAULT_TRACKING_ZOOM,
-  MAX_PAN_DURATION_MS,
   MIN_MOVE_INTERVAL_MS,
+  RECENTER_DURATION_MS,
   PRESS_STALE_MS,
   RESUME_AFTER_MS,
   SELECT_DURATION_MS,
+  isInsideComfortZone,
 } from './followCamera.js';
 
 const WIDTH = 1000;
@@ -98,6 +99,15 @@ const setup = (options = {}) => {
   return { clock, map, controller };
 };
 
+// Geometry of the fake: the safe area is 900x600 centred at (500, 350) and the
+// comfort zone is its middle 70% (x 185..815, y 140..560); 200 000 px per degree.
+const px = (n) => n / PX_PER_DEGREE;
+const INSIDE = px(120);     // 120 px from the centre: comfortably in view
+const NEAR_EDGE = px(600);  // 600 px right of the centre: about to leave, still within one viewport
+const SAFE_AREA = {
+  left: 50, right: 950, top: 50, bottom: 650, width: 900, height: 600,
+};
+
 let nextId = 0;
 const at = (dLat, dLng, extra = {}) => {
   nextId += 1;
@@ -138,18 +148,41 @@ test('a far-away vehicle is jumped to, not panned across the world', () => {
   assert.equal(map.calls[0].duration, 0);
 });
 
-test('follow updates pan without touching the zoom', () => {
+test('follow: leaving the comfort zone triggers one gentle ease, without touching the zoom', () => {
   const { clock, map, controller } = setup();
   controller.select(7, at(0, 0.0003));
   clock.advance(1000);
-  controller.update(at(0, 0.0008));
+  controller.update(at(0, 0.0003 + NEAR_EDGE));
 
   assert.equal(map.calls.length, 2);
   assert.equal('zoom' in map.calls[1], false, 'tracking zoom is stable during follow');
-  assert.equal(map.calls[1].duration, MAX_PAN_DURATION_MS);
+  assert.equal(map.calls[1].duration, RECENTER_DURATION_MS);
 });
 
-test('a burst of positions is coalesced; the camera ends on the latest and never queues', () => {
+test('follow: while the vehicle stays inside the comfort zone the camera does not move at all', () => {
+  const { clock, map, controller } = setup();
+  controller.select(7, at(0, 0.0003));
+  clock.advance(1000);
+  map.calls.length = 0;
+
+  [0.5, 1, -1, 0.8, -0.9].forEach((fraction) => {
+    controller.update(at(fraction * INSIDE, 0.0003 + fraction * INSIDE));
+    clock.advance(1000);
+  });
+
+  assert.equal(map.calls.length, 0);
+});
+
+test('follow: the comfort zone is the middle of the safe area, 15% in from every edge', () => {
+  assert.equal(isInsideComfortZone({ x: 500, y: 350 }, SAFE_AREA), true);
+  assert.equal(isInsideComfortZone({ x: 815, y: 350 }, SAFE_AREA), true, 'right on the boundary is still inside');
+  assert.equal(isInsideComfortZone({ x: 816, y: 350 }, SAFE_AREA), false);
+  assert.equal(isInsideComfortZone({ x: 184, y: 350 }, SAFE_AREA), false);
+  assert.equal(isInsideComfortZone({ x: 500, y: 139 }, SAFE_AREA), false);
+  assert.equal(isInsideComfortZone({ x: 500, y: 561 }, SAFE_AREA), false);
+});
+
+test('a burst of positions is coalesced; the vehicle is kept in view and nothing queues', () => {
   const { clock, map, controller } = setup();
   controller.select(7, at(0, 0.0003));
   clock.advance(1000);
@@ -164,7 +197,11 @@ test('a burst of positions is coalesced; the camera ends on the latest and never
   clock.advance(MIN_MOVE_INTERVAL_MS * 2);
 
   assert.ok(map.calls.length <= 4, `expected a handful of moves, got ${map.calls.length}`);
-  assert.deepEqual(map.calls.at(-1).center, [last.longitude, last.latitude]);
+  assert.equal(
+    isInsideComfortZone(map.project([last.longitude, last.latitude]), SAFE_AREA),
+    true,
+    'after the burst the newest fix is comfortably in view',
+  );
   assert.equal(clock.pending(), 0, 'no timers left behind');
 });
 
@@ -215,7 +252,7 @@ test('camera moves the app makes itself (no originalEvent) never pause following
 
   map.emit('dragstart', {});
   map.emit('moveend', {});
-  controller.update(at(0, 0.0008));
+  controller.update(at(0, 0.0003 + NEAR_EDGE));
 
   assert.equal(map.calls.length, 2);
 });
@@ -259,7 +296,7 @@ test('a GPS spike is held back; the camera stays put', () => {
   clock.advance(1000);
   assert.equal(map.calls.length, 0);
 
-  controller.update(at(0, 0.0006)); // vehicle is right where it was heading
+  controller.update(at(0, 0.0003 + NEAR_EDGE)); // the vehicle is really heading for the edge
   clock.advance(1000);
   assert.equal(map.calls.length, 1);
 });
@@ -337,10 +374,9 @@ test('re-adopting the current selection (map re-mount) keeps following without m
   assert.equal(remounted.map.calls.length, 0, 'no snap back to the vehicle');
 
   remounted.clock.advance(1000);
-  remounted.controller.update(at(0, 0.0009));
-  assert.equal(remounted.map.calls.length, 1, 'but the next position is followed');
+  remounted.controller.update(at(0, NEAR_EDGE));
+  assert.equal(remounted.map.calls.length, 1, 'but the next time it nears the edge it is followed');
 });
-
 
 // ---------------------------------------------------------------- smooth mode
 // The marker icon glides between fixes (markerMotion). The camera then follows the
@@ -351,8 +387,11 @@ const createMotion = (lng = ORIGIN[0], lat = ORIGIN[1]) => {
     enabled: true,
     shown: [lng, lat],
     target: [lng, lat],
+    ahead: null,
+    aheadAskedMs: null,
     isEnabled: () => motion.enabled,
     positionAt: () => motion.shown,
+    positionAhead: (id, ms) => { motion.aheadAskedMs = ms; return motion.ahead || motion.shown; },
     targetOf: () => motion.target,
   };
   return motion;
@@ -384,18 +423,15 @@ const glideTo = (ctx, dLng, shownDLng) => {
   return next;
 };
 
-test('smooth mode: a new fix never starts an animated ease towards it (it would fight the glide)', () => {
+test('smooth mode: the camera chases the icon, never the fix the icon is still gliding towards', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
 
-  glideTo(ctx, 0.0010, 0.0002);
+  // The fix is far to the right, but the icon is still near the middle.
+  glideTo(ctx, 0.0040, INSIDE);
   ctx.clock.advance(1000);
 
-  assert.ok(
-    ctx.map.calls.every((call) => call.duration === 0),
-    'the camera only ever locks onto the drawn icon, instantly',
-  );
-  assert.ok(ctx.map.calls.every((call) => call.center[0] === ORIGIN[0] + 0.0002), 'and never aims at the fix');
+  assert.equal(ctx.map.calls.length, 0, 'icon is comfortably in view: nothing to do');
 });
 
 test('smooth mode: a fix the marker draws instantly (long silence, relocation) still brings the camera along', () => {
@@ -425,34 +461,64 @@ test('smooth mode: settling after a normal fix is a no-op because the glide star
   assert.equal(ctx.map.calls.length, 0);
 });
 
-test('smooth mode: each frame puts the drawn vehicle at the centre of the safe area, instantly', () => {
+test('smooth mode: nearing the edge triggers one gentle ease aimed where the icon WILL be', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
+  ctx.motion.ahead = [ORIGIN[0] + NEAR_EDGE + px(40), ORIGIN[1]];
 
   ctx.controller.frame();
 
   assert.equal(ctx.map.calls.length, 1);
   const call = ctx.map.calls[0];
-  assert.equal(call.duration, 0, 'a per-frame move must not be an animation of its own');
-  assert.deepEqual(call.center, [ORIGIN[0] + 0.0002, ORIGIN[1]], 'centres the DRAWN position, not the fix');
+  assert.equal(call.duration, RECENTER_DURATION_MS, 'a calm ease, not a snap');
+  assert.equal(typeof call.easing, 'function');
+  assert.deepEqual(call.center, ctx.motion.ahead, "aims at the icon's position when the ease ends");
+  assert.equal(ctx.motion.aheadAskedMs, RECENTER_DURATION_MS, 'looked ahead by exactly the ease length');
   assert.equal('zoom' in call, false, 'tracking zoom is never touched');
 });
 
-test('smooth mode: successive frames follow the glide step by step with no lag build-up', () => {
+test('smooth mode: an icon that is somewhere off-centre but inside the comfort zone is left alone', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0001);
+  glideTo(ctx, 0.0040, INSIDE);
 
-  const centres = [];
-  for (let i = 1; i <= 4; i += 1) {
-    ctx.motion.shown = [ORIGIN[0] + 0.0001 * i, ORIGIN[1]];
+  ctx.controller.frame();
+
+  assert.equal(ctx.map.calls.length, 0);
+});
+
+test('smooth mode: an icon far outside the view is jumped to at once, not eased across the map', () => {
+  const ctx = setupSmooth();
+  focusOn(ctx);
+  // ~1200 px away (more than one viewport) yet a plausible 640 m: not a GPS spike.
+  glideTo(ctx, px(1200), px(1200));
+  ctx.motion.ahead = [ORIGIN[0] + px(1260), ORIGIN[1]];
+
+  ctx.controller.frame();
+
+  assert.equal(ctx.map.calls[0].duration, 0);
+  assert.deepEqual(ctx.map.calls[0].center, [ORIGIN[0] + px(1200), ORIGIN[1]], 'drawn position, no look-ahead');
+});
+
+test('smooth mode: the map stays perfectly still while the icon crosses the view, then eases once at the edge', () => {
+  const ctx = setupSmooth();
+  focusOn(ctx);
+
+  const moves = [];
+  for (let offset = 0; offset <= 700; offset += 50) {
+    ctx.motion.shown = [ORIGIN[0] + px(offset), ORIGIN[1]];
+    ctx.motion.target = ctx.motion.shown;
+    ctx.controller.latest = { ...ctx.controller.latest, longitude: ctx.motion.shown[0], latitude: ctx.motion.shown[1] };
+    const before = ctx.map.calls.length;
     ctx.controller.frame();
-    centres.push(ctx.map.calls.at(-1).center[0]);
+    if (ctx.map.calls.length > before) {
+      moves.push(offset);
+      ctx.map.easing = true; // the ease is now running
+    }
   }
 
-  assert.deepEqual(centres, [0.0001, 0.0002, 0.0003, 0.0004].map((d) => ORIGIN[0] + d));
-  assert.equal(ctx.map.calls.length, 4, 'exactly one move per frame, nothing queued');
+  assert.deepEqual(moves, [350], 'still up to 300 px, one ease as soon as the zone is left, none while it runs');
 });
 
 test('smooth mode: a frame with the vehicle already centred does nothing', () => {
@@ -466,7 +532,7 @@ test('smooth mode: a frame with the vehicle already centred does nothing', () =>
 test('smooth mode: no frame moves while the user has the map', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('dragstart', USER);
   ctx.controller.frame();
@@ -481,21 +547,21 @@ test('smooth mode: no frame moves while the user has the map', () => {
 test('smooth mode: after five quiet seconds the camera glides back to the drawn vehicle', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
   ctx.map.emit('dragstart', USER);
   ctx.map.emit('dragend', USER);
 
   ctx.clock.advance(RESUME_AFTER_MS);
 
   assert.equal(ctx.map.calls.length, 1);
-  assert.deepEqual(ctx.map.calls[0].center, [ORIGIN[0] + 0.0002, ORIGIN[1]]);
+  assert.deepEqual(ctx.map.calls[0].center, [ORIGIN[0] + NEAR_EDGE, ORIGIN[1]]);
   assert.ok(ctx.map.calls[0].duration > 0, 'resume is an ease, not a snap');
 });
 
 test('smooth mode: frames wait while the camera is still easing (initial focus)', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.easing = true;
   ctx.controller.frame();
@@ -536,7 +602,7 @@ test('smooth mode: finishing one of our own eases re-centres once and cannot loo
   const ctx = setupSmooth();
   ctx.map.emitMoveend = true; // a real map fires moveend after every move, including per-frame ones
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('moveend', {}); // our focus ease just finished
 
@@ -546,7 +612,7 @@ test('smooth mode: finishing one of our own eases re-centres once and cannot loo
 test('smooth mode: a user gesture ending is not mistaken for one of our own', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('moveend', USER);
 
@@ -561,7 +627,7 @@ test('smooth mode: with following switched off the camera is left alone', () => 
   ctx.controller.select(7, first);
   ctx.map.calls.length = 0;
 
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
   ctx.controller.frame();
 
   assert.equal(ctx.map.calls.length, 0);
@@ -572,9 +638,9 @@ test('when the motion tracker is off the camera falls back to easing towards eac
   focusOn(ctx);
   ctx.motion.enabled = false;
 
-  ctx.controller.update(at(0, 0.0008));
+  ctx.controller.update(at(0, NEAR_EDGE));
   ctx.clock.advance(1000);
-  ctx.controller.update(at(0, 0.0012));
+  ctx.controller.update(at(0, NEAR_EDGE * 2));
 
   assert.ok(ctx.map.calls.length >= 1, 'classic follow still moves the camera');
   ctx.controller.frame();
@@ -589,7 +655,7 @@ test('a vehicle the tracker is not drawing (filtered out of view) is still follo
   ctx.motion.targetOf = () => null; // tracker has no entry for this device
 
   ctx.clock.advance(1000);
-  ctx.controller.update(at(0, 0.0009));
+  ctx.controller.update(at(0, NEAR_EDGE));
 
   assert.ok(ctx.map.calls.length >= 1);
 });
@@ -605,7 +671,7 @@ const touchEvent = (touchesLeft) => ({ originalEvent: { touches: { length: touch
 test('pointer: no camera call is made from the moment the map is pressed, before any drag', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('mousedown', USER);
   ctx.controller.frame();
@@ -629,7 +695,7 @@ test('pointer: the classic (non-smooth) follow also holds off while the map is p
 test('pointer: a plain click that never becomes a gesture does not cost a five-second pause', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('mousedown', USER);
   ctx.map.emit('mouseup', USER);
@@ -641,7 +707,7 @@ test('pointer: a plain click that never becomes a gesture does not cost a five-s
 test('pointer: releasing after a real drag starts the five-second window', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('mousedown', USER);
   ctx.map.emit('dragstart', USER);
@@ -658,7 +724,7 @@ test('pointer: releasing after a real drag starts the five-second window', () =>
 test('pointer: with two fingers down, lifting one does not release the map', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('touchstart', touchEvent(1));
   ctx.map.emit('touchstart', touchEvent(2));
@@ -674,7 +740,7 @@ test('pointer: with two fingers down, lifting one does not release the map', () 
 test('pointer: a release that is never delivered cannot freeze following forever', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('mousedown', USER); // button released outside the window: no mouseup arrives
   ctx.clock.advance(PRESS_STALE_MS - 1);
@@ -689,7 +755,7 @@ test('pointer: a release that is never delivered cannot freeze following forever
 test('pointer: wheel zoom pauses immediately, before the zoom gesture has even started', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('wheel', USER);
   ctx.controller.frame();
@@ -715,10 +781,37 @@ test('pointer: selecting a vehicle clears a stuck press', () => {
 test('pointer: events that are not from a person never count as a press', () => {
   const ctx = setupSmooth();
   focusOn(ctx);
-  glideTo(ctx, 0.0010, 0.0002);
+  glideTo(ctx, 0.0040, NEAR_EDGE);
 
   ctx.map.emit('mousedown', {});
   ctx.controller.frame();
 
   assert.equal(ctx.map.calls.length, 1);
+});
+
+
+test('smooth mode: focusing and resuming also aim where the gliding icon will be, so it lands centred', () => {
+  const ctx = setupSmooth();
+  const first = at(0, 0.0003);
+  ctx.motion.shown = [first.longitude, first.latitude];
+  ctx.motion.target = [first.longitude, first.latitude];
+  ctx.motion.ahead = [first.longitude + px(60), first.latitude];
+
+  ctx.controller.select(7, first);
+
+  assert.deepEqual(ctx.map.calls[0].center, ctx.motion.ahead, 'initial focus looks ahead');
+  assert.equal(ctx.motion.aheadAskedMs, SELECT_DURATION_MS);
+
+  ctx.clock.advance(1000);
+  ctx.map.calls.length = 0;
+  glideTo(ctx, 0.0040, px(250)); // the user dragged the map: the icon is now 130 px off-centre
+  ctx.motion.ahead = [ORIGIN[0] + px(250) + px(80), ORIGIN[1]];
+  ctx.map.emit('dragstart', USER);
+  ctx.map.emit('dragend', USER);
+
+  ctx.clock.advance(RESUME_AFTER_MS);
+
+  assert.equal(ctx.map.calls.length, 1);
+  assert.deepEqual(ctx.map.calls[0].center, ctx.motion.ahead, 'resume looks ahead too');
+  assert.equal(ctx.motion.aheadAskedMs, RECENTER_DURATION_MS);
 });

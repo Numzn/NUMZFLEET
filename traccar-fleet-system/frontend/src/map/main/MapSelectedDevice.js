@@ -18,6 +18,7 @@ import { DEFAULT_TRACKING_ZOOM, computeSafeArea } from './followCamera';
 const motion = {
   isEnabled: () => markerMotion.isEnabled(),
   positionAt: (deviceId) => markerMotion.positionAt(deviceId, motionClock()),
+  positionAhead: (deviceId, ms) => markerMotion.positionAt(deviceId, motionClock() + ms),
   targetOf: (deviceId) => markerMotion.targetOf(deviceId),
 };
 

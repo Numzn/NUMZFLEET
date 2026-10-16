@@ -21,9 +21,15 @@ export const PRESS_STALE_MS = 15_000;
 /** Camera moves are coalesced to at most one per this interval (latest wins). */
 export const MIN_MOVE_INTERVAL_MS = 120;
 
-/** Bounds for the pan duration; the actual duration follows the update cadence. */
-export const MIN_PAN_DURATION_MS = 250;
-export const MAX_PAN_DURATION_MS = 900;
+/**
+ * The camera stays still while the vehicle moves inside the usable map area.
+ * Once the vehicle comes within this fraction of that area's edge, one gentle
+ * ease brings it back to the centre.
+ */
+export const RECENTER_EDGE_FRACTION = 0.15;
+
+/** Length of that ease. */
+export const RECENTER_DURATION_MS = 1500;
 
 /** Ease used when a vehicle is (re)selected and the camera has to travel to it. */
 export const SELECT_DURATION_MS = 800;
@@ -213,4 +219,17 @@ export const computeSafeArea = ({
     center,
     offset: { x: center.x - paddedCenter.x, y: center.y - paddedCenter.y },
   };
+};
+
+/**
+ * Whether a screen point is comfortably inside the safe area, i.e. not yet
+ * within `fraction` of any of its edges (the "almost leaving the view" test).
+ */
+export const isInsideComfortZone = (point, safe, fraction = RECENTER_EDGE_FRACTION) => {
+  const insetX = safe.width * fraction;
+  const insetY = safe.height * fraction;
+  return point.x >= safe.left + insetX
+    && point.x <= safe.right - insetX
+    && point.y >= safe.top + insetY
+    && point.y <= safe.bottom - insetY;
 };

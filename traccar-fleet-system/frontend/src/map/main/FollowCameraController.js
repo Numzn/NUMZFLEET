@@ -1,21 +1,19 @@
 import {
   DEFAULT_TRACKING_ZOOM,
   JUMP_VIEWPORT_FRACTION,
-  MAX_PAN_DURATION_MS,
   MIN_MOVE_INTERVAL_MS,
   MIN_MOVE_PX,
-  MIN_PAN_DURATION_MS,
   PRESS_STALE_MS,
+  RECENTER_DURATION_MS,
   RESUME_AFTER_MS,
   SELECT_DURATION_MS,
   createFixFilter,
+  isInsideComfortZone,
   isValidFollowFix,
 } from './followCamera.js';
 
-const easeOutQuad = (t) => t * (2 - t);
-
-/** While locked on a gliding vehicle, corrections smaller than this are ignored. */
-const FRAME_LOCK_MIN_PX = 0.5;
+/** Gentle start and finish; peak speed is only ~1.6x the average (cubic would be 3x). */
+const easeInOutSine = (t) => -(Math.cos(Math.PI * t) - 1) / 2;
 
 /** Camera events a person causes (they carry `originalEvent`); our own moves do not. */
 const INTERACTION_START = ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart'];
@@ -35,10 +33,15 @@ const sameFix = (a, b) => Boolean(a && b)
  * `map` is duck-typed (on/off/easeTo/project/getZoom/isEasing) so the controller
  * can be tested with a fake; `getSafeArea()` returns a computeSafeArea() result.
  *
- * Optional `motion` ({ isEnabled, positionAt(id), targetOf(id) }) is the marker
- * motion tracker. When it is enabled the vehicle icon glides between fixes, so
- * the camera must follow the *drawn* position every frame (`frame()`): easing the
- * camera towards each fix separately would make the icon wobble on screen.
+ * Following is calm rather than constant: the camera stays still while the
+ * vehicle moves inside the usable map area, and when it comes within
+ * RECENTER_EDGE_FRACTION of the edge one gentle ease brings it back to the
+ * centre. Selecting a vehicle and resuming after a pause always centre it.
+ *
+ * Optional `motion` ({ isEnabled, positionAt(id), positionAhead(id, ms),
+ * targetOf(id) }) is the marker motion tracker. When it is enabled the vehicle
+ * icon glides between fixes, so the edge test runs every frame on the *drawn*
+ * position (`frame()`), and the ease aims at where the icon will be when it ends.
  */
 export default class FollowCameraController {
   constructor({
@@ -244,8 +247,9 @@ export default class FollowCameraController {
   }
 
   /**
-   * Keep the drawn vehicle at the centre of the safe area. Called every
-   * animation frame while a glide is running, and once when an ease ends.
+   * Called every animation frame while a glide is running, and once when an
+   * ease ends. Leaves the camera alone while the drawn vehicle is comfortably
+   * inside the safe area; re-centres it once it is about to leave.
    */
   frame() {
     if (this.framing || this.selectedId == null || !this.latest) return;
@@ -262,14 +266,28 @@ export default class FollowCameraController {
 
     const safe = this.getSafeArea();
     const point = this.map.project(drawn);
-    if (Math.hypot(point.x - safe.center.x, point.y - safe.center.y) < FRAME_LOCK_MIN_PX) return;
+    if (isInsideComfortZone(point, safe)) return;
+
+    const distance = Math.hypot(point.x - safe.center.x, point.y - safe.center.y);
+    const far = distance > Math.max(safe.width, safe.height) * JUMP_VIEWPORT_FRACTION;
+    const duration = far ? 0 : RECENTER_DURATION_MS;
+    // The icon keeps gliding during the ease: aim where it will be when it ends.
+    const ahead = !far && typeof this.motion.positionAhead === 'function'
+      ? this.motion.positionAhead(this.selectedId, duration)
+      : null;
 
     this.framing = true;
     try {
-      this.map.easeTo({ center: drawn, offset: [safe.offset.x, safe.offset.y], duration: 0 });
+      this.map.easeTo({
+        center: ahead || drawn,
+        offset: [safe.offset.x, safe.offset.y],
+        duration,
+        easing: easeInOutSine,
+      });
     } finally {
       this.framing = false;
     }
+    this.lastMoveAt = this.now();
     this.lastMovedFix = this.latest;
   }
 
@@ -350,13 +368,19 @@ export default class FollowCameraController {
       return;
     }
 
+    // Ordinary following: leave the camera alone until the vehicle nears the edge.
+    if (reason === 'follow' && !focusing && isInsideComfortZone(point, safe)) {
+      this.lastMovedFix = position;
+      return;
+    }
+
     const viewport = Math.max(safe.width, safe.height);
     const far = distance > viewport * JUMP_VIEWPORT_FRACTION;
 
     const options = {
       center: target,
       offset: [safe.offset.x, safe.offset.y],
-      easing: easeOutQuad,
+      easing: easeInOutSine,
     };
     if (zoomChanges) options.zoom = this.trackingZoom;
 
@@ -365,8 +389,15 @@ export default class FollowCameraController {
     } else if (focusing) {
       options.duration = SELECT_DURATION_MS;
     } else {
-      const cadence = this.lastMoveAt ? this.now() - this.lastMoveAt : MAX_PAN_DURATION_MS;
-      options.duration = Math.min(MAX_PAN_DURATION_MS, Math.max(MIN_PAN_DURATION_MS, cadence));
+      options.duration = RECENTER_DURATION_MS;
+    }
+
+    // A gliding icon keeps moving during the ease: aim where it will be when it
+    // ends, so it lands centred instead of already drifting off again.
+    if (options.duration > 0 && this.smoothFor(position.deviceId ?? this.selectedId)
+        && typeof this.motion.positionAhead === 'function') {
+      options.center = this.motion.positionAhead(position.deviceId ?? this.selectedId, options.duration)
+        || options.center;
     }
 
     this.map.easeTo(options);
