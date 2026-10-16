@@ -159,14 +159,13 @@ async function assertDeviceInCompany(auth, deviceId, deps) {
 }
 
 async function defaultReleaseOwnership(deviceId) {
-  const { sequelize, DeviceAssignment, CompanyDevice } = await import('../models/index.js');
-  await sequelize.transaction(async (transaction) => {
-    await DeviceAssignment.update(
-      { isActive: false, unassignedAt: new Date() },
-      { where: { deviceId, isActive: true }, transaction },
-    );
-    await CompanyDevice.destroy({ where: { traccarDeviceId: deviceId }, transaction });
-  });
+  const { CompanyDevice } = await import('../models/index.js');
+  const { releaseTracker } = await import('./trackerAssignmentService.js');
+  // Detaching the tracker first: the vehicle keeps the mileage it had accepted (held, with an open gap)
+  // instead of silently losing its tracker. Both steps are idempotent, so a retry after a partial
+  // failure converges.
+  await releaseTracker({ deviceId });
+  await CompanyDevice.destroy({ where: { traccarDeviceId: deviceId } });
 }
 
 async function resolveDeps(injected) {

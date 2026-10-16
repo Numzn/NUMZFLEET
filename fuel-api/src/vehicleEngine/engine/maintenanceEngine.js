@@ -1,6 +1,7 @@
 import {
   deriveRoutineServiceStatus,
   isRoutineServiceSchedule,
+  routineRemainingKm,
   ROUTINE_SERVICE_LABEL,
 } from '../../maintenance/routineServiceStatus.js';
 
@@ -25,16 +26,11 @@ function buildRoutineNextService(routineSchedule, currentOdometerKm, lastService
     nextServiceAtKm = Math.round(Number(routineSchedule.nextDue) / 1000);
   }
 
-  let remainingKm = null;
-  if (
-    currentOdometerKm != null
-    && Number.isFinite(Number(currentOdometerKm))
-    && nextServiceAtKm != null
-  ) {
-    remainingKm = Math.round(nextServiceAtKm - Number(currentOdometerKm));
-  } else if (routineSchedule.type === 'totalDistance' && routineSchedule.remaining != null) {
-    remainingKm = Math.round(Number(routineSchedule.remaining) / 1000);
-  }
+  // The ONE remaining-km calculation: the due engine's own figure for this schedule,
+  // converted by the same function the dashboard and notifications use. It is already
+  // measured against the canonical odometer, so this page never subtracts its own
+  // odometer from nextDue — a second subtraction is how two screens drift apart.
+  const remainingKm = routineRemainingKm(routineSchedule);
 
   const { status, statusLabel } = deriveRoutineServiceStatus(remainingKm);
 

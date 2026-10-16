@@ -1,3 +1,4 @@
+import { odometerErrorBody } from '../vehicleEngine/odometer/vehicleOdometerAnchorService.js';
 import {
   createVehicle as createVehicleService,
   listVehiclesMerged,
@@ -105,7 +106,7 @@ export const assignDevice = async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Assign device error:', error);
-    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to assign device') });
+    return res.status(status).json(odometerErrorBody(error, 'Failed to assign device'));
   }
 };
 
@@ -300,7 +301,7 @@ export const updateVehicleServiceRecord = async (req, res) => {
   } catch (error) {
     const status = error.statusCode || 500;
     if (status >= 500) console.error('Update vehicle service record error:', error);
-    return res.status(status).json({ error: dbErrorMessage(error, 'Failed to update service record') });
+    return res.status(status).json(odometerErrorBody(error, 'Failed to update service record'));
   }
 };
 

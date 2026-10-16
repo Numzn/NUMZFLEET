@@ -6,7 +6,7 @@ import { calculateDrift } from './calculateDrift.js';
 import { scoreConfidence } from './scoreConfidence.js';
 import { buildEvidenceFromBatch } from './collectEvidence.js';
 import { resolveOdometerFromEvidence } from './resolveVehicleOdometer.js';
-import { detectUnitMismatch } from './validateEvidence.js';
+import { detectUnitMismatch, validateTelemetryFreshness } from './validateEvidence.js';
 
 test('resolveOdometerKm anchored adds telemetry delta', () => {
   const result = resolveOdometerKm({
@@ -83,10 +83,7 @@ test('buildEvidenceFromBatch extracts full odometer>totalDistance>mileage priori
     deviceLastUpdate: new Date().toISOString(),
     positionFixTime: new Date().toISOString(),
     positionAttributes: { odometer: 500, totalDistance: 480000 },
-    verifiedOdometerKm: 490,
-    verifiedOdometerAt: '2026-06-01T00:00:00.000Z',
-    verifiedOdometerSource: 'manual',
-    verifiedTraccarDistance: 475,
+    anchor: { odometerKm: 490, telemetryKm: 475, state: 'physically_verified', source: 'manual', observedAt: '2026-06-01T00:00:00.000Z' },
   });
   assert.equal(evidence.telemetryAttribute, 'odometer');
   assert.equal(evidence.telemetryKm, 500);
@@ -95,7 +92,7 @@ test('buildEvidenceFromBatch extracts full odometer>totalDistance>mileage priori
   assert.equal(evidence.hasObservation, true);
 });
 
-test('buildEvidenceFromBatch with no spec anchor yields telemetry_only evidence', () => {
+test('buildEvidenceFromBatch with no vehicle anchor yields telemetry_only evidence', () => {
   const evidence = buildEvidenceFromBatch({
     deviceStatus: 'offline',
     deviceLastUpdate: '2026-06-06T23:28:15.000Z',
@@ -154,10 +151,8 @@ test('resolveOdometerFromEvidence: x1000 unit mismatch is corrected end-to-end a
     deviceLastUpdate: new Date().toISOString(),
     positionFixTime: new Date().toISOString(),
     positionAttributes: { odometer: 1166000 }, // device sent metres under "odometer"
-    verifiedOdometerKm: 1162,
-    verifiedOdometerAt: new Date().toISOString(),
-    verifiedOdometerSource: 'manual',
-    verifiedTraccarDistance: 1166, // anchor's own telemetry baseline == corrected current value -> zero delta
+    // the anchor's own telemetry baseline == corrected current value -> zero delta
+    anchor: { odometerKm: 1162, telemetryKm: 1166, state: 'physically_verified', source: 'manual', observedAt: new Date().toISOString() },
   });
   const result = resolveOdometerFromEvidence(evidence);
   assert.equal(result.odometerKm, 1162); // anchor(1162) + max(0, corrected(1166) - anchorTelemetry(1166))
@@ -166,20 +161,101 @@ test('resolveOdometerFromEvidence: x1000 unit mismatch is corrected end-to-end a
 });
 
 test('resolveOdometerFromEvidence matches the real dev vehicle (TOYOTA ALLION, deviceId 4)', () => {
-  // Live values pulled directly from the dev DB: tc_devices/tc_positions (deviceId 4)
-  // and vehicle_specs (verifiedOdometerKm=1166, verifiedTraccarDistance=1162.1).
+  // Live values pulled directly from the dev DB: tc_devices/tc_positions (deviceId 4) and the vehicle's
+  // anchor (originally vehicle_specs verifiedOdometerKm=1166, verifiedTraccarDistance=1162.1, now migrated
+  // to a vehicle-owned legacy anchor).
   const evidence = buildEvidenceFromBatch({
     deviceStatus: 'offline',
     deviceLastUpdate: '2026-06-06T23:28:15.000Z',
     positionFixTime: '2026-06-06T23:28:12.000Z',
     positionAttributes: { totalDistance: 1162082.5618777191 },
-    verifiedOdometerKm: 1166,
-    verifiedOdometerAt: '2026-07-02T06:54:13.588Z',
-    verifiedOdometerSource: 'manual',
-    verifiedTraccarDistance: 1162.1,
+    anchor: { odometerKm: 1166, telemetryKm: 1162.1, state: 'legacy_unverified', source: 'manual', observedAt: '2026-07-02T06:54:13.588Z' },
   });
   const result = resolveOdometerFromEvidence(evidence);
   assert.equal(result.odometerKm, 1166);
   assert.equal(result.resolutionMode, 'anchored');
   assert.ok(result.diagnostics.includes('stale_telemetry'));
+});
+
+// ---------------------------------------------------------- staleness grading
+// An anchored odometer with no drift used to stay High for months after the tracker
+// went silent (found on real data: an anchored 3000 km, offline since July, "high").
+
+const HOUR = 60 * 60 * 1000;
+const agoIso = (ms) => new Date(Date.now() - ms).toISOString();
+const anchoredEvidence = (device, position) => ({
+  telemetryKm: 4000,
+  telemetryAttribute: 'totalDistance',
+  anchor: { anchorKm: 3000, anchorTelemetryKm: 4000 },
+  hasObservation: true,
+  latestObservationKm: 3000,
+  device,
+  position,
+});
+const offlineFor = (ms) => anchoredEvidence(
+  { status: 'offline', lastUpdate: agoIso(ms) },
+  { fixTime: agoIso(ms) },
+);
+
+test('validateTelemetryFreshness: a reporting tracker is never stale, however the clocks look', () => {
+  const live = validateTelemetryFreshness({
+    device: { status: 'online', lastUpdate: agoIso(2 * HOUR) },
+    position: { fixTime: agoIso(2 * HOUR) },
+  });
+  assert.deepEqual(live.diagnostics, []);
+  assert.equal(live.stale, false);
+});
+
+test('validateTelemetryFreshness: staleness is graded and cumulative', () => {
+  const diag = (ms) => validateTelemetryFreshness({
+    device: { status: 'offline', lastUpdate: agoIso(ms) }, position: null,
+  }).diagnostics;
+
+  assert.deepEqual(diag(10 * 60 * 1000), ['stale_telemetry']);
+  assert.deepEqual(diag(25 * HOUR), ['stale_telemetry', 'stale_telemetry_day']);
+  assert.deepEqual(diag(8 * 24 * HOUR), ['stale_telemetry', 'stale_telemetry_day', 'stale_telemetry_week']);
+});
+
+test('validateTelemetryFreshness: no timestamp at all is the most stale case', () => {
+  const { diagnostics } = validateTelemetryFreshness({ device: null, position: null });
+  assert.ok(diagnostics.includes('stale_telemetry_week'));
+});
+
+test('confidence: an anchored, drift-free estimate is High only while telemetry is fresh', () => {
+  const confidence = (evidence) => resolveOdometerFromEvidence(evidence).odometerConfidence;
+
+  assert.equal(confidence(anchoredEvidence(
+    { status: 'online', lastUpdate: agoIso(20 * 1000) }, { fixTime: agoIso(20 * 1000) },
+  )), 'high', 'live');
+  assert.equal(confidence(offlineFor(10 * 60 * 1000)), 'high', 'a few minutes quiet is still fine');
+  assert.equal(confidence(offlineFor(25 * HOUR)), 'medium', 'a day quiet: usable with awareness');
+  assert.equal(confidence(offlineFor(23 * HOUR)), 'high', 'just under a day quiet: unchanged');
+  assert.equal(confidence(offlineFor(7 * 24 * HOUR - HOUR)), 'medium', 'just under a week quiet');
+  assert.equal(confidence(offlineFor(7 * 24 * HOUR)), 'low', 'a week quiet: no longer a confident estimate');
+  assert.equal(confidence(offlineFor(30 * 24 * HOUR)), 'low', 'a month quiet: provisional');
+  assert.equal(confidence(offlineFor(100 * 24 * HOUR)), 'low');
+});
+
+test('confidence never changes the odometer value (C2)', () => {
+  const live = resolveOdometerFromEvidence(anchoredEvidence(
+    { status: 'online', lastUpdate: agoIso(1000) }, { fixTime: agoIso(1000) },
+  ));
+  const dead = resolveOdometerFromEvidence(offlineFor(100 * 24 * HOUR));
+  assert.equal(dead.odometerKm, live.odometerKm);
+});
+
+test('confidence: a live vehicle with no anchor is Medium, not Low (single-device path regression)', () => {
+  // collectEvidence() now supplies the device's real status/lastUpdate, so this is
+  // what a refuel capture sees for a tracker reporting right now.
+  const state = resolveOdometerFromEvidence({
+    telemetryKm: 1234.5,
+    telemetryAttribute: 'totalDistance',
+    anchor: null,
+    hasObservation: false,
+    latestObservationKm: null,
+    device: { status: 'online', lastUpdate: agoIso(20 * 1000) },
+    position: { fixTime: agoIso(20 * 1000) },
+  });
+  assert.equal(state.odometerConfidence, 'medium');
+  assert.deepEqual(state.diagnostics, []);
 });

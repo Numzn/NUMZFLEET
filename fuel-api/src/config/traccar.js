@@ -252,7 +252,7 @@ export const getTraccarPosition = async (deviceId) => {
   try {
     const pool = getTraccarPool();
     const [rows] = await pool.execute(
-      `SELECT p.*, d.positionid 
+      `SELECT p.*, d.positionid, d.status AS deviceStatus, d.lastupdate AS deviceLastUpdate
        FROM tc_devices d
        LEFT JOIN tc_positions p ON d.positionid = p.id
        WHERE d.id = ?

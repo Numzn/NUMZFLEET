@@ -22,6 +22,11 @@ import VehicleComplianceModel from './VehicleCompliance.js';
 import VehicleFuelLearningModel from './VehicleFuelLearning.js';
 import VehicleFuelIntervalModel from './VehicleFuelInterval.js';
 import VehicleDailyMileageModel from './VehicleDailyMileage.js';
+import VehicleOdometerAnchorModel from './VehicleOdometerAnchor.js';
+import VehicleMileageGapModel from './VehicleMileageGap.js';
+import VehicleTrackerChangeModel from './VehicleTrackerChange.js';
+import TrackerCounterStateModel from './TrackerCounterState.js';
+import MileageReadingEventModel from './MileageReadingEvent.js';
 import VehicleActivityStateModel from './VehicleActivityState.js';
 import VehicleStateAuditEventModel from './VehicleStateAuditEvent.js';
 import TelemetryProcessedEventModel from './TelemetryProcessedEvent.js';
@@ -60,6 +65,11 @@ const VehicleCompliance = VehicleComplianceModel(sequelize);
 const VehicleFuelLearning = VehicleFuelLearningModel(sequelize);
 const VehicleFuelInterval = VehicleFuelIntervalModel(sequelize);
 const VehicleDailyMileage = VehicleDailyMileageModel(sequelize);
+const VehicleOdometerAnchor = VehicleOdometerAnchorModel(sequelize);
+const VehicleMileageGap = VehicleMileageGapModel(sequelize);
+const VehicleTrackerChange = VehicleTrackerChangeModel(sequelize);
+const TrackerCounterState = TrackerCounterStateModel(sequelize);
+const MileageReadingEvent = MileageReadingEventModel(sequelize);
 const VehicleActivityState = VehicleActivityStateModel(sequelize);
 const VehicleStateAuditEvent = VehicleStateAuditEventModel(sequelize);
 const TelemetryProcessedEvent = TelemetryProcessedEventModel(sequelize);
@@ -140,6 +150,15 @@ Vehicle.hasMany(VehicleFuelInterval, { foreignKey: 'fleetVehicleId', as: 'fuelIn
 VehicleFuelInterval.belongsTo(Vehicle, { foreignKey: 'fleetVehicleId', as: 'vehicle' });
 Vehicle.hasMany(VehicleDailyMileage, { foreignKey: 'vehicleId', as: 'dailyMileage' });
 VehicleDailyMileage.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
+Vehicle.hasMany(VehicleOdometerAnchor, { foreignKey: 'vehicleId', as: 'odometerAnchors' });
+VehicleOdometerAnchor.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
+Vehicle.hasMany(VehicleMileageGap, { foreignKey: 'vehicleId', as: 'mileageGaps' });
+VehicleMileageGap.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
+Vehicle.hasMany(VehicleTrackerChange, { foreignKey: 'vehicleId', as: 'trackerChanges' });
+VehicleTrackerChange.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
+Vehicle.hasMany(MileageReadingEvent, { foreignKey: 'vehicleId', as: 'mileageReadingEvents' });
+MileageReadingEvent.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
+TrackerCounterState.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
 Vehicle.hasOne(VehicleActivityState, { foreignKey: 'vehicleId', as: 'activityState' });
 VehicleActivityState.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
 Vehicle.hasMany(VehicleStateAuditEvent, { foreignKey: 'vehicleId', as: 'stateAuditEvents' });
@@ -307,6 +326,11 @@ export {
   VehicleFuelLearning,
   VehicleFuelInterval,
   VehicleDailyMileage,
+  VehicleOdometerAnchor,
+  VehicleMileageGap,
+  VehicleTrackerChange,
+  TrackerCounterState,
+  MileageReadingEvent,
   VehicleActivityState,
   VehicleStateAuditEvent,
   TelemetryProcessedEvent,

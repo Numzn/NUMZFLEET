@@ -93,37 +93,56 @@ async function loadFleetVehicleMap(companyId, deviceIds) {
   return map;
 }
 
-async function loadOdometerMetresByDevice(deviceIds) {
+/**
+ * Canonical odometer in metres per device — the ONLY mileage maintenance is measured
+ * against. `supplied` maps deviceId -> odometer km the caller has ALREADY resolved in
+ * this request (so a page and its maintenance section cannot disagree, and the same
+ * work is not done twice); a supplied null means "unknown" and is honoured as such.
+ * Devices the caller did not supply are resolved through the odometer engine.
+ */
+async function loadOdometerMetresByDevice(deviceIds, supplied, resolveOdometer) {
   const unique = [...new Set(deviceIds.filter(Number.isFinite))];
+  const given = new Map([...(supplied ?? [])].map(([id, km]) => [Number(id), km]));
   const map = new Map();
   await Promise.all(unique.map(async (deviceId) => {
-    const state = await resolveOdometerForDevice(deviceId);
-    const metres = state.odometerKm != null ? state.odometerKm * 1000 : null;
-    map.set(Number(deviceId), metres);
+    const km = given.has(deviceId)
+      ? given.get(deviceId)
+      : (await resolveOdometer(deviceId)).odometerKm;
+    map.set(Number(deviceId), km != null && Number.isFinite(Number(km)) ? Number(km) * 1000 : null);
   }));
   return map;
 }
 
+async function findActiveAssignment(companyId, fleetVehicleId) {
+  return DeviceAssignment.findOne({
+    where: { vehicleId: String(fleetVehicleId), isActive: true },
+    include: [{
+      model: Vehicle,
+      where: { companyId: String(companyId) },
+      attributes: VEHICLE_IDENTITY_ATTRIBUTES,
+      required: true,
+    }],
+  });
+}
+
+/** Real collaborators; tests pass fakes as the last argument of the two loaders below. */
+const defaultDeps = {
+  getCompanyDeviceIds,
+  findActiveAssignment,
+  loadMaintenancesForDevices,
+  loadLatestPositions: getTraccarLatestPositionsByDeviceIds,
+  loadFleetVehicleMap,
+  resolveOdometer: resolveOdometerForDevice,
+};
+
 /**
- * Compute maintenance due state for all company devices.
+ * Due state for each schedule, from the position and the canonical odometer. One
+ * builder for the company-wide and the single-vehicle loaders, so they cannot differ.
  */
-export async function loadCompanyMaintenanceDueState(companyId) {
-  const deviceIds = await getCompanyDeviceIds(companyId);
-  const [schedules, positions, vehicleByDevice, odometerMetresByDevice] = await Promise.all([
-    loadMaintenancesForDevices(deviceIds),
-    getTraccarLatestPositionsByDeviceIds(deviceIds),
-    loadFleetVehicleMap(companyId, deviceIds),
-    loadOdometerMetresByDevice(deviceIds),
-  ]);
-
-  const positionByDevice = new Map(
-    positions.map((p) => [Number(p.deviceId), p]),
-  );
-
-  const computed = schedules.map((schedule) => {
+function buildDueItems(schedules, { positionByDevice, odometerMetresByDevice, vehicleByDevice }) {
+  return schedules.map((schedule) => {
     const position = positionByDevice.get(schedule.deviceId);
-    const odometerFallbackMeters = odometerMetresByDevice.get(schedule.deviceId) ?? null;
-    const due = computeDue(schedule, position, odometerFallbackMeters);
+    const due = computeDue(schedule, position, odometerMetresByDevice.get(schedule.deviceId) ?? null);
     const vehicle = vehicleByDevice.get(schedule.deviceId);
     const bucket = classifyDueBucket(due);
     return {
@@ -136,20 +155,40 @@ export async function loadCompanyMaintenanceDueState(companyId) {
       remainingLabel: formatRemainingLabel(due),
     };
   });
+}
 
-  const kpis = {
-    overdue: 0,
-    dueToday: 0,
-    dueThisWeek: 0,
-    dueSoon: 0,
-  };
-
-  for (const item of computed) {
+function countBuckets(items) {
+  const kpis = { overdue: 0, dueToday: 0, dueThisWeek: 0, dueSoon: 0 };
+  for (const item of items) {
     if (item.bucket === 'overdue') kpis.overdue += 1;
     else if (item.bucket === 'dueToday') kpis.dueToday += 1;
     else if (item.bucket === 'dueThisWeek') kpis.dueThisWeek += 1;
     else if (item.bucket === 'dueSoon') kpis.dueSoon += 1;
   }
+  return kpis;
+}
+
+/**
+ * Compute maintenance due state for all company devices.
+ * @param {string} companyId
+ * @param {{ odometerKmByDevice?: Map<number, number|null> }} [options] canonical odometers the
+ *   caller already resolved (km); devices not in the map are resolved here
+ */
+export async function loadCompanyMaintenanceDueState(companyId, options = {}, deps = defaultDeps) {
+  const deviceIds = await deps.getCompanyDeviceIds(companyId);
+  const [schedules, positions, vehicleByDevice, odometerMetresByDevice] = await Promise.all([
+    deps.loadMaintenancesForDevices(deviceIds),
+    deps.loadLatestPositions(deviceIds),
+    deps.loadFleetVehicleMap(companyId, deviceIds),
+    loadOdometerMetresByDevice(deviceIds, options.odometerKmByDevice, deps.resolveOdometer),
+  ]);
+
+  const positionByDevice = new Map(
+    positions.map((p) => [Number(p.deviceId), p]),
+  );
+
+  const computed = buildDueItems(schedules, { positionByDevice, odometerMetresByDevice, vehicleByDevice });
+  const kpis = countBuckets(computed);
 
   const perVehicle = new Map();
   for (const item of computed) {
@@ -175,17 +214,14 @@ export async function loadCompanyMaintenanceDueState(companyId) {
 
 /**
  * Maintenance due state for a single fleet vehicle (device-scoped, no full-fleet scan).
+ * @param {string} companyId
+ * @param {string} fleetVehicleId
+ * @param {{ odometerKm?: number|null }} [options] the canonical odometer (km) the caller has
+ *   already resolved for this vehicle. A number or null is used as given (null = unknown);
+ *   undefined means "resolve it here".
  */
-export async function loadVehicleMaintenanceDueState(companyId, fleetVehicleId) {
-  const assignment = await DeviceAssignment.findOne({
-    where: { vehicleId: String(fleetVehicleId), isActive: true },
-    include: [{
-      model: Vehicle,
-      where: { companyId: String(companyId) },
-      attributes: VEHICLE_IDENTITY_ATTRIBUTES,
-      required: true,
-    }],
-  });
+export async function loadVehicleMaintenanceDueState(companyId, fleetVehicleId, options = {}, deps = defaultDeps) {
+  const assignment = await deps.findActiveAssignment(companyId, fleetVehicleId);
 
   if (!assignment) {
     return {
@@ -197,36 +233,22 @@ export async function loadVehicleMaintenanceDueState(companyId, fleetVehicleId) 
 
   const deviceId = Number(assignment.deviceId);
   const vehicle = assignment.Vehicle;
+  const supplied = options.odometerKm !== undefined ? new Map([[deviceId, options.odometerKm]]) : null;
   const [schedules, positions, odometerMetresByDevice] = await Promise.all([
-    loadMaintenancesForDevices([deviceId]),
-    getTraccarLatestPositionsByDeviceIds([deviceId]),
-    loadOdometerMetresByDevice([deviceId]),
+    deps.loadMaintenancesForDevices([deviceId]),
+    deps.loadLatestPositions([deviceId]),
+    loadOdometerMetresByDevice([deviceId], supplied, deps.resolveOdometer),
   ]);
 
-  const position = positions[0] || null;
-  const computed = schedules.map((schedule) => {
-    const odometerFallbackMeters = odometerMetresByDevice.get(schedule.deviceId) ?? null;
-    const due = computeDue(schedule, position, odometerFallbackMeters);
-    const bucket = classifyDueBucket(due);
-    return {
-      ...due,
-      deviceId,
-      fleetVehicleId: String(fleetVehicleId),
-      vehicleName: vehicle?.name || null,
-      plateNumber: vehicle?.plateNumber || null,
-      bucket,
-      remainingLabel: formatRemainingLabel(due),
-    };
-  });
+  const positionByDevice = new Map(positions.map((p) => [Number(p.deviceId), p]));
+  const vehicleByDevice = new Map([[deviceId, {
+    fleetVehicleId: String(fleetVehicleId),
+    name: vehicle?.name || null,
+    plateNumber: vehicle?.plateNumber || null,
+  }]]);
 
-  const kpis = { overdue: 0, dueToday: 0, dueThisWeek: 0, dueSoon: 0 };
-  for (const item of computed) {
-    if (item.bucket === 'overdue') kpis.overdue += 1;
-    else if (item.bucket === 'dueToday') kpis.dueToday += 1;
-    else if (item.bucket === 'dueThisWeek') kpis.dueThisWeek += 1;
-    else if (item.bucket === 'dueSoon') kpis.dueSoon += 1;
-  }
-
+  const computed = buildDueItems(schedules, { positionByDevice, odometerMetresByDevice, vehicleByDevice });
+  const kpis = countBuckets(computed);
   const healthScore = scoreMaintenance(computed);
 
   return { items: computed, kpis, healthScore };

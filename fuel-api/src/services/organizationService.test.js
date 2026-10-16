@@ -300,16 +300,14 @@ describe('Phase 2 Consolidation Stage 2: organizationService optional admin prov
       const { Vehicle } = await import('../models/index.js');
       await Vehicle.create({ name: 'Overview Delta Vehicle', companyId: customer.id });
 
-      // >= rather than strict +1 for both counts — node:test runs files in
-      // parallel, and other files may concurrently insert their own vehicles
-      // or direct customers between the two reads (same pre-existing
-      // flakiness class as organizations.test.js's aggregation test; observed
-      // directCustomerCount actually collide with peopleService.test.js's
-      // company creation under a full-suite run). Still fails hard against a
-      // hardcoded 0.
+      // node:test runs files in parallel, and other suites insert AND delete their own vehicles and companies
+      // while this one runs, so a before/after comparison of GLOBAL totals is not stable (it was observed to
+      // go down as well as up: before=20, after=5). What this test can rely on is its own rows: the vehicle
+      // and the customer it just created exist for its whole duration, so a real count can never be below
+      // them, whereas a hardcoded 0 always is.
       const overviewAfter = await getOrganizationOverview();
-      assert.ok(overviewAfter.vehicleCount >= overview.vehicleCount + 1, `vehicleCount must be a real Vehicle.count(), not a hardcoded 0 (before=${overview.vehicleCount}, after=${overviewAfter.vehicleCount})`);
-      assert.ok(overviewAfter.directCustomerCount >= overview.directCustomerCount + 1, `directCustomerCount must be a real count, not a hardcoded 0 (before=${overview.directCustomerCount}, after=${overviewAfter.directCustomerCount})`);
+      assert.ok(overviewAfter.vehicleCount >= 1, `vehicleCount must be a real Vehicle.count(), not a hardcoded 0 (before=${overview.vehicleCount}, after=${overviewAfter.vehicleCount})`);
+      assert.ok(overviewAfter.directCustomerCount >= 1, `directCustomerCount must be a real count, not a hardcoded 0 (before=${overview.directCustomerCount}, after=${overviewAfter.directCustomerCount})`);
     });
   });
 });

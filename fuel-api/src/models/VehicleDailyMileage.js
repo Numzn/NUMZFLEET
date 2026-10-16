@@ -61,6 +61,27 @@ export default (sequelize) => {
       allowNull: true,
       comment: 'null means unavailable — never fabricated as 0',
     },
+    confirmedKm: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'accepted distance placed inside this local day by continuous coverage (evidence = accepted)',
+    },
+    unattributedKm: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+      comment: 'accepted distance that arrived across a long silence ending this day: in the cumulative mileage, not placeable on a day',
+    },
+    evidence: {
+      type: DataTypes.STRING(16),
+      allowNull: false,
+      defaultValue: 'legacy',
+      validate: { isIn: [['legacy', 'accepted']] },
+      comment: 'legacy = raw counter difference (previous method); accepted = built from accepted readings',
+    },
+    firstReadingAt: { type: DataTypes.DATE, allowNull: true },
+    lastReadingAt: { type: DataTypes.DATE, allowNull: true },
+    revisionCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    lastRevisedAt: { type: DataTypes.DATE, allowNull: true },
   }, {
     tableName: 'vehicle_daily_mileage',
     indexes: [

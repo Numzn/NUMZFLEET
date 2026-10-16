@@ -27,8 +27,20 @@ export function withActionableFlags(computed) {
  *
  *   start 5,000 km, period 5,000 km, odometer 10,500 km
  *     -> nextDue 10,000 km, remaining -500 km (overdue)   [not 15,000 / +4,500]
+ *
+ * ONE MILEAGE: a distance ("totalDistance") schedule is measured against the canonical
+ * odometer — the Vehicle Odometer Engine's resolved value, passed in as `odometerMeters`
+ * — and nothing else. The raw tracker counter on `position` is evidence that engine
+ * already consumes (anchored to the verified odometer); it is a different scale from
+ * the schedule's `start`, so it is never read here. When there is no canonical
+ * odometer the schedule is `unknown` ("Awaiting telemetry") rather than guessed.
+ * Schedules on other attributes (e.g. `hours`) still read their own position attribute.
+ *
+ * @param {object} m Traccar maintenance row ({ type, start, period, ... })
+ * @param {object|null} position latest Traccar position (non-distance attributes only)
+ * @param {number|null} [odometerMeters] canonical odometer in metres; null/undefined = unknown
  */
-export function computeDue(m, position, odometerFallbackMeters = null) {
+export function computeDue(m, position, odometerMeters = null) {
   const isTime = typeof m.type === 'string' && m.type.endsWith('Time');
   const start = Number(m.start) || 0;
   const period = Number(m.period) || 0;
@@ -47,16 +59,9 @@ export function computeDue(m, position, odometerFallbackMeters = null) {
     });
   }
 
-  const positionValue = Number(position?.attributes?.[m.type]);
-  const fallbackValue = m.type === 'totalDistance' && Number.isFinite(Number(odometerFallbackMeters))
-    ? Number(odometerFallbackMeters)
-    : NaN;
-
-  // For distance schedules, prefer the higher of live telemetry vs verified odometer.
-  // This prevents stale tracker values from immediately re-flagging a just-completed service.
-  const current = Number.isFinite(positionValue) && Number.isFinite(fallbackValue)
-    ? Math.max(positionValue, fallbackValue)
-    : (Number.isFinite(positionValue) ? positionValue : fallbackValue);
+  const current = m.type === 'totalDistance'
+    ? (odometerMeters != null && Number.isFinite(Number(odometerMeters)) ? Number(odometerMeters) : NaN)
+    : Number(position?.attributes?.[m.type]);
 
   if (!Number.isFinite(current) || period <= 0) {
     return withActionableFlags({

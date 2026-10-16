@@ -1,6 +1,6 @@
 import { Op } from 'sequelize';
 import sequelize from '../config/database.js';
-import { Vehicle, DeviceAssignment, VehicleSpec, VehicleDailyMileage, CompanyDevice, DEFAULT_COMPANY_ID } from '../models/index.js';
+import { Vehicle, DeviceAssignment, VehicleSpec, VehicleDailyMileage, VehicleOdometerAnchor, TrackerCounterState, CompanyDevice, DEFAULT_COMPANY_ID } from '../models/index.js';
 import {
   getTraccarDevice,
   getTraccarDevicesByIds,
@@ -20,12 +20,15 @@ import {
   mergeFleetConfigFromBody,
 } from '../utils/fleetConfigUtils.js';
 import { updateVehicleSpec, getVehicleSpec, getTankCapacitySource } from './vehicleSpecService.js';
+import { applyTrackerAssignment } from './trackerAssignmentService.js';
 import { summarizeForVehicle } from '../repositories/serviceRecordRepository.js';
 import { buildVehicleAttachmentPath } from '../middleware/vehicleUpload.js';
 import { loadCompanyMaintenanceDueState, loadVehicleMaintenanceDueState } from '../maintenance/maintenanceTraccarAdapter.js';
 import { buildRoutineServiceSummaryByVehicle } from '../maintenance/routineServiceSummary.js';
 import { buildEvidenceFromBatch } from '../vehicleEngine/odometer/collectEvidence.js';
 import { resolveOdometerFromEvidence } from '../vehicleEngine/odometer/resolveVehicleOdometer.js';
+import { formatOdometerProvenance } from '../vehicleEngine/odometer/formatOdometerResponse.js';
+import { liveAcceptedCounter, readingFromPosition } from '../vehicleEngine/readings/acceptedReadings.js';
 import { evaluateAndPersistActivityStates } from '../vehicleEngine/activity/activityStateService.js';
 import { buildDailyMileageDto } from '../vehicleEngine/mileage/dailyMileageReadModel.js';
 import { localDateString, DEFAULT_BUSINESS_TIMEZONE } from '../utils/businessDay.js';
@@ -40,27 +43,43 @@ const UNAVAILABLE_ODOMETER_STATE = {
   odometerConfidence: 'unavailable',
   odometerDriftPct: null,
   odometerDriftClass: 'unknown',
+  ...formatOdometerProvenance(null),
 };
 
 /**
  * Resolve canonical odometer for one vehicle from already-batch-loaded rows
  * (no per-vehicle Traccar/DB query). Same engine as the single-vehicle path
  * (resolveOdometerFromEvidence) — only the evidence-gathering differs.
- * @param {{ device: object|null, position: object|null, spec: object|null }}
+ *
+ * The anchor is the VEHICLE's (vehicle_odometer_anchors), never one read off the tracker: a tracker that
+ * was on another vehicle must not bring that vehicle's mileage with it.
+ * @param {{ device: object|null, position: object|null, anchor: object|null, deviceId: number|null }}
  */
-function resolveOdometerForMergedRow({ device, position, spec }) {
+function resolveOdometerForMergedRow({ device, position, anchor, deviceId, trackerState = null }) {
   const rawAttrs = position?.attributes && typeof position.attributes === 'object'
     ? position.attributes
     : null;
+
+  // The counter that advances the mileage is the ACCEPTED one (remembered state extended to the latest
+  // position with the ingest's own rules): a glitching tracker never reaches the odometer.
+  let acceptedCounter = null;
+  if (deviceId != null) {
+    const remembered = trackerState && (!trackerState.vehicleId || !anchor || !anchor.vehicleId
+      || String(trackerState.vehicleId) === String(anchor.vehicleId)) ? trackerState : null;
+    const latest = position
+      ? readingFromPosition({ id: position.id, fixtime: position.fixtime, attributes: rawAttrs }, remembered?.attribute ?? null)
+      : null;
+    acceptedCounter = liveAcceptedCounter(remembered, latest?.rawKm != null && latest?.fixMs != null ? latest : null);
+  }
+
   const evidence = buildEvidenceFromBatch({
     deviceStatus: device?.status ?? null,
     deviceLastUpdate: device?.lastupdate ?? null,
     positionFixTime: position?.fixtime ?? null,
     positionAttributes: rawAttrs,
-    verifiedOdometerKm: spec?.verifiedOdometerKm ?? null,
-    verifiedOdometerAt: spec?.verifiedOdometerAt ?? null,
-    verifiedOdometerSource: spec?.verifiedOdometerSource ?? null,
-    verifiedTraccarDistance: spec?.verifiedTraccarDistance ?? null,
+    anchor,
+    deviceId,
+    acceptedCounter,
   });
   const state = resolveOdometerFromEvidence(evidence);
   return {
@@ -68,6 +87,7 @@ function resolveOdometerForMergedRow({ device, position, spec }) {
     odometerConfidence: state.odometerConfidence,
     odometerDriftPct: state.odometerDriftPct,
     odometerDriftClass: state.odometerDriftClass,
+    ...formatOdometerProvenance(state),
   };
 }
 
@@ -75,7 +95,7 @@ function resolveOdometerForMergedRow({ device, position, spec }) {
  * v1 merged vehicle DTO — single shape for list and get-by-id.
  * Merge logic lives only in this module (see fleet plan).
  */
-export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap) {
+export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap, anchorMap = new Map(), stateMap = new Map()) {
   const base = {
     id: vehicle.id,
     name: vehicle.name,
@@ -88,6 +108,8 @@ export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap
     photoUrl: vehicle.photoFileId ? buildVehicleAttachmentPath(vehicle.photoFileId) : null,
   };
 
+  const anchor = anchorMap.get(vehicle.id) ?? anchorMap.get(String(vehicle.id)) ?? null;
+
   if (!assignment) {
     return {
       ...base,
@@ -96,7 +118,11 @@ export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap
       position: null,
       vehicleSpec: null,
       fleetConfig: null,
-      ...UNAVAILABLE_ODOMETER_STATE,
+      // No tracker, but the vehicle still owns its accepted mileage: show it, held and flagged,
+      // rather than blank. (No anchor at all => unavailable, as before.)
+      ...(anchor
+        ? resolveOdometerForMergedRow({ device: null, position: null, anchor, deviceId: null })
+        : UNAVAILABLE_ODOMETER_STATE),
     };
   }
 
@@ -149,7 +175,7 @@ export function toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap
   // Canonical odometer, resolved from the same tr/pos/spec rows already
   // batch-loaded above — no extra query per vehicle. Independent of the
   // lat/lng guard on positionDto: mileage evidence doesn't require a GPS fix.
-  const odometerState = resolveOdometerForMergedRow({ device: tr, position: pos, spec });
+  const odometerState = resolveOdometerForMergedRow({ device: tr, position: pos, anchor, deviceId, trackerState: stateMap.get(deviceId) ?? null });
 
   return {
     ...base,
@@ -190,6 +216,22 @@ async function loadMergeMapsForDeviceIds(deviceIds) {
     : [];
   const specMap = new Map(specs.map((s) => [Number(s.deviceId), s]));
   return { deviceMap, positionMap, specMap };
+}
+
+/** The remembered accepted state of each tracker, in one query. */
+async function loadTrackerStateMap(deviceIds) {
+  if (!deviceIds?.length) return new Map();
+  const states = await TrackerCounterState.findAll({ where: { deviceId: { [Op.in]: deviceIds } } });
+  return new Map(states.map((s) => [Number(s.deviceId), s]));
+}
+
+/** The current (not superseded) anchor of each vehicle, in one query. */
+async function loadCurrentAnchorMap(vehicleIds) {
+  if (!vehicleIds?.length) return new Map();
+  const anchors = await VehicleOdometerAnchor.findAll({
+    where: { vehicleId: { [Op.in]: vehicleIds }, supersededAt: null },
+  });
+  return new Map(anchors.map((a) => [String(a.vehicleId), a]));
 }
 
 async function syncVehicleDeviceLabels(vehicle, deviceId) {
@@ -463,13 +505,27 @@ export async function listVehiclesMerged(auth) {
   const assignmentByVehicleId = new Map(assignments.map((a) => [a.vehicleId, a]));
   const deviceIds = [...new Set(assignments.map((a) => Number(a.deviceId)))];
   const { deviceMap, positionMap, specMap } = await loadMergeMapsForDeviceIds(deviceIds);
+  const anchorMap = await loadCurrentAnchorMap(vehicleIds);
+  const stateMap = await loadTrackerStateMap(deviceIds);
+
+  // Merged DTOs first: they carry the canonical odometer resolved from the rows above,
+  // and the maintenance section below is measured against exactly that number.
+  const dtoByVehicleId = new Map(vehicles.map((v) => [
+    v.id,
+    toMergedDto(v, assignmentByVehicleId.get(v.id), deviceMap, positionMap, specMap, anchorMap, stateMap),
+  ]));
+  const odometerKmByDevice = new Map();
+  for (const v of vehicles) {
+    const assignment = assignmentByVehicleId.get(v.id);
+    if (assignment) odometerKmByDevice.set(Number(assignment.deviceId), dtoByVehicleId.get(v.id).odometerKm ?? null);
+  }
 
   let routineByVehicle = new Map();
   try {
     // For Partners with multiple customer companies, load maintenance state for each accessible company
     // For backward compatibility, handle both single company and multiple companies
     const effectiveCompanyId = Array.isArray(companyIds) && companyIds.length > 0 ? companyIds[0] : DEFAULT_COMPANY_ID;
-    const dueState = await loadCompanyMaintenanceDueState(effectiveCompanyId);
+    const dueState = await loadCompanyMaintenanceDueState(effectiveCompanyId, { odometerKmByDevice });
     routineByVehicle = buildRoutineServiceSummaryByVehicle(dueState);
   } catch {
     routineByVehicle = new Map();
@@ -515,10 +571,10 @@ export async function listVehiclesMerged(auth) {
   }
 
   return vehicles.map((v) => {
-    const dto = toMergedDto(v, assignmentByVehicleId.get(v.id), deviceMap, positionMap, specMap);
+    const dto = dtoByVehicleId.get(v.id);
     dto.routineService = routineByVehicle.get(String(v.id)) ?? null;
     dto.activityState = activityByVehicle.get(String(v.id)) ?? null;
-    dto.dailyMileage = buildDailyMileageDto(dailyMileageByVehicle.get(String(v.id)) ?? null, dto.odometerKm);
+    dto.dailyMileage = buildDailyMileageDto(dailyMileageByVehicle.get(String(v.id)) ?? null, dto.odometerKm, { confidence: dto.odometerConfidence });
     return dto;
   });
 }
@@ -541,7 +597,9 @@ export async function getVehicleMerged(id, auth = null) {
   const deviceIds = assignment ? [Number(assignment.deviceId)] : [];
   const { deviceMap, positionMap, specMap } = await loadMergeMapsForDeviceIds(deviceIds);
 
-  const merged = toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap);
+  const anchorMap = await loadCurrentAnchorMap([vehicle.id]);
+  const stateMap = await loadTrackerStateMap(deviceIds);
+  const merged = toMergedDto(vehicle, assignment, deviceMap, positionMap, specMap, anchorMap, stateMap);
   const effectiveCompanyId = vehicle.companyId || DEFAULT_COMPANY_ID;
   merged.serviceSummary = await summarizeForVehicle(id, effectiveCompanyId);
 
@@ -559,7 +617,7 @@ export async function getVehicleMerged(id, auth = null) {
   // pointer. Device-scoped lookup, no full-fleet scan (matches the batched
   // company-wide computation already used by listVehiclesMerged).
   try {
-    const dueState = await loadVehicleMaintenanceDueState(effectiveCompanyId, id);
+    const dueState = await loadVehicleMaintenanceDueState(effectiveCompanyId, id, { odometerKm: merged.odometerKm ?? null });
     merged.routineService = buildRoutineServiceSummaryByVehicle(dueState).get(String(id)) ?? null;
   } catch {
     merged.routineService = null;
@@ -592,7 +650,7 @@ export async function getVehicleMerged(id, auth = null) {
   try {
     const today = localDateString(new Date(), DEFAULT_BUSINESS_TIMEZONE);
     const dmRow = await VehicleDailyMileage.findOne({ where: { vehicleId: id, localDate: today } });
-    merged.dailyMileage = buildDailyMileageDto(dmRow, merged.odometerKm);
+    merged.dailyMileage = buildDailyMileageDto(dmRow, merged.odometerKm, { confidence: merged.odometerConfidence });
   } catch {
     merged.dailyMileage = null;
   }
@@ -681,27 +739,16 @@ export async function assignDevice(vehicleId, deviceId, options = {}) {
     where: { vehicleId: vid, isActive: true },
   });
 
-  const assignedAt = new Date();
-
-  await sequelize.transaction(async (t) => {
-    await DeviceAssignment.update(
-      { isActive: false, unassignedAt: assignedAt },
-      { where: { vehicleId: vid, isActive: true }, transaction: t },
-    );
-    await DeviceAssignment.update(
-      { isActive: false, unassignedAt: assignedAt },
-      { where: { deviceId: did, isActive: true }, transaction: t },
-    );
-    await DeviceAssignment.create(
-      {
-        vehicleId: vid,
-        deviceId: did,
-        isActive: true,
-        assignedAt,
-      },
-      { transaction: t },
-    );
+  // Attach the tracker. The vehicle keeps its mileage (the new tracker's evidence is provisional until
+  // reconciled), a tracker taken from another vehicle never brings that vehicle's mileage along, the
+  // unobserved interval is recorded, and the vehicle's maintenance schedules follow it to the new tracker.
+  // Serialised against concurrent assignments of this vehicle or this tracker; see trackerAssignmentService.
+  const { assignment: newAssignment } = await applyTrackerAssignment({
+    vehicleId: vid,
+    deviceId: did,
+    actorUserId,
   });
+  const assignedAt = newAssignment.assignedAt instanceof Date ? newAssignment.assignedAt : new Date(newAssignment.assignedAt);
 
   try {
     await syncVehicleDeviceLabels(vehicle, did);

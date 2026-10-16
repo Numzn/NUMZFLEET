@@ -48,19 +48,35 @@ function mapWorkOrder(dto) {
   };
 }
 
-export async function buildMaintenanceHub(companyId, fleetVehicleId) {
+/** Real collaborators; tests pass fakes as the last argument of buildMaintenanceHub. */
+const defaultDeps = {
+  fetchMaintenanceFacts,
+  listServiceRecords,
+  aggregateMaintenanceCosts,
+  summarizeForVehicle,
+  findLatestCompletedForMaintenance,
+};
+
+/**
+ * @param {string} companyId
+ * @param {string} fleetVehicleId
+ * @param {{ odometerKm?: number|null }} [options] the canonical odometer the caller already
+ *   resolved for this vehicle; the schedules are measured against it, so the page's mileage and
+ *   its maintenance section are the same number by construction
+ */
+export async function buildMaintenanceHub(companyId, fleetVehicleId, options = {}, deps = defaultDeps) {
   const [dueState, activeRows, costs, summary] = await Promise.all([
-    fetchMaintenanceFacts(companyId, fleetVehicleId),
-    listServiceRecords(companyId, { fleetVehicleId, activeOnly: true }),
-    aggregateMaintenanceCosts(companyId, fleetVehicleId),
-    summarizeForVehicle(fleetVehicleId, companyId),
+    deps.fetchMaintenanceFacts(companyId, fleetVehicleId, options),
+    deps.listServiceRecords(companyId, { fleetVehicleId, activeOnly: true }),
+    deps.aggregateMaintenanceCosts(companyId, fleetVehicleId),
+    deps.summarizeForVehicle(fleetVehicleId, companyId),
   ]);
 
   const schedules = (dueState.items || []).map(mapSchedule);
   const routineSchedule = schedules.find((s) => isRoutineServiceSchedule(s)) ?? null;
   let routineLastService = null;
   if (routineSchedule) {
-    const row = await findLatestCompletedForMaintenance(
+    const row = await deps.findLatestCompletedForMaintenance(
       companyId,
       fleetVehicleId,
       routineSchedule.id,

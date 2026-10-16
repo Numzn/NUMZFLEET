@@ -53,16 +53,23 @@ async function fetchFirstPositionAfter(deviceId, boundary) {
  * @param {{ deviceId: number, boundary: Date, anchorKm: number|null, anchorTelemetryKm: number|null }}
  * @returns {Promise<{ odometerKm: number|null, source: string, evidenceFixtime: Date|null, confidence: string }>}
  */
-export async function resolveDayStartOdometer({ deviceId, boundary, anchorKm, anchorTelemetryKm }) {
+export async function resolveDayStartOdometer({
+  deviceId,
+  boundary,
+  anchorKm,
+  anchorTelemetryKm,
+  // Injectable for tests; production always uses the Traccar-backed defaults.
+  queries = { lastBefore: fetchLastPositionBefore, firstAfter: fetchFirstPositionAfter },
+}) {
   if (deviceId == null) {
     return { odometerKm: null, source: 'unavailable', evidenceFixtime: null, confidence: 'unavailable', telemetryKm: null };
   }
 
-  let row = await fetchLastPositionBefore(deviceId, boundary);
+  let row = await queries.lastBefore(deviceId, boundary);
   let source = 'nearest_before';
 
   if (!row) {
-    row = await fetchFirstPositionAfter(deviceId, boundary);
+    row = await queries.firstAfter(deviceId, boundary);
     source = 'nearest_after';
   }
 
@@ -85,7 +92,10 @@ export async function resolveDayStartOdometer({ deviceId, boundary, anchorKm, an
     anchor: anchorKm != null ? { anchorKm, anchorTelemetryKm: anchorTelemetryKm ?? null } : null,
     hasObservation: anchorKm != null,
     latestObservationKm: anchorKm ?? null,
-    device: null,
+    // As-of reconstruction: this evidence was the latest available AT the boundary,
+    // so it is judged fresh against its own time. Measuring its age against today's
+    // clock would brand every historical day "stale" and drag old rows to Low.
+    device: { status: 'online', lastUpdate: row.fixtime },
     position: { fixTime: row.fixtime },
   });
 

@@ -1,8 +1,9 @@
-import { DeviceAssignment, VehicleSpec } from '../../models/index.js';
+import { DeviceAssignment, VehicleOdometerAnchor } from '../../models/index.js';
 import sequelize from '../../config/database.js';
 import { localDateString, localMidnightUtc, DEFAULT_BUSINESS_TIMEZONE } from '../../utils/businessDay.js';
 import { resolveDayStartOdometer } from './dayStartEvidence.js';
 import { resolveOdometerForDevice } from '../odometer/resolveVehicleOdometer.js';
+import { anchorToEvidence } from '../odometer/collectEvidence.js';
 
 const GRACE_WINDOW_MS = 48 * 60 * 60 * 1000;
 
@@ -11,15 +12,19 @@ const GRACE_WINDOW_MS = 48 * 60 * 60 * 1000;
  * as immutable — past days must not silently change on a later recompute
  * (e.g. a stray retry, a manual backfill call).
  */
-async function findFrozenRow(vehicleId, localDate, timeZone) {
-  const dayEnd = new Date(localMidnightUtc(localDate, timeZone).getTime() + 24 * 60 * 60 * 1000);
-  if (Date.now() - dayEnd.getTime() < GRACE_WINDOW_MS) return null;
-
+async function findRow(vehicleId, localDate) {
   const [rows] = await sequelize.query(
     `SELECT * FROM vehicle_daily_mileage WHERE "vehicleId" = :vehicleId AND "localDate" = :localDate LIMIT 1`,
     { replacements: { vehicleId, localDate } },
   );
-  const existing = rows[0];
+  return rows[0] ?? null;
+}
+
+async function findFrozenRow(vehicleId, localDate, timeZone, nowMs = Date.now()) {
+  const dayEnd = new Date(localMidnightUtc(localDate, timeZone).getTime() + 24 * 60 * 60 * 1000);
+  if (nowMs - dayEnd.getTime() < GRACE_WINDOW_MS) return null;
+
+  const existing = await findRow(vehicleId, localDate);
   if (existing && existing.dayStartSource !== 'unavailable' && existing.distanceKm != null) {
     return existing;
   }
@@ -36,41 +41,62 @@ async function findFrozenRow(vehicleId, localDate, timeZone) {
  * (see findFrozenRow) rather than silently recomputed.
  *
  * @param {{ vehicleId: string, localDate?: string, timeZone?: string }}
+ * @param {object} [deps] collaborators, injectable for tests only
  */
 export async function computeDailyMileage({
   vehicleId,
-  localDate = localDateString(new Date(), DEFAULT_BUSINESS_TIMEZONE),
+  localDate,
   timeZone = DEFAULT_BUSINESS_TIMEZONE,
-}) {
-  const frozen = await findFrozenRow(vehicleId, localDate, timeZone);
+}, deps = defaultDeps) {
+  const now = deps.now();
+  const today = localDateString(now, timeZone);
+  const date = localDate ?? today;
+
+  const frozen = await deps.findFrozenRow(vehicleId, date, timeZone, now.getTime());
   if (frozen) return frozen;
 
-  const assignment = await DeviceAssignment.findOne({ where: { vehicleId, isActive: true } });
+  // A day built from ACCEPTED readings is owned by the ingest (acceptedReadingsService). The raw counter
+  // difference computed below is exactly the figure that glitches and resets distort, so it never overwrites
+  // such a day.
+  const existingDay = await deps.findRow(vehicleId, date);
+  if (existingDay?.evidence === 'accepted') return existingDay;
+
+  const isToday = date === today;
+  // A day that already has a real distance is never overwritten by "unknown", today included:
+  // a recompute that finds no history (tracker unassigned since, Traccar returning nothing,
+  // a counter glitch) must not destroy an earlier real measurement. A recompute that DOES
+  // resolve replaces it, which is how an in-progress day keeps growing.
+  const keptResolvedRow = async () => (existingDay?.distanceKm != null ? existingDay : null);
+
+  const assignment = await deps.findAssignment(vehicleId);
   const deviceId = assignment ? Number(assignment.deviceId) : null;
 
   if (deviceId == null) {
-    return upsertRow({
-      vehicleId, localDate, timeZone,
+    const kept = await keptResolvedRow();
+    if (kept) return kept;
+    return deps.upsertRow({
+      vehicleId, localDate: date, timeZone,
       dayStartOdometerKm: null, dayStartSource: 'unavailable', dayStartEvidenceFixtime: null,
       latestOdometerKm: null, latestOdometerConfidence: 'unavailable', latestCapturedAt: null,
       distanceKm: null,
     });
   }
 
-  const spec = await VehicleSpec.findOne({ where: { deviceId } });
-  const anchorKm = spec?.verifiedOdometerKm ?? null;
-  const anchorTelemetryKm = spec?.verifiedTraccarDistance ?? null;
+  // The anchor is the VEHICLE's. It carries one tracker's counter reading, so it only gives a counter
+  // reference for that tracker; for any other it contributes its mileage alone.
+  const anchor = anchorToEvidence(await deps.findAnchor(vehicleId), { deviceId });
+  const anchorKm = anchor?.anchorKm ?? null;
+  const anchorTelemetryKm = anchor?.anchorTelemetryKm ?? null;
 
-  const boundary = localMidnightUtc(localDate, timeZone);
-  const dayStart = await resolveDayStartOdometer({ deviceId, boundary, anchorKm, anchorTelemetryKm });
+  const boundary = localMidnightUtc(date, timeZone);
+  const dayStart = await deps.resolveDayStart({ deviceId, boundary, anchorKm, anchorTelemetryKm });
 
-  const isToday = localDate === localDateString(new Date(), timeZone);
   // "Today" wants the freshest live reading. A past `localDate` must compare
   // against THAT day's end, not today's live odometer — otherwise a
   // historical query silently mixes two different points in time.
   const latest = isToday
-    ? await resolveOdometerForDevice(deviceId)
-    : await resolveDayStartOdometer({
+    ? await deps.resolveLive(deviceId)
+    : await deps.resolveDayStart({
       deviceId,
       boundary: new Date(boundary.getTime() + 24 * 60 * 60 * 1000),
       anchorKm,
@@ -87,16 +113,24 @@ export async function computeDailyMileage({
   } else if (dayStart.odometerKm != null && latest.odometerKm != null) {
     distanceKm = Number((latest.odometerKm - dayStart.odometerKm).toFixed(1));
   }
+  // A vehicle cannot drive a negative distance: the counter was reset, or positions
+  // arrived out of order around a boundary. That is "unknown", not a number to persist.
+  if (distanceKm != null && distanceKm < 0) distanceKm = null;
   // else stays null — not fabricated as 0; either side missing means "don't know".
 
-  return upsertRow({
-    vehicleId, localDate, timeZone,
+  if (distanceKm == null) {
+    const kept = await keptResolvedRow();
+    if (kept) return kept;
+  }
+
+  return deps.upsertRow({
+    vehicleId, localDate: date, timeZone,
     dayStartOdometerKm: dayStart.odometerKm,
     dayStartSource: dayStart.source,
     dayStartEvidenceFixtime: dayStart.evidenceFixtime,
     latestOdometerKm: latest.odometerKm,
     latestOdometerConfidence: latest.odometerConfidence,
-    latestCapturedAt: new Date(),
+    latestCapturedAt: now,
     distanceKm,
   });
 }
@@ -138,3 +172,15 @@ async function upsertRow(fields) {
   );
   return rows[0];
 }
+
+/** Real collaborators; tests pass fakes as the second argument of computeDailyMileage. */
+const defaultDeps = {
+  now: () => new Date(),
+  findFrozenRow,
+  findRow,
+  findAssignment: (vehicleId) => DeviceAssignment.findOne({ where: { vehicleId, isActive: true } }),
+  findAnchor: (vehicleId) => VehicleOdometerAnchor.findOne({ where: { vehicleId, supersededAt: null } }),
+  resolveDayStart: resolveDayStartOdometer,
+  resolveLive: resolveOdometerForDevice,
+  upsertRow,
+};

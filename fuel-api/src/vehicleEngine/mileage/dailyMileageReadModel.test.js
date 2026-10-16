@@ -82,3 +82,75 @@ test('carries confidence and day-start source through', () => {
   assert.equal(dto.confidence, 'medium');
   assert.equal(dto.dayStartSource, 'exact_boundary');
 });
+
+// ---- days built from ACCEPTED readings ------------------------------------------------------------------
+
+const accepted = (overrides = {}) => ({
+  localDate: '2026-10-18',
+  evidence: 'accepted',
+  confirmedKm: 42.34,
+  unattributedKm: 0,
+  distanceKm: 42.34,
+  dayStartOdometerKm: null,
+  dayStartSource: 'unavailable',
+  latestOdometerKm: null,
+  latestOdometerConfidence: 'unavailable',
+  firstReadingAt: '2026-10-18T05:10:00.000Z',
+  lastReadingAt: '2026-10-18T14:20:00.000Z',
+  revisionCount: 0,
+  lastRevisedAt: null,
+  ...overrides,
+});
+
+test('an accepted day reports its confirmed distance; the odometer difference is not consulted', () => {
+  // the odometer was re-anchored today (+300 km): a difference against it would be nonsense, the ledger is not
+  const dto = buildDailyMileageDto(accepted(), 125300);
+  assert.equal(dto.km, 42.3);
+  assert.equal(dto.source, 'accepted');
+  assert.equal(dto.evidence, 'accepted');
+});
+
+test('distance that arrived across a gap is reported apart from the confirmed figure, never added to it', () => {
+  const dto = buildDailyMileageDto(accepted({ confirmedKm: 5, unattributedKm: 130 }), 125300);
+  assert.equal(dto.km, 5, 'the figure for "today" is only what was observed today');
+  assert.equal(dto.confirmedKm, 5);
+  assert.equal(dto.unattributedKm, 130);
+  assert.equal(dto.hasUnobservedDistance, true);
+});
+
+test('a day with no unattributed distance says so plainly', () => {
+  const dto = buildDailyMileageDto(accepted({ unattributedKm: null }), null);
+  assert.equal(dto.unattributedKm, 0);
+  assert.equal(dto.hasUnobservedDistance, false);
+});
+
+test('revisions and observation window are exposed so a screen can show that a day was corrected', () => {
+  const dto = buildDailyMileageDto(accepted({ revisionCount: 2, lastRevisedAt: '2026-10-19T09:00:00.000Z' }), null);
+  assert.equal(dto.revisionCount, 2);
+  assert.equal(dto.lastRevisedAt, '2026-10-19T09:00:00.000Z');
+  assert.equal(dto.firstReadingAt, '2026-10-18T05:10:00.000Z');
+  assert.equal(dto.lastReadingAt, '2026-10-18T14:20:00.000Z');
+});
+
+test('an accepted day takes its confidence from the live odometer, not from a stale stored value', () => {
+  const dto = buildDailyMileageDto(accepted(), 125300, { confidence: 'medium' });
+  assert.equal(dto.confidence, 'medium');
+});
+
+test('an accepted day with an implausible total (a bug, not a drive) is reported as unknown', () => {
+  const dto = buildDailyMileageDto(accepted({ confirmedKm: 9000 }), null);
+  assert.equal(dto.km, null);
+});
+
+test('a legacy day is unchanged and says which method produced it', () => {
+  const dto = buildDailyMileageDto(row(), 120057.85);
+  assert.equal(dto.km, 57.9);
+  assert.equal(dto.evidence, 'legacy');
+  assert.equal(dto.unattributedKm, 0);
+  assert.equal(dto.revisionCount, 0);
+});
+
+test('an accepted day with nothing confirmed yet is zero confirmed, not unknown', () => {
+  const dto = buildDailyMileageDto(accepted({ confirmedKm: 0, distanceKm: 0 }), null);
+  assert.equal(dto.km, 0);
+});

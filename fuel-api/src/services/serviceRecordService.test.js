@@ -76,3 +76,70 @@ test('summarizeServiceRecordRows returns zeros when empty', () => {
   assert.equal(summary.inProgressCount, 0);
   assert.equal(summary.lastCompletedAt, null);
 });
+
+// ---- the odometer typed on a completed service, and which tracker's schedule it rebases ----------------
+
+const { resolveScheduleDeviceId, applyServiceCompletionOdometer } = await import('./serviceRecordService.js');
+
+test('the schedule is found on the vehicle\'s CURRENT tracker even though the record names the old one', async () => {
+  const owns = async (device, maintenance) => device === 9 && maintenance === 55; // schedules followed the vehicle to tracker 9
+  const device = await resolveScheduleDeviceId(
+    { fleetVehicleId: 'veh-1', record: { deviceId: 7, maintenanceId: 55 } },
+    { resolveActiveDeviceId: async () => 9, deviceOwnsMaintenanceId: owns },
+  );
+  assert.equal(device, 9);
+});
+
+test('...and falls back to the record\'s tracker while the schedule re-link has not completed yet', async () => {
+  const owns = async (device, maintenance) => device === 7 && maintenance === 55;
+  const device = await resolveScheduleDeviceId(
+    { fleetVehicleId: 'veh-1', record: { deviceId: 7, maintenanceId: 55 } },
+    { resolveActiveDeviceId: async () => 9, deviceOwnsMaintenanceId: owns },
+  );
+  assert.equal(device, 7);
+});
+
+test('if Traccar cannot be asked, the vehicle\'s current tracker is the best guess', async () => {
+  const device = await resolveScheduleDeviceId(
+    { fleetVehicleId: 'veh-1', record: { deviceId: 7, maintenanceId: 55 } },
+    { resolveActiveDeviceId: async () => 9, deviceOwnsMaintenanceId: async () => { throw new Error('mysql down'); } },
+  );
+  assert.equal(device, 9);
+});
+
+test('a record with no schedule resolves to the current tracker, or the recorded one if the vehicle has none', async () => {
+  const deps = (active) => ({ resolveActiveDeviceId: async () => active, deviceOwnsMaintenanceId: async () => false });
+  assert.equal(await resolveScheduleDeviceId({ fleetVehicleId: 'v', record: { deviceId: 7, maintenanceId: null } }, deps(9)), 9);
+  assert.equal(await resolveScheduleDeviceId({ fleetVehicleId: 'v', record: { deviceId: 7, maintenanceId: null } }, deps(null)), 7);
+  assert.equal(await resolveScheduleDeviceId({ fleetVehicleId: 'v', record: { deviceId: null, maintenanceId: null } }, deps(null)), null);
+});
+
+test('a service odometer is an observation by default: not attested, labelled as a service reading', async () => {
+  let seen;
+  await applyServiceCompletionOdometer(
+    { fleetVehicleId: 'veh-1', odometerKm: '125400', actorUserId: 42 },
+    { recordObservation: async (input) => { seen = input; return {}; } },
+  );
+  assert.equal(seen.vehicleId, 'veh-1');
+  assert.equal(seen.odometerKm, 125400);
+  assert.equal(seen.source, 'service');
+  assert.equal(seen.confirmedPhysical, false, 'typing a number is not a physical verification');
+  assert.equal(seen.actorUserId, 42);
+});
+
+test('only an explicit attestation makes a service odometer a physical verification', async () => {
+  const seen = [];
+  const deps = { recordObservation: async (input) => { seen.push(input); return {}; } };
+  await applyServiceCompletionOdometer({ fleetVehicleId: 'v', odometerKm: 1, confirmedPhysical: true }, deps);
+  await applyServiceCompletionOdometer({ fleetVehicleId: 'v', odometerKm: 1, confirmedPhysical: 'yes' }, deps);
+  await applyServiceCompletionOdometer({ fleetVehicleId: 'v', odometerKm: 1, confirmedPhysical: 1 }, deps);
+  assert.deepEqual(seen.map((s) => s.confirmedPhysical), [true, false, false]);
+});
+
+test('a refused service odometer propagates, so the caller does not complete the service', async () => {
+  const refusal = Object.assign(new Error('implausible'), { statusCode: 422, code: 'implausible_increase' });
+  await assert.rejects(
+    () => applyServiceCompletionOdometer({ fleetVehicleId: 'v', odometerKm: 9e9 }, { recordObservation: async () => { throw refusal; } }),
+    (error) => error.statusCode === 422 && error.code === 'implausible_increase',
+  );
+});

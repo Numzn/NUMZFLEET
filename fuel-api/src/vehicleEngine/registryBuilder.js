@@ -1,3 +1,5 @@
+import { formatOdometerProvenance } from './odometer/formatOdometerResponse.js';
+
 /**
  * Layer 1 — permanent identity from merged vehicle DTO.
  * @param {object} merged
@@ -23,5 +25,6 @@ export function buildRegistry(merged, odometerState = null) {
     odometerConfidence: odometerState?.odometerConfidence ?? 'unavailable',
     odometerDriftPct: odometerState?.odometerDriftPct ?? null,
     odometerDriftClass: odometerState?.odometerDriftClass ?? 'unknown',
+    ...formatOdometerProvenance(odometerState),
   };
 }

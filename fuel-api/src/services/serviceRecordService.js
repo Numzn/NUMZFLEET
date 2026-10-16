@@ -11,9 +11,9 @@ import {
   nextWorkOrderNumber,
 } from '../repositories/serviceRecordRepository.js';
 import { assertVehicleInTenant } from './vehicleFleetService.js';
-import { applyObservation } from '../vehicleEngine/odometer/applyObservation.js';
+import { recordObservation } from '../vehicleEngine/odometer/vehicleOdometerAnchorService.js';
 import { notifyRoutineServiceCompleted } from '../notifications/maintenanceNotificationService.js';
-import { resetMaintenanceScheduleAfterCompletion } from '../maintenance/routineServiceTraccarService.js';
+import { resetMaintenanceScheduleAfterCompletion, deviceOwnsMaintenanceId } from '../maintenance/routineServiceTraccarService.js';
 import { VEHICLE_IDENTITY_ATTRIBUTES } from '../utils/vehicleIdentityAttributes.js';
 
 function badRequest(message) {
@@ -108,6 +108,47 @@ async function resolveActiveDeviceId(fleetVehicleId) {
     where: { vehicleId: String(fleetVehicleId), isActive: true },
   });
   return assignment ? Number(assignment.deviceId) : null;
+}
+
+/**
+ * The tracker a vehicle's maintenance schedule is attached to. Schedules follow the vehicle across tracker
+ * changes, so this is normally the vehicle's CURRENT tracker; the tracker recorded on an old service record
+ * is only a fallback (for a re-link that has not completed yet). Never trusts a stored device blindly: it
+ * returns the first candidate that actually owns the schedule.
+ */
+export async function resolveScheduleDeviceId({ fleetVehicleId, record }, deps = {}) {
+  const findActive = deps.resolveActiveDeviceId ?? resolveActiveDeviceId;
+  const owns = deps.deviceOwnsMaintenanceId ?? deviceOwnsMaintenanceId;
+  const active = await findActive(fleetVehicleId);
+  const candidates = [...new Set([active, record.deviceId != null ? Number(record.deviceId) : null].filter((id) => id != null))];
+  if (record.maintenanceId != null) {
+    for (const candidate of candidates) {
+      try {
+        if (await owns(candidate, record.maintenanceId)) return candidate;
+      } catch {
+        /* Traccar unreachable: fall through to the best guess below */
+      }
+    }
+  }
+  return candidates[0] ?? null;
+}
+
+/**
+ * The odometer typed on a completed service becomes part of the vehicle's mileage record, so it passes the
+ * same plausibility rules as any observation. It is only physically verified if the person attests it was
+ * read from the dashboard (payload.odometerConfirmedPhysical); a reading that merely agrees with the
+ * system's own estimate changes nothing. A refused reading is a 422 and the service is NOT completed.
+ */
+export async function applyServiceCompletionOdometer({ fleetVehicleId, odometerKm, confirmedPhysical, reason, actorUserId }, deps = {}) {
+  return (deps.recordObservation ?? recordObservation)({
+    vehicleId: fleetVehicleId,
+    odometerKm: Number(odometerKm),
+    source: 'service',
+    confirmedPhysical: confirmedPhysical === true,
+    reason: reason ?? null,
+    evidence: { recordedOn: 'service completion' },
+    actorUserId: actorUserId ?? null,
+  });
 }
 
 function normalizeStatusForDb(status) {
@@ -237,19 +278,23 @@ export async function updateServiceRecord(companyId, fleetVehicleId, id, payload
     if (payload.scheduledDueDate) patch.dueAt = new Date(payload.scheduledDueDate);
   }
 
+  // Completing a service with an odometer reading: the reading is checked BEFORE anything is changed, so a
+  // typo is refused (422) and cannot reach the vehicle's mileage or rebase the schedule.
+  const completing = patch.status === 'completed' && !wasCompleted;
+  const completionOdometerKm = 'odometerKm' in patch ? patch.odometerKm : record.odometerKm;
+  if (completing && completionOdometerKm != null) {
+    await applyServiceCompletionOdometer({
+      fleetVehicleId,
+      odometerKm: completionOdometerKm,
+      confirmedPhysical: payload.odometerConfirmedPhysical === true,
+      reason: payload.odometerReason,
+      actorUserId: options.actorUserId,
+    });
+  }
+
   await record.update(patch);
 
-  const deviceId = record.deviceId != null
-    ? Number(record.deviceId)
-    : await resolveActiveDeviceId(fleetVehicleId);
-
-  if (patch.status === 'completed' && record.odometerKm != null && deviceId) {
-    try {
-      await applyObservation(deviceId, record.odometerKm, 'service');
-    } catch (error) {
-      console.error('Failed to set verified odometer from service record:', error.message);
-    }
-  }
+  const deviceId = await resolveScheduleDeviceId({ fleetVehicleId, record });
 
   // Schedule rebase runs server-side, in the same request as completion —
   // not a second client-initiated call — so a lost connection between steps
@@ -320,9 +365,7 @@ export async function retryScheduleReset(companyId, fleetVehicleId, id) {
     return toServiceRecordDto(record);
   }
 
-  const deviceId = record.deviceId != null
-    ? Number(record.deviceId)
-    : await resolveActiveDeviceId(fleetVehicleId);
+  const deviceId = await resolveScheduleDeviceId({ fleetVehicleId, record });
 
   try {
     await resetMaintenanceScheduleAfterCompletion({

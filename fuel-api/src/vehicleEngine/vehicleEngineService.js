@@ -35,7 +35,8 @@ export async function getVehicleEngine(fleetVehicleId, auth) {
   const registry = buildRegistry(merged, odometerState);
 
   const [maintenance, repairs, fuel, activityHub] = await Promise.all([
-    buildMaintenanceHub(companyId, fleetVehicleId),
+    // Same odometer the registry shows: the page and its maintenance section cannot disagree.
+    buildMaintenanceHub(companyId, fleetVehicleId, { odometerKm: odometerState.odometerKm ?? null }),
     buildRepairsHub(companyId, fleetVehicleId),
     buildFuelHub(deviceId, merged),
     buildActivityHub(deviceId),

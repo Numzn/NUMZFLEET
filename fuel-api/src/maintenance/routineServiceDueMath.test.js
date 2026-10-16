@@ -30,9 +30,13 @@ const routineSchedule = {
   attributes: { numzServicePackage: true },
 };
 
-/** A due-engine item exactly as maintenanceTraccarAdapter builds it. */
+/**
+ * A due-engine item exactly as maintenanceTraccarAdapter builds it: the position carries
+ * the raw tracker counter and the canonical odometer is passed separately. The counter is
+ * deliberately 777 km off the odometer, so every case below also proves it is ignored.
+ */
 function dueItem(odometerKm, schedule = routineSchedule) {
-  const due = computeDue(schedule, { attributes: { totalDistance: odometerKm * KM } });
+  const due = computeDue(schedule, { attributes: { totalDistance: (odometerKm + 777) * KM } }, odometerKm * KM);
   return {
     ...due,
     deviceId: 62,
@@ -141,7 +145,7 @@ test('an odometer below the cycle start is not overdue and still measures from s
   assert.equal(item.remaining / KM, 6000);
 });
 
-test('a verified odometer is used when it is ahead of a stale tracker counter', () => {
+test('the canonical odometer is used when it is ahead of a stale tracker counter', () => {
   const due = computeDue(routineSchedule, { attributes: { totalDistance: 9000 * KM } }, 10500 * KM);
   assert.equal(due.current / KM, 10500);
   assert.equal(due.remaining / KM, -500);

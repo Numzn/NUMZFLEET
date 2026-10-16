@@ -57,3 +57,5 @@
 20260908_vehicles_company_id_not_null.sql
 20260911_company_traccar_group_unique.sql
 20260913_driver_domain.sql
+20261016_vehicle_owned_odometer.sql
+20261017_accepted_mileage_readings.sql

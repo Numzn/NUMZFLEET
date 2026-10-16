@@ -3,8 +3,15 @@
  */
 
 const STALE_MS = 5 * 60 * 1000;
+const STALE_DAY_MS = 24 * 60 * 60 * 1000;
+const STALE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
+ * Staleness is graded (M2 §6.1, §9): a tracker that has been quiet for minutes is
+ * a small concern, one silent for a day is a larger one, and one silent for a
+ * week no longer supports a confident estimate. The diagnostics are cumulative:
+ * `stale_telemetry` (> 5 min offline) ⊂ `stale_telemetry_day` (≥ 24 h) ⊂
+ * `stale_telemetry_week` (≥ 7 d, or no telemetry timestamp at all).
  * @param {{ device?: { status?: string, lastUpdate?: string|null }|null, position?: { fixTime?: string|null }|null }}
  */
 export function validateTelemetryFreshness({ device, position }) {
@@ -13,12 +20,15 @@ export function validateTelemetryFreshness({ device, position }) {
 
   const lastUpdate = device?.lastUpdate ?? position?.fixTime ?? null;
   if (!lastUpdate) {
-    diagnostics.push('stale_telemetry');
+    // Nothing ever reported (or nothing we can date): the estimate rests on the anchor alone.
+    diagnostics.push('stale_telemetry', 'stale_telemetry_day', 'stale_telemetry_week');
     stale = true;
   } else {
     const age = Date.now() - new Date(lastUpdate).getTime();
     if (age > STALE_MS && device?.status !== 'online') {
       diagnostics.push('stale_telemetry');
+      if (age >= STALE_DAY_MS) diagnostics.push('stale_telemetry_day');
+      if (age >= STALE_WEEK_MS) diagnostics.push('stale_telemetry_week');
       stale = true;
     }
   }

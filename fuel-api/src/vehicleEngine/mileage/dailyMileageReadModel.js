@@ -26,12 +26,50 @@ function validKm(value) {
 /**
  * @param {object|null} row - vehicle_daily_mileage row (model instance or plain object) for the current business day
  * @param {number|null} currentOdometerKm - canonical odometer resolved in this request, if any
+ * @param {{ confidence?: string|null }} [options] the live odometer's confidence, preferred over a stored one
  * @returns {{ km: number|null, source: 'live'|'ledger'|null, date: string|null,
  *             dayStartKm: number|null, dayStartSource: string|null, confidence: string|null }|null}
  *          null when there is no ledger row at all (feature has no data for the day)
  */
-export function buildDailyMileageDto(row, currentOdometerKm) {
+export function buildDailyMileageDto(row, currentOdometerKm, options = {}) {
   if (!row) return null;
+
+  const base = {
+    date: row.localDate ?? null,
+    evidence: row.evidence === 'accepted' ? 'accepted' : 'legacy',
+    confirmedKm: null,
+    unattributedKm: 0,
+    hasUnobservedDistance: false,
+    firstReadingAt: null,
+    lastReadingAt: null,
+    revisionCount: 0,
+    lastRevisedAt: null,
+  };
+
+  // A day built from ACCEPTED readings (see acceptedReadingsService) reports what the ledger accumulated.
+  // It is deliberately not derived from the odometer: the odometer can be re-anchored mid-day, and the
+  // ledger and the odometer are built from the same accepted evidence, so they cannot disagree.
+  if (row.evidence === 'accepted') {
+    const confirmed = validKm(row.confirmedKm ?? row.distanceKm);
+    const unattributed = Number.isFinite(Number(row.unattributedKm)) ? Number(row.unattributedKm) : 0;
+    const iso = (value) => (value ? new Date(value).toISOString() : null);
+    return {
+      ...base,
+      km: confirmed != null ? Number(confirmed.toFixed(1)) : null,
+      source: 'accepted',
+      dayStartKm: null,
+      dayStartSource: row.dayStartSource ?? null,
+      confidence: options.confidence ?? row.latestOdometerConfidence ?? null,
+      confirmedKm: confirmed != null ? Number(confirmed.toFixed(1)) : null,
+      unattributedKm: Number(unattributed.toFixed(1)),
+      // distance that is in the odometer but cannot be placed in this day: shown apart, never added to km
+      hasUnobservedDistance: unattributed > 0,
+      firstReadingAt: iso(row.firstReadingAt),
+      lastReadingAt: iso(row.lastReadingAt),
+      revisionCount: Number(row.revisionCount) || 0,
+      lastRevisedAt: iso(row.lastRevisedAt),
+    };
+  }
 
   const dayStartKm = row.dayStartOdometerKm != null && Number.isFinite(Number(row.dayStartOdometerKm))
     ? Number(row.dayStartOdometerKm)
@@ -59,9 +97,9 @@ export function buildDailyMileageDto(row, currentOdometerKm) {
   }
 
   return {
+    ...base,
     km: km != null ? Number(km.toFixed(1)) : null,
     source,
-    date: row.localDate ?? null,
     dayStartKm,
     dayStartSource: row.dayStartSource ?? null,
     confidence: row.latestOdometerConfidence ?? null,

@@ -24,6 +24,12 @@ export async function getVehicleTelemetry(deviceId) {
     return {
       source: 'traccar',
       tankLevelFraction,
+      // Freshness evidence for the Vehicle Odometer Engine: without it a single-device
+      // resolution cannot tell a live tracker from a dead one (see collectEvidence).
+      deviceStatus: position?.deviceStatus ?? null,
+      deviceLastUpdate: position?.deviceLastUpdate ?? null,
+      positionFixTime: position?.fixtime ?? null,
+      positionId: position?.id ?? null,
       positionAttributes: {
         odometer: attrs.odometer,
         totalDistance: attrs.totalDistance,
@@ -34,6 +40,10 @@ export async function getVehicleTelemetry(deviceId) {
     return {
       source: 'unavailable',
       tankLevelFraction: null,
+      deviceStatus: null,
+      deviceLastUpdate: null,
+      positionFixTime: null,
+      positionId: null,
       positionAttributes: null,
     };
   }
