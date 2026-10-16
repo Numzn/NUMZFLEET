@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { buildMarkerFeatures } from './markerFeatures.js';
+import { buildMarkerFeatures, moveFeatures } from './markerFeatures.js';
 
 const devices = { 1: { id: 1 }, 2: { id: 2 }, 3: { id: 3 } };
 
@@ -135,19 +135,61 @@ const effectDeps = (source, anchor) => {
     .filter(Boolean);
 };
 
-test('EnhancedMarkers wiring: no position interpolation loop, uses the direct feature builder', () => {
+test('EnhancedMarkers wiring: gliding goes through the shared tracker, not a fixed-length lerp', () => {
   const source = readComponentSource();
 
+  // The old animation: fixed 1450 ms ease-out restarted from the previous fix on every update.
   assert.ok(!source.includes('LERP_DURATION'), 'LERP_DURATION must not return');
   assert.ok(!source.includes('prevCoordsRef'), 'per-device previous-coordinate cache must not return');
   assert.ok(!source.includes('animFrameRef'), 'position animation frame ref must not return');
+
   assert.ok(source.includes('buildMarkerFeatures'), 'markers must be fed by buildMarkerFeatures');
+  assert.ok(source.includes('markerMotion.push'), 'fixes must be pushed into the motion tracker');
+  assert.ok(source.includes('frameLoop.subscribe'), 'geometry must advance on the shared frame loop');
+  assert.ok(source.includes('moveFeatures'), 'a frame must only rewrite geometry');
+});
+
+test('buildMarkerFeatures: coordinatesFor draws a marker somewhere other than its raw fix', () => {
+  const [feature] = build(
+    [{ id: 10, deviceId: 1, longitude: 28.5, latitude: -15.5 }],
+    { coordinatesFor: () => [28.25, -15.25] },
+  );
+  assert.deepEqual(feature.geometry.coordinates, [28.25, -15.25]);
+});
+
+const featureFor = (deviceId, lng, lat) => ({
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [lng, lat] },
+  properties: { deviceId, name: `d${deviceId}` },
+});
+
+test('moveFeatures: rewrites geometry only and leaves properties untouched', () => {
+  const before = [featureFor(1, 10, 20)];
+  const [after] = moveFeatures(before, () => [10.5, 20.5]);
+
+  assert.deepEqual(after.geometry.coordinates, [10.5, 20.5]);
+  assert.equal(after.properties, before[0].properties, 'properties are reused, not rebuilt');
+  assert.deepEqual(before[0].geometry.coordinates, [10, 20], 'input is not mutated');
+});
+
+test('moveFeatures: a device that has not moved keeps its identity', () => {
+  const before = [featureFor(1, 10, 20), featureFor(2, 30, 40)];
+  const after = moveFeatures(before, (deviceId) => (deviceId === 2 ? [31, 41] : [10, 20]));
+
+  assert.equal(after[0], before[0]);
+  assert.notEqual(after[1], before[1]);
+});
+
+test('moveFeatures: a device the tracker does not know is left where it is', () => {
+  const before = [featureFor(1, 10, 20)];
+  const after = moveFeatures(before, () => null);
+  assert.equal(after[0], before[0]);
 });
 
 test('EnhancedMarkers wiring: marker data is re-pushed whenever the sources are recreated', () => {
   const source = readComponentSource();
   const sourceDeps = effectDeps(source, '// Add sources');
-  const dataDeps = effectDeps(source, 'Push the latest fixes straight into both GeoJSON sources');
+  const dataDeps = effectDeps(source, 'Draw the latest fixes.');
 
   assert.ok(sourceDeps.length > 0, 'expected the source-creating effect to have dependencies');
 

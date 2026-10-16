@@ -1,4 +1,4 @@
-import { useId, useCallback, useEffect } from 'react';
+import { useId, useCallback, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -10,7 +10,10 @@ import { useCatchCallback } from '../../reactHelper';
 import { findFonts } from '../core/mapUtil';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 import { resolveLiveActivityState } from '../../fleet/vehicleDetail/resolveLiveActivityState.js';
-import { buildMarkerFeatures } from './markerFeatures.js';
+import { buildMarkerFeatures, moveFeatures } from './markerFeatures.js';
+import {
+  frameLoop, markerMotion, motionClock, prefersReducedMotion,
+} from './motionRuntime.js';
 
 const STYLE_TRANSITION_MS = 480;
 const MOVE_PULSE = '#34d399';
@@ -51,6 +54,13 @@ const EnhancedMarkers = ({
 
   const mapCluster = useAttributePreference('mapCluster', true);
   const directionType = useAttributePreference('mapDirection', 'selected');
+  // Glide moving vehicles between fixes instead of hopping. On by default;
+  // an explicit saved `mapSmoothMovement: false` turns it off.
+  const smoothMovement = useAttributePreference('mapSmoothMovement', true);
+
+  // Latest assembled features and hover target, read by the per-frame step.
+  const frameStateRef = useRef({ features: {}, hoveredDeviceId: null });
+  frameStateRef.current.hoveredDeviceId = externalHoveredDeviceId;
 
   const createFeature = (devices, position, selectedPositionId) => {
     const device = devices[position.deviceId];
@@ -544,7 +554,7 @@ const EnhancedMarkers = ({
         type: 'Feature',
         geometry: {
           type: 'Point',
-          coordinates: [pos.longitude, pos.latitude],
+          coordinates: markerMotion.positionAt(pos.deviceId, motionClock()) ?? [pos.longitude, pos.latitude],
         },
         properties: { deviceId: externalHoveredDeviceId },
       }],
@@ -673,31 +683,41 @@ const EnhancedMarkers = ({
   }, [selectedDeviceId, id, selected, clusters, iconScale]);
 
   /**
-   * Push the latest fixes straight into both GeoJSON sources. No interpolation:
-   * a marker is drawn at the reported longitude/latitude as soon as the
-   * position reaches Redux, so any remaining lag is the tracker's report
-   * interval plus network latency, not the UI.
+   * Draw the latest fixes. Properties are rebuilt here whenever the data
+   * changes; coordinates come from markerMotion, which glides each moving
+   * vehicle from where it is drawn right now to its newest fix (see
+   * markerMotion.js), so an icon travels continuously instead of hopping from
+   * fix to fix. The per-frame step below only rewrites geometry.
    */
   useEffect(() => {
+    const now = motionClock();
+    markerMotion.setEnabled(smoothMovement && !prefersReducedMotion());
+    markerMotion.prune(safePositions.map((position) => position.deviceId));
+    safePositions.forEach((position) => markerMotion.push(position.deviceId, position, now));
+
     const selectedPositionId = selectedPosition && selectedPosition.id;
     [id, selected].forEach((source) => {
-      map.getSource(source)?.setData({
-        type: 'FeatureCollection',
-        features: buildMarkerFeatures({
-          positions: safePositions,
-          devices,
-          selectedDeviceId,
-          selectedSource: source === selected,
-          createProperties: (position) => createFeature(devices, position, selectedPositionId),
-        }),
+      const features = buildMarkerFeatures({
+        positions: safePositions,
+        devices,
+        selectedDeviceId,
+        selectedSource: source === selected,
+        createProperties: (position) => createFeature(devices, position, selectedPositionId),
+        coordinatesFor: (position) => markerMotion.positionAt(position.deviceId, now)
+          ?? [position.longitude, position.latitude],
       });
+      frameStateRef.current.features[source] = features;
+      map.getSource(source)?.setData({ type: 'FeatureCollection', features });
     });
+
+    frameLoop.kick();
   }, [
     safePositions,
     devices,
     selectedDeviceId,
     selectedPosition,
     directionType,
+    smoothMovement,
     // The effect that creates the sources tears them down and re-adds them
     // (empty) whenever any of its own inputs change — e.g. a breakpoint change
     // flipping iconScale. Re-running on exactly those inputs repopulates the
@@ -716,6 +736,35 @@ const EnhancedMarkers = ({
     onMouseLeave,
     onMapClickCallback,
   ]);
+
+  /** One glide frame: advance geometry only, and only while something is moving. */
+  useEffect(() => frameLoop.subscribe((now) => {
+    const state = frameStateRef.current;
+    const drawnAt = (deviceId) => markerMotion.positionAt(deviceId, now);
+
+    [id, selected].forEach((source) => {
+      const previous = state.features[source];
+      if (!previous) return;
+      const moved = moveFeatures(previous, drawnAt);
+      if (moved.every((feature, index) => feature === previous[index])) return;
+      state.features[source] = moved;
+      map.getSource(source)?.setData({ type: 'FeatureCollection', features: moved });
+    });
+
+    if (state.hoveredDeviceId != null) {
+      const drawn = drawnAt(state.hoveredDeviceId);
+      if (drawn) {
+        map.getSource(hovered)?.setData({
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: drawn },
+            properties: { deviceId: state.hoveredDeviceId },
+          }],
+        });
+      }
+    }
+  }), [id, selected, hovered]);
 
   return null;
 };
