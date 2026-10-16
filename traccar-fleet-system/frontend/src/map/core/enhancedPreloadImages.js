@@ -1,6 +1,7 @@
 
 
 import { loadImage, prepareIcon } from './mapUtil';
+import { prepareHeadingCone, prepareTopDownCar } from './vehicleSprites';
 
 import directionSvg from '../../resources/images/direction.svg';
 import backgroundSvg from '../../resources/images/background.svg';
@@ -131,6 +132,9 @@ export default async () => {
   const background = await loadImage(backgroundSvg);
   mapImages.background = await prepareIcon(background);
   mapImages.direction = await prepareIcon(await loadImage(directionSvg));
+  // Rotating top-down car (car-category vehicles) and the heading cone under every marker.
+  mapImages['car-top-live'] = prepareTopDownCar();
+  mapImages['heading-cone'] = prepareHeadingCone();
 
   await Promise.all(
     Object.keys(mapIcons).map(async (category) => {
