@@ -39,19 +39,27 @@ export const buildMarkerFeatures = ({
   }));
 
 /**
- * Per-frame step of a glide: same features, new geometry. Properties are reused
- * untouched (they only change when the data does), and a feature whose drawn
- * position has not moved keeps its identity.
+ * Per-frame step of a glide: same features, new geometry and heading. Other
+ * properties are reused untouched (they only change when the data does), and a
+ * feature whose drawn position and heading have not changed keeps its identity.
  *
  * @param {Array<object>} features output of buildMarkerFeatures
  * @param {(deviceId: number) => number[]|null} drawnAt current [lng, lat] of a device
+ * @param {(deviceId: number) => number|null} [headingAt] current heading of a device
  */
-export const moveFeatures = (features, drawnAt) => features.map((feature) => {
-  const drawn = drawnAt(feature.properties.deviceId);
-  if (!drawn) return feature;
+export const moveFeatures = (features, drawnAt, headingAt = () => null) => features.map((feature) => {
+  const { deviceId } = feature.properties;
+  const drawn = drawnAt(deviceId);
+  const heading = headingAt(deviceId);
   const [lng, lat] = feature.geometry.coordinates;
-  if (drawn[0] === lng && drawn[1] === lat) return feature;
-  return { ...feature, geometry: { type: 'Point', coordinates: [drawn[0], drawn[1]] } };
+  const moved = drawn && (drawn[0] !== lng || drawn[1] !== lat);
+  const turned = heading != null && heading !== feature.properties.heading;
+  if (!moved && !turned) return feature;
+  return {
+    ...feature,
+    geometry: moved ? { type: 'Point', coordinates: [drawn[0], drawn[1]] } : feature.geometry,
+    properties: turned ? { ...feature.properties, heading } : feature.properties,
+  };
 });
 
 export default buildMarkerFeatures;

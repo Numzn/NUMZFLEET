@@ -5,6 +5,7 @@ import {
   GLIDE_HEADROOM,
   MAX_GLIDE_MS,
   MIN_GLIDE_MS,
+  MIN_HEADING_SPEED_KN,
   STALE_AFTER_MS,
   createMotionTracker,
 } from './markerMotion.js';
@@ -204,4 +205,90 @@ test('devices are independent and pruned when no longer displayed', () => {
 
   assert.notEqual(tracker.positionAt(1, T0), null);
   assert.equal(tracker.positionAt(2, T0), null);
+});
+
+
+// ------------------------------------------------------------------- heading
+// A top-down car icon rotates with the vehicle, so the heading must turn
+// smoothly through corners and never snap to north when the vehicle stops.
+
+const moving = (id, lat, lng, fixSeconds, course, speed = 20) => fix(id, lat, lng, fixSeconds, { course, speed });
+
+test('heading: the first fix points the icon the way the tracker says', () => {
+  const tracker = createMotionTracker();
+  tracker.push(7, moving(1, -15.4, 28.3, 0, 90), T0);
+  assert.equal(tracker.headingAt(7, T0), 90);
+  assert.equal(tracker.headingAt(99, T0), null);
+});
+
+test('heading: turns smoothly from the heading drawn now to the new course, at the glide pace', () => {
+  const tracker = createMotionTracker();
+  tracker.push(7, moving(1, -15.4000, 28.3, 0, 0), T0);
+  tracker.push(7, moving(2, -15.4002, 28.3, 2, 90), T0 + 2000);
+
+  const start = T0 + 2000;
+  const duration = 2000 * GLIDE_HEADROOM;
+  assert.equal(tracker.headingAt(7, start), 0);
+  assert.ok(Math.abs(tracker.headingAt(7, start + duration / 2) - 45) < 1e-9, 'halfway through the turn');
+  assert.equal(tracker.headingAt(7, start + duration), 90);
+});
+
+test('heading: turns the short way round (350 to 10 passes through north, not the long way)', () => {
+  const tracker = createMotionTracker();
+  tracker.push(7, moving(1, -15.4000, 28.3, 0, 350), T0);
+  tracker.push(7, moving(2, -15.4002, 28.3, 2, 10), T0 + 2000);
+
+  const start = T0 + 2000;
+  const duration = 2000 * GLIDE_HEADROOM;
+  const mid = tracker.headingAt(7, start + duration / 2);
+  assert.ok(mid < 1e-6 || mid > 359.999999, `expected ~0 (north), got ${mid}`);
+  assert.equal(tracker.headingAt(7, start + duration), 10);
+});
+
+test('heading: a fix arriving mid-turn re-targets from the heading drawn right now, with no jump', () => {
+  const tracker = createMotionTracker();
+  tracker.push(7, moving(1, -15.4000, 28.3, 0, 0), T0);
+  tracker.push(7, moving(2, -15.4002, 28.3, 2, 90), T0 + 2000);
+  const midway = T0 + 2000 + 1000;
+
+  const before = tracker.headingAt(7, midway);
+  tracker.push(7, moving(3, -15.4004, 28.3002, 3, 180), midway);
+  assert.ok(Math.abs(tracker.headingAt(7, midway) - before) < 1e-9);
+});
+
+test('heading: a stopped vehicle keeps pointing the way it last travelled instead of snapping north', () => {
+  const tracker = createMotionTracker();
+  tracker.push(7, moving(1, -15.4000, 28.3, 0, 135), T0);
+  tracker.push(7, moving(2, -15.4002, 28.3, 2, 135), T0 + 2000);
+  // Parked: speed 0, and the tracker reports course 0.
+  tracker.push(7, moving(3, -15.4002, 28.3, 8, 0, 0), T0 + 8000);
+
+  assert.equal(tracker.headingAt(7, T0 + 20_000), 135);
+});
+
+test('heading: noise-level speed does not turn the icon either', () => {
+  const tracker = createMotionTracker();
+  tracker.push(7, moving(1, -15.4000, 28.3, 0, 200), T0);
+  tracker.push(7, moving(2, -15.40001, 28.3, 4, 20, MIN_HEADING_SPEED_KN), T0 + 4000);
+  assert.equal(tracker.headingAt(7, T0 + 10_000), 200);
+});
+
+test('heading: a vehicle that first appears while stopped uses the course it reports, else north', () => {
+  const tracker = createMotionTracker();
+  tracker.push(1, moving(1, -15.4, 28.3, 0, 270, 0), T0);
+  tracker.push(2, { ...moving(2, -15.5, 28.4, 0, 0, 0), deviceId: 2, course: undefined }, T0);
+  assert.equal(tracker.headingAt(1, T0), 270);
+  assert.equal(tracker.headingAt(2, T0), 0);
+});
+
+test('heading: snaps together with an instantly-drawn position (teleport guard, disabled tracker)', () => {
+  const teleport = createMotionTracker();
+  teleport.push(7, moving(1, -15.4, 28.3, 0, 0), T0);
+  teleport.push(7, moving(2, -14.2, 28.3, 2, 180), T0 + 2000);
+  assert.equal(teleport.headingAt(7, T0 + 2000), 180);
+
+  const off = createMotionTracker({ enabled: false });
+  off.push(7, moving(1, -15.4000, 28.3, 0, 0), T0);
+  off.push(7, moving(2, -15.4002, 28.3, 2, 90), T0 + 2000);
+  assert.equal(off.headingAt(7, T0 + 2001), 90);
 });

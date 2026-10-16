@@ -203,3 +203,27 @@ test('EnhancedMarkers wiring: marker data is re-pushed whenever the sources are 
     assert.ok(dataDeps.includes(dep), `data effect must depend on ${dep}`);
   });
 });
+
+
+test('moveFeatures: heading advances with the glide while other properties are reused', () => {
+  const before = [{
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [10, 20] },
+    properties: { deviceId: 1, heading: 10, name: 'car' },
+  }];
+  const [after] = moveFeatures(before, () => [10, 20], () => 40);
+
+  assert.equal(after.properties.heading, 40);
+  assert.equal(after.properties.name, 'car');
+  assert.equal(after.geometry, before[0].geometry, 'geometry reused when only the heading turned');
+});
+
+test('moveFeatures: nothing moved and nothing turned keeps the very same feature', () => {
+  const before = [{
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [10, 20] },
+    properties: { deviceId: 1, heading: 10 },
+  }];
+  const [after] = moveFeatures(before, () => [10, 20], () => 10);
+  assert.equal(after, before[0]);
+});
