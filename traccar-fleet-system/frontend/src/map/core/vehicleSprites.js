@@ -14,6 +14,11 @@ export const CAR_SPRITE_PX = 64;
 export const CONE_SPRITE_PX = 128;
 /** Radius, at icon-size 1, of the status ring drawn around a top-down car. */
 export const CAR_RING_RADIUS_PX = 29;
+/**
+ * How large a top-down car is drawn relative to the generic icon size (the round
+ * puck for other vehicle kinds uses 1). The ring, heading cone and label follow it.
+ */
+export const CAR_SIZE_FACTOR = 0.8;
 
 /** Trace the car body, nose at the top, as a closed symmetric path. */
 const carBodyPath = () => {

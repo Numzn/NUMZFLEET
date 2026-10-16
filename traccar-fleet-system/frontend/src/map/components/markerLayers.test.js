@@ -8,7 +8,7 @@ import {
   iconSizeExpression,
   vehicleLayerSpecs,
 } from './markerLayers.js';
-import { CAR_RING_RADIUS_PX } from '../core/vehicleSprites.js';
+import { CAR_RING_RADIUS_PX, CAR_SIZE_FACTOR } from '../core/vehicleSprites.js';
 
 const OPTIONS = { iconScale: 0.8, titleField: 'name', fonts: ['Noto Sans Regular'] };
 
@@ -84,12 +84,25 @@ test('the heading cone follows the smoothed heading and shows only when the feat
   assert.ok(JSON.stringify(cone.filter).includes('"direction"'), 'driven by the existing direction flag');
 });
 
-test('selected vehicle bump scales the icon-size stops', () => {
-  const bumped = iconSizeExpression(0.8, SELECTED_SCALE);
-  const flat = iconSizeExpression(0.8);
-  ICON_SIZE_STOPS.forEach((_, i) => {
-    const sizeIndex = 4 + i * 2;
-    assert.ok(Math.abs(bumped[sizeIndex] - flat[sizeIndex] * SELECTED_SCALE) < 1e-12);
+test('a car is drawn smaller than the generic icon size; every other kind is not', () => {
+  const size = (bump, properties, zoom = 15) => evaluate(
+    iconSizeExpression(0.8, bump), latest.layout_symbol['icon-size'], zoom, properties,
+  );
+  const generic = 0.94 * 0.8; // the zoom-15 stop times the user's icon scale
+
+  assert.ok(Math.abs(size(1, { topDown: 0 }) - generic) < 1e-9, 'puck size is unchanged');
+  assert.ok(Math.abs(size(1, { topDown: 1 }) - generic * CAR_SIZE_FACTOR) < 1e-9);
+  assert.ok(CAR_SIZE_FACTOR < 1);
+});
+
+test('selected vehicle bump scales both kinds of icon, and stays in proportion', () => {
+  const size = (bump, properties) => evaluate(
+    iconSizeExpression(0.8, bump), latest.layout_symbol['icon-size'], 15, properties,
+  );
+
+  [0, 1].forEach((topDown) => {
+    const ratio = size(SELECTED_SCALE, { topDown }) / size(1, { topDown });
+    assert.ok(Math.abs(ratio - SELECTED_SCALE) < 1e-9, `topDown ${topDown}`);
   });
 });
 
@@ -108,9 +121,10 @@ test('a top-down car gets a ring scaled like its sprite, with core and aura arou
   const layers = vehicleLayerSpecs('veh', OPTIONS);
   const car = (id, zoom, markerSelected = 0) => radiusAt(layers, id, zoom, { topDown: 1, markerSelected });
 
-  // icon-size at zoom 14 (between the 10 and 15 stops) times the user's icon scale.
+  // icon-size at zoom 14 (between the 10 and 15 stops) times the user's icon scale
+  // and the car's own size factor: the ring is sized like the sprite it surrounds.
   const iconSize14 = (0.76 + ((14 - 10) / 5) * (0.94 - 0.76)) * 0.8;
-  const ring = CAR_RING_RADIUS_PX * iconSize14;
+  const ring = CAR_RING_RADIUS_PX * iconSize14 * CAR_SIZE_FACTOR;
 
   assert.ok(Math.abs(car('telemetry-ring-veh', 14) - ring) < 1e-9);
   assert.ok(Math.abs(car('telemetry-ring-veh', 14, 1) - ring * SELECTED_SCALE) < 1e-9, 'selected is bumped like the icon');
@@ -130,10 +144,20 @@ test('the car ring is always bigger than the car and grows with zoom and with th
   assert.ok(CAR_RING_RADIUS_PX > 23, 'the ring clears the car at the same scale');
 });
 
-test('a top-down car label sits further out than a puck label, clear of its ring', () => {
-  const offset = layerNamed(vehicleLayerSpecs('veh', OPTIONS), 'veh').layout['text-offset'];
+test('a top-down car label sits further out than a puck label, and clear of its ring', () => {
+  const layers = vehicleLayerSpecs('veh', OPTIONS);
+  const offset = layerNamed(layers, 'veh').layout['text-offset'];
   const at = (topDown) => evaluate(offset, latest.layout_symbol['text-offset'], 15, { topDown });
 
   assert.ok(at(1)[1] > at(0)[1]);
   assert.equal(at(0)[1], 1.58 * 0.8, 'puck label position unchanged');
+
+  // At zoom 15 the text is 13 px, so an offset of N em is 13 * N px; it must clear
+  // the selected car's (largest) ring with a visible gap, at both icon scales.
+  [0.8, 1].forEach((iconScale) => {
+    const scaled = vehicleLayerSpecs('veh', { ...OPTIONS, iconScale });
+    const em = evaluate(layerNamed(scaled, 'veh').layout['text-offset'], latest.layout_symbol['text-offset'], 15, { topDown: 1 })[1];
+    const selectedRing = radiusAt(scaled, 'telemetry-ring-veh', 15, { topDown: 1, markerSelected: 1 });
+    assert.ok(em * 13 > selectedRing + 2, `label ${em * 13}px vs ring ${selectedRing}px at iconScale ${iconScale}`);
+  });
 });

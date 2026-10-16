@@ -1,4 +1,4 @@
-import { CAR_RING_RADIUS_PX } from '../core/vehicleSprites.js';
+import { CAR_RING_RADIUS_PX, CAR_SIZE_FACTOR } from '../core/vehicleSprites.js';
 
 /**
  * MapLibre layer definitions for one vehicle source, in draw order:
@@ -39,10 +39,16 @@ const iconSizeAt = (zoom, iconScale) => {
   return stops.at(-1)[1] * iconScale;
 };
 
-/** The icon-size expression used by the icon and the heading cone. */
+/**
+ * The icon-size expression used by the icon and the heading cone. A top-down car
+ * is drawn CAR_SIZE_FACTOR as large as the generic icon size.
+ */
 export const iconSizeExpression = (iconScale, bump = 1) => [
   'interpolate', ['linear'], ['zoom'],
-  ...ICON_SIZE_STOPS.flatMap(([zoom, size]) => [zoom, iconScale * size * bump]),
+  ...ICON_SIZE_STOPS.flatMap(([zoom, size]) => [
+    zoom,
+    ['case', isTopDown, iconScale * size * bump * CAR_SIZE_FACTOR, iconScale * size * bump],
+  ]),
 ];
 
 const ZOOM_STOPS = [9, 14, 18];
@@ -55,7 +61,7 @@ const ZOOM_STOPS = [9, 14, 18];
  */
 const radius = (puck, car, iconScale) => ['interpolate', ['linear'], ['zoom'],
   ...ZOOM_STOPS.flatMap((zoom, i) => {
-    const ring = CAR_RING_RADIUS_PX * iconSizeAt(zoom, iconScale);
+    const ring = CAR_RING_RADIUS_PX * iconSizeAt(zoom, iconScale) * CAR_SIZE_FACTOR;
     const [carSelected, carNormal] = car(ring);
     return [zoom, ['case', isTopDown,
       ['case', isSelected, carSelected, carNormal],
@@ -188,7 +194,7 @@ export const vehicleLayerSpecs = (sourceId, { iconScale, titleField, fonts }) =>
       'text-anchor': 'top',
       // Below the ring: a top-down car's ring is much larger than the puck's.
       'text-offset': ['case', isTopDown,
-        ['literal', [0, 2.6 * iconScale]],
+        ['literal', [0, 2.2 * iconScale]],
         ['literal', [0, 1.58 * iconScale]]],
       'text-font': fonts,
       'text-size': [
