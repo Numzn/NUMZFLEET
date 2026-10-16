@@ -17,27 +17,16 @@ import useMotionDurationTick from '../../fleet/vehicleDetail/useMotionDurationTi
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 import VehicleLocationLine from '../../common/components/VehicleLocationLine';
 import { STALE_FIX_MS } from './vehicleOperationalIndicators.js';
+import { formatTodaySidebarLabel } from './mobile/vehicleTodayDistance.js';
 
 dayjs.extend(relativeTime);
 
 /**
- * Single right-column insight: Daily Mileage (distance travelled today, from
- * the fuel-api daily-mileage ledger) when known; canonical odometer
- * (fuel-api resolveOdometerKm) as the labeled fallback — a lifetime reading
- * is never presented as a daily distance.
+ * Single right-column insight: Daily Mileage (distance travelled today, from the fuel-api daily-mileage
+ * ledger) when known; the canonical odometer as the labeled fallback — a lifetime reading is never
+ * presented as a daily distance. When the backend reports that the value is not settled (provisional,
+ * awaiting a tracker, held for review, unobserved distance, an old reading) one short flag sits under it.
  */
-function formatOdometerInsight(display) {
-  const dailyKm = display?.dailyMileage?.km;
-  if (dailyKm != null && Number.isFinite(Number(dailyKm))) {
-    return `Today ${Number(dailyKm).toFixed(1)} km`;
-  }
-  const odometerKm = display?.odometerKm;
-  if (odometerKm == null || !Number.isFinite(Number(odometerKm))) return null;
-  const n = Number(odometerKm);
-  if (n >= 100) return `Odometer ${Math.round(n).toLocaleString()} km`;
-  return `Odometer ${n.toFixed(1)} km`;
-}
-
 function pickRightInsight({ device, isOffline, odometerInsight, fixRel }) {
   if (isOffline) {
     if (fixRel) return `Last seen ${fixRel}`;
@@ -91,7 +80,8 @@ const VehicleListItem = ({
 
   const fixRel = position?.fixTime ? dayjs(position.fixTime).fromNow() : null;
 
-  const odometerInsight = formatOdometerInsight(display);
+  const mileage = formatTodaySidebarLabel(display, motionNow);
+  const odometerInsight = mileage.text;
 
   const hasFix = position?.latitude != null && position?.longitude != null;
   const ign = !isOffline && isFixFresh ? getIgnitionPhrase(position?.attributes) : null;
@@ -246,6 +236,7 @@ const VehicleListItem = ({
               <Typography
                 variant="caption"
                 textAlign="right"
+                title={mileage.title || undefined}
                 sx={{
                   flexShrink: 0,
                   alignSelf: 'flex-start',
@@ -260,6 +251,14 @@ const VehicleListItem = ({
                 }}
               >
                 {insight}
+                {!isOffline && insight === mileage.text && mileage.flag ? (
+                  <Box
+                    component="span"
+                    sx={{ display: 'block', color: 'warning.main', opacity: 1, fontWeight: 600 }}
+                  >
+                    {mileage.flag}
+                  </Box>
+                ) : null}
               </Typography>
             ) : null}
           </Box>

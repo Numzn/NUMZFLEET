@@ -4,6 +4,8 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
+  FormControlLabel,
   Stack,
   TextField,
   Typography,
@@ -14,6 +16,12 @@ import {
   fuelApiErrorMessage,
 } from '../../../vehiclesApi.js';
 import { useManager } from '../../../../common/util/permissions';
+import { describeOdometerStatus } from '../../../display/odometerStatus.js';
+import {
+  MIN_REASON_CHARS,
+  buildObservationPayload,
+  canSubmitObservation,
+} from './odometerObservationPayload.js';
 
 const fmtKm = (km) => (km != null && Number.isFinite(Number(km))
   ? `${Number(km).toLocaleString()} km`
@@ -29,6 +37,8 @@ export default function VehicleOdometerObservation({ fleetVehicleId }) {
   const isManager = useManager();
   const [data, setData] = useState(null);
   const [manualKm, setManualKm] = useState('');
+  const [attested, setAttested] = useState(false);
+  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -48,14 +58,20 @@ export default function VehicleOdometerObservation({ fleetVehicleId }) {
     load();
   }, [load]);
 
-  const recordObservation = async (km, source) => {
+  const submitReading = async () => {
     setBusy(true);
     setError('');
     setInfo('');
     try {
-      await recordOdometerObservation(user, fleetVehicleId, { odometerKm: km, source });
+      await recordOdometerObservation(user, fleetVehicleId, buildObservationPayload({
+        odometerKm: manualKm,
+        attestedFromDashboard: attested,
+        reason,
+      }));
       setManualKm('');
-      setInfo('Dashboard reading recorded.');
+      setReason('');
+      setAttested(false);
+      setInfo('Dashboard reading recorded and verified.');
       await load();
     } catch (e) {
       setError(fuelApiErrorMessage(e, 'Failed to record odometer reading'));
@@ -63,6 +79,8 @@ export default function VehicleOdometerObservation({ fleetVehicleId }) {
       setBusy(false);
     }
   };
+
+  const status = describeOdometerStatus(data);
 
   const driftPct = data?.odometerDriftPct;
   const driftClass = data?.odometerDriftClass;
@@ -81,6 +99,21 @@ export default function VehicleOdometerObservation({ fleetVehicleId }) {
         <strong>{fmtKm(data?.odometerKm)}</strong>
         {data?.odometerConfidence ? ` · ${confidenceLabel(data.odometerConfidence)} confidence` : ''}
       </Typography>
+      {status.state !== 'none' && (
+        <Typography
+          variant="body2"
+          color={status.tone === 'warn' ? 'warning.main' : 'text.secondary'}
+          fontWeight={status.tone === 'warn' ? 600 : 400}
+        >
+          {status.label}
+          {status.age ? ` · last reading ${status.age}` : ''}
+        </Typography>
+      )}
+      {status.details.map((line) => (
+        <Typography key={line} variant="caption" color="text.secondary" display="block">
+          {line}
+        </Typography>
+      ))}
       <Typography variant="body2" color="text.secondary">
         Drift vs last observation:
         {' '}
@@ -98,33 +131,45 @@ export default function VehicleOdometerObservation({ fleetVehicleId }) {
       {info && <Alert severity="success" sx={{ mt: 1 }}>{info}</Alert>}
 
       {isManager && (
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }} alignItems={{ sm: 'center' }}>
-          <TextField
-            label="Record dashboard reading (km)"
-            type="number"
-            size="small"
-            value={manualKm}
-            onChange={(e) => setManualKm(e.target.value)}
-            disabled={busy}
-            sx={{ maxWidth: 220 }}
-          />
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={busy || manualKm === ''}
-            onClick={() => recordObservation(manualKm, 'manual')}
-          >
-            Save reading
-          </Button>
-          {data?.odometerKm != null && (
+        <Stack spacing={1} sx={{ mt: 1.5 }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+            <TextField
+              label="Dashboard reading (km)"
+              type="number"
+              size="small"
+              value={manualKm}
+              onChange={(e) => setManualKm(e.target.value)}
+              disabled={busy}
+              sx={{ maxWidth: 220 }}
+            />
             <Button
               size="small"
-              disabled={busy}
-              onClick={() => recordObservation(data.odometerKm, 'audit')}
+              variant="outlined"
+              disabled={busy || !canSubmitObservation({ odometerKm: manualKm, attestedFromDashboard: attested })}
+              onClick={submitReading}
             >
-              Trust live reading ({fmtKm(data.odometerKm)})
+              Save reading
             </Button>
-          )}
+          </Stack>
+          <FormControlLabel
+            control={(
+              <Checkbox
+                size="small"
+                checked={attested}
+                onChange={(e) => setAttested(e.target.checked)}
+                disabled={busy}
+              />
+            )}
+            label="I read this value from the vehicle’s own odometer"
+          />
+          <TextField
+            label="Reason (needed to correct a verified odometer)"
+            size="small"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            disabled={busy}
+            helperText={`At least ${MIN_REASON_CHARS} characters when lowering a verified reading or raising it by more than the vehicle could have driven.`}
+          />
         </Stack>
       )}
     </Box>

@@ -48,11 +48,21 @@ export async function fetchVehicleOdometerState(user, fleetVehicleId) {
   return res.json();
 }
 
-export async function recordOdometerObservation(user, fleetVehicleId, { odometerKm, source }) {
+/**
+ * Record a reading of the vehicle's odometer. `payload` comes from buildObservationPayload (so a reading is
+ * only ever sent as physically confirmed when the person attested to it).
+ * @param {object} payload - { odometerKm, source?, confirmedPhysical?, reason? }
+ */
+export async function recordOdometerObservation(user, fleetVehicleId, payload) {
   const res = await fetchOrThrow(`/api/vehicles/${encodeURIComponent(fleetVehicleId)}/odometer/observation`, {
     method: 'POST',
     headers: fuelApiAuthHeaders(user),
-    body: JSON.stringify({ odometerKm: Number(odometerKm), source: source || 'manual' }),
+    body: JSON.stringify({
+      odometerKm: Number(payload.odometerKm),
+      source: payload.source || 'manual',
+      confirmedPhysical: payload.confirmedPhysical === true,
+      ...(payload.reason ? { reason: payload.reason } : {}),
+    }),
   });
   return res.json();
 }

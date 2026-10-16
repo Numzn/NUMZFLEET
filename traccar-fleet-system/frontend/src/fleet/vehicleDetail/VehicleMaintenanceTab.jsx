@@ -1,5 +1,6 @@
 import { Alert, Box } from '@mui/material';
 import RoutineServiceOpsPanel from './RoutineServiceOpsPanel.jsx';
+import OdometerStatusLine from '../display/OdometerStatusLine.jsx';
 
 export default function VehicleMaintenanceTab({
   vehicleEngine,
@@ -29,6 +30,8 @@ export default function VehicleMaintenanceTab({
           Assign a tracker to this vehicle to enable Routine Service monitoring.
         </Alert>
       )}
+
+      <OdometerStatusLine registry={vehicleEngine?.registry} />
 
       <RoutineServiceOpsPanel
         nextService={nextService}

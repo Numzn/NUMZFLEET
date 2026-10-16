@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   TextField,
   Typography,
 } from '@mui/material';
@@ -40,6 +42,8 @@ export default function CompleteMaintenanceDialog({
 }) {
   const [completionDate, setCompletionDate] = useState(toDateInputValue());
   const [odometerKm, setOdometerKm] = useState('');
+  const [odometerAttested, setOdometerAttested] = useState(false);
+  const [odometerReason, setOdometerReason] = useState('');
   const [engineHours, setEngineHours] = useState('');
   const [cost, setCost] = useState('');
   const [technician, setTechnician] = useState('');
@@ -54,6 +58,8 @@ export default function CompleteMaintenanceDialog({
       : '';
     setCompletionDate(toDateInputValue());
     setOdometerKm(fromEngine);
+    setOdometerAttested(false);
+    setOdometerReason('');
     setEngineHours(prefillEngineHours(maintenanceItem));
     setCost('');
     setTechnician('');
@@ -73,6 +79,8 @@ export default function CompleteMaintenanceDialog({
     try {
       await completeMaintenanceService(user, fleetVehicleId, maintenanceItem, {
         odometerKm,
+        odometerConfirmedPhysical: odometerAttested,
+        odometerReason,
         cost: routineServiceMode ? undefined : cost,
         vendor: technician,
         technician,
@@ -142,6 +150,36 @@ export default function CompleteMaintenanceDialog({
             fullWidth
             autoFocus={!routineServiceMode}
           />
+        ) : null}
+
+        {isDistanceMaintenanceType(maintenanceItem.type) && odometerKm !== '' ? (
+          <>
+            <FormControlLabel
+              control={(
+                <Checkbox
+                  size="small"
+                  checked={odometerAttested}
+                  onChange={(e) => setOdometerAttested(e.target.checked)}
+                  disabled={saving}
+                />
+              )}
+              label="I read this value from the vehicle’s own odometer"
+            />
+            {odometerAttested ? (
+              <TextField
+                label="Reason (only if this corrects the recorded odometer)"
+                value={odometerReason}
+                onChange={(e) => setOdometerReason(e.target.value)}
+                disabled={saving}
+                size="small"
+                fullWidth
+              />
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                The prefilled value is the system’s own figure. Tick the box only if you read it from the dashboard; otherwise it will not be recorded as a verified reading.
+              </Typography>
+            )}
+          </>
         ) : null}
 
         {isHours ? (

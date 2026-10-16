@@ -1,5 +1,6 @@
 import { Box } from '@mui/material';
 import VehicleOverviewKpiRow from './VehicleOverviewKpiRow.jsx';
+import OdometerStatusLine from '../../display/OdometerStatusLine.jsx';
 import VehicleMaintenanceOverviewPanel from './VehicleMaintenanceOverviewPanel.jsx';
 import VehicleServiceRemindersTimeline from './VehicleServiceRemindersTimeline.jsx';
 import VehicleDigitalEnginePlaceholder from './VehicleDigitalEnginePlaceholder.jsx';
@@ -39,6 +40,8 @@ export default function VehicleOverviewTab(props) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: sectionGap }}>
+      <OdometerStatusLine registry={vehicleEngine?.registry} />
+
       <VehicleOverviewKpiRow
         fuelPerformance={fuelPerformance}
         fuelPerformanceLoading={fuelPerformanceLoading}

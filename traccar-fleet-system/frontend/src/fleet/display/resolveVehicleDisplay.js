@@ -20,9 +20,15 @@ function trimOrNull(value) {
  * @param {string} [input.fleetVehicleId]
  * @param {number|null} [input.odometerKm] - canonical resolved odometer (fuel-api resolveOdometerKm), NOT daily mileage
  * @param {string} [input.odometerConfidence]
+ * @param {string} [input.odometerVerification] - physical | estimated | unverified_legacy | none (who vouches for the value)
+ * @param {string} [input.odometerReconciliation] - none | awaiting_tracker | provisional | established
+ * @param {boolean} [input.odometerBaselinePending]
+ * @param {string} [input.odometerReadingStatus] - accepted | quarantined | unvalidated | none
+ * @param {string|null} [input.odometerEvidenceAt] - when the tracker reading behind the value was taken
+ * @param {string|null} [input.odometerAnchorObservedAt]
  * @param {object|null} [input.activityState] - canonical resolveActivityState() result, persisted server-side
  * @param {object|null} [input.dailyMileage] - fuel-api dailyMileage DTO ({ km, source, date, ... }) — distance travelled today
- * @returns {{ primary: string, secondary: string|null, deviceId: number|null, fleetVehicleId: string|null, odometerKm: number|null, odometerConfidence: string, activityState: object|null, dailyMileage: object|null }}
+ * @returns {{ primary: string, secondary: string|null, deviceId: number|null, fleetVehicleId: string|null, odometerKm: number|null, odometerConfidence: string, odometerVerification: string, odometerReconciliation: string, odometerBaselinePending: boolean, odometerReadingStatus: string, odometerEvidenceAt: string|null, odometerAnchorObservedAt: string|null, activityState: object|null, dailyMileage: object|null }}
  */
 export function resolveVehicleDisplay(input = {}) {
   const nickname = trimOrNull(input.name);
@@ -51,6 +57,13 @@ export function resolveVehicleDisplay(input = {}) {
     fleetVehicleId,
     odometerKm: Number.isFinite(Number(input.odometerKm)) ? Number(input.odometerKm) : null,
     odometerConfidence: input.odometerConfidence ?? 'unavailable',
+    // Provenance is passed through exactly as fuel-api resolved it; nothing here is derived from raw counters.
+    odometerVerification: input.odometerVerification ?? 'none',
+    odometerReconciliation: input.odometerReconciliation ?? 'none',
+    odometerBaselinePending: Boolean(input.odometerBaselinePending),
+    odometerReadingStatus: input.odometerReadingStatus ?? 'none',
+    odometerEvidenceAt: input.odometerEvidenceAt ?? null,
+    odometerAnchorObservedAt: input.odometerAnchorObservedAt ?? null,
     activityState: input.activityState ?? null,
     dailyMileage: input.dailyMileage ?? null,
   };
@@ -72,6 +85,12 @@ export function resolveVehicleDisplayFromFleetRow(vehicleRow) {
     fleetVehicleId: vehicleRow.id,
     odometerKm: vehicleRow.odometerKm,
     odometerConfidence: vehicleRow.odometerConfidence,
+    odometerVerification: vehicleRow.odometerVerification,
+    odometerReconciliation: vehicleRow.odometerReconciliation,
+    odometerBaselinePending: vehicleRow.odometerBaselinePending,
+    odometerReadingStatus: vehicleRow.odometerReadingStatus,
+    odometerEvidenceAt: vehicleRow.odometerEvidenceAt,
+    odometerAnchorObservedAt: vehicleRow.odometerAnchorObservedAt,
     activityState: vehicleRow.activityState ?? null,
     dailyMileage: vehicleRow.dailyMileage ?? null,
   });

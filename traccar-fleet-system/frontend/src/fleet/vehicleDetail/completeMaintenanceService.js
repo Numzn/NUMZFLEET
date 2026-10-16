@@ -2,6 +2,7 @@ import {
   createVehicleServiceRecord,
   updateVehicleServiceRecord,
 } from '../vehiclesApi.js';
+import { buildCompletionPatch } from './completionPatch.js';
 
 export function isTimeMaintenanceType(type) {
   return typeof type === 'string' && type.endsWith('Time');
@@ -58,10 +59,12 @@ export async function completeMaintenanceService(user, fleetVehicleId, maintenan
   }
 
   const record = await createVehicleServiceRecord(user, fleetVehicleId, payload);
-  const completionPatch = { status: 'completed' };
-  if (form.completedAt) {
-    completionPatch.completedAt = form.completedAt;
-  }
+  const completionPatch = buildCompletionPatch({
+    completedAt: form.completedAt,
+    odometerKm: isDistanceMaintenanceType(maintenanceItem.type) ? form.odometerKm : undefined,
+    odometerConfirmedPhysical: form.odometerConfirmedPhysical,
+    odometerReason: form.odometerReason,
+  });
   const completed = await updateVehicleServiceRecord(user, fleetVehicleId, record.id, completionPatch);
 
   if (completed.scheduleResetStatus === 'failed') {

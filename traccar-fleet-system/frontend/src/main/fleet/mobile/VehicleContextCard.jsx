@@ -16,7 +16,7 @@ import useMotionDurationTick from '../../../fleet/vehicleDetail/useMotionDuratio
 import VehicleLocationLine from '../../../common/components/VehicleLocationLine';
 import DeviceQuickActions from '../DeviceQuickActions';
 import { getGpsStaleWarning } from './gpsStaleWarning';
-import { formatDistanceInsight } from './vehicleTodayDistance';
+import { formatMileageSummary } from './vehicleTodayDistance';
 import { STATUS_TINT } from './fleetMobileCardSx';
 
 const VehicleContextCard = ({
@@ -50,9 +50,9 @@ const VehicleContextCard = ({
   const motionDuration = getMotionDurationLabel(durationState, motionNow);
   const statusText = motionDuration ? `${motionLabel} • ${motionDuration}` : motionLabel;
   const gpsStale = position ? getGpsStaleWarning(position?.fixTime) : null;
-  // Daily Mileage (distance travelled today, fuel-api daily-mileage ledger)
-  // when known; canonical odometer as the labeled fallback otherwise.
-  const odometerLabel = formatDistanceInsight(display);
+  // Daily Mileage (distance travelled today, fuel-api daily-mileage ledger) when known, else the canonical
+  // odometer; underneath, the odometer with who vouches for it and the age of the reading behind it.
+  const mileage = formatMileageSummary(display, motionNow);
   const hasFix = position?.latitude != null && position?.longitude != null;
 
   return (
@@ -108,9 +108,23 @@ const VehicleContextCard = ({
               </Typography>
             </Box>
           ) : null}
-          {odometerLabel ? (
+          {mileage.primary ? (
             <Typography sx={{ fontSize: '0.6875rem', color: 'var(--color-text-secondary)', mt: 0.35 }}>
-              {odometerLabel}
+              {mileage.primary}
+            </Typography>
+          ) : null}
+          {mileage.secondary ? (
+            <Typography
+              title={mileage.title || undefined}
+              sx={{
+                fontSize: '0.625rem',
+                fontWeight: mileage.tone === 'warn' ? 600 : 400,
+                color: mileage.tone === 'warn' ? 'var(--color-warning)' : 'var(--color-text-secondary)',
+                opacity: mileage.tone === 'warn' ? 1 : 0.85,
+                mt: 0.1,
+              }}
+            >
+              {mileage.secondary}
             </Typography>
           ) : null}
         </Box>
