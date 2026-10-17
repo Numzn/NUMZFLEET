@@ -26,6 +26,13 @@ export function buildRoutineServiceSummaryByVehicle(dueState) {
       statusLabel,
       remainingKm,
       nextServiceAtKm: item.nextDue != null ? Math.round(Number(item.nextDue) / 1000) : null,
+      // Where the current interval started: Traccar's schedule `start`, which completing a service rebases.
+      // This (not the cached numzFleetConfig copy, which is only written at setup) is the true baseline, so a
+      // screen that re-saves Routine Service can never rewind the interval to a stale figure. null when the
+      // schedule carries no usable start; a genuine 0 is a real first-cycle value.
+      startingOdometerKm: item.start != null && item.start !== '' && Number.isFinite(Number(item.start))
+        ? Math.round(Number(item.start) / 1000)
+        : null,
       // Authoritative interval (Traccar schedule period), not the cached
       // numzFleetConfig pointer — lets readiness/UI stop trusting the cache.
       intervalKm: item.period != null ? Math.round(Number(item.period) / 1000) : null,

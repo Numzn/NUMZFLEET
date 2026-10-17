@@ -70,3 +70,37 @@ test('buildRoutineServiceSummaryByVehicle: empty/missing items -> empty map, not
   assert.equal(buildRoutineServiceSummaryByVehicle({}).size, 0);
   assert.equal(buildRoutineServiceSummaryByVehicle({ items: [] }).size, 0);
 });
+
+test('buildRoutineServiceSummaryByVehicle: exposes the schedule\'s real cycle start, not a cached copy', () => {
+  // completed at 10,500 km with a 5,000 km interval: Traccar's `start` was rebased to 10,500,000 m
+  const map = buildRoutineServiceSummaryByVehicle({
+    items: [
+      {
+        id: 12,
+        fleetVehicleId: 'veh-5',
+        attributes: { numzServicePackage: true },
+        type: 'totalDistance',
+        start: 10500000,
+        period: 5000000,
+        nextDue: 15500000,
+        remaining: 4200000,
+      },
+    ],
+  });
+  const entry = map.get('veh-5');
+  assert.equal(entry.startingOdometerKm, 10500);
+  assert.equal(entry.intervalKm, 5000);
+  assert.equal(entry.nextServiceAtKm, 15500);
+  assert.equal(entry.nextServiceAtKm - entry.intervalKm, entry.startingOdometerKm, 'the three figures agree');
+});
+
+test('buildRoutineServiceSummaryByVehicle: a schedule without a usable start reports null, never 0', () => {
+  const base = { fleetVehicleId: 'veh-6', attributes: { numzServicePackage: true }, type: 'totalDistance', period: 5000000 };
+  for (const start of [undefined, null, '', 'x', NaN]) {
+    const entry = buildRoutineServiceSummaryByVehicle({ items: [{ ...base, start }] }).get('veh-6');
+    assert.equal(entry.startingOdometerKm, null, String(start));
+  }
+  // a genuine start of 0 (new vehicle, first cycle) is a real value
+  const zero = buildRoutineServiceSummaryByVehicle({ items: [{ ...base, start: 0 }] }).get('veh-6');
+  assert.equal(zero.startingOdometerKm, 0);
+});

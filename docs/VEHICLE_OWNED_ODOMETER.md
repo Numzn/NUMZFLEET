@@ -210,18 +210,53 @@ All of it is the backend's resolved result; the frontend only names it (`fleet/d
 |---------|-------|
 | Map vehicle card (`VehicleContextCard`) | day figure (or odometer), then `Odometer • N km · <Verified/Estimated/Provisional/Awaiting tracker/Reading under review/Calibrating/Unverified> · <age>`; warning colour and a tooltip listing the reasons when it needs attention |
 | Sidebar row (`VehicleListItem`) | the compact `Today X km` / `Odometer N km`, plus **one** flag only when something is unsettled (state, `+X km unobserved`, `Last reading 3 days ago`, low confidence). Offline rows keep showing `Last seen …` |
+| Vehicle header (`VehicleWorkspaceHero`) | **Odometer** (cumulative only, never daily distance) with state and reading age under it; Routine Service due text is the backend's own wording |
 | Vehicle overview and maintenance tabs | `OdometerStatusLine`: odometer, state, reading age; a warning with reasons when unsettled |
 | Odometer module (Setup) | live value, state, age, reasons; dashboard-reading form with attestation and reason |
+| Fuel operations | a vehicle still waiting to be fuelled shows its **live** canonical odometer; a fuelled line shows the mileage **captured at the fill** (`currentMileage`), never today's odometer |
+| Vehicles list, maintenance dashboard | Routine Service status / remaining km follow the vehicles live (below) |
+| Replay / event status card | the raw tracker counter is labelled **Tracker distance counter** — historical evidence, not the vehicle's odometer |
 | Daily label | `Daily Mileage • 30.0 km (partial day, +8.0 km unobserved)` — the unobserved distance is shown beside the figure, never added |
 
 An offline tracker keeps its last accepted value and the **age of the reading is disclosed**; staleness changes the
 tone (≥ 24 h) and confidence, never the value.
 
-**Liveness without polling.** The positions already arrive over the existing socket into Redux. When a tracker's
-distance counter advances by ≥ 100 m, the registry re-fetches `/api/vehicles` (fuel-api resolves the numbers):
-debounced 5 s, at most one request per 30 s, only while the tab is visible, and once on return to a tab hidden for
-> 60 s. The raw counter is used only as that *trigger*, never displayed. A failed refresh keeps the rows already on
-screen. The vehicle workspace keeps its existing engine polling.
+### Live updates (no manual refresh)
+
+fuel-api resolves every number; the browser only decides **when to ask again**. One signal source
+(`fleet/display/useMileageSignalSource.js`, mounted once with the registry) watches data already in Redux and publishes
+signals on a small bus (`mileageSignal.js`):
+
+| Signal | When | Screens react |
+|--------|------|---------------|
+| `counter` + `deviceIds` | a tracker's distance counter advanced ≥ 100 m (compared per device, never displayed) | normal: after a 5 s window, at most one refresh per 30 s; a single-vehicle screen reacts only to its own device |
+| `reconnect` | the live connection returned after a drop | urgent: refresh after the short floor (10 s between urgent refreshes) |
+| `online` | the browser regained connectivity | urgent |
+| `visible` | the tab was shown | urgent only if the screen's data is > 60 s old or it skipped a refresh while hidden |
+| `fallback` | **only while the live connection is down** and the tab is visible: every 2 min | normal |
+
+Each screen subscribes through `useMileageSignalRefresh` → `mileageConsumer.js` → `refreshScheduler.js`: notifications
+join an open window instead of extending it (a moving vehicle cannot starve the refresh), a refresh never overlaps itself,
+a hidden tab spends nothing, a failed refresh keeps the last good data on screen, and nothing polls while the connection is
+healthy. Subscribers: the registry (map cards, sidebar, operations, Vehicles list), the vehicle workspace engine
+(odometer, Routine Service remaining km and status), and the maintenance dashboard. The workspace keeps its existing 60 s
+engine poll as a backstop.
+
+### Routine Service interval — what moves it
+
+`start` of the Traccar schedule is where the current interval began; **only completing a service moves it** (the backend
+rebases it to the completion odometer). Three screen rules protect that:
+
+- the Complete Service dialog initialises once per opening; a live odometer update refreshes an *untouched, unconfirmed*
+  odometer field only and never replaces something the person typed or ticked as a dashboard reading;
+- Vehicle Setup hydrates the interval baseline from the **schedule** (`routineService.startingOdometerKm`, `intervalKm`), not
+  from the `numzFleetConfig` copy written once at setup (stale after the first completed service), and rewrites the
+  schedule only when it does not exist yet or the person changed those two fields — previously every setup save re-sent the
+  cached baseline and could rewind the interval;
+- the live odometer is suggested as a starting odometer only when no schedule exists.
+
+Reports: a vehicle's operation report row (`getVehicleOperationKpis`) now carries the mileage captured at each fill; it
+previously stamped today's odometer on every historical fill, which fed the "last refill" odometer and the PDF.
 
 ---
 

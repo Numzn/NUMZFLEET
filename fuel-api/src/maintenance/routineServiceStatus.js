@@ -41,7 +41,8 @@ export function deriveRoutineServiceStatus(remainingKm) {
 export function routineRemainingKm(item) {
   if (item?.type !== 'totalDistance' || item.remaining == null) return null;
   const km = Math.round(Number(item.remaining) / 1000);
-  return Number.isFinite(km) ? km : null;
+  // Math.round(-0.4) is -0, which prints as "-0": a service a few hundred metres short of due is simply 0 km away.
+  return Number.isFinite(km) ? km + 0 : null;
 }
 
 export function isRoutineServiceSchedule(schedule) {

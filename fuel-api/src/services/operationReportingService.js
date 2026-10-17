@@ -2,7 +2,6 @@ import { Op } from 'sequelize';
 import { OperationSession, OperationSessionRefuel, OperationSessionInvoice } from '../models/index.js';
 import { listByUser } from '../repositories/operationSessionRepository.js';
 import { summarizeInvoices } from './invoiceReconciliationService.js';
-import { resolveOdometerMapForDevices } from './operationSessionCore.js';
 import { getLocksAt } from './operationLockHelper.js';
 import { getFleetTimezone } from '../config/operationConfig.js';
 
@@ -98,6 +97,30 @@ export async function getDailyOperationKpis(user, query = {}, companyId = null) 
   });
 }
 
+/**
+ * One fill in a vehicle's operation report. Its mileage is the mileage CAPTURED at that fill (`currentMileage`).
+ * It used to be the vehicle's live odometer resolved at request time, which put today's reading on every
+ * historical fill (and changed it every time the report was opened). A fill with no captured mileage reports
+ * null.
+ */
+export function mapVehicleRefuelKpiRow(r) {
+  const planned = r.plannedFuelLitres != null ? Number(r.plannedFuelLitres) : Number(r.estimatedFuelLitres || 0);
+  const actual = Number(r.actualFuelLitres);
+  const captured = r.currentMileage != null && Number.isFinite(Number(r.currentMileage)) ? Number(r.currentMileage) : null;
+  return {
+    refuelId: r.id,
+    operationId: r.sessionId,
+    calendarDate: r.session?.calendarDate,
+    plannedLitres: planned,
+    actualLitres: actual,
+    varianceLitres: Number((actual - planned).toFixed(2)),
+    forecastAccuracyPercent: pctAccuracy(planned, actual),
+    mileage: captured,
+    odometerKm: captured,
+    sessionDate: r.sessionDate,
+  };
+}
+
 export async function getVehicleOperationKpis(user, query = {}, companyId = null) {
   const vehicleId = Number(query.vehicleId);
   if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
@@ -126,25 +149,7 @@ export async function getVehicleOperationKpis(user, query = {}, companyId = null
     limit: Math.min(Number(query.limit) || 50, 200),
   });
 
-  const odometerMap = await resolveOdometerMapForDevices(refuels.map((r) => r.vehicleId));
-
-  const rows = refuels.map((r) => {
-    const planned = r.plannedFuelLitres != null ? Number(r.plannedFuelLitres) : Number(r.estimatedFuelLitres || 0);
-    const actual = Number(r.actualFuelLitres);
-    const liveOdometer = odometerMap.get(Number(r.vehicleId));
-    return {
-      refuelId: r.id,
-      operationId: r.sessionId,
-      calendarDate: r.session?.calendarDate,
-      plannedLitres: planned,
-      actualLitres: actual,
-      varianceLitres: Number((actual - planned).toFixed(2)),
-      forecastAccuracyPercent: pctAccuracy(planned, actual),
-      mileage: liveOdometer?.odometerKm ?? null,
-      odometerKm: liveOdometer?.odometerKm ?? null,
-      sessionDate: r.sessionDate,
-    };
-  });
+  const rows = refuels.map(mapVehicleRefuelKpiRow);
 
   const accuracies = rows.map((r) => r.forecastAccuracyPercent).filter((n) => n != null);
   const avgAccuracy = accuracies.length
