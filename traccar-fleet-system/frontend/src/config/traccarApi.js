@@ -28,6 +28,7 @@ export const FUEL_API_PREFIXES = [
   '/api/my-customers',
   '/api/partner',
   '/api/context',
+  '/api/geofence-boundaries',
   '/api/platform',
 ];
 

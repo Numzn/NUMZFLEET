@@ -3,7 +3,7 @@ import { traccarPath } from '../config/traccarApi.js';
 
 import { useDispatch } from 'react-redux';
 import {
-  Box, Typography, IconButton, Tooltip,
+  Box, Typography, IconButton, Tooltip, Tab, Tabs, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import UploadFileIcon from '@mui/icons-material/FileUpload';
@@ -12,6 +12,8 @@ import MapView from '../map/core/MapView';
 import MapCurrentLocation from '../map/MapCurrentLocation';
 import MapGeofenceEdit from '../map/draw/MapGeofenceEdit';
 import GeofencesList from './GeofencesList';
+import BoundarySearchPanel from './geofences/BoundarySearchPanel';
+import MapFocusPoint from '../map/draw/MapFocusPoint';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import MapGeocoder from '../map/geocoder/MapGeocoder';
 import { errorsActions } from '../store';
@@ -55,7 +57,7 @@ const useStyles = makeStyles()((theme) => ({
       flexShrink: 0,
     },
     [theme.breakpoints.down('sm')]: {
-      height: 280,
+      height: 'min(52vh, 420px)',
       borderRight: 'none',
       borderBottom: '1px solid var(--surface-border)',
     },
@@ -89,6 +91,9 @@ const GeofencesPage = () => {
   const t = useTranslation();
 
   const [selectedGeofenceId, setSelectedGeofenceId] = useState();
+  const [tab, setTab] = useState('list');
+  const [createMethod, setCreateMethod] = useState('draw');
+  const [focusPoint, setFocusPoint] = useState(null);
 
   const handleFile = (event) => {
     const files = Array.from(event.target.files);
@@ -158,11 +163,51 @@ const GeofencesPage = () => {
               </Tooltip>
             </label>
           </Box>
-          <GeofencesList onGeofenceSelected={setSelectedGeofenceId} />
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth" sx={{ flexShrink: 0, minHeight: 40 }}>
+            <Tab value="list" label="Geofences" sx={{ minHeight: 40 }} />
+            <Tab value="create" label="Create" sx={{ minHeight: 40 }} />
+          </Tabs>
+          {tab === 'list' && (
+            <GeofencesList onGeofenceSelected={setSelectedGeofenceId} selectedGeofenceId={selectedGeofenceId} />
+          )}
+          {tab === 'create' && (
+            <>
+              <Box sx={{ p: 1.5, pb: 0 }}>
+                <ToggleButtonGroup
+                  exclusive
+                  fullWidth
+                  size="small"
+                  value={createMethod}
+                  onChange={(_, v) => v && setCreateMethod(v)}
+                >
+                  <ToggleButton value="draw">Draw on map</ToggleButton>
+                  <ToggleButton value="search">Search boundary</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+              {createMethod === 'draw' ? (
+                <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                  Use the polygon or line tool at the top-left of the map to draw a zone.
+                  After you finish drawing you can name and configure it.
+                </Typography>
+              ) : (
+                <BoundarySearchPanel
+                  onDrawInstead={(center) => {
+                    setFocusPoint(center);
+                    setCreateMethod('draw');
+                  }}
+                  onCreated={(id) => {
+                    setTab('list');
+                    setSelectedGeofenceId(id);
+                  }}
+                />
+              )}
+            </>
+          )}
         </Box>
         <div className={classes.mapContainer}>
           <MapView>
             <MapGeofenceEdit selectedGeofenceId={selectedGeofenceId} />
+            <MapFocusPoint point={focusPoint} />
           </MapView>
           <MapScale />
           <MapCurrentLocation />
