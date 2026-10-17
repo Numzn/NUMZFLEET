@@ -13,17 +13,21 @@ export default function RoutineServiceSetupModule({
   patch,
   canSaveSpecs,
   fleetVehicleId,
+  scheduleExists = false,
 }) {
   const { odometerKm, loading: engineLoading } = useVehicleEngine(fleetVehicleId);
 
+  // A starting odometer is suggested from the live odometer ONLY when no schedule exists yet. For an existing
+  // schedule an empty field means "unknown", and filling in today's odometer would restart the service interval.
   useEffect(() => {
-    if (!canSaveSpecs || engineLoading) return;
+    if (!canSaveSpecs || engineLoading || scheduleExists) return;
     if (form.routineServiceStartingOdometerKm !== '') return;
     if (odometerKm == null || !Number.isFinite(Number(odometerKm))) return;
     patch({ routineServiceStartingOdometerKm: String(Math.round(Number(odometerKm))) });
   }, [
     canSaveSpecs,
     engineLoading,
+    scheduleExists,
     odometerKm,
     form.routineServiceStartingOdometerKm,
     patch,
@@ -58,7 +62,9 @@ export default function RoutineServiceSetupModule({
         helperText={
           engineLoading
             ? 'Loading odometer from Vehicle Engine…'
-            : 'Last service baseline — prefilled from live odometer when available'
+            : (scheduleExists
+              ? 'Where the current service interval started — moves only when a service is completed'
+              : 'Last service baseline — prefilled from live odometer when available')
         }
         sx={{ mb: 2 }}
       />

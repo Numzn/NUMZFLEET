@@ -142,4 +142,25 @@ export function describeOdometerStatus(display, now = Date.now()) {
   };
 }
 
+/**
+ * The vehicle workspace header's "Odometer" stat: cumulative odometer only (never daily distance), with the
+ * provenance and age of the reading under it.
+ * @param {object|null|undefined} registry - the engine's `registry` (odometer + provenance fields)
+ * @param {number|null|undefined} fallbackKm - the engine's own rounded figure if the registry is missing
+ * @param {number} [now]
+ * @returns {{ value: string, subtitle: string|null, warn: boolean }}
+ */
+export function odometerStat(registry, fallbackKm, now = Date.now()) {
+  const km = finite(registry?.odometerKm) ? Number(registry.odometerKm) : (finite(fallbackKm) ? Number(fallbackKm) : null);
+  if (km == null) return { value: '\u2014', subtitle: null, warn: false };
+  const value = `${Math.round(km).toLocaleString()} km`;
+  if (!finite(registry?.odometerKm)) return { value, subtitle: null, warn: false };
+  const status = describeOdometerStatus(registry, now);
+  return {
+    value,
+    subtitle: [status.label, status.age].filter(Boolean).join(' \u00b7 '),
+    warn: status.attention,
+  };
+}
+
 export default describeOdometerStatus;

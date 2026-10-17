@@ -5,8 +5,9 @@
  * reported new distance, then ask fuel-api again — never derive a number from the raw counter. The raw
  * counters are used strictly as a TRIGGER (did anything move?) and are never displayed.
  *
- * No timers poll: a refresh is scheduled only by a counter change or by returning to a tab that has gone
- * stale, and a moving fleet is held to one request per MIN_REFRESH_INTERVAL_MS.
+ * No timers poll while the live connection is up: a refresh is scheduled only by a counter change, a
+ * reconnect, or returning to a tab that has gone stale (see mileageSignal.js and refreshScheduler.js), and a
+ * moving fleet is held to one request per MIN_REFRESH_INTERVAL_MS.
  */
 
 /** Quiet period after a counter change, so a burst of position updates costs one request. */
@@ -28,32 +29,34 @@ const counterStep = (value) => {
 };
 
 /**
+ * Each tracker's distance-counter step ("did this vehicle move another 100 m?"), keyed by device id.
+ * Only a trigger: the value is compared for equality and never displayed or converted to a distance.
+ * @param {Record<string, {deviceId?: number, attributes?: object}>|null|undefined} positions
+ * @returns {Map<string, string>}
+ */
+export function mileageStepsByDevice(positions) {
+  const steps = new Map();
+  if (!positions) return steps;
+  Object.keys(positions).forEach((key) => {
+    const attributes = positions[key]?.attributes;
+    const total = counterStep(attributes?.totalDistance);
+    const odo = counterStep(attributes?.odometer);
+    if (total == null && odo == null) return;
+    steps.set(key, `${total ?? ''}:${odo ?? ''}`);
+  });
+  return steps;
+}
+
+/**
  * A string that changes exactly when some tracker's distance counter advances by a step. Compare by
  * equality; do not parse it.
  * @param {Record<string, {deviceId?: number, attributes?: object}>|null|undefined} positions
  */
 export function mileageFingerprint(positions) {
-  if (!positions) return '';
-  const parts = [];
-  Object.keys(positions)
-    .sort((a, b) => Number(a) - Number(b))
-    .forEach((key) => {
-      const attributes = positions[key]?.attributes;
-      const total = counterStep(attributes?.totalDistance);
-      const odo = counterStep(attributes?.odometer);
-      if (total == null && odo == null) return;
-      parts.push(`${key}:${total ?? ''}:${odo ?? ''}`);
-    });
-  return parts.join('|');
-}
-
-/**
- * Milliseconds to wait before the next fetch after a counter change.
- * @param {{ lastLoadedAt: number, now: number }} args
- */
-export function nextRefreshDelay({ lastLoadedAt, now }) {
-  const untilAllowed = (lastLoadedAt || 0) + MIN_REFRESH_INTERVAL_MS - now;
-  return Math.max(TRIGGER_DEBOUNCE_MS, untilAllowed);
+  return [...mileageStepsByDevice(positions).entries()]
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([key, step]) => `${key}:${step}`)
+    .join('|');
 }
 
 /**

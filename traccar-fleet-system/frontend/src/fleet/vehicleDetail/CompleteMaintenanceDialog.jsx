@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -19,6 +19,7 @@ import {
   isHoursMaintenanceType,
   isTimeMaintenanceType,
 } from './completeMaintenanceService.js';
+import { odometerFieldValue, prefillFromOdometer } from './completionFormState.js';
 
 function prefillEngineHours(item) {
   const ms = Number(item?.current);
@@ -51,21 +52,42 @@ export default function CompleteMaintenanceDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  // The system odometer keeps moving while this dialog is open (live updates), and the schedule object is
+  // replaced on every refresh. Neither may reset what the person is filling in, or change the odometer they
+  // are about to record: the next service interval starts from the figure they confirm here.
+  const liveOdometerRef = useRef(registryOdometerKm);
+  liveOdometerRef.current = registryOdometerKm;
+  const itemRef = useRef(maintenanceItem);
+  itemRef.current = maintenanceItem;
+  const itemId = maintenanceItem?.id ?? null;
+  const [odometerTouched, setOdometerTouched] = useState(false);
+  const odometerLockedRef = useRef(false);
+  odometerLockedRef.current = odometerTouched || odometerAttested;
+
+  // Initialise once per opening (or when a different schedule is opened) — never on a live refresh.
   useEffect(() => {
-    if (!open || !maintenanceItem) return;
-    const fromEngine = registryOdometerKm != null && Number.isFinite(Number(registryOdometerKm))
-      ? String(Math.round(Number(registryOdometerKm)))
-      : '';
+    if (!open || itemId == null) return;
     setCompletionDate(toDateInputValue());
-    setOdometerKm(fromEngine);
+    setOdometerKm(prefillFromOdometer(liveOdometerRef.current));
+    setOdometerTouched(false);
     setOdometerAttested(false);
     setOdometerReason('');
-    setEngineHours(prefillEngineHours(maintenanceItem));
+    setEngineHours(prefillEngineHours(itemRef.current));
     setCost('');
     setTechnician('');
     setNotes('');
     setError(null);
-  }, [open, maintenanceItem, registryOdometerKm]);
+  }, [open, itemId]);
+
+  // A live odometer update refreshes an untouched, unconfirmed field only.
+  useEffect(() => {
+    if (!open) return;
+    setOdometerKm((current) => odometerFieldValue({
+      current,
+      touched: odometerLockedRef.current,
+      live: registryOdometerKm,
+    }));
+  }, [open, registryOdometerKm]);
 
   const handleClose = () => {
     if (saving) return;
@@ -145,8 +167,12 @@ export default function CompleteMaintenanceDialog({
             label="Completion odometer (km)"
             type="number"
             value={odometerKm}
-            onChange={(e) => setOdometerKm(e.target.value)}
+            onChange={(e) => { setOdometerTouched(true); setOdometerKm(e.target.value); }}
             inputProps={{ min: 0 }}
+            helperText={odometerTouched && prefillFromOdometer(registryOdometerKm) !== ''
+              && prefillFromOdometer(registryOdometerKm) !== String(odometerKm)
+              ? `System odometer now ${Number(prefillFromOdometer(registryOdometerKm)).toLocaleString()} km`
+              : undefined}
             fullWidth
             autoFocus={!routineServiceMode}
           />

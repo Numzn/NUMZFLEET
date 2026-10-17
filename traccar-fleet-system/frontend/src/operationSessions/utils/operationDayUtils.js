@@ -123,6 +123,23 @@ export function isRefuelComplete(refuel) {
   return refuel?.actualFuelLitres != null && Number(refuel.actualFuelLitres) > 0;
 }
 
+/**
+ * The mileage to show beside a refuel line.
+ *  - fuelled: the mileage CAPTURED at the fill (`currentMileage`). The session DTO's `odometerKm` is the live
+ *    odometer resolved when the page loaded, and showing that against a past fill makes the fill's mileage change
+ *    every time the page is opened. A legacy fill with no captured mileage shows nothing.
+ *  - waiting: the live canonical odometer (the registry's, which updates as the vehicle drives), falling back to
+ *    the session's own. The plan-time snapshot is never shown as current.
+ * @param {object} refuel
+ * @param {number|null|undefined} liveOdometerKm - canonical odometer from the live registry, if known
+ * @returns {number|null}
+ */
+export function refuelMileageKm(refuel, liveOdometerKm) {
+  const finite = (v) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
+  if (isRefuelComplete(refuel)) return finite(refuel?.currentMileage);
+  return finite(liveOdometerKm) ?? finite(refuel?.odometerKm);
+}
+
 export function isRefuelSkipped(refuel) {
   return refuel?.skippedAt != null;
 }

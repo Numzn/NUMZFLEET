@@ -13,6 +13,7 @@ import { resolveKnownFleetVehicleId } from '../../fleet/display/resolveVehicleDi
 import { formatLitres, formatZmw } from '../utils/formatters.js';
 import {
   isRefuelComplete,
+  refuelMileageKm,
   deriveVehicleWorkflowState,
   VEHICLE_STATE_LABEL,
   vehicleStateChipColor,
@@ -26,6 +27,8 @@ export default function OperationVehicleRow({ refuel, onReportCorrection, linkTa
   const device = devicesItems[refuel.vehicleId];
   const display = useOperationVehicleDisplay(refuel.vehicleId);
   const complete = isRefuelComplete(refuel);
+  // Fuelled: the mileage captured at the fill. Waiting: the live canonical odometer from the registry.
+  const mileageKm = refuelMileageKm(refuel, display.odometerKm);
   const workflowState = deriveVehicleWorkflowState(refuel);
   const planned = refuel.plannedFuelLitres != null ? Number(refuel.plannedFuelLitres) : null;
   const actual = refuel.actualFuelLitres != null ? Number(refuel.actualFuelLitres) : null;
@@ -45,10 +48,10 @@ export default function OperationVehicleRow({ refuel, onReportCorrection, linkTa
           {formatZmw(refuel.actualCost)}
         </>
       )}
-      {refuel.odometerKm != null && (
+      {mileageKm != null && (
         <>
           {' · '}
-          {Number(refuel.odometerKm).toLocaleString()}
+          {mileageKm.toLocaleString()}
           {' km'}
         </>
       )}

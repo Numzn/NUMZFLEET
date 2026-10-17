@@ -16,10 +16,7 @@ export default function useVehicleWorkspaceData(vehicleId) {
   const { deviceId, vehicle } = core;
   const fleetVehicleId = vehicle?.id ?? vehicleId;
 
-  const vehicleEngine = useVehicleEngine(fleetVehicleId, {
-    deviceId,
-    livePosition: core.livePosition,
-  });
+  const vehicleEngine = useVehicleEngine(fleetVehicleId, { deviceId });
   const linkedGeofences = useLinkedGeofences(deviceId);
   const lastRefill = useLastRefill(deviceId);
   const todayRefuel = useTodayOperationRefuel(deviceId);

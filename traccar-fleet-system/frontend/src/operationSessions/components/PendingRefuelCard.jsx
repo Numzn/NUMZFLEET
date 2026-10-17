@@ -6,6 +6,7 @@ import { useTheme } from '@mui/material/styles';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { fuelApiErrorMessage } from '../../fleet/vehiclesApi.js';
 import { validateMileageAgainstPrevious } from '../utils/validateMileage.js';
+import { refuelMileageKm } from '../utils/operationDayUtils.js';
 import { useOperationVehicleDisplay } from './OperationVehicleLabel.jsx';
 import FuelCaptureFields from './FuelCaptureFields.jsx';
 import SkipReasonDialog from './SkipReasonDialog.jsx';
@@ -49,6 +50,9 @@ export default function PendingRefuelCard({
   const [focusLitres, setFocusLitres] = useState(false);
   const [localError, setLocalError] = useState('');
   const display = useOperationVehicleDisplay(refuel.vehicleId);
+  // The live canonical odometer (the registry updates it as the vehicle drives), not the value the session had
+  // when this page was opened.
+  const liveMileageKm = refuelMileageKm(refuel, display.odometerKm);
   const theme = useTheme();
   const arrived = refuel.arrivedAt != null;
   const hideArrivedStep = sessionInProgress && arrived;
@@ -65,15 +69,15 @@ export default function PendingRefuelCard({
   const fuelTypeText = refuel.fuelTypeSnapshot ? String(refuel.fuelTypeSnapshot).toUpperCase() : null;
   const fuelColor = fuelTypeColor(refuel.fuelTypeSnapshot, theme.palette.mode);
 
-  // Mileage is Odometer Engine evidence, not a manual entry point — prefill from the
-  // canonical value and only mark it 'manual' if the operator explicitly overrides it.
+  // Mileage is Odometer Engine evidence, not a manual entry point — prefill from the canonical value, keep it
+  // following the live odometer, and only stop (and mark it 'manual') once the operator types their own.
   useEffect(() => {
-    if (mileage !== '') return;
-    if (refuel.odometerKm != null) {
-      setMileage(String(refuel.odometerKm));
+    if (mileageSource === 'manual') return;
+    if (liveMileageKm != null) {
+      setMileage(String(liveMileageKm));
       setMileageSource('snapshot');
     }
-  }, [mileage, refuel.odometerKm]);
+  }, [liveMileageKm, mileageSource]);
 
   useEffect(() => {
     if (focusLitres) {
@@ -197,7 +201,7 @@ export default function PendingRefuelCard({
         </Typography>
         <Box sx={{ flex: 1, textAlign: 'right' }}>
           <Typography variant="body2" fontWeight={700}>
-            {refuel.odometerKm != null ? `${Number(refuel.odometerKm).toLocaleString()} km` : '—'}
+            {liveMileageKm != null ? `${liveMileageKm.toLocaleString()} km` : '—'}
           </Typography>
           {expanded ? (
             <Typography

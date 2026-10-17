@@ -24,10 +24,13 @@ import {
 } from '../vehicleRegistry/vehicleRegistryUtils.js';
 import useFeatures from '../../common/util/useFeatures';
 import { resolveVehicleDisplayFromFleetRow } from '../display/resolveVehicleDisplay.js';
+import { odometerStat } from '../display/odometerStatus.js';
+import useMotionDurationTick from './useMotionDurationTick.js';
 import { hasBlockingSetupIncomplete } from './setup/vehicleSetupReadiness.js';
 import { vehicleWorkspaceCardSx } from './dashboardCardSx.js';
 import { WORKSPACE_COLORS } from './vehicleWorkspaceTokens.js';
 import { resolveFuelEfficiencyDisplay } from './fuelEfficiencyDisplay.js';
+import { routineDueText } from './routineServiceDisplay.js';
 import { vehicleTypeLabel } from './vehicleDetailSections.js';
 import useVehicleWorkspaceDensity from './hooks/useVehicleWorkspaceDensity.js';
 import { uploadVehiclePhoto } from '../vehiclesApi.js';
@@ -93,9 +96,7 @@ function RoutineServiceStat({
     );
   }
 
-  const dueText = nextService.remainingKm != null
-    ? `Due in ${Number(nextService.remainingKm).toLocaleString()} km`
-    : (nextService.dueLabel || '—');
+  const dueText = routineDueText(nextService);
   const nextAt = nextService.nextServiceAtKm != null
     ? `${Number(nextService.nextServiceAtKm).toLocaleString()} km`
     : '—';
@@ -171,8 +172,10 @@ export default function VehicleWorkspaceHero({
   onPhotoUpdated,
   nextService,
   nextServiceLoading,
+  odometerRegistry = null,
 }) {
   const navigate = useNavigate();
+  const motionNow = useMotionDurationTick();
   const dispatch = useDispatch();
   const { vehicleId } = useParams();
   const user = useSelector((s) => s.session.user);
@@ -203,9 +206,8 @@ export default function VehicleWorkspaceHero({
     ? '…'
     : efficiencyDisplay.label;
 
-  const currentMileageLabel = nextService?.currentOdometerKm != null
-    ? `${Number(nextService.currentOdometerKm).toLocaleString()} km`
-    : '—';
+  // Cumulative odometer from the engine's registry (live), with who vouches for it and how old the reading is.
+  const odometer = odometerStat(odometerRegistry, nextService?.currentOdometerKm, motionNow);
   const statusLabel = online ? 'Online' : (status === 'offline' ? 'Offline' : status || 'Unknown');
 
   const openSetup = () => {
@@ -430,7 +432,12 @@ export default function VehicleWorkspaceHero({
           onConfigure={openSetup}
         />
         <StatItem label="Fuel Economy" value={efficiencyValue} />
-        <StatItem label="Current Mileage" value={currentMileageLabel} />
+        <StatItem
+          label="Odometer"
+          value={odometer.value}
+          subtitle={odometer.subtitle}
+          warn={odometer.warn}
+        />
         <StatItem label="Status" value={statusLabel} highlight={online} />
       </Box>
     </Box>

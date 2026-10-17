@@ -45,7 +45,7 @@ export default function VehicleServiceRemindersTimeline({
             }}
           />
           <Box>
-            <Typography variant="body2" fontWeight={600}>Current mileage</Typography>
+            <Typography variant="body2" fontWeight={600}>Odometer</Typography>
             <Typography variant="caption" color="text.secondary">
               {formatDistance(currentOdoMeters, distanceUnit, t)}
             </Typography>

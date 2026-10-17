@@ -3,23 +3,10 @@ import { useSelector } from 'react-redux';
 import { fetchVehicleEngine } from '../../vehiclesApi.js';
 import useCachedResource from '../../../common/cache/useCachedResource.js';
 import { makeResourceKey } from '../../../common/cache/resourceCache.js';
+import useMileageSignalRefresh from '../../display/useMileageSignalRefresh.js';
 
 const ENGINE_POLL_MS = 60_000;
-const ENGINE_RELOAD_DEBOUNCE_MS = 5_000;
 const ENGINE_CACHE_TTL_MS = 60_000;
-
-/** Stable fingerprint of mileage evidence on a live Traccar position. */
-export function mileageEvidenceFingerprint(position) {
-  const attrs = position?.attributes;
-  if (!attrs || typeof attrs !== 'object') return null;
-  for (const key of ['odometer', 'totalDistance', 'mileage']) {
-    const raw = attrs[key];
-    if (raw == null || raw === '') continue;
-    const num = Number(raw);
-    if (Number.isFinite(num)) return `${key}:${num}`;
-  }
-  return null;
-}
 
 /** Map engine.fuel to FuelCard / workspace fuel shape. */
 export function fuelSnapshotFromEngine(snapshot) {
@@ -89,11 +76,8 @@ export function overviewMetricsFromEngine(snapshot) {
   };
 }
 
-export default function useVehicleEngine(fleetVehicleId, { deviceId = null, livePosition = null } = {}) {
+export default function useVehicleEngine(fleetVehicleId, { deviceId = null } = {}) {
   const user = useSelector((s) => s.session.user);
-  const lastEvidenceRef = useRef(null);
-  const debounceTimerRef = useRef(null);
-
   const cacheKey = user && fleetVehicleId ? makeResourceKey('vehicleEngine', fleetVehicleId) : null;
 
   const fetcher = useCallback(
@@ -123,28 +107,16 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
   // automatically from whether cached data already exists.
   const reload = useCallback(() => cachedRef.current.invalidate(), []);
 
-  // Refresh engine when live tracker mileage evidence changes (debounced).
-  useEffect(() => {
-    if (deviceId == null) return undefined;
-    const fingerprint = mileageEvidenceFingerprint(livePosition);
-    if (fingerprint == null) return undefined;
-    if (lastEvidenceRef.current === fingerprint) return undefined;
-    lastEvidenceRef.current = fingerprint;
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = window.setTimeout(() => {
-      reload();
-    }, ENGINE_RELOAD_DEBOUNCE_MS);
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
-    };
-  }, [deviceId, livePosition, reload]);
+  // Live mileage: re-fetch the resolved snapshot (odometer, Routine Service remaining km and status) when the
+  // shared signal says THIS vehicle's tracker reported new distance, the live connection came back, or the tab
+  // was shown after a while. Coalesced and rate-limited, so a moving vehicle costs a bounded number of
+  // requests. A vehicle without a tracker has nothing to listen for.
+  const { markLoaded } = useMileageSignalRefresh(
+    () => cachedRef.current.invalidate(),
+    { deviceId, enabled: Boolean(user && fleetVehicleId && deviceId != null) },
+  );
+  const markLoadedRef = useRef(markLoaded);
+  markLoadedRef.current = markLoaded;
 
   // Periodic refresh while workspace is open (covers devices that rarely emit
   // distance attrs). Skips while the tab isn't visible — a backgrounded tab
@@ -154,6 +126,7 @@ export default function useVehicleEngine(fleetVehicleId, { deviceId = null, live
     const id = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       reload();
+      markLoadedRef.current();
     }, ENGINE_POLL_MS);
     return () => window.clearInterval(id);
   }, [user, fleetVehicleId, reload]);

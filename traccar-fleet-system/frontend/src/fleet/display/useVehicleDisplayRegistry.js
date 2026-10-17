@@ -1,7 +1,7 @@
 import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
-import { useSelector, useStore } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useManager } from '../../common/util/permissions';
 import { fetchVehicles } from '../vehiclesApi';
 import useNotificationBridge from '../../notifications/useNotificationBridge';
@@ -9,11 +9,7 @@ import {
   buildVehicleDisplayRegistry,
   lookupVehicleDisplay,
 } from './resolveVehicleDisplay';
-import {
-  mileageFingerprint,
-  nextRefreshDelay,
-  shouldRefreshOnVisible,
-} from './registryRefreshPolicy';
+import useMileageSignalRefresh from './useMileageSignalRefresh';
 
 const isAssignmentNotification = (n) => n.entityType === 'assignment';
 
@@ -26,8 +22,6 @@ export default function useVehicleDisplayRegistry() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const store = useStore();
-  const lastLoadedAtRef = useRef(0);
 
   const reload = useCallback(async () => {
     if (!manager || !user) {
@@ -39,7 +33,7 @@ export default function useVehicleDisplayRegistry() {
     try {
       const data = await fetchVehicles(user);
       setRows(Array.isArray(data) ? data : []);
-      lastLoadedAtRef.current = Date.now();
+      markLoadedRef.current();
     } catch (e) {
       setError(e?.message || 'Failed to load vehicles');
       setRows([]);
@@ -56,7 +50,7 @@ export default function useVehicleDisplayRegistry() {
       const data = await fetchVehicles(user);
       if (Array.isArray(data)) {
         setRows(data);
-        lastLoadedAtRef.current = Date.now();
+        markLoadedRef.current();
       }
     } catch {
       // keep the last good rows; the next trigger retries
@@ -77,54 +71,12 @@ export default function useVehicleDisplayRegistry() {
 
   useNotificationBridge(isAssignmentNotification, reload);
 
-  // Live mileage. The Redux store already receives every tracker position over the existing socket; when a
-  // counter advances, ask fuel-api for the resolved values again (debounced, rate-limited). Subscribing to
-  // the store directly keeps this provider from re-rendering on every position update. A tab that was
-  // hidden catches up when it becomes visible.
-  useEffect(() => {
-    if (!manager || !user) return undefined;
-    let timer = null;
-    let skippedWhileHidden = false;
-    let lastPositions = null;
-    let fingerprint = mileageFingerprint(store.getState().session.positions);
-
-    const fire = () => {
-      timer = null;
-      if (document.visibilityState === 'hidden') {
-        skippedWhileHidden = true;
-        return;
-      }
-      refreshSilently();
-    };
-
-    const unsubscribe = store.subscribe(() => {
-      const { positions } = store.getState().session;
-      if (positions === lastPositions) return;
-      lastPositions = positions;
-      const next = mileageFingerprint(positions);
-      if (next === fingerprint) return;
-      const wasEmpty = fingerprint === '';
-      fingerprint = next;
-      // The first positions after load are the baseline the registry fetch already reflects.
-      if (wasEmpty || timer != null) return;
-      timer = window.setTimeout(fire, nextRefreshDelay({ lastLoadedAt: lastLoadedAtRef.current, now: Date.now() }));
-    });
-
-    const onVisibility = () => {
-      if (document.visibilityState !== 'visible') return;
-      if (skippedWhileHidden || shouldRefreshOnVisible({ lastLoadedAt: lastLoadedAtRef.current, now: Date.now() })) {
-        skippedWhileHidden = false;
-        refreshSilently();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-
-    return () => {
-      unsubscribe();
-      document.removeEventListener('visibilitychange', onVisibility);
-      if (timer != null) window.clearTimeout(timer);
-    };
-  }, [manager, user, store, refreshSilently]);
+  // Live mileage: re-fetch the resolved values when the shared signal says they may have changed (a tracker's
+  // counter advanced, the live connection came back, the tab was shown again, ...). See mileageSignal.js.
+  const { markLoaded } = useMileageSignalRefresh(refreshSilently, { enabled: Boolean(manager && user) });
+  // (the load callbacks above read this ref at call time; it cannot be declared before the hook that needs them)
+  const markLoadedRef = useRef(markLoaded);
+  markLoadedRef.current = markLoaded;
 
   const { byDeviceId, byFleetVehicleId } = useMemo(
     () => buildVehicleDisplayRegistry(rows),

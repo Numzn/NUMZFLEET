@@ -2,11 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  MIN_REFRESH_INTERVAL_MS,
-  TRIGGER_DEBOUNCE_MS,
   VISIBLE_STALE_MS,
   mileageFingerprint,
-  nextRefreshDelay,
   shouldRefreshOnVisible,
 } from './registryRefreshPolicy.js';
 
@@ -39,22 +36,6 @@ test('both counters a tracker may report are watched', () => {
   const a = mileageFingerprint({ 1: pos(1, null, { odometer: 5000 }) });
   assert.notEqual(a, '');
   assert.notEqual(a, mileageFingerprint({ 1: pos(1, null, { odometer: 5200 }) }));
-});
-
-test('a change is applied after the debounce when nothing was fetched recently', () => {
-  assert.equal(nextRefreshDelay({ lastLoadedAt: 0, now: 10 * 60000 }), TRIGGER_DEBOUNCE_MS);
-});
-
-test('a change right after a fetch waits for the minimum interval, so a moving fleet cannot hammer the API', () => {
-  const now = 1_000_000;
-  assert.equal(nextRefreshDelay({ lastLoadedAt: now - 1000, now }), MIN_REFRESH_INTERVAL_MS - 1000);
-  assert.equal(nextRefreshDelay({ lastLoadedAt: now - MIN_REFRESH_INTERVAL_MS, now }), TRIGGER_DEBOUNCE_MS);
-});
-
-test('the wait is never shorter than the debounce nor negative', () => {
-  const now = 1_000_000;
-  assert.ok(nextRefreshDelay({ lastLoadedAt: now - (MIN_REFRESH_INTERVAL_MS - 100), now }) >= TRIGGER_DEBOUNCE_MS);
-  assert.ok(nextRefreshDelay({ lastLoadedAt: now + 5000, now }) >= TRIGGER_DEBOUNCE_MS);
 });
 
 test('returning to a hidden tab refreshes only when the data is old enough to matter', () => {

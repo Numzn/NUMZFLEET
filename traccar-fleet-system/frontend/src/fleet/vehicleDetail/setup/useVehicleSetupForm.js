@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fuelApiErrorMessage } from '../../vehiclesApi.js';
+import { routineBaselineFromVehicle } from './routineBaseline.js';
 
 export const FUEL_TYPES = ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'CNG'];
 
@@ -40,6 +41,7 @@ export function buildFormFromVehicle(vehicle) {
   if (!vehicle) return defaultForm();
   const fleet = vehicle.fleetConfig;
   const eff = vehicle.vehicleSpec?.fuelEfficiency;
+  const routine = routineBaselineFromVehicle(vehicle);
   return {
     name: vehicle.name ?? '',
     plate: vehicle.plateNumber ?? '',
@@ -60,14 +62,10 @@ export function buildFormFromVehicle(vehicle) {
     alSpeed: fleet?.alerts?.speeding !== false,
     alGeo: fleet?.alerts?.geofence !== false,
     alCut: fleetBool(fleet?.alerts?.engineCut, false),
-    routineServiceIntervalKm:
-      fleet?.routineService?.intervalKm != null
-        ? String(fleet.routineService.intervalKm)
-        : '5000',
+    // From the real schedule (see routineBaseline.js), not the copy cached at setup time.
+    routineServiceIntervalKm: routine.intervalKm != null ? String(routine.intervalKm) : '5000',
     routineServiceStartingOdometerKm:
-      fleet?.routineService?.startingOdometerKm != null
-        ? String(Math.round(Number(fleet.routineService.startingOdometerKm)))
-        : '',
+      routine.startingOdometerKm != null ? String(Math.round(routine.startingOdometerKm)) : '',
   };
 }
 

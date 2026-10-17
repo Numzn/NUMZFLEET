@@ -1,11 +1,14 @@
 import { createContext, useContext, useMemo } from 'react';
 import useVehicleDisplayRegistry from './useVehicleDisplayRegistry';
+import useMileageSignalSource from './useMileageSignalSource';
 import { lookupVehicleDisplay } from './resolveVehicleDisplay';
 
 const VehicleDisplayRegistryContext = createContext(null);
 
 export function VehicleDisplayRegistryProvider({ children }) {
   const registry = useVehicleDisplayRegistry();
+  // The one place live tracker data becomes a "mileage may have changed" signal for every screen.
+  useMileageSignalSource();
   const value = useMemo(() => registry, [registry]);
   return (
     <VehicleDisplayRegistryContext.Provider value={value}>

@@ -38,6 +38,7 @@ import { devicesActions } from '../../store';
 import { useVehicleDisplayContext } from '../../fleet/display/VehicleDisplayRegistryContext';
 import { resolveKnownFleetVehicleId } from '../../fleet/display/resolveVehicleDisplay';
 import { vehicleImmobilizerPath } from '../../fleet/vehicleRegistry/vehicleRegistryUtils';
+import { positionRowLabel } from './statusCardLabels.js';
 import { deleteFleetDevice } from '../../fleet/fleetDevicesApi';
 import { useCatch, useCatchCallback } from '../../reactHelper';
 import { useAttributePreference } from '../util/preferences';
@@ -222,7 +223,7 @@ const StatusCard = ({ deviceId, position, onClose, disableActions, desktopPaddin
                       {positionItems.split(',').filter((key) => position.hasOwnProperty(key) || position.attributes.hasOwnProperty(key)).map((key) => (
                         <StatusRow
                           key={key}
-                          name={positionAttributes[key]?.name || key}
+                          name={positionRowLabel(key, positionAttributes[key]?.name)}
                           content={(
                             <PositionValue
                               position={position}

@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {
+  useState, useEffect, useCallback, useRef,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
@@ -50,6 +52,7 @@ import PageHeader from '../common/components/PageHeader.jsx';
 import VehicleRegistryCard from './vehicleRegistry/VehicleRegistryCard';
 import VehicleRegistryTable from './vehicleRegistry/VehicleRegistryTable';
 import { vehicleWorkspacePath } from './vehicleRegistry/vehicleRegistryUtils';
+import { useVehicleDisplayContext } from './display/VehicleDisplayRegistryContext';
 
 const VehiclesPage = () => {
   const navigate = useNavigate();
@@ -92,6 +95,20 @@ const VehiclesPage = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Live mileage and Routine Service status: the shared registry already re-fetches /api/vehicles when a tracker
+  // reports new distance (or the live connection returns), so this page adopts those rows instead of polling or
+  // fetching a second copy. The first value is skipped (this page's own load is the baseline) and an empty list
+  // never replaces rows that are on screen.
+  const { rows: liveRows } = useVehicleDisplayContext();
+  const skipFirstLiveRows = useRef(true);
+  useEffect(() => {
+    if (skipFirstLiveRows.current) {
+      skipFirstLiveRows.current = false;
+      return;
+    }
+    if (Array.isArray(liveRows) && liveRows.length > 0) setRows(liveRows);
+  }, [liveRows]);
 
   const handleCreate = async () => {
     try {

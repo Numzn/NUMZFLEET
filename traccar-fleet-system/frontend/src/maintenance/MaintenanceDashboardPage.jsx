@@ -9,6 +9,8 @@ import FleetWorkspaceShell from '../common/components/FleetWorkspaceShell';
 import PageHeader from '../common/components/PageHeader.jsx';
 import { RUNTIME_STACK_GAP } from '../common/styles/runtimeDensity';
 import { fetchVehicleEngine } from '../fleet/vehiclesApi.js';
+import { useVehicleDisplayContext } from '../fleet/display/VehicleDisplayRegistryContext';
+import useMileageSignalRefresh from '../fleet/display/useMileageSignalRefresh';
 import MaintenanceKpiRow from './components/MaintenanceKpiRow';
 import ImmediateAttentionStrip from './components/ImmediateAttentionStrip';
 import ActiveWorkOrdersTable from './components/ActiveWorkOrdersTable';
@@ -97,9 +99,11 @@ export default function MaintenanceDashboardPage() {
   const [editRow, setEditRow] = useState(null);
   const [actionError, setActionError] = useState(null);
 
-  const loadDashboard = useCallback(async () => {
+  // `silent` is the live-mileage refresh: keep what is on screen, update it in place, and keep the last good data
+  // if the request fails (an outage must not blank the dashboard).
+  const loadDashboard = useCallback(async ({ silent = false } = {}) => {
     if (!user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       if (fleetVehicleId) {
         const [engineData, fleetData] = await Promise.all([
@@ -119,16 +123,25 @@ export default function MaintenanceDashboardPage() {
         setDashboard(data);
       }
     } catch {
-      setDashboard(null);
-      setVehicleEngine(null);
+      if (!silent) {
+        setDashboard(null);
+        setVehicleEngine(null);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [user, fleetVehicleId]);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  // Routine Service status, remaining km and due/overdue counts follow the vehicles as they drive: refresh when
+  // the shared mileage signal says a tracker reported new distance (or the connection came back).
+  const { byFleetVehicleId } = useVehicleDisplayContext();
+  const focusDeviceId = fleetVehicleId ? byFleetVehicleId.get(String(fleetVehicleId))?.deviceId ?? null : null;
+  const refreshSilently = useCallback(() => loadDashboard({ silent: true }), [loadDashboard]);
+  useMileageSignalRefresh(refreshSilently, { deviceId: focusDeviceId, enabled: Boolean(user) });
 
   const filteredWorkOrders = useMemo(() => {
     const rows = dashboard?.activeWorkOrders || [];

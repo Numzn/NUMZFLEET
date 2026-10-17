@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { describeOdometerStatus, formatReadingAge } from './odometerStatus.js';
+import { describeOdometerStatus, formatReadingAge, odometerStat } from './odometerStatus.js';
 import { resolveVehicleDisplayFromFleetRow } from './resolveVehicleDisplay.js';
 
 const NOW = Date.parse('2026-10-16T12:00:00Z');
@@ -175,4 +175,39 @@ test('a fleet row from an older backend still resolves with neutral provenance d
   assert.equal(display.odometerReconciliation, 'none');
   assert.equal(display.odometerReadingStatus, 'none');
   assert.equal(display.odometerEvidenceAt, null);
+});
+
+// ---- the workspace header's odometer stat ----
+
+test('the header stat shows the odometer, who vouches for it and the age of the reading', () => {
+  const s = odometerStat(verified, null, NOW);
+  assert.equal(s.value, '120,000 km');
+  assert.equal(s.subtitle, 'Verified \u00b7 1 min ago');
+  assert.equal(s.warn, false);
+});
+
+test('the header stat warns when the value is unsettled or old', () => {
+  const stale = odometerStat({ ...verified, odometerEvidenceAt: minutesAgo(3 * 24 * 60) }, null, NOW);
+  assert.equal(stale.warn, true);
+  assert.match(stale.subtitle, /3 days ago/);
+  const prov = odometerStat({ ...verified, odometerReconciliation: 'provisional' }, null, NOW);
+  assert.equal(prov.warn, true);
+  assert.match(prov.subtitle, /Provisional/);
+});
+
+test('without a registry the header falls back to the engine\'s own figure, labelled plainly', () => {
+  const s = odometerStat(null, 125510, NOW);
+  assert.equal(s.value, '125,510 km');
+  assert.equal(s.subtitle, null);
+  assert.equal(s.warn, false);
+});
+
+test('the header stat is a dash when there is no odometer at all', () => {
+  assert.deepEqual(odometerStat(null, null, NOW), { value: '\u2014', subtitle: null, warn: false });
+  assert.deepEqual(odometerStat({ odometerKm: null }, null, NOW), { value: '\u2014', subtitle: null, warn: false });
+});
+
+test('the odometer is never mixed with daily distance: the stat reads the odometer field only', () => {
+  const s = odometerStat({ ...verified, dailyMileage: { km: 42.3 } }, null, NOW);
+  assert.equal(s.value, '120,000 km');
 });

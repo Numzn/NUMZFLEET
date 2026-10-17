@@ -7,6 +7,7 @@ import {
   deriveFuelingDayStatus,
   deriveInvoiceStage,
   deriveOperationSteps,
+  refuelMileageKm,
 } from './operationDayUtils.js';
 
 test('deriveVehicleWorkflowState derives state from refuel fields', () => {
@@ -75,4 +76,31 @@ test('deriveOperationSteps treats a fully skipped/fueled plan as fueled', () => 
     details: { refuels: [{ actualFuelLitres: 40 }, { skippedAt: 'x' }] },
   });
   assert.equal(steps.fuel.done, true);
+});
+
+// ---- which mileage belongs beside a refuel line ----
+
+test('a fuelled line shows the mileage captured at the fill, never today\'s odometer', () => {
+  const fuelled = { actualFuelLitres: 40, currentMileage: 125010, odometerKm: 125900 };
+  assert.equal(refuelMileageKm(fuelled, 126500), 125010);
+});
+
+test('a fuelled line with no captured mileage shows nothing rather than the live odometer', () => {
+  assert.equal(refuelMileageKm({ actualFuelLitres: 40, currentMileage: null, odometerKm: 125900 }, 126500), null);
+  assert.equal(refuelMileageKm({ actualFuelLitres: 40 }, 126500), null);
+});
+
+test('a vehicle still waiting to be fuelled shows its live canonical odometer', () => {
+  const pending = { actualFuelLitres: null, currentMileage: 124000, odometerKm: 125000 };
+  assert.equal(refuelMileageKm(pending, 125400), 125400, 'the registry\'s live value wins');
+  assert.equal(refuelMileageKm(pending, null), 125000, 'falling back to what the session returned');
+  assert.equal(refuelMileageKm(pending, undefined), 125000);
+});
+
+test('a pending line never shows the plan-time snapshot as if it were current', () => {
+  assert.equal(refuelMileageKm({ actualFuelLitres: null, currentMileage: 124000, odometerKm: null }, null), null);
+});
+
+test('a zero captured mileage is a real value, not "missing"', () => {
+  assert.equal(refuelMileageKm({ actualFuelLitres: 12, currentMileage: 0 }, 5), 0);
 });

@@ -18,6 +18,7 @@ import useVehicleData from './useVehicleData';
 import { useLinkedGeofences } from './useLinkedGeofences.js';
 import { vehicleWorkspacePath } from '../vehicleRegistry/vehicleRegistryUtils.js';
 import { patchVehicleFields, saveRoutineService } from '../vehiclesApi.js';
+import { routineBaselineFromVehicle, shouldSaveRoutineService } from './setup/routineBaseline.js';
 import { fetchImmobilizationCapabilities } from './immobilizationIntentsApi.js';
 import useVehicleSetupForm from './setup/useVehicleSetupForm.js';
 import useVehicleSetupReadiness from './setup/useVehicleSetupReadiness.js';
@@ -86,6 +87,7 @@ function renderModuleContent(moduleId, props) {
           patch={props.patch}
           canSaveSpecs={props.canSaveSpecs}
           fleetVehicleId={props.vehicleId}
+          scheduleExists={Boolean(props.vehicle?.routineService)}
         />
       );
     case 'geofence':
@@ -242,7 +244,10 @@ export default function VehicleSetupPage() {
         homeBaseLabel: form.homeBaseLabel?.trim() || null,
       });
       const merged = await save(saveConfig);
-      if (canSaveSpecs && deviceId != null) {
+      // Only (re)write the schedule when it does not exist yet or the person changed it: re-sending an unchanged
+      // baseline is how a stale figure used to rewind the service interval on every unrelated save.
+      const routineBaseline = routineBaselineFromVehicle(vehicle);
+      if (canSaveSpecs && deviceId != null && shouldSaveRoutineService({ form, baseline: routineBaseline })) {
         const intervalKm = Number(form.routineServiceIntervalKm);
         const startingOdometerKm = Number(form.routineServiceStartingOdometerKm);
         if (!Number.isFinite(intervalKm) || intervalKm <= 0) {
@@ -276,8 +281,8 @@ export default function VehicleSetupPage() {
     form.make,
     form.model,
     form.homeBaseLabel,
-    form.routineServiceIntervalKm,
-    form.routineServiceStartingOdometerKm,
+    form,
+    vehicle,
     canSaveSpecs,
     deviceId,
     err,

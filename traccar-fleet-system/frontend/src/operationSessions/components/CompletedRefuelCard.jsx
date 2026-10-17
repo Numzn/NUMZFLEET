@@ -1,12 +1,14 @@
 import { Box, Chip, Typography } from '@mui/material';
 import { formatK, formatLitres } from '../utils/formatters.js';
-import { varianceTone } from '../utils/operationDayUtils.js';
+import { refuelMileageKm, varianceTone } from '../utils/operationDayUtils.js';
 import OperationVehicleLabel from './OperationVehicleLabel.jsx';
 
 export default function CompletedRefuelCard({ refuel }) {
   const planned = refuel.plannedFuelLitres != null ? Number(refuel.plannedFuelLitres) : null;
   const actual = Number(refuel.actualFuelLitres);
   const varianceL = planned != null && Number.isFinite(planned) ? actual - planned : null;
+  // The mileage captured at the fill — not today's odometer.
+  const fillMileageKm = refuelMileageKm(refuel, null);
 
   return (
     <Box
@@ -36,10 +38,10 @@ export default function CompletedRefuelCard({ refuel }) {
             {formatK(refuel.actualCost)}
           </>
         )}
-        {refuel.odometerKm != null && (
+        {fillMileageKm != null && (
           <>
             {' · '}
-            {Number(refuel.odometerKm).toLocaleString()}
+            {fillMileageKm.toLocaleString()}
             {' km'}
           </>
         )}
