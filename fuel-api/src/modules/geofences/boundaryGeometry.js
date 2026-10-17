@@ -9,8 +9,9 @@
  */
 
 export const MAX_AREA_CHARS = 4000; // Traccar tc_geofences.area is VARCHAR(4096)
-export const MAX_RING_AREA_KM2 = 50000;
+export const MAX_RING_AREA_KM2 = 200000; // largest Zambian province is ~147,000 km²; a country is not a geofence
 const MIN_RING_POINTS = 4; // closed triangle
+const SELF_CHECK_MAX_POINTS = 800; // above this the O(n^2) check is skipped mid-loop
 
 const isFiniteNum = (n) => typeof n === 'number' && Number.isFinite(n);
 
@@ -47,6 +48,34 @@ export const ringAreaKm2 = (ring) => {
     sum += (x1 * kx) * (y2 * ky) - (x2 * kx) * (y1 * ky);
   }
   return Math.abs(sum) / 2;
+};
+
+const orient = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+const segmentsCross = (a, b, c, d) => {
+  const o1 = orient(a, b, c);
+  const o2 = orient(a, b, d);
+  const o3 = orient(c, d, a);
+  const o4 = orient(c, d, b);
+  return ((o1 > 0 && o2 < 0) || (o1 < 0 && o2 > 0)) && ((o3 > 0 && o4 < 0) || (o3 < 0 && o4 > 0));
+};
+
+/**
+ * True when two non-adjacent edges of the (open or closed) ring properly cross
+ * each other: a bow-tie, which Traccar's ray-casting containment mis-evaluates.
+ * O(n^2): call it on rings of a few hundred points, not raw source geometry.
+ */
+export const ringSelfIntersects = (ring) => {
+  const pts = openRing(ring);
+  const n = pts.length;
+  for (let i = 0; i < n; i += 1) {
+    const a = pts[i];
+    const b = pts[(i + 1) % n];
+    for (let j = i + 2; j < n; j += 1) {
+      if (i === 0 && j === n - 1) continue; // adjacent through the closing edge
+      if (segmentsCross(a, b, pts[j], pts[(j + 1) % n])) return true;
+    }
+  }
+  return false;
 };
 
 const perpDistSq = (p, a, b) => {
@@ -92,17 +121,24 @@ const round6 = (p) => [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e
  * Simplify an open ring until its WKT fits MAX_AREA_CHARS. Returns a CLOSED
  * ring. Never drops below a triangle.
  */
-export const simplifyRingToFit = (ring, maxChars = MAX_AREA_CHARS) => {
+export const simplifyRingToFit = (ring, maxChars = MAX_AREA_CHARS, stats = {}) => {
   let pts = openRing(ring).map(round6);
   let tol = 1e-6; // degrees, ~0.1 m
+  let used = 0;
   const close = (r) => [...r, r[0]];
   let guard = 0;
-  while (wktLength(close(pts)) > maxChars && guard < 60) {
+  while (wktLength(close(pts)) > maxChars && guard < 80) {
     const next = douglasPeucker([...pts, pts[0]], tol * tol).slice(0, -1);
-    if (next.length >= 3) pts = next;
+    // Never accept a simplification that folds the outline over itself.
+    const safe = next.length >= 3 && (next.length > SELF_CHECK_MAX_POINTS || !ringSelfIntersects(next));
+    if (safe) {
+      pts = next;
+      used = tol;
+    }
     tol *= 1.5;
     guard += 1;
   }
+  stats.toleranceDeg = used;
   return close(pts);
 };
 
@@ -128,36 +164,51 @@ export const normalizeBoundaryGeometry = (geometry) => {
   if (!Array.isArray(polygons)) return { ok: false, reason: 'invalid_geometry' };
 
   const candidates = [];
+  let sawSelfIntersecting = false;
   let droppedHoles = 0;
   polygons.forEach((poly) => {
     if (!Array.isArray(poly) || !poly.length) return;
     const [outer, ...holes] = poly;
     if (!validateRing(outer)) return;
+    if (outer.length <= SELF_CHECK_MAX_POINTS && ringSelfIntersects(outer)) {
+      sawSelfIntersecting = true;
+      return;
+    }
     const area = ringAreaKm2(outer);
     if (area <= 0) return;
     candidates.push({ outer, area, holes: holes.length });
   });
-  if (!candidates.length) return { ok: false, reason: 'invalid_geometry' };
+  if (!candidates.length) return { ok: false, reason: sawSelfIntersecting ? 'self_intersecting' : 'invalid_geometry' };
 
   candidates.sort((a, b) => b.area - a.area);
   const [best] = candidates;
   droppedHoles = best.holes;
   const droppedParts = candidates.length - 1;
+  const totalArea = candidates.reduce((sum, c) => sum + c.area, 0);
+  const droppedAreaPct = totalArea > 0 ? Math.round(((totalArea - best.area) / totalArea) * 1000) / 10 : 0;
   if (best.area > MAX_RING_AREA_KM2) return { ok: false, reason: 'too_large' };
 
   const before = openRing(best.outer).length;
-  const ring = simplifyRingToFit(best.outer);
+  const stats = {};
+  const ring = simplifyRingToFit(best.outer, MAX_AREA_CHARS, stats);
   if (wktLength(ring) > MAX_AREA_CHARS || ringAreaKm2(ring) <= 0) {
     return { ok: false, reason: 'cannot_simplify' };
   }
+  // The source outline itself may be invalid (bow-tie); never save that.
+  if (ringSelfIntersects(ring)) return { ok: false, reason: 'self_intersecting' };
   return {
     ok: true,
     geometry: { type: 'Polygon', coordinates: [ring] },
     areaKm2: Math.round(ringAreaKm2(ring) * 10) / 10,
     vertices: ring.length - 1,
+    originalVertices: before,
+    originalAreaKm2: Math.round(best.area * 10) / 10,
+    // Upper bound on how far any discarded vertex lay from the saved outline.
+    maxDeviationM: Math.round((stats.toleranceDeg || 0) * 111320),
     notes: {
       droppedParts,
       droppedHoles,
+      droppedAreaPct,
       simplified: ring.length - 1 < before,
     },
   };

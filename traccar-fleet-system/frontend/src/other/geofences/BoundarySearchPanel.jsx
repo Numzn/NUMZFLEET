@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Alert, Autocomplete, Box, Button, Chip, CircularProgress, InputAdornment, List, ListItemButton,
-  ListItemText, TextField, Typography, IconButton,
+  ListItemText, TextField, ToggleButton, ToggleButtonGroup, Typography, IconButton,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { traccarPath } from '../../config/traccarApi.js';
@@ -13,7 +13,8 @@ import { geofencesActions } from '../../store';
 import MapBoundaryPreview from '../../map/draw/MapBoundaryPreview';
 import { searchBoundaries } from './boundarySearchApi';
 import {
-  GEOFENCE_NAME_MAX, boundaryToGeofenceBody, permissionBodies, splitAssignableVehicles,
+  GEOFENCE_NAME_MAX, RADIUS_MAX_M, RADIUS_MIN_M, RADIUS_PRESETS_M, boundaryToGeofenceBody, defaultRadiusName,
+  formatRadius, permissionBodies, radiusPreviewGeometry, radiusZoneBody, splitAssignableVehicles,
 } from './geofenceHelpers';
 
 const post = (path, body) => fetchOrThrow(traccarPath(path), {
@@ -22,21 +23,51 @@ const post = (path, body) => fetchOrThrow(traccarPath(path), {
   body: JSON.stringify(body),
 });
 
+const KIND_COLOR = { town: 'success', district: 'warning', province: 'warning' };
+
+const BoundaryRow = ({ place, selected, onClick }) => (
+  <ListItemButton selected={selected} onClick={onClick} sx={{ borderRadius: 1, alignItems: 'flex-start' }}>
+    <ListItemText
+      disableTypography
+      primary={(
+        <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Typography variant="body2" fontWeight={600}>{place.name}</Typography>
+          <Chip size="small" color={KIND_COLOR[place.kind] || 'default'} variant="outlined" label={`${place.levelLabel} boundary`} />
+          {place.recommended && <Chip size="small" color="primary" label="Recommended" />}
+        </Box>
+      )}
+      secondary={(
+        <>
+          <Typography variant="caption" color="text.secondary" display="block">
+            {[place.province ? `${place.province} Province` : null, place.areaKm2 != null ? `${place.areaKm2.toLocaleString()} km²` : null, place.sourceLabel].filter(Boolean).join(' · ')}
+          </Typography>
+          {place.warning && (
+            <Typography variant="caption" color="warning.main" display="block">{place.warning}</Typography>
+          )}
+        </>
+      )}
+    />
+  </ListItemButton>
+);
+
 const BoundarySearchPanel = ({ onCreated, onDrawInstead }) => {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.session.user);
 
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
-  const [outcome, setOutcome] = useState(null); // { results, pointOnly, invalid }
+  const [outcome, setOutcome] = useState(null);
   const [error, setError] = useState('');
+  // selected: { kind: 'boundary', place } | { kind: 'radius', place }
   const [selected, setSelected] = useState(null);
+  const [radiusM, setRadiusM] = useState(2000);
+  const [customKm, setCustomKm] = useState('');
   const [name, setName] = useState('');
   const [vehicles, setVehicles] = useState([]);
   const [chosen, setChosen] = useState([]);
   const [saving, setSaving] = useState(false);
   const [warning, setWarning] = useState('');
-  const [createdId, setCreatedId] = useState(null); // set once the geofence exists, so Create can't run twice
+  const [createdId, setCreatedId] = useState(null);
 
   useEffectAsync(async () => {
     try {
@@ -48,12 +79,25 @@ const BoundarySearchPanel = ({ onCreated, onDrawInstead }) => {
 
   const { assignable, unassignable } = useMemo(() => splitAssignableVehicles(vehicles), [vehicles]);
 
+  // The preview IS the geometry that will be saved (boundary), or the circle Traccar will test (radius).
+  const previewGeometry = useMemo(() => {
+    if (!selected) return null;
+    if (selected.kind === 'boundary') return selected.place.geometry;
+    return radiusPreviewGeometry(selected.place.center, radiusM);
+  }, [selected, radiusM]);
+
+  const reset = () => {
+    setSelected(null);
+    setWarning('');
+    setCreatedId(null);
+  };
+
   const runSearch = async (event) => {
     event.preventDefault();
     if (searching || query.trim().length < 3) return;
     setSearching(true);
     setError('');
-    setSelected(null);
+    reset();
     setOutcome(null);
     try {
       setOutcome(await searchBoundaries(user, query.trim()));
@@ -64,12 +108,24 @@ const BoundarySearchPanel = ({ onCreated, onDrawInstead }) => {
     }
   };
 
-  const choose = (result) => {
-    setSelected(result);
-    setName(result.name);
-    setWarning('');
-    setCreatedId(null);
+  const chooseBoundary = (place) => {
+    reset();
+    setSelected({ kind: 'boundary', place });
+    setName(place.name);
   };
+
+  const chooseRadius = (place) => {
+    reset();
+    setSelected({ kind: 'radius', place });
+    setName(defaultRadiusName(place.name, radiusM));
+  };
+
+  const changeRadius = (m) => {
+    setRadiusM(m);
+    if (selected?.kind === 'radius') setName(defaultRadiusName(selected.place.name, m));
+  };
+
+  const customRadiusError = customKm !== '' && !(Number(customKm) * 1000 >= RADIUS_MIN_M && Number(customKm) * 1000 <= RADIUS_MAX_M);
 
   const save = async () => {
     if (!selected || saving) return;
@@ -78,7 +134,10 @@ const BoundarySearchPanel = ({ onCreated, onDrawInstead }) => {
     setWarning('');
     let geofence;
     try {
-      geofence = await (await post('/api/geofences', boundaryToGeofenceBody(name, selected.geometry))).json();
+      const body = selected.kind === 'boundary'
+        ? boundaryToGeofenceBody(name, selected.place.geometry, selected.place)
+        : radiusZoneBody(name, selected.place.center, radiusM, selected.place.name);
+      geofence = await (await post('/api/geofences', body)).json();
     } catch (e) {
       setError(e.message);
       setSaving(false);
@@ -101,17 +160,21 @@ const BoundarySearchPanel = ({ onCreated, onDrawInstead }) => {
     onCreated(geofence.id);
   };
 
-  const { notes } = selected || {};
+  const notes = selected?.kind === 'boundary' ? selected.place.notes || {} : {};
+  const boundaries = outcome?.boundaries || [];
+  const locations = outcome?.locations || [];
+  const nothingFound = outcome && !boundaries.length && !locations.length;
+  const noTown = outcome && !outcome.townBoundary;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1, overflow: 'auto', p: 1.5, gap: 1.5 }}>
-      <MapBoundaryPreview geometry={selected?.geometry} />
+      <MapBoundaryPreview geometry={previewGeometry} />
       <form onSubmit={runSearch}>
         <TextField
           fullWidth
           size="small"
-          label="Search place or area"
-          placeholder="e.g. Matero, Mandevu, Lusaka"
+          label="Search a town, district or province"
+          placeholder="e.g. Chipata, Lusaka, Kabwe, Livingstone"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           slotProps={{
@@ -125,58 +188,54 @@ const BoundarySearchPanel = ({ onCreated, onDrawInstead }) => {
               ),
             },
           }}
-          helperText="Press Enter to search. Boundaries come from OpenStreetMap."
+          helperText="Press Enter to search. Boundaries come from geoBoundaries and OpenStreetMap."
         />
       </form>
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      {outcome && outcome.results.length === 0 && (
-        <Alert severity="info">
-          No boundary is available for “{query.trim()}”.
-          {outcome.pointOnly > 0
-            ? ' OpenStreetMap only has a location pin for it, not an outline, so it can\'t be used as a geofence directly.'
-            : ' Try a different spelling.'}
-          {' '}You can draw the zone by hand instead.
-        </Alert>
-      )}
+      {outcome?.notice && <Alert severity={nothingFound ? 'info' : 'warning'}>{outcome.notice}</Alert>}
 
-      {outcome && outcome.results.length > 0 && (
-        <>
-          {outcome.results.length > 1 && (
-            <Typography variant="caption" color="text.secondary">
-              {outcome.results.length} boundaries match — pick the right one (note the type and parent area).
-            </Typography>
-          )}
-          <List dense disablePadding>
-            {outcome.results.map((r) => (
-              <ListItemButton key={r.id} selected={selected?.id === r.id} onClick={() => choose(r)} sx={{ borderRadius: 1, alignItems: 'flex-start' }}>
-                <ListItemText
-                  primary={(
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Typography variant="body2" fontWeight={600}>{r.name}</Typography>
-                      {r.level && <Chip size="small" variant="outlined" label={r.level} />}
-                    </Box>
-                  )}
-                  secondary={`${r.displayName} · ${r.areaKm2.toLocaleString()} km²`}
-                />
-              </ListItemButton>
-            ))}
-          </List>
-        </>
-      )}
-
-      {outcome && outcome.pointResults?.length > 0 && (
+      {boundaries.length > 0 && (
         <Box>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-            Found as a location only (no outline available):
+            Verified boundaries — pick the one you mean:
           </Typography>
           <List dense disablePadding>
-            {outcome.pointResults.map((r) => (
-              <ListItemButton key={r.id} onClick={() => onDrawInstead(r.center)} sx={{ borderRadius: 1, alignItems: 'flex-start' }}>
+            {boundaries.map((place) => (
+              <BoundaryRow
+                key={place.id}
+                place={place}
+                selected={selected?.kind === 'boundary' && selected.place.id === place.id}
+                onClick={() => chooseBoundary(place)}
+              />
+            ))}
+          </List>
+        </Box>
+      )}
+
+      {locations.length > 0 && (
+        <Box>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+            {noTown ? 'No verified town boundary — only a location:' : 'Locations without a boundary:'}
+          </Typography>
+          <List dense disablePadding>
+            {locations.map((place) => (
+              <ListItemButton
+                key={place.id}
+                selected={selected?.kind === 'radius' && selected.place.id === place.id}
+                onClick={() => chooseRadius(place)}
+                sx={{ borderRadius: 1, alignItems: 'flex-start' }}
+              >
                 <ListItemText
-                  primary={r.name}
-                  secondary={`${r.displayName} — tap to find it on the map and draw the zone`}
+                  disableTypography
+                  primary={(
+                    <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Typography variant="body2" fontWeight={600}>{place.name}</Typography>
+                      <Chip size="small" variant="outlined" label={`${place.levelLabel} · location only`} />
+                    </Box>
+                  )}
+                  secondary={<Typography variant="caption" color="text.secondary">Tap to create a radius zone around this location</Typography>}
                 />
               </ListItemButton>
             ))}
@@ -184,14 +243,62 @@ const BoundarySearchPanel = ({ onCreated, onDrawInstead }) => {
         </Box>
       )}
 
+      {outcome && (noTown || nothingFound) && (
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => onDrawInstead(locations[0]?.center || boundaries[0]?.center || null)}
+        >
+          Draw a custom geofence on the map instead
+        </Button>
+      )}
+
+      {outcome?.attribution?.length > 0 && (
+        <Typography variant="caption" color="text.secondary" display="block">
+          Data: {outcome.attribution.join(' · ')}
+        </Typography>
+      )}
+
+      {selected?.kind === 'radius' && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Alert severity="info">
+            Radius zone around the {selected.place.name} location. This is an operational circle, not the
+            town&apos;s boundary.
+          </Alert>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={RADIUS_PRESETS_M.includes(radiusM) && customKm === '' ? radiusM : null}
+            onChange={(_, v) => { if (v) { setCustomKm(''); changeRadius(v); } }}
+            sx={{ flexWrap: 'wrap' }}
+          >
+            {RADIUS_PRESETS_M.map((m) => <ToggleButton key={m} value={m}>{formatRadius(m)}</ToggleButton>)}
+          </ToggleButtonGroup>
+          <TextField
+            size="small"
+            type="number"
+            label="Custom radius (km)"
+            value={customKm}
+            error={customRadiusError}
+            helperText={customRadiusError ? `Between ${RADIUS_MIN_M / 1000} and ${RADIUS_MAX_M / 1000} km` : ' '}
+            onChange={(e) => {
+              setCustomKm(e.target.value);
+              const m = Number(e.target.value) * 1000;
+              if (m >= RADIUS_MIN_M && m <= RADIUS_MAX_M) changeRadius(Math.round(m));
+            }}
+            slotProps={{ htmlInput: { min: RADIUS_MIN_M / 1000, max: RADIUS_MAX_M / 1000, step: 0.1 } }}
+          />
+        </Box>
+      )}
+
       {selected && (
         <>
-          {(notes.droppedParts > 0 || notes.droppedHoles > 0 || notes.simplified) && (
+          {selected.kind === 'boundary' && (notes.droppedParts > 0 || notes.droppedHoles > 0 || notes.simplified) && (
             <Alert severity="warning">
-              Preview shows what will be saved:
-              {notes.droppedParts > 0 && ` this place has ${notes.droppedParts + 1} separate areas — only the largest is kept;`}
+              Preview shows exactly what will be saved:
+              {notes.droppedParts > 0 && ` this place has ${notes.droppedParts + 1} separate areas — only the largest is kept (${notes.droppedAreaPct}% of the area is left out);`}
               {notes.droppedHoles > 0 && ` ${notes.droppedHoles} inner hole(s) are filled in;`}
-              {notes.simplified && ` outline simplified to ${selected.vertices} points.`}
+              {notes.simplified && ` outline simplified to ${selected.place.vertices} points (within about ${selected.place.maxDeviationM ?? 0} m of the source).`}
             </Alert>
           )}
           <TextField

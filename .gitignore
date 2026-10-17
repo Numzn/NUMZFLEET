@@ -105,3 +105,7 @@ fuel-api/shadow-output/
 deployment/deploy/.last_staging_deploy
 deployment/deploy/.staging_deploy_history
 .last_local_oci_restore
+
+# raw geographic sources for the place catalogue (see fuel-api/docs/GEOFENCE_BOUNDARY_CATALOGUE.md)
+place-sources/
+.venv/

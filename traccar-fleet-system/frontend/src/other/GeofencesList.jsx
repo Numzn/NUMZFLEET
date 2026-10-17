@@ -76,7 +76,7 @@ const GeofencesList = ({ onGeofenceSelected, selectedGeofenceId }) => {
             onClick={() => onGeofenceSelected(item.id)}
           >
             <ListItemText primary={item.name} className={classes.itemText} />
-            <Chip size="small" variant="outlined" label={geofenceKind(item.area)} sx={{ mr: 1 }} />
+            <Chip size="small" variant="outlined" label={geofenceKind(item.area, item.attributes)} sx={{ mr: 1 }} />
             <CollectionActions itemId={item.id} editPath="/settings/geofence" endpoint="geofences" setTimestamp={refreshGeofences} />
           </ListItemButton>
         ))}

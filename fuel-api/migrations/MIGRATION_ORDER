@@ -59,3 +59,4 @@
 20260913_driver_domain.sql
 20261016_vehicle_owned_odometer.sql
 20261017_accepted_mileage_readings.sql
+20261018_place_boundaries.sql

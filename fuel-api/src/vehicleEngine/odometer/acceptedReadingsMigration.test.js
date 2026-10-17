@@ -56,7 +56,8 @@ const cols = async (c, table) => (await c.query(
 
 test('it is listed in MIGRATION_ORDER, after the vehicle-owned odometer migration', () => {
   const lines = ORDER.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
-  assert.equal(lines.at(-1), '20261017_accepted_mileage_readings.sql');
+  // Not "last": later migrations are appended after it.
+  assert.ok(lines.includes('20261017_accepted_mileage_readings.sql'));
   assert.ok(lines.indexOf('20261016_vehicle_owned_odometer.sql') < lines.indexOf('20261017_accepted_mileage_readings.sql'));
 });
 

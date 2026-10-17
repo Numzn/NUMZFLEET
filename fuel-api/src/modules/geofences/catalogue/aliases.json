@@ -1,0 +1,14 @@
+{
+  "_comment": "Alternative and historic names for matching only. Keyed by geoBoundaries ADM2 district name. Only well-documented alternatives; nothing here changes a boundary.",
+  "Kabwe": ["Broken Hill"],
+  "Chipata": ["Fort Jameson"],
+  "Mansa": ["Fort Rosebery"],
+  "Mbala": ["Abercorn"],
+  "Chililabombwe": ["Bancroft"],
+  "Livingstone": ["Maramba"],
+  "Kapiri Mposhi": ["Kapiri"],
+  "Itezhi-Tezhi": ["Itezhitezhi", "Itezhi Tezhi"],
+  "Zambezi": ["Balovale"],
+  "Shiwang'Andu": ["Shiwangandu", "Shiwan'gandu"],
+  "Mpongwe": ["Mpongwe Farm Block"]
+}

@@ -27,6 +27,7 @@ import VehicleMileageGapModel from './VehicleMileageGap.js';
 import VehicleTrackerChangeModel from './VehicleTrackerChange.js';
 import TrackerCounterStateModel from './TrackerCounterState.js';
 import MileageReadingEventModel from './MileageReadingEvent.js';
+import PlaceBoundaryModel from './PlaceBoundary.js';
 import VehicleActivityStateModel from './VehicleActivityState.js';
 import VehicleStateAuditEventModel from './VehicleStateAuditEvent.js';
 import TelemetryProcessedEventModel from './TelemetryProcessedEvent.js';
@@ -70,6 +71,7 @@ const VehicleMileageGap = VehicleMileageGapModel(sequelize);
 const VehicleTrackerChange = VehicleTrackerChangeModel(sequelize);
 const TrackerCounterState = TrackerCounterStateModel(sequelize);
 const MileageReadingEvent = MileageReadingEventModel(sequelize);
+const PlaceBoundary = PlaceBoundaryModel(sequelize);
 const VehicleActivityState = VehicleActivityStateModel(sequelize);
 const VehicleStateAuditEvent = VehicleStateAuditEventModel(sequelize);
 const TelemetryProcessedEvent = TelemetryProcessedEventModel(sequelize);
@@ -331,6 +333,7 @@ export {
   VehicleTrackerChange,
   TrackerCounterState,
   MileageReadingEvent,
+  PlaceBoundary,
   VehicleActivityState,
   VehicleStateAuditEvent,
   TelemetryProcessedEvent,

@@ -3,9 +3,13 @@ import rateLimit from 'express-rate-limit';
 import { authenticate } from '../../middleware/auth.js';
 import { requireAuth, requireManager } from '../../middleware/authGates.js';
 import { attachTenantContext } from '../../middleware/tenantContext.js';
-import { searchBoundaries, BoundarySearchError } from './boundarySearchService.js';
+import { BoundarySearchError } from './boundarySearchService.js';
+import { searchPlaces } from './placeSearch.js';
+import { createPlaceRepository } from './placeCatalogueRepository.js';
 
 const router = express.Router();
+
+const repository = createPlaceRepository(async () => (await import('../../models/index.js')).PlaceBoundary);
 
 router.use(authenticate);
 router.use(attachTenantContext);
@@ -22,11 +26,11 @@ const searchLimiter = rateLimit({
   message: { error: 'Too many boundary searches, slow down.' },
 });
 
-// Search only: returns candidate boundaries, persists nothing. Geofences are
+// Search only: returns candidate boundaries (local Zambian catalogue first, live OSM lookup as fallback), persists nothing. Geofences are
 // still created through Traccar by the client (see TENANCY_ARCHITECTURE §9).
 router.get('/search', requireAuth, requireManager, searchLimiter, async (req, res) => {
   try {
-    const out = await searchBoundaries(req.query.q);
+    const out = await searchPlaces(req.query.q, { repository });
     res.json(out);
   } catch (e) {
     if (e instanceof BoundarySearchError) {

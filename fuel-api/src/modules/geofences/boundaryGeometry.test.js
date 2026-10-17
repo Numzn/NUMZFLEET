@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizeBoundaryGeometry, wktLength, MAX_AREA_CHARS, ringAreaKm2,
+  normalizeBoundaryGeometry, wktLength, MAX_AREA_CHARS, ringAreaKm2, ringSelfIntersects,
 } from './boundaryGeometry.js';
 
 // lon,lat order, Lusaka-ish
@@ -65,5 +65,27 @@ describe('normalizeBoundaryGeometry', () => {
     assert.ok(Math.abs(r.areaKm2 - orig) / orig < 0.05, 'area preserved within 5%');
     const c = r.geometry.coordinates[0];
     assert.deepEqual(c[0], c[c.length - 1], 'ring closed');
+  });
+
+  it('rejects a bow-tie (self-intersecting) outline instead of saving it', () => {
+    const bow = [[28, -15], [28.2, -15.2], [28.2, -15], [28, -15.2], [28, -15]];
+    assert.equal(ringSelfIntersects(bow), true);
+    assert.equal(normalizeBoundaryGeometry({ type: 'Polygon', coordinates: [bow] }).reason, 'self_intersecting');
+    assert.equal(ringSelfIntersects(square(28, -15, 0.1)), false);
+  });
+
+  it('reports how far simplification may have moved the outline, and what a MultiPolygon dropped', () => {
+    const ring = [];
+    for (let i = 0; i < 3000; i += 1) {
+      const a = (i / 3000) * 2 * Math.PI;
+      ring.push([28.3 + 0.05 * Math.cos(a), -15.4 + 0.05 * Math.sin(a)]);
+    }
+    ring.push(ring[0]);
+    const r = normalizeBoundaryGeometry({ type: 'MultiPolygon', coordinates: [[ring], [square(29, -14, 0.01)]] });
+    assert.equal(r.ok, true);
+    assert.equal(r.originalVertices, 3000);
+    assert.ok(r.maxDeviationM > 0 && r.maxDeviationM < 200, `deviation ${r.maxDeviationM}`);
+    assert.equal(r.notes.droppedParts, 1);
+    assert.ok(r.notes.droppedAreaPct > 0 && r.notes.droppedAreaPct < 2);
   });
 });
